@@ -5,6 +5,8 @@ from __future__ import annotations
 import os
 import re
 import hashlib
+import uuid
+from dataclasses import replace
 from typing import Any, Mapping, Sequence
 
 from assistant.claim_ledger import claim_ledger_public_summary, verify_answer_against_evidence
@@ -16,44 +18,254 @@ from config.settings import Settings
 from external_watch.delivery import render_on_demand_edition
 from external_watch.editions import project_edition
 from external_watch.selection import rank_edition_events
+from llm.client import LLMClient, LLMOutcomeUnknown, suppress_usage_recording
+from prm.conversation import (
+    GLOBAL_CONVERSATIONS,
+    ConversationState,
+    ConversationStore,
+    assemble_safe_dialogue_context,
+    classify_turn,
+)
 from prm.archive_contract import ARCHIVE_RESPONSE_INTENTS, apply_archive_response_contract
-from prm.contracts import AssistantResult, OperatorRequest
+from prm.briefs import (
+    BRIEF_RETENTION,
+    BRIEF_FULL_VIEW_BUTTON_TEXT,
+    BriefBuildRequest,
+    BriefDocument,
+    BriefDocumentStore,
+    BriefFollowup,
+    BriefWindow,
+    CoverageSource,
+    brief_owner_ref_from_authenticated_private_tuple,
+    build_brief_document,
+    classify_brief_followup,
+    parse_requested_brief_window,
+    rebuild_brief_request,
+    render_brief_document,
+)
+from prm.contracts import AssistantResult, OperatorRequest, PublicWebAccess
 from prm.presentation import render_payload, render_project_clarification
+from prm.public_web import (
+    PublicWebBounds,
+    PublicWebProvider,
+    execute_public_web_research,
+    render_public_web_answer,
+)
 from prm.research_planner import plan_archive_evidence
-from prm.research_facade import build_research_facade
+from prm.research_facade import BriefWindowResearchFacade, build_research_facade
 from prm.request_plan import build_request_plan
+from prm.deep_research import (
+    ArchiveResearchReader,
+    DeepResearchRequest,
+    GitHubContextProvider,
+    ResearchCancellation,
+    ResearchCheckpoint,
+    ResearchPlan,
+    ResearchResult,
+    build_research_plan,
+    render_research_fact_section,
+    render_research_result,
+    run_bounded_research,
+)
 from prm.routing import decide_route
-from prm.synthesis import synthesize_answer
+from prm.synthesis import synthesize_archive_response, _abandon_archive_access
+from prm.brief_editorial import synthesize_brief_editorial
 
 
 class PersonalResearchAssistant:
     """Coordinate one bounded PRM request lifecycle."""
 
-    def __init__(self, *, settings: Settings) -> None:
+    def __init__(
+        self,
+        *,
+        settings: Settings,
+        conversations: ConversationStore | None = None,
+        llm_client: type[LLMClient] = LLMClient,
+        public_web_provider: PublicWebProvider | None = None,
+        public_web_bounds: PublicWebBounds | None = None,
+        deep_archive_reader: ArchiveResearchReader | None = None,
+        github_context_provider: GitHubContextProvider | None = None,
+        briefs: BriefDocumentStore | None = None,
+    ) -> None:
         self.settings = settings
+        self.conversations = conversations or GLOBAL_CONVERSATIONS
+        self.llm_client = llm_client
+        # There is intentionally no environment-derived default. Supplying an
+        # adapter is a runtime integration decision, never a consequence of a
+        # user asking a current-fact question.
+        self.public_web_provider = public_web_provider
+        self.public_web_bounds = public_web_bounds
+        self.deep_archive_reader = deep_archive_reader
+        self.github_context_provider = github_context_provider
+        # Visible conversation bindings remain in-process.  Exact immutable
+        # versions use the already-selected local database only when its
+        # additive PA-07 table exists; the store never migrates it itself.
+        self.briefs = briefs or BriefDocumentStore(db_path=settings.db_path)
 
     def answer(self, request: OperatorRequest) -> AssistantResult:
+        conversation = self.conversations.active_or_start(request.chat_id)
+        visible_ref = conversation.object_refs[0].response_ref if conversation.object_refs else None
+        visible_brief = self.briefs.resolve_visible(
+            conversation_id=conversation.conversation_id,
+            response_ref=visible_ref,
+        )
+        active_brief_item = (
+            self.briefs.visible_item_number(
+                conversation_id=conversation.conversation_id,
+                response_ref=visible_ref,
+            )
+            if visible_brief is not None and visible_brief[0].editorial is not None
+            else None
+        )
+        brief_followup = (
+            classify_brief_followup(request.query, active_item_number=active_brief_item)
+            if visible_brief is not None else None
+        )
+        if brief_followup is not None:
+            return self._brief_followup_result(
+                request,
+                conversation=conversation,
+                document=visible_brief[0],
+                comparison_document=visible_brief[1],
+                followup=brief_followup,
+                active_item_number=active_brief_item,
+            )
+        if visible_brief is not None and _is_brief_refresh(request.query):
+            refreshed_request = rebuild_brief_request(visible_brief[0])
+            if visible_brief[1] is not None:
+                refreshed_request = replace(
+                    refreshed_request,
+                    comparison_document=visible_brief[1],
+                )
+            return self.render_brief_document(
+                request,
+                refreshed_request,
+                refresh_note=True,
+            )
+        turn = classify_turn(request.query, conversation)
+        if turn.kind == "cancel":
+            self.briefs.forget_conversation(conversation.conversation_id)
+            self.conversations.cancel(request.chat_id)
+            return self._conversation_control_result(
+                request,
+                conversation,
+                status="cancelled",
+                text="Текущая задача отменена. Новое сообщение начнёт отдельную тему; никакое подтверждение не будет использовано.",
+            )
+        if turn.kind == "reset_topic":
+            self.briefs.forget_conversation(conversation.conversation_id)
+            self.conversations.begin_new_topic(request.chat_id)
+            return self._conversation_control_result(
+                request,
+                conversation,
+                status="topic_reset",
+                text="Начинаем новую тему. Предыдущий ответ и подтверждения не будут использованы.",
+            )
+        if turn.kind == "plain_yes":
+            resolution = self.conversations.resolve_plain_yes(
+                request.chat_id,
+                actor_id=request.actor_id,
+                owner_chat_id=request.owner_chat_id,
+                # PA-13 will provide the authoritative proposal-version loader.
+                # Until then a text confirmation must fail closed.
+                proposal_versions=None,
+            )
+            return self._conversation_control_result(
+                request,
+                conversation,
+                status="confirmation_unavailable",
+                text=(
+                    "Подтверждение сейчас недоступно: нужен один текущий видимый предпросмотр с "
+                    "точной версией действия. Я не выберу действие по прошлой теме."
+                    if resolution.status != "resolved"
+                    else "Подтверждение выбрано; выполнение появится только после отдельного защищённого шага."
+                ),
+                confirmation_status=resolution.status,
+            )
+        if turn.kind == "next_step" and turn.response_ref:
+            response = next((item for item in conversation.object_refs if item.response_ref == turn.response_ref), None)
+            if response is not None:
+                topic = conversation.topic or "этой теме"
+                return self._conversation_control_result(
+                    request,
+                    conversation,
+                    status="ok",
+                    text=(
+                        f"Следующий шаг: уточни один термин, источник или период по теме {topic}; "
+                        "предыдущий ответ не запускает действие сам по себе."
+                    ),
+                    response_ref=response.response_ref,
+                )
+        if turn.kind == "shorten" and turn.response_ref:
+            response = next((item for item in conversation.object_refs if item.response_ref == turn.response_ref), None)
+            if response is not None:
+                shortened = _shorten_visible_response(response.display_text)
+                result = self._conversation_control_result(
+                    request,
+                    conversation,
+                    status="ok",
+                    text=shortened,
+                    response_ref=turn.response_ref,
+                )
+                return self._remember_conversation_result(request, result, topic=conversation.topic)
+        if turn.kind == "select_item" and turn.response_ref and turn.item_ref:
+            response = next((item for item in conversation.object_refs if item.response_ref == turn.response_ref), None)
+            if response is not None and turn.item_ref in response.item_refs:
+                index = response.item_refs.index(turn.item_ref)
+                result = self._conversation_control_result(
+                    request,
+                    conversation,
+                    status="ok",
+                    text=response.item_texts[index],
+                    response_ref=turn.item_ref,
+                )
+                return self._remember_conversation_result(request, result, topic=conversation.topic)
+        if type(request.brief_request) is BriefBuildRequest:
+            # The carrier was assembled by a caller with a fixed selected local
+            # archive set. It has no archive-search capability, so this branch
+            # is a zero-retrieval route even when the query text is elaborate.
+            self.briefs.forget_conversation(conversation.conversation_id)
+            self.conversations.begin_new_topic(request.chat_id)
+            return self.render_brief_document(request, request.brief_request)
+        # All ordinary text starts an independent topic for confirmation
+        # purposes.  Read-only archive follow-up composition remains separate
+        # transport compatibility and cannot retain action authority.
+        prior_brief_for_new_report = visible_brief if _may_start_brief(request) else None
+        if prior_brief_for_new_report is None:
+            self.briefs.forget_conversation(conversation.conversation_id)
+        conversation = self.conversations.begin_new_topic(request.chat_id)
         route = decide_route(request.query, requested_mode=request.mode, explicit_project=request.project_name)
         route_payload = route.to_dict()
-        request_plan = build_request_plan(request.query, route_payload)
+        request_plan = build_request_plan(
+            request.query,
+            route_payload,
+            public_mode_consented=(
+                type(request.public_web_access) is PublicWebAccess
+                and bool(request.public_web_query.strip())
+            ),
+        )
         if route.mode == "project_clarify":
-            return AssistantResult(
+            return self._remember_conversation_result(request, AssistantResult(
                 interaction_id="",
                 status="clarify",
                 mode="project_clarify",
                 text=render_project_clarification(),
                 route=route_payload,
-            )
+            ), topic="")
         if route.mode == "clarify":
-            return AssistantResult(
+            return self._remember_conversation_result(request, AssistantResult(
                 interaction_id="",
                 status="clarify",
                 mode="clarify",
                 text="Уточни: найти материалы в архиве, собрать бриф или задать свободный вопрос?",
                 route=route_payload,
-            )
+            ), topic="")
         if route.primary_intent == "memory_action":
-            return self._memory_action_guidance(request, route_payload)
+            return self._remember_conversation_result(
+                request,
+                self._memory_action_guidance(request, route_payload),
+                topic="",
+            )
 
         context = build_operator_context(
             chat_id=request.chat_id,
@@ -70,13 +282,60 @@ class PersonalResearchAssistant:
             "archive_scope": route.archive_scope,
         }
 
+        deep_research_plan = request.deep_research_plan
+        if type(deep_research_plan) is not ResearchPlan and type(request.deep_research_request) is DeepResearchRequest:
+            deep_request = request.deep_research_request
+            deep_research_plan = build_research_plan(
+                request.query,
+                archive_query=deep_request.archive_query or None,
+                public_tasks=deep_request.public_tasks,
+                github_access=deep_request.github_access,
+                project_name=deep_request.requested_project_label,
+                budget=deep_request.budget,
+            )
+        if type(deep_research_plan) is ResearchPlan:
+            return self._remember_conversation_result(
+                request,
+                self._deep_research(
+                    request,
+                    context=context_payload,
+                    route=route_payload,
+                    plan=deep_research_plan,
+                ),
+                topic=str(route_payload.get("retrieval_query") or request.query),
+            )
+
+        # A public query and its authority are separate ingress fields. Do
+        # not compose a mixed archive/current request here: private archive
+        # text must not influence public search, and the existing mixed path
+        # remains an explicit no-live-verification boundary.
+        if (
+            route.primary_intent == "current_fact_verification"
+            and not route.archive_scope
+            and (bool(request.public_web_query.strip()) or request.public_web_access is not None)
+        ):
+            return self._remember_conversation_result(
+                request,
+                self._current_fact_with_public_web(
+                    request,
+                    context=context_payload,
+                    route=route_payload,
+                    request_plan=request_plan,
+                ),
+                topic=str(route_payload.get("retrieval_query") or request.query),
+            )
+
         if route.mode == "chat":
-            return self._chat(request, context_payload, route_payload)
+            return self._remember_conversation_result(
+                request,
+                self._chat(request, context_payload, route_payload, conversation=conversation),
+                topic="general conversation",
+            )
 
         budget = MemoryResearchBudget(
             max_tool_calls=4,
-            max_archive_sources=8 if route.primary_intent == "archive_to_action" else (5 if route.mode == "brief" else 4),
-            max_archive_candidates=32 if route.primary_intent == "archive_to_action" else 16,
+            max_archive_sources=8 if route.primary_intent == "archive_to_action" or route.mode == "brief" else 4,
+            max_archive_candidates=32 if route.primary_intent == "archive_to_action" or route.mode == "brief" else 16,
             max_linked_sources=3,
             max_retries=0,
             timeout_seconds=30,
@@ -88,19 +347,27 @@ class PersonalResearchAssistant:
             allow_vector_retrieval=_env_enabled("PRM_ARCHIVE_HYBRID_RETRIEVAL"),
             vector_index_path=os.environ.get("PRM_ARCHIVE_VECTOR_INDEX_PATH", "").strip(),
         )
+        mixed_archive_current = route.archive_scope and route.external_verification_required
+        brief_window: BriefWindow | None = None
+        brief_period_basis = ""
+        if route.mode == "brief" and not mixed_archive_current:
+            # Parse before archive candidate selection, then carry exactly this
+            # object through retrieval and BriefDocument construction.
+            brief_window, brief_period_basis = parse_requested_brief_window(request.query)
         facade = build_research_facade(
             settings=self.settings,
-            question=request.query,
+            question=route.retrieval_query if route.mode == "brief" else request.query,
             project_context_required=route.project_context_required,
         )
-        mixed_archive_current = route.archive_scope and route.external_verification_required
+        if brief_window is not None:
+            facade = BriefWindowResearchFacade(facade, window=brief_window)
         payload = answer_memory_research(
             request.query,
             archive_query=route.retrieval_query,
             project_name=route.project_name if route.project_context_required else "",
             settings=self.settings,
             facade=facade,
-            limit=8 if route.primary_intent == "archive_to_action" else (5 if route.mode == "brief" else 4),
+            limit=8 if route.primary_intent == "archive_to_action" or route.mode == "brief" else 4,
             budget=budget,
             operator_context=context_payload,
             # Preserve a requested archive portion even when the same message
@@ -138,27 +405,80 @@ class PersonalResearchAssistant:
                 route=route_payload,
             )
 
+        if route.mode == "brief" and not mixed_archive_current:
+            # Editorial synthesis uses the exact period-bound selection and
+            # the existing paired archive authorization. Saved views/follow-ups
+            # reuse that immutable content without a second provider request.
+            return self.render_brief_document(
+                request,
+                _brief_request_from_archive_payload(
+                    request=request,
+                    payload=payload,
+                    topic=str(route_payload.get("retrieval_query") or request.query),
+                    prior_document=(prior_brief_for_new_report or (None, None))[0],
+                    window=brief_window,
+                    period_basis=brief_period_basis,
+                ),
+                source_payload={
+                    **payload,
+                    "brief_retrieval_window": {
+                        **brief_window.to_dict(),
+                        "interval": "[start_at,end_at)",
+                        "bound_before_candidate_selection": True,
+                    },
+                },
+                route=route_payload,
+            )
+
         deterministic = render_payload(payload, mode=route.mode)
         local_archive_evidence = {
-            (str(item.get("source_url") or ""), str(item.get("snippet") or ""))
+            (
+                str(item.get("source_url") or ""),
+                str(
+                    item.get("archive_document_id")
+                    or item.get("post_archive_document_id")
+                    or item.get("post_id")
+                    or item.get("source_url")
+                    or ""
+                ),
+            )
             for item in _mapping(payload.get("archive_evidence")).get("items") or []
-            if isinstance(item, Mapping) and str(item.get("archive_document_id") or "")
+            if isinstance(item, Mapping)
+            and str(
+                item.get("archive_document_id")
+                or item.get("post_archive_document_id")
+                or item.get("post_id")
+                or item.get("source_url")
+                or ""
+            )
         }
         evidence_items = [
             {
                 **dict(item),
                 "local_archive_provenance": (
-                    str(item.get("source_url") or ""),
-                    str(item.get("support_span") or item.get("snippet") or ""),
+                    str(item.get("source_url") or ""), str(item.get("evidence_id") or ""),
                 ) in local_archive_evidence,
             }
             for item in _mapping(payload.get("evidence_quality")).get("items") or []
             if isinstance(item, Mapping)
         ]
-        # No synthesis capability is invoked in this assigned local-only
-        # implementation, regardless of environment flags.
+        selected_archive_evidence = _selected_archive_evidence_items(
+            evidence_items,
+            archive_contract=_mapping(payload.get("archive_contract")),
+        )
         final_text = deterministic
         gate = _mapping(payload.get("answer_gate"))
+        if route.primary_intent in ARCHIVE_RESPONSE_INTENTS and not bool(payload.get("mixed_current_boundary")):
+            synthesis = synthesize_archive_response(
+                payload,
+                question=request.query,
+                evidence_items=evidence_items,
+                access=request.archive_synthesis_access,
+            )
+        else:
+            synthesis = None
+        if synthesis is not None and synthesis.text is not None:
+            final_text = synthesis.text
         verification = verify_answer_against_evidence(
             final_text,
             evidence_items,
@@ -169,8 +489,12 @@ class PersonalResearchAssistant:
                 else ""
             ),
         )
+        archive_synthesis_verified = synthesis is not None and synthesis.status == "generated_verified" and synthesis.text is not None
         publication_allowed = _final_answer_publication_allowed(
-            verification, gate, response_contract_id=str(payload.get("response_contract_id") or route.response_contract_id)
+            verification,
+            gate,
+            response_contract_id=str(payload.get("response_contract_id") or route.response_contract_id),
+            archive_source_bound=archive_synthesis_verified,
         )
         final_publication_allowed = publication_allowed
         if not publication_allowed:
@@ -179,7 +503,7 @@ class PersonalResearchAssistant:
             # fact.  This path is local-only and shows the selected excerpts
             # with their actual source URLs.
             final_text = _render_verified_evidence_fallback(
-                evidence_items,
+                selected_archive_evidence,
                 boundary=str(payload.get("mixed_current_boundary") or ""),
                 local_only=bool(payload.get("mixed_current_boundary")),
                 empty_next_step=empty_next_step,
@@ -215,10 +539,22 @@ class PersonalResearchAssistant:
             "final_answer_publication": {
                 "allowed": final_publication_allowed,
                 "fallback_used": not publication_allowed,
-                "reason": "verified" if final_publication_allowed else "final_claim_verification_incomplete_or_unsupported",
+                "reason": (
+                    "archive_source_bound_verified"
+                    if final_publication_allowed and archive_synthesis_verified
+                    else "verified"
+                    if final_publication_allowed
+                    else "final_claim_verification_incomplete_or_unsupported"
+                ),
+            },
+            "retrieval_generation_measurement": _retrieval_generation_measurement(payload, synthesis=synthesis),
+            "archive_synthesis_verification": {
+                "status": str(synthesis.status) if synthesis is not None else "not_attempted",
+                "method": "exact_selected_span_with_bounded_paraphrase.v1" if archive_synthesis_verified else "not_published",
+                "published": archive_synthesis_verified and final_publication_allowed,
             },
         }
-        return AssistantResult(
+        return self._remember_conversation_result(request, AssistantResult(
             interaction_id=context.interaction_id,
             status=(
                 "partial_needs_external_verification"
@@ -237,6 +573,476 @@ class PersonalResearchAssistant:
                 "summary": claim_ledger_public_summary(verification),
             },
             route=route_payload,
+        ), topic=str(route_payload.get("retrieval_query") or request.query))
+
+    def render_brief_document(
+        self,
+        request: OperatorRequest,
+        brief_request: BriefBuildRequest,
+        *,
+        source_payload: Mapping[str, Any] | None = None,
+        route: Mapping[str, Any] | None = None,
+        refresh_note: bool = False,
+    ) -> AssistantResult:
+        """Render one explicit local-evidence BriefDocument without retrieval.
+
+        The public method is the PA-07 application seam for callers that have
+        already selected archive evidence. It cannot accept a provider, source
+        adapter, job, delivery handle, or untyped history lookup.
+        """
+
+        durable_owner_ref = _brief_owner_ref(request)
+        brief_request = _with_authenticated_brief_owner(brief_request, durable_owner_ref)
+        try:
+            document = build_brief_document(brief_request)
+        except ValueError as exc:
+            return AssistantResult(
+                interaction_id="",
+                status="invalid_brief_request",
+                mode="brief",
+                text=(
+                    "Не удалось собрать BriefDocument из предоставленной локальной выборки; "
+                    "новый поиск источников не запускался."
+                ),
+                payload={
+                    "brief_document_created": False,
+                    "retrieval_performed": False,
+                    "write_performed": False,
+                    "error_type": type(exc).__name__,
+                },
+                route=dict(route or {"mode": "brief", "primary_intent": "writer_brief"}),
+        )
+        editorial_measurement: Mapping[str, object] = {"status": "saved_editorial" if document.editorial else "not_attempted"}
+        if document.editorial is None and not refresh_note:
+            editorial, editorial_measurement = synthesize_brief_editorial(
+                document, question=request.query, access=request.archive_synthesis_access,
+            )
+            if editorial is not None:
+                brief_request = replace(brief_request, editorial=editorial)
+                document = build_brief_document(brief_request)
+        else:
+            _abandon_archive_access(request.archive_synthesis_access)
+        text = render_brief_document(document, view="telegram")
+        if refresh_note:
+            text = (
+                "Обновление: создана новая версия из того же выбранного набора источников. "
+                "Существенных изменений фактов не обнаружено; новый поиск не запускался.\n\n"
+                + text
+            )
+        result = AssistantResult(
+            interaction_id=hashlib.sha256(
+                f"{request.chat_id}\x1f{document.brief_id}\x1f{document.version}".encode("utf-8")
+            ).hexdigest()[:24],
+            status="ok" if document.status == "complete" else "partial_brief" if document.status == "partial" else "empty_brief",
+            mode="brief",
+            text=text,
+            payload={
+                **dict(source_payload or {}),
+                "brief_document": document.to_dict(),
+                "brief_inspection": document.inspect(),
+                "brief_view": "telegram",
+                "brief_editorial": dict(editorial_measurement),
+                # The conversational Telegram views are native HTML. The
+                # source object remains an ordinary inspectable data contract.
+                "telegram_parse_mode": "HTML",
+                "brief_document_created": True,
+                # A direct BriefBuildRequest is a zero-retrieval seam. The
+                # normal active /brief route calls local retrieval first and
+                # passes its selected payload here, which must remain visible.
+                "retrieval_performed": source_payload is not None,
+                "write_performed": False,
+                "automatic_job_created": False,
+                "notification_sent": False,
+                "brief_refresh": {
+                    "performed": refresh_note,
+                    "new_source_search": False,
+                    "material_changes": [],
+                },
+                "telegram_navigation": _brief_navigation_payload(document, view="telegram"),
+            },
+            operator_context={
+                "input_kind": request.input_kind,
+                "brief_retention": BRIEF_RETENTION,
+            },
+            route=dict(route or {"mode": "brief", "primary_intent": "writer_brief"}),
+        )
+        return self._remember_brief_document(
+            request,
+            result,
+            document=document,
+            comparison_document=brief_request.comparison_document,
+            topic=brief_request.topic,
+        )
+
+    def _brief_followup_result(
+        self,
+        request: OperatorRequest,
+        *,
+        conversation: ConversationState,
+        document: BriefDocument,
+        comparison_document: BriefDocument | None,
+        followup: BriefFollowup,
+        active_item_number: int | None,
+    ) -> AssistantResult:
+        """Use the current report object only; never fall through to retrieval."""
+
+        _abandon_archive_access(request.archive_synthesis_access)
+
+        if followup.kind == "explain_item":
+            text = render_brief_document(document, view="item", item_number=followup.item_number)
+            view = "item"
+        elif followup.kind == "why_item":
+            text = render_brief_document(document, view="why", item_number=followup.item_number)
+            view = "why"
+        elif followup.kind == "simplify_item":
+            text = render_brief_document(document, view="simplify", item_number=followup.item_number)
+            view = "simplify"
+        elif followup.kind == "next_step_item":
+            text = render_brief_document(document, view="next_step", item_number=followup.item_number)
+            view = "next_step"
+        elif followup.kind == "sources_item":
+            text = render_brief_document(document, view="sources", item_number=followup.item_number)
+            view = "sources"
+        elif followup.kind == "caveat_item":
+            text = render_brief_document(document, view="caveat", item_number=followup.item_number)
+            view = "caveat"
+        elif followup.kind == "shorten":
+            text = render_brief_document(document, view="short")
+            view = "short"
+        elif followup.kind == "filter_topics":
+            text = render_brief_document(document, view="topics", topics=followup.topics)
+            view = "topics"
+        elif followup.kind == "less_technical":
+            text = render_brief_document(document, view="less_technical")
+            view = "less_technical"
+        elif followup.kind == "apply":
+            text = render_brief_document(document, view="apply")
+            view = "apply"
+        elif followup.kind == "full":
+            text = render_brief_document(document, view="full")
+            view = "full"
+        else:
+            text = render_brief_document(
+                document,
+                view="comparison",
+                comparison_document=comparison_document,
+            )
+            view = "comparison"
+        result = AssistantResult(
+            interaction_id="",
+            status="ok" if document.status == "complete" else "partial_brief",
+            mode="brief",
+            text=text,
+            payload={
+                "brief_document": document.to_dict(),
+                "brief_inspection": document.inspect(),
+                "brief_view": view,
+                "telegram_parse_mode": "HTML" if view == "full" or document.editorial is not None else None,
+                "brief_followup": {
+                    "kind": followup.kind,
+                    "item_number": followup.item_number,
+                    "topics": list(followup.topics),
+                    "source": "current_visible_brief_document",
+                },
+                "telegram_navigation": _brief_navigation_payload(document, view=view),
+                "retrieval_performed": False,
+                "write_performed": False,
+            },
+            operator_context={"brief_retention": BRIEF_RETENTION},
+            route={"mode": "brief", "primary_intent": "brief_document_followup"},
+        )
+        story_count = len(document.editorial.stories) if document.editorial is not None else len(document.items)
+        if followup.kind == "explain_item":
+            next_active_item = (
+                followup.item_number
+                if followup.item_number is not None and 1 <= followup.item_number <= story_count
+                else None
+            )
+        elif followup.kind in {"why_item", "simplify_item", "next_step_item", "sources_item", "caveat_item"}:
+            next_active_item = active_item_number
+        else:
+            # A whole-brief projection has no single visible story.  Do not
+            # carry an earlier detail reference into an ambiguous shorthand.
+            next_active_item = None
+        return self._remember_brief_document(
+            request,
+            result,
+            document=document,
+            comparison_document=comparison_document,
+            topic=conversation.topic,
+            active_item_number=next_active_item,
+        )
+
+    def _remember_brief_document(
+        self,
+        request: OperatorRequest,
+        result: AssistantResult,
+        *,
+        document: BriefDocument,
+        comparison_document: BriefDocument | None,
+        topic: str,
+        active_item_number: int | None = None,
+    ) -> AssistantResult:
+        """Bind report state to precisely the response made visible this turn."""
+
+        state = self.conversations.record_response(request.chat_id, text=result.text, topic=topic)
+        response_ref = state.object_refs[0].response_ref
+        authenticated_tuple = (
+            (request.chat_id, request.actor_id, request.owner_chat_id)
+            if _brief_owner_ref(request) == document.owner_ref
+            else (None, None, None)
+        )
+        self.briefs.bind_visible(
+            conversation_id=state.conversation_id,
+            response_ref=response_ref,
+            document=document,
+            comparison_document=comparison_document,
+            active_item_number=active_item_number,
+            authenticated_chat_id=authenticated_tuple[0],
+            authenticated_actor_id=authenticated_tuple[1],
+            authenticated_owner_chat_id=authenticated_tuple[2],
+        )
+        payload = {**dict(result.payload), "conversation": _safe_conversation_payload(state)}
+        return AssistantResult(
+            interaction_id=result.interaction_id,
+            status=result.status,
+            mode=result.mode,
+            text=result.text,
+            payload=payload,
+            operator_context=result.operator_context,
+            final_answer_verification=result.final_answer_verification,
+            route=result.route,
+        )
+
+    def _current_fact_with_public_web(
+        self,
+        request: OperatorRequest,
+        *,
+        context: Mapping[str, Any],
+        route: Mapping[str, Any],
+        request_plan: Mapping[str, Any],
+    ) -> AssistantResult:
+        """Execute the PA-05 current-fact path without archive retrieval.
+
+        ``execute_public_web_research`` owns every provider operation and
+        consumes the already-sealed public scopes immediately before those
+        operations. This application layer only renders its typed evidence;
+        it neither creates a scope nor selects a provider from configuration.
+        """
+
+        web_result = execute_public_web_research(
+            public_query=request.public_web_query,
+            original_query=request.query,
+            access=request.public_web_access,
+            provider=self.public_web_provider,
+            bounds=self.public_web_bounds,
+        )
+        status = str(web_result.get("status") or "public_web_unavailable")
+        verified_current = status == "verified_current_evidence"
+        evidence_items = [
+            dict(item)
+            for item in web_result.get("evidence_items") or []
+            if isinstance(item, Mapping)
+        ]
+        final_text = render_public_web_answer(web_result)
+        verification = verify_answer_against_evidence(
+            final_text,
+            evidence_items,
+            # The verified branch contains freshly fetched primary evidence;
+            # every other branch is an explicit current-fact boundary.
+            current_fact_required=not verified_current,
+        )
+        answer_gate = {
+            "allow_answer": verified_current,
+            "external_verification_required": not verified_current,
+            "current_claim_allowed": verified_current,
+            "reason": status,
+        }
+        publication_allowed = verified_current and _final_answer_publication_allowed(
+            verification,
+            answer_gate,
+            response_contract_id="current_fact.v2",
+        )
+        payload = {
+            "status": status,
+            "question": request.query,
+            "primary_intent": "current_fact_verification",
+            "response_contract_id": "current_fact.v2",
+            "route_decision": dict(route),
+            "request_plan": dict(request_plan),
+            "answer_gate": answer_gate,
+            "public_web_research": web_result,
+            "archive_accessed": False,
+            "provider_egress_attempted": bool(_mapping(web_result.get("search")).get("performed")),
+            "rendered_final_answer": final_text,
+            "rendered_final_answer_verification": verification,
+            "final_answer_publication": {
+                "allowed": publication_allowed,
+                "fallback_used": not verified_current,
+                "reason": "fresh_primary_evidence_verified" if publication_allowed else status,
+            },
+            "write_performed": False,
+        }
+        return AssistantResult(
+            interaction_id=str(context.get("interaction_id") or ""),
+            status=status,
+            mode="research",
+            text=final_text,
+            payload=payload,
+            operator_context=context,
+            final_answer_verification={
+                "claim_count": int(verification.get("claim_count") or 0),
+                "metrics": verification.get("metrics") or {},
+                "summary": claim_ledger_public_summary(verification),
+            },
+            route=route,
+        )
+
+    def _deep_research(
+        self,
+        request: OperatorRequest,
+        *,
+        context: Mapping[str, Any],
+        route: Mapping[str, Any],
+        plan: ResearchPlan,
+    ) -> AssistantResult:
+        """Active PA-06 ingress for an already bounded, typed plan only."""
+
+        checkpoint = (
+            request.deep_research_checkpoint
+            if type(request.deep_research_checkpoint) is ResearchCheckpoint
+            else None
+        )
+        try:
+            result: ResearchResult = run_bounded_research(
+                plan,
+                original_query=request.query,
+                archive_reader=self.deep_archive_reader,
+                public_provider=self.public_web_provider,
+                public_bounds=self.public_web_bounds,
+                github_provider=self.github_context_provider,
+                cancellation=(
+                    request.deep_research_cancellation
+                    if type(request.deep_research_cancellation) is ResearchCancellation
+                    else ResearchCancellation()
+                ),
+                checkpoint=checkpoint,
+            )
+        except ValueError:
+            if checkpoint is None:
+                raise
+            final_text = _render_terminal_empty_answer(
+                "для продолжения нужен текущий защищённый checkpoint для того же исследования."
+            )
+            verification = verify_answer_against_evidence(final_text, [])
+            return AssistantResult(
+                interaction_id=str(context.get("interaction_id") or ""),
+                status="partial",
+                mode="research",
+                text=final_text,
+                payload={
+                    "status": "partial",
+                    "primary_intent": "deep_research",
+                    "route_decision": dict(route),
+                    "checkpoint_status": "untrusted_or_scope_mismatch",
+                    "write_performed": False,
+                },
+                operator_context=context,
+                final_answer_verification={
+                    "claim_count": int(verification.get("claim_count") or 0),
+                    "metrics": verification.get("metrics") or {},
+                    "summary": claim_ledger_public_summary(verification),
+                },
+                route=route,
+            )
+        if result.coverage.get("refusal_reason") == "request_context_mismatch":
+            final_text = _render_terminal_empty_answer(
+                "выданный план относится к другому запросу; создай новый план для текущего вопроса."
+            )
+            verification = verify_answer_against_evidence(final_text, [])
+            return AssistantResult(
+                interaction_id=str(context.get("interaction_id") or ""),
+                status="partial",
+                mode="research",
+                text=final_text,
+                payload={
+                    "status": "partial",
+                    "primary_intent": "deep_research",
+                    "route_decision": dict(route),
+                    "research_result": result.to_dict(),
+                    "refusal_reason": "request_context_mismatch",
+                    "write_performed": False,
+                },
+                operator_context=context,
+                final_answer_verification={
+                    "claim_count": int(verification.get("claim_count") or 0),
+                    "metrics": verification.get("metrics") or {},
+                    "summary": claim_ledger_public_summary(verification),
+                },
+                route=route,
+            )
+        rendered_research_text = render_research_result(result)
+        evidence_items = [
+            {
+                "support_span": item.get("support_span") or "",
+                "source_url": item.get("source_url") or "",
+                "freshness_status": item.get("freshness") or "unknown",
+            }
+            for item in result.facts
+            if item.get("support_span") and item.get("source_url")
+        ]
+        # The generic verifier is intentionally lexical and evaluates exact
+        # fact spans only. PA-06 separately validates the typed inference and
+        # recommendation contract before rendering those visibly labelled
+        # non-fact categories.
+        verification = verify_answer_against_evidence(render_research_fact_section(result), evidence_items)
+        category_verification = _verify_deep_research_categories(result)
+        verification = {**verification, "deep_research_categories": category_verification}
+        publication_allowed = (
+            _final_answer_publication_allowed(verification, {})
+            and bool(category_verification["valid"])
+        )
+        fallback_used = False
+        final_text = rendered_research_text
+        if not publication_allowed:
+            # Do not expose a renderer regression as if its factual prose had
+            # passed verification. The established evidence-only fallback has
+            # no recommendation or inferred conclusion.
+            fallback_used = True
+            final_text = _render_verified_evidence_fallback(evidence_items)
+            verification = verify_answer_against_evidence(final_text, evidence_items)
+            publication_allowed = _final_answer_publication_allowed(verification, {})
+        payload = {
+            "status": result.status,
+            "primary_intent": "deep_research",
+            "route_decision": dict(route),
+            "research_result": result.to_dict(),
+            "rendered_final_answer": final_text,
+            "rendered_final_answer_verification": verification,
+            "final_answer_publication": {
+                "allowed": publication_allowed,
+                "fallback_used": fallback_used,
+                "reason": (
+                    "cited_research_facts"
+                    if publication_allowed and not fallback_used
+                    else "evidence_only_fallback" if fallback_used else "research_result_partial_or_unverified"
+                ),
+            },
+            "write_performed": False,
+        }
+        return AssistantResult(
+            interaction_id=str(context.get("interaction_id") or ""),
+            status=result.status,
+            mode="research",
+            text=final_text,
+            payload=payload,
+            operator_context=context,
+            final_answer_verification={
+                "claim_count": int(verification.get("claim_count") or 0),
+                "metrics": verification.get("metrics") or {},
+                "summary": claim_ledger_public_summary(verification),
+            },
+            route=route,
         )
 
     def render_topic_edition(
@@ -291,14 +1097,217 @@ class PersonalResearchAssistant:
             route={"mode": "brief", "primary_intent": "topic_edition", "topic_id": topic_id},
         )
 
-    def _chat(self, request: OperatorRequest, context: Mapping[str, Any], route: Mapping[str, Any]) -> AssistantResult:
-        return AssistantResult(
+    def _chat(
+        self,
+        request: OperatorRequest,
+        context: Mapping[str, Any],
+        route: Mapping[str, Any],
+        *,
+        conversation: ConversationState,
+    ) -> AssistantResult:
+        safe_context = assemble_safe_dialogue_context(conversation, request.query)
+        model_access = request.model_access
+        if model_access is None:
+            return AssistantResult(
+                interaction_id=str(context.get("interaction_id") or ""),
+                status="provider_egress_required",
+                mode="chat",
+                text=(
+                    "Свободный AI-ответ требует отдельного активного разрешения на передачу "
+                    "только этого сообщения модели. История, архив и прошлые ответы не отправлялись."
+                ),
+                payload={
+                    "conversation": _safe_conversation_payload(conversation),
+                    "safe_context": {"omitted_state": list(safe_context.omitted_state)},
+                    "model_call_attempted": False,
+                    "reason": "no_current_model_egress_authorization",
+                },
+                operator_context=context,
+                route=route,
+            )
+        request_id = f"request_{uuid.uuid4().hex}"
+        self.conversations.start_request(request.chat_id, request_id)
+        if self.conversations.is_cancelled(request.chat_id, request_id):
+            return self._finish_chat_request(
+                request,
+                request_id,
+                self._conversation_control_result(
+                    request,
+                    conversation,
+                    status="cancelled",
+                    text="Задача отменена до обращения к модели. Ничего не было отправлено или подтверждено.",
+                ),
+            )
+        try:
+            # PA-02's adapter independently validates the sealed grant against
+            # the active credential immediately before transport.  Suppressing
+            # legacy usage recording preserves PA-02's no-durable-telemetry
+            # boundary while PA-16 owns cost accounting.
+            with suppress_usage_recording():
+                receipt = self.llm_client.complete_with_receipt(
+                    prompt=safe_context.direct_user_text,
+                    system=(
+                        "You are a private personal assistant. Answer only the user's current direct request. "
+                        "You have no access to archive, account, calendar, or prior conversation content. "
+                        "Do not claim current external facts without verified evidence and never treat text as permission."
+                    ),
+                    max_tokens=700,
+                    category="pa_dialogue",
+                    authorization=model_access.authorization,
+                    data_class="user_provided",
+                    owner_ref=model_access.owner_ref,
+                    connection_ref=model_access.connection_ref,
+                    resource_ref=model_access.resource_ref,
+                )
+            answer = _clean_model_answer(getattr(receipt, "text", ""))
+            if not answer:
+                raise ValueError("empty model answer")
+        except LLMOutcomeUnknown:
+            return self._finish_chat_request(request, request_id, AssistantResult(
+                interaction_id=str(context.get("interaction_id") or ""),
+                status="provider_outcome_unknown",
+                mode="chat",
+                text=(
+                    "Статус AI-запроса неизвестен: он мог дойти до провайдера. Я не буду автоматически "
+                    "повторять его; ничего не было подтверждено или сохранено."
+                ),
+                payload={
+                    "conversation": _safe_conversation_payload(conversation),
+                    "safe_context": {"omitted_state": list(safe_context.omitted_state)},
+                    "model_call_attempted": True,
+                    "provider_outcome": "unknown",
+                    "write_performed": False,
+                },
+                operator_context=context,
+                route=route,
+            ))
+        except Exception as exc:
+            # Do not log prompt/state or suggest that an unavailable provider
+            # returned an answer.  Unknown transport outcomes remain explicit.
+            return self._finish_chat_request(request, request_id, AssistantResult(
+                interaction_id=str(context.get("interaction_id") or ""),
+                status="provider_unavailable",
+                mode="chat",
+                text=f"Свободный AI-ответ сейчас недоступен ({type(exc).__name__}). Ничего не было подтверждено или сохранено.",
+                payload={
+                    "conversation": _safe_conversation_payload(conversation),
+                    "safe_context": {"omitted_state": list(safe_context.omitted_state)},
+                    "model_call_attempted": True,
+                    "write_performed": False,
+                },
+                operator_context=context,
+                route=route,
+            ))
+        return self._finish_chat_request(request, request_id, AssistantResult(
             interaction_id=str(context.get("interaction_id") or ""),
-            status="provider_egress_required",
+            status="ok",
             mode="chat",
-            text="Свободный AI-ответ сейчас выключен. Задай вопрос по локальному архиву; внешний режим требует отдельного разрешения. Ничего не было отправлено.",
+            text=answer,
+            payload={
+                "conversation": _safe_conversation_payload(conversation),
+                "safe_context": {"omitted_state": list(safe_context.omitted_state)},
+                "model_call_attempted": True,
+                "write_performed": False,
+            },
             operator_context=context,
             route=route,
+        ))
+
+    def cancel(self, request_id: str) -> bool:
+        """Cancel one unambiguous ephemeral PA-03 request by its opaque ID."""
+
+        return self.conversations.cancel_request(request_id) is not None
+
+    def _finish_chat_request(
+        self,
+        request: OperatorRequest,
+        request_id: str,
+        result: AssistantResult,
+    ) -> AssistantResult:
+        cancelled = self.conversations.is_cancelled(request.chat_id, request_id)
+        state = self.conversations.finish_request(request.chat_id, request_id)
+        if cancelled:
+            payload = {
+                **dict(result.payload),
+                "request_id": request_id,
+                "cancelled": True,
+                "conversation": _safe_conversation_payload(state) if state is not None else {},
+            }
+            return AssistantResult(
+                interaction_id=result.interaction_id,
+                status="cancelled_after_model_boundary" if bool(result.payload.get("model_call_attempted")) else "cancelled",
+                mode=result.mode,
+                text=(
+                    "Задача отменена. Результат модели не будет использован; никакое действие не подтверждено или сохранено."
+                ),
+                payload=payload,
+                operator_context=result.operator_context,
+                final_answer_verification=result.final_answer_verification,
+                route=result.route,
+            )
+        payload = {**dict(result.payload), "request_id": request_id}
+        return AssistantResult(
+            interaction_id=result.interaction_id,
+            status=result.status,
+            mode=result.mode,
+            text=result.text,
+            payload=payload,
+            operator_context=result.operator_context,
+            final_answer_verification=result.final_answer_verification,
+            route=result.route,
+        )
+
+    def _conversation_control_result(
+        self,
+        request: OperatorRequest,
+        conversation: ConversationState,
+        *,
+        status: str,
+        text: str,
+        response_ref: str | None = None,
+        confirmation_status: str | None = None,
+    ) -> AssistantResult:
+        payload: dict[str, Any] = {
+            "conversation": _safe_conversation_payload(conversation),
+            "write_performed": False,
+            "model_call_attempted": False,
+        }
+        if response_ref is not None:
+            payload["response_ref"] = response_ref
+        if confirmation_status is not None:
+            payload["confirmation_status"] = confirmation_status
+        return AssistantResult(
+            interaction_id="",
+            status=status,
+            mode="chat",
+            text=text,
+            payload=payload,
+            route={"mode": "chat", "primary_intent": "freeform_chat", "conversation_control": status},
+        )
+
+    def _remember_conversation_result(
+        self,
+        request: OperatorRequest,
+        result: AssistantResult,
+        *,
+        topic: str,
+    ) -> AssistantResult:
+        # Control responses must not replace the object that a user was trying
+        # to refer to; a fresh visible result does replace it and clears any
+        # previous confirmation reference.
+        if result.status in {"cancelled", "confirmation_unavailable"}:
+            return result
+        state = self.conversations.record_response(request.chat_id, text=result.text, topic=topic)
+        payload = {**dict(result.payload), "conversation": _safe_conversation_payload(state)}
+        return AssistantResult(
+            interaction_id=result.interaction_id,
+            status=result.status,
+            mode=result.mode,
+            text=result.text,
+            payload=payload,
+            operator_context=result.operator_context,
+            final_answer_verification=result.final_answer_verification,
+            route=result.route,
         )
 
     def _memory_action_guidance(
@@ -338,8 +1347,233 @@ class PersonalResearchAssistant:
                 "primary_intent": "memory_action",
                 "response_contract_id": payload["response_contract_id"],
             },
-            route=route,
+        route=route,
+    )
+
+
+def _selected_archive_evidence_items(
+    evidence_items: Sequence[Mapping[str, Any]],
+    *,
+    archive_contract: Mapping[str, Any],
+) -> list[Mapping[str, Any]]:
+    """Keep fallback excerpts within the immutable archive response contract.
+
+    ``evidence_quality`` can contain diagnostics or locally retrieved candidates
+    which were deliberately excluded from the direct/partial/adjacent archive
+    contract.  They must neither reach the synthesis provider nor reappear
+    after that provider's output is rejected.
+    """
+
+    selected = {
+        (str(finding.get("evidence_id") or "").strip(), str(finding.get("source_url") or "").strip())
+        for field in ("direct_findings", "partial_findings", "adjacent_findings")
+        for finding in archive_contract.get(field) or ()
+        if isinstance(finding, Mapping)
+        if str(finding.get("evidence_id") or "").strip() and str(finding.get("source_url") or "").strip()
+    }
+    return [
+        item
+        for item in evidence_items
+        if item.get("local_archive_provenance") is True
+        and (str(item.get("evidence_id") or "").strip(), str(item.get("source_url") or "").strip()) in selected
+    ]
+
+
+def _brief_owner_ref(request: OperatorRequest) -> str | None:
+    """Accept durable brief history only from the canonical private ingress tuple."""
+
+    return brief_owner_ref_from_authenticated_private_tuple(
+        request.chat_id,
+        request.actor_id,
+        request.owner_chat_id,
+    )
+
+
+def _with_authenticated_brief_owner(
+    brief_request: BriefBuildRequest,
+    durable_owner_ref: str | None,
+) -> BriefBuildRequest:
+    """Never let a caller-supplied request choose an authenticated owner scope."""
+
+    if durable_owner_ref is None:
+        return brief_request
+    previous = (
+        brief_request.previous_document
+        if brief_request.previous_document is not None and brief_request.previous_document.owner_ref == durable_owner_ref
+        else None
+    )
+    comparison = (
+        brief_request.comparison_document
+        if brief_request.comparison_document is not None and brief_request.comparison_document.owner_ref == durable_owner_ref
+        else None
+    )
+    return replace(
+        brief_request,
+        owner_ref=durable_owner_ref,
+        previous_document=previous,
+        comparison_document=comparison,
+    )
+
+
+def _brief_request_from_archive_payload(
+    *,
+    request: OperatorRequest,
+    payload: Mapping[str, Any],
+    topic: str,
+    prior_document: BriefDocument | None = None,
+    window: BriefWindow | None = None,
+    period_basis: str = "",
+) -> BriefBuildRequest:
+    """Adapt only the already-selected local archive rows to PA-07 evidence.
+
+    The archive result is a bounded current-turn selection, not an archive
+    inventory.  The resulting coverage is therefore always partial unless a
+    future, separately-authorized caller supplies a checked manifest.
+    """
+
+    if window is None:
+        window, period_basis = parse_requested_brief_window(request.query)
+    archive = _mapping(payload.get("archive_evidence"))
+    quality_by_identity: dict[tuple[str, str], Mapping[str, Any]] = {}
+    for item in _mapping(payload.get("evidence_quality")).get("items") or ():
+        if not isinstance(item, Mapping):
+            continue
+        evidence_id = str(item.get("evidence_id") or "").strip()
+        source_ref = str(item.get("source_url") or "").strip()
+        if evidence_id and source_ref:
+            quality_by_identity[(evidence_id, source_ref)] = item
+    selected: list[Mapping[str, Any]] = []
+    for item in archive.get("items") or ():
+        if not isinstance(item, Mapping):
+            continue
+        source_ref = str(item.get("source_url") or item.get("telegram_url") or "").strip()
+        evidence_id = str(
+            item.get("archive_document_id")
+            or item.get("post_archive_document_id")
+            or item.get("post_id")
+            or ""
+        ).strip()
+        quality = quality_by_identity.get((evidence_id, source_ref), {})
+        selected.append(
+            {
+                **dict(item),
+                # The application establishes this provenance by iterating the
+                # selected ``archive_evidence`` payload itself, not by trusting
+                # a marker that arrived from an adapter/source document.
+                "local_archive_provenance": True,
+                "evidence_id": evidence_id,
+                "source_url": source_ref,
+                "support_span": quality.get("support_span") or item.get("support_span") or item.get("snippet") or item.get("summary"),
+                "relevance_label": quality.get("relevance_label") or item.get("relevance_label"),
+            }
         )
+    durable_owner_ref = _brief_owner_ref(request)
+    owner_ref = (
+        durable_owner_ref
+        if durable_owner_ref is not None
+        else prior_document.owner_ref
+        if prior_document is not None
+        else "owner_ephemeral_" + hashlib.sha256(f"pa07.owner:{request.chat_id}".encode("utf-8")).hexdigest()[:24]
+    )
+    prior_document = (
+        prior_document
+        if prior_document is not None and prior_document.owner_ref == owner_ref
+        else None
+    )
+    return BriefBuildRequest(
+        topic=(" ".join(str(topic or request.query).split())[:160] or "local archive"),
+        window=window,
+        evidence=tuple(selected),
+        # A durable owner scope only comes from the authenticated private
+        # tuple. Other local calls remain visible-only and cannot persist.
+        owner_ref=owner_ref,
+        coverage=(
+            CoverageSource(
+                "local_archive_selected_evidence",
+                "partial",
+                "bounded current-turn local archive selection",
+            ),
+        ),
+        limitations=("bounded_local_archive_selection", "full_archive_coverage_not_measured"),
+        previous_document=prior_document,
+        comparison_document=(
+            prior_document
+            if prior_document is not None
+            and (
+                prior_document.window.timezone != window.timezone
+                or prior_document.window.start_at != window.start_at
+                or prior_document.window.end_at != window.end_at
+            )
+            else None
+        ),
+        period_basis=period_basis,
+    )
+
+
+def _is_brief_refresh(text: str) -> bool:
+    lowered = " ".join(str(text or "").split()).casefold()
+    return lowered in {
+        "обнови бриф", "обнови отчёт", "обнови отчет", "update brief", "refresh brief",
+    }
+
+
+def _brief_navigation_payload(document: BriefDocument, *, view: str) -> dict[str, object] | None:
+    """Describe a stateless Telegram reply-keyboard control for this view.
+
+    The button sends normal text; it carries no document id and creates no
+    callback, database record, job or restart-recoverable state.  The next
+    turn still resolves only against the current visible BriefDocument.
+    """
+
+    if view == "full":
+        return None
+    return {
+        "kind": "reply_keyboard",
+        "button_text": BRIEF_FULL_VIEW_BUTTON_TEXT,
+        "current_visible_brief_only": True,
+        "brief_version": document.version_ref.to_dict(),
+    }
+
+
+def _may_start_brief(request: OperatorRequest) -> bool:
+    if request.mode == "brief":
+        return True
+    lowered = " ".join(str(request.query or "").split()).casefold()
+    return bool(
+        lowered.startswith("/brief")
+        or "бриф" in lowered
+        or "brief" in lowered
+        or "за прошлую неделю" in lowered
+        or "what matters this week" in lowered
+    )
+
+
+def _retrieval_generation_measurement(payload: Mapping[str, Any], *, synthesis: Any | None) -> dict[str, Any]:
+    """Expose bounded retrieval/generation facts without recording source text."""
+
+    archive = _mapping(payload.get("archive_evidence"))
+    receipt = _mapping(payload.get("receipt"))
+    selected = [item for item in archive.get("items") or [] if isinstance(item, Mapping)]
+    retrieval = {
+        "status": str(archive.get("status") or "unknown"),
+        "retrieval_mode": str(archive.get("retrieval_mode") or _mapping(receipt.get("retrieval_policy")).get("mode") or "unknown"),
+        "candidate_count": len([item for item in payload.get("archive_candidate_pool") or [] if isinstance(item, Mapping)]),
+        "selected_source_count": len(selected),
+        "attempted_query_count": len([item for item in archive.get("attempted_queries") or [] if isinstance(item, Mapping)]),
+    }
+    if synthesis is None:
+        generation: dict[str, Any] = {
+            "status": "skipped_current_or_non_archive_boundary",
+            "provider_egress_attempted": False,
+            "context_egress_attempted": False,
+        }
+    else:
+        generation = {"status": str(synthesis.status), **dict(synthesis.measurement)}
+    return {
+        "schema_version": "prm_retrieval_generation_measurement.v1",
+        "retrieval": retrieval,
+        "generation": generation,
+    }
 
 
 def _apply_route_boundaries(
@@ -390,8 +1624,62 @@ def _preserve_requested_project_identity(payload: Mapping[str, Any], route: Mapp
     }
 
 
+def _verify_deep_research_categories(result: ResearchResult) -> dict[str, Any]:
+    """Check non-fact PA-06 categories against their typed evidence contract."""
+
+    source_kinds = {str(item.get("source_kind") or "") for item in result.facts}
+    source_urls = {str(item.get("source_url") or "") for item in result.facts if str(item.get("source_url") or "")}
+    failures: list[str] = []
+    for item in result.inferences:
+        basis = tuple(str(value) for value in item.get("basis") or ())
+        statement = " ".join(str(item.get("statement") or "").split())
+        if (
+            item.get("kind") != "inference"
+            or not statement
+            or len(statement) > 400
+            or not basis
+            or not set(basis) <= source_kinds
+        ):
+            failures.append("invalid_inference_contract")
+            break
+    github_facts = [
+        item for item in result.facts
+        if item.get("source_kind") == "github_repository_identity"
+    ]
+    for item in result.project_recommendations:
+        conditions = {str(value) for value in item.get("conditions") or ()}
+        references = tuple(str(value) for value in item.get("evidence_refs") or ())
+        statement = " ".join(str(item.get("statement") or "").split())
+        requested_label = " ".join(str(item.get("requested_project_label") or "").split())
+        repository_match = any(
+            f"{fact.get('repository_ref')}@{fact.get('commit_sha')}" in statement
+            for fact in github_facts
+        )
+        if (
+            item.get("kind") != "project_recommendation"
+            or not statement
+            or len(statement) > 500
+            or not references
+            or not set(references) <= source_urls
+            or "human_confirmation_required_for_any_change" not in conditions
+            or "project_label_unverified" not in conditions
+            or not repository_match
+            or item.get("write_performed") is not False
+            or item.get("project_label_status") != "unverified_user_input"
+            or (requested_label and requested_label in statement)
+        ):
+            failures.append("invalid_project_recommendation_contract")
+            break
+    return {
+        "valid": not failures,
+        "inference_count": len(result.inferences),
+        "project_recommendation_count": len(result.project_recommendations),
+        "failures": failures,
+    }
+
+
 def _final_answer_publication_allowed(
-    verification: Mapping[str, Any], gate: Mapping[str, Any], *, response_contract_id: str = ""
+    verification: Mapping[str, Any], gate: Mapping[str, Any], *, response_contract_id: str = "", archive_source_bound: bool = False
 ) -> bool:
     """Whether rendered factual text is safe to publish as an answer."""
     metrics = _mapping(verification.get("metrics"))
@@ -399,7 +1687,7 @@ def _final_answer_publication_allowed(
         return False
     if int(metrics.get("current_fact_violations") or 0):
         return False
-    if float(metrics.get("unsupported_claim_rate") or 0.0) > 0.0:
+    if not archive_source_bound and float(metrics.get("unsupported_claim_rate") or 0.0) > 0.0:
         return False
     factual = [
         claim for claim in verification.get("claims") or []
@@ -413,6 +1701,12 @@ def _final_answer_publication_allowed(
             isinstance(claim, Mapping) and str(claim.get("claim_type") or "") == "boundary"
             for claim in verification.get("claims") or []
         )
+    if archive_source_bound:
+        # ``synthesize_archive_response`` already establishes a stricter
+        # source-bound condition for generated archive claims. The generic
+        # ledger remains in the payload as an independent lexical diagnostic;
+        # it must not turn a checked safe paraphrase into an evidence fallback.
+        return True
     return all(
         bool(claim.get("evidence_refs"))
         and all(str(status) == "supported" for status in _mapping(claim.get("citation_support")).values())
@@ -480,6 +1774,34 @@ def _render_terminal_empty_answer(next_step: str) -> str:
     # Keep this as the verifier's established non-factual refusal shape: a
     # second imperative sentence would be classified as an unsupported claim.
     return f"Не удалось собрать проверяемый ответ: {next_step}"
+
+
+def _safe_conversation_payload(state: ConversationState) -> dict[str, object]:
+    """Expose only opaque state metadata to renderers/tests, never dialogue text."""
+
+    return {
+        "conversation_id": state.conversation_id,
+        "summary_version": state.summary_version,
+        "response_refs": [item.response_ref for item in state.object_refs],
+        "has_current_confirmation": state.current_confirmation_ref is not None,
+        "retention": "ephemeral_clear_on_restart",
+    }
+
+
+def _shorten_visible_response(text: str) -> str:
+    """A local selected-object reduction that never re-egresses old model text."""
+
+    clean = " ".join(str(text or "").split())
+    if not clean:
+        return "Для сокращения сначала нужен видимый ответ."
+    for marker in (". ", "! ", "? ", "\n"):
+        if marker in clean:
+            return clean.split(marker, 1)[0].rstrip(".!? ") + "."
+    return clean[:420].rstrip() + ("…" if len(clean) > 420 else "")
+
+
+def _clean_model_answer(value: object) -> str:
+    return " ".join(str(value or "").split())[:2_400]
 
 
 def _env_enabled(name: str) -> bool:

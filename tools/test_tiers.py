@@ -29,8 +29,50 @@ PRM_ACTIVE_TESTS = (
     "tests/test_prm_post_answer_actions.py",
     "tests/test_prm_qa_dataset_eval.py",
     "tests/test_prm_product_ux_eval.py",
+    "tests/test_prm_product_ux_eval_openrouter.py",
+    # PA-10 mail connector is a private-connector read boundary; keep its
+    # fail-closed scope/consent/store holdouts in the required active tier.
+    "tests/test_assistant_mail.py",
+    # PA-11 read-only calendar/contacts contracts.
+    "tests/test_assistant_calendar.py",
+    "tests/test_assistant_contacts.py",
+    # PA-12 Academic Inbox normalization/authority/conflict/reminder contracts.
+    "tests/test_assistant_academic.py",
+    # PA-13 one-use confirmed external actions, idempotency and reconciliation.
+    "tests/test_assistant_actions.py",
+    # PA-14 inspectable memory, reversible preferences and forget propagation.
+    "tests/test_assistant_memory.py",
+    # PA-15 media safety: allowlist, bounded OCR, page refs, cleanup, egress.
+    "tests/test_assistant_media.py",
+    # PA-16 quality-first routing, honest cost accounting and matched-quality savings.
+    "tests/test_assistant_cost.py",
+    # PA-17 operations: health, failure policy, recovery, rehearsal, approval, secrets.
+    "tests/test_assistant_ops.py",
+    # The judge layer (text answers + visual layout) is safety-relevant and
+    # must keep its fail-closed holdouts in the active tier.
+    "tests/test_assistant_answer_judge.py",
+    "tests/test_assistant_visual_judge.py",
+    "tests/test_pdf_inspection.py",
+    "tests/test_pdf_ocr_crosscheck.py",
+    "tests/test_brief_studio.py",
+    "tests/test_editorial_transport.py",
+    "tests/test_profile_ranked_brief.py",
     "tests/test_callbacks.py",
     "tests/test_prm_application.py",
+    # PA-06 is a high-risk worker/checkpoint boundary. Keep its dedicated
+    # adversarial suite in the required active tier rather than relying on a
+    # separate optional command.
+    "tests/test_assistant_research.py",
+    # PA-07 must keep the exact BriefDocument/history and report-follow-up
+    # contracts in the active regression tier, not only in a manual command.
+    "tests/test_assistant_briefs.py",
+    "tests/test_assistant_brief_editorial.py",
+    "tests/test_assistant_report_dialogue.py",
+    "tests/test_prm_synthesis.py",
+    # PA-09 has local durable state and safety-critical reconciliation paths.
+    # Keep the dedicated holdouts in its required active regression tier.
+    "tests/test_assistant_jobs.py",
+    "tests/test_assistant_subscriptions.py",
     "tests/test_prm_bot_dispatch.py",
     "tests/test_prm_cli.py",
     "tests/test_retrofit_boundaries.py",
@@ -80,6 +122,10 @@ RETROFIT_TESTS = (
 )
 
 FAST_CONTRACT_TESTS = (
+    "tests/test_assistant_contracts.py",
+    "tests/test_assistant_grant_codec.py",
+    "tests/test_assistant_permissions.py",
+    "tests/test_assistant_egress.py",
     "tests/test_core_boundaries.py",
     "tests/test_delivery_health.py",
     "tests/test_cost_stats.py",

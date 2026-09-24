@@ -1,0 +1,3 @@
+[submodule "ai-workflow-playbook"]
+	path = .playbook/upstream
+	url = https://github.com/ashishki/AI_workflow_playbook.git

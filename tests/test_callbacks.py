@@ -270,7 +270,7 @@ class TestIdeaCallbacks(unittest.TestCase):
             bot_runtime,
             "_telegram_answer_callback",
         ) as answer_mock:
-            bot_runtime.run_bot(settings)
+            bot_runtime.run_bot(settings, runtime_mode=bot_runtime.BOT_RUNTIME_LEGACY)
 
         get_updates_mock.assert_called_once_with(token="token", offset=None)
         record_mock.assert_called_once_with(settings, "idea:7:done")
@@ -306,16 +306,16 @@ class TestIdeaCallbacks(unittest.TestCase):
             bot_runtime,
             "_telegram_answer_callback",
         ) as answer_mock:
-            bot_runtime.run_bot(settings, runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT)
+            bot_runtime.run_bot(settings)
 
         record_mock.assert_not_called()
         answer_mock.assert_called_once_with(
             "token",
             "callback-1",
-            "PRM safe mode: legacy callbacks are disabled.",
+            "Action unavailable",
         )
 
-    def test_run_bot_prm_safe_routes_only_post_answer_callbacks(self):
+    def test_run_bot_prm_safe_denies_post_answer_callbacks_before_validation_or_mutation(self):
         settings = self._settings_with_idea()
         update = {
             "update_id": 100,
@@ -340,10 +340,6 @@ class TestIdeaCallbacks(unittest.TestCase):
             return_value=[update],
         ), patch.object(
             bot_runtime,
-            "handle_prm_post_answer_callback",
-            return_value={"message": "Черновик готов.", "reply_markup": {"inline_keyboard": []}},
-        ) as action_mock, patch.object(
-            bot_runtime,
             "send_message",
         ) as send_mock, patch.object(
             bot_runtime,
@@ -351,20 +347,44 @@ class TestIdeaCallbacks(unittest.TestCase):
         ) as answer_mock:
             bot_runtime.run_bot(settings, runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT)
 
-        action_mock.assert_called_once_with(settings, "prma:opaque:n", chat_id="12345", actor_id="12345")
-        send_mock.assert_called_once_with(
-            "token", "12345", "Черновик готов.", parse_mode=None, reply_markup={"inline_keyboard": []}
-        )
-        answer_mock.assert_called_once_with("token", "callback-1", "Принято")
+        send_mock.assert_not_called()
+        answer_mock.assert_called_once_with("token", "callback-1", "Action unavailable")
 
-    def test_run_bot_prm_english_feedback_callback_uses_english_toast(self):
+    def test_handle_callback_denies_invalid_prm_before_any_legacy_callback_path(self):
+        settings = self._settings_with_idea()
+        update = {
+            "update_id": 100,
+            "callback_query": {
+                "id": "callback-invalid",
+                "from": {"id": 12345},
+                "message": {"chat": {"id": 12345}},
+                "data": "prma:not-a-context:n",
+            },
+        }
+        events = []
+
+        def stop_after_first_poll(state):
+            state.stop_requested = True
+
+        def acknowledge(*_args):
+            events.append("ack")
+
+        with patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "token", "TELEGRAM_OWNER_CHAT_ID": "12345"}, clear=False), patch.object(bot_runtime, "_install_signal_handlers", side_effect=stop_after_first_poll), patch.object(bot_runtime, "_telegram_get_updates", return_value=[update]), patch.object(bot_runtime, "record_callback") as record_mock, patch.object(bot_runtime, "_telegram_answer_callback", side_effect=acknowledge), patch.object(bot_runtime, "send_message") as send_mock:
+            bot_runtime.run_bot(settings, runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT)
+
+        assert events == ["ack"]
+        record_mock.assert_not_called()
+        send_mock.assert_not_called()
+
+    def test_run_bot_prm_blocks_utd_feedback_callback_before_legacy_mutation(self):
         settings = self._settings_with_idea()
         update = {"update_id": 100, "callback_query": {"id": "callback-1", "from": {"id": 12345}, "message": {"chat": {"id": 12345}}, "data": "utdw:key:useful:en"}}
         def stop_after_first_poll(state): state.stop_requested = True
-        with patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "token", "TELEGRAM_OWNER_CHAT_ID": "12345"}, clear=False), patch.object(bot_runtime, "_install_signal_handlers", side_effect=stop_after_first_poll), patch.object(bot_runtime, "_telegram_get_updates", return_value=[update]), patch.object(bot_runtime, "handle_prm_post_answer_callback", return_value={"message": "Recorded: useful.", "reply_markup": {"inline_keyboard": []}}), patch.object(bot_runtime, "send_message") as send_mock, patch.object(bot_runtime, "_telegram_answer_callback") as answer_mock:
+        with patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "token", "TELEGRAM_OWNER_CHAT_ID": "12345"}, clear=False), patch.object(bot_runtime, "_install_signal_handlers", side_effect=stop_after_first_poll), patch.object(bot_runtime, "_telegram_get_updates", return_value=[update]), patch.object(bot_runtime, "record_callback") as record_mock, patch.object(bot_runtime, "send_message") as send_mock, patch.object(bot_runtime, "_telegram_answer_callback") as answer_mock:
             bot_runtime.run_bot(settings, runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT)
-        answer_mock.assert_called_once_with("token", "callback-1", "Recorded")
-        send_mock.assert_called_once_with("token", "12345", "Recorded: useful.", parse_mode=None, reply_markup={"inline_keyboard": []})
+        answer_mock.assert_called_once_with("token", "callback-1", "Action unavailable")
+        record_mock.assert_not_called()
+        send_mock.assert_not_called()
 
     def test_run_bot_dispatches_transcribed_voice_feedback(self):
         settings = self._settings_with_idea()
@@ -393,12 +413,13 @@ class TestIdeaCallbacks(unittest.TestCase):
             bot_runtime,
             "dispatch_command",
         ) as dispatch_mock:
-            bot_runtime.run_bot(settings)
+            bot_runtime.run_bot(settings, runtime_mode=bot_runtime.BOT_RUNTIME_LEGACY)
 
         dispatch_mock.assert_called_once_with(
             chat_id="12345",
             text="/voice Too shallow target=eval-gates.",
             settings=settings,
+            runtime_mode=bot_runtime.BOT_RUNTIME_LEGACY,
         )
 
     def test_run_bot_prm_safe_dispatches_transcribed_voice_as_auto(self):
@@ -430,12 +451,42 @@ class TestIdeaCallbacks(unittest.TestCase):
         ) as dispatch_mock:
             bot_runtime.run_bot(settings, runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT)
 
-        dispatch_mock.assert_called_once_with(
-            chat_id="12345",
-            text="/auto_voice Too shallow target=eval-gates.",
-            settings=settings,
-            runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT,
-        )
+        dispatch_mock.assert_called_once()
+        self.assertEqual(dispatch_mock.call_args.kwargs["chat_id"], "12345")
+        self.assertEqual(dispatch_mock.call_args.kwargs["text"], "/auto_voice Too shallow target=eval-gates.")
+        self.assertIs(dispatch_mock.call_args.kwargs["settings"], settings)
+        self.assertEqual(dispatch_mock.call_args.kwargs["runtime_mode"], bot_runtime.BOT_RUNTIME_PRM_ASSISTANT)
+        self.assertEqual(dispatch_mock.call_args.kwargs["actor_id"], "12345")
+        self.assertEqual(dispatch_mock.call_args.kwargs["owner_chat_id"], "12345")
+        self.assertEqual(len(dispatch_mock.call_args.kwargs["delivery_authorizations"]), 8)
+        self.assertNotIn("utd_draft_authorization", dispatch_mock.call_args.kwargs)
+
+    def test_run_bot_prm_safe_dispatches_completed_voice_with_owner_tuple(self):
+        settings = self._settings_with_idea()
+        update = {
+            "update_id": 102,
+            "message": {
+                "chat": {"id": 12345},
+                "from": {"id": 12345},
+                "voice": {"file_id": "voice-1"},
+            },
+        }
+
+        def stop_after_first_poll(state):
+            state.stop_requested = True
+
+        with patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "token", "TELEGRAM_OWNER_CHAT_ID": "12345"}, clear=False), patch.object(bot_runtime, "_install_signal_handlers", side_effect=stop_after_first_poll), patch.object(bot_runtime, "_telegram_get_updates", return_value=[update]), patch.object(bot_runtime, "transcribe_telegram_voice", return_value="completed private voice"), patch.object(bot_runtime, "dispatch_command") as dispatch_mock, patch.object(bot_runtime, "send_message"):
+            bot_runtime.run_bot(settings, runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT)
+
+        dispatch_mock.assert_called_once()
+        self.assertEqual(dispatch_mock.call_args.kwargs["chat_id"], "12345")
+        self.assertEqual(dispatch_mock.call_args.kwargs["text"], "/auto_voice completed private voice")
+        self.assertIs(dispatch_mock.call_args.kwargs["settings"], settings)
+        self.assertEqual(dispatch_mock.call_args.kwargs["runtime_mode"], bot_runtime.BOT_RUNTIME_PRM_ASSISTANT)
+        self.assertEqual(dispatch_mock.call_args.kwargs["actor_id"], "12345")
+        self.assertEqual(dispatch_mock.call_args.kwargs["owner_chat_id"], "12345")
+        self.assertEqual(len(dispatch_mock.call_args.kwargs["delivery_authorizations"]), 7)
+        self.assertNotIn("utd_draft_authorization", dispatch_mock.call_args.kwargs)
 
     def test_run_bot_dispatches_plain_text_to_hermes_chat(self):
         settings = self._settings_with_idea()
@@ -463,12 +514,13 @@ class TestIdeaCallbacks(unittest.TestCase):
             bot_runtime,
             "dispatch_command",
         ) as dispatch_mock:
-            bot_runtime.run_bot(settings)
+            bot_runtime.run_bot(settings, runtime_mode=bot_runtime.BOT_RUNTIME_LEGACY)
 
         dispatch_mock.assert_called_once_with(
             chat_id="12345",
             text="/message Что мне делать с weekly workbook?",
             settings=settings,
+            runtime_mode=bot_runtime.BOT_RUNTIME_LEGACY,
         )
 
     def test_run_bot_prm_safe_dispatches_plain_text_as_auto(self):
@@ -499,12 +551,15 @@ class TestIdeaCallbacks(unittest.TestCase):
         ) as dispatch_mock:
             bot_runtime.run_bot(settings, runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT)
 
-        dispatch_mock.assert_called_once_with(
-            chat_id="12345",
-            text="/auto Что мне делать с weekly workbook?",
-            settings=settings,
-            runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT,
-        )
+        dispatch_mock.assert_called_once()
+        self.assertEqual(dispatch_mock.call_args.kwargs["chat_id"], "12345")
+        self.assertEqual(dispatch_mock.call_args.kwargs["text"], "/auto Что мне делать с weekly workbook?")
+        self.assertIs(dispatch_mock.call_args.kwargs["settings"], settings)
+        self.assertEqual(dispatch_mock.call_args.kwargs["runtime_mode"], bot_runtime.BOT_RUNTIME_PRM_ASSISTANT)
+        self.assertEqual(dispatch_mock.call_args.kwargs["actor_id"], "12345")
+        self.assertEqual(dispatch_mock.call_args.kwargs["owner_chat_id"], "12345")
+        self.assertEqual(len(dispatch_mock.call_args.kwargs["delivery_authorizations"]), 8)
+        self.assertNotIn("utd_draft_authorization", dispatch_mock.call_args.kwargs)
 
     def test_run_bot_prm_safe_drops_owner_sender_message_in_group(self):
         settings = self._settings_with_idea()
@@ -525,11 +580,12 @@ class TestIdeaCallbacks(unittest.TestCase):
         def stop_after_first_poll(state):
             state.stop_requested = True
 
-        with patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "token", "TELEGRAM_OWNER_CHAT_ID": "12345"}, clear=False), patch.object(bot_runtime, "_install_signal_handlers", side_effect=stop_after_first_poll), patch.object(bot_runtime, "_telegram_get_updates", return_value=[update]), patch.object(bot_runtime, "handle_prm_post_answer_callback") as action_mock, patch.object(bot_runtime, "_telegram_answer_callback") as answer_mock:
+        with patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "token", "TELEGRAM_OWNER_CHAT_ID": "12345"}, clear=False), patch.object(bot_runtime, "_install_signal_handlers", side_effect=stop_after_first_poll), patch.object(bot_runtime, "_telegram_get_updates", return_value=[update]), patch.object(bot_runtime, "record_callback") as record_mock, patch.object(bot_runtime, "_telegram_answer_callback") as answer_mock, patch.object(bot_runtime, "send_message") as send_mock:
             bot_runtime.run_bot(settings, runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT)
 
-        action_mock.assert_not_called()
-        answer_mock.assert_called_once_with("token", "callback-group", "PRM доступен только в личном чате владельца")
+        record_mock.assert_not_called()
+        answer_mock.assert_not_called()
+        send_mock.assert_not_called()
 
     def test_run_bot_voice_without_transcript_runs_transcription(self):
         settings = self._settings_with_idea()
@@ -564,7 +620,7 @@ class TestIdeaCallbacks(unittest.TestCase):
             "transcribe_telegram_voice",
             return_value="Useful workbook. target=claim-cards.",
         ) as transcribe_mock:
-            bot_runtime.run_bot(settings)
+            bot_runtime.run_bot(settings, runtime_mode=bot_runtime.BOT_RUNTIME_LEGACY)
 
         send_message_mock.assert_called_once()
         self.assertIn("Распознаю", send_message_mock.call_args.args[2])
@@ -573,6 +629,7 @@ class TestIdeaCallbacks(unittest.TestCase):
             chat_id="12345",
             text="/voice Useful workbook. target=claim-cards.",
             settings=settings,
+            runtime_mode=bot_runtime.BOT_RUNTIME_LEGACY,
         )
 
     def test_run_bot_voice_without_openai_key_returns_text_fallback(self):
@@ -608,7 +665,7 @@ class TestIdeaCallbacks(unittest.TestCase):
             "transcribe_telegram_voice",
             side_effect=bot_runtime.VoiceTranscriptionUnavailable("OPENAI_API_KEY is not set"),
         ):
-            bot_runtime.run_bot(settings)
+            bot_runtime.run_bot(settings, runtime_mode=bot_runtime.BOT_RUNTIME_LEGACY)
 
         dispatch_mock.assert_not_called()
         self.assertEqual(send_message_mock.call_count, 2)
@@ -654,7 +711,7 @@ class TestIdeaCallbacks(unittest.TestCase):
         dispatch_mock.assert_not_called()
         self.assertEqual(send_message_mock.call_count, 2)
         fallback_message = send_message_mock.call_args_list[-1].args[2]
-        self.assertIn("OPENAI_API_KEY", fallback_message)
+        self.assertIn("политике доступа", fallback_message)
         self.assertIn("обычное текстовое сообщение", fallback_message)
         self.assertNotIn("/feedback", fallback_message)
 

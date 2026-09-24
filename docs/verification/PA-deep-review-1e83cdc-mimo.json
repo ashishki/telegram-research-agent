@@ -1,0 +1,99 @@
+{
+  "status": "reviewed",
+  "reviewer_model": "mimo-v2.6-pro",
+  "reviewer_role": "deep_review",
+  "base_sha": "1a1ac5c909d5e35083f05a35f8351c3d520a6c2d",
+  "head_sha": "1e83cdc462ea442e111d8f9b886c7858e2531b2a",
+  "diff_sha256": "049729d0364e72f349be2ca9021571f415bba07775c41813b6613ad6ccaf2613",
+  "diff_chars": 494787,
+  "findings": {
+    "verdict": "FIX_P1_FIRST",
+    "findings": [
+      {
+        "severity": "P1",
+        "title": "execute_action loses one-use/idempotency when the executor raises; store check is TOCTOU",
+        "file": "src/prm/confirmed_actions.py:337",
+        "issue": "execute_action calls executor.execute() before store.put(). If the adapter raises (a network timeout is exactly the 'unknown outcome' case), nothing is recorded and the confirmation is only marked consumed on a discarded copy, so a retry calls the provider again — a mail send can go out twice. The store.get()/consume()/put() sequence is also non-atomic, so two concurrent clicks with the same idempotency_key can both miss the receipt and both execute, and one-use is only per-store (a fresh ActionReceiptStore replays the action).",
+        "fix": "Record a 'pending/unknown' receipt keyed by idempotency_key in a compare-and-set insert (unique key) before calling the provider, and treat any exception from execute() as an unknown outcome that is stored and requires reconcile_action. Persist the consumed confirmation in the same transaction as the reservation so one-use survives restarts and store instances."
+      },
+      {
+        "severity": "P1",
+        "title": "One maximum_request_count=1 egress reservation authorizes up to `attempts` provider calls",
+        "file": "src/prm/editorial_transport.py:262",
+        "issue": "synthesize_opencode_editorial validates the PA-02 reservation once via require_authorized_egress and then loops up to `attempts` (default 3, 4 in profile_ranked_brief) _call_model requests under that single reservation, whose ProviderPolicy says maximum_request_count=1. The reservation's request bound is therefore bypassed, and cli.py/prm.cli editorial-brief uses the same pattern.",
+        "fix": "Re-reserve (or check-and-consume the reservation) immediately before every provider request and stop the retry loop as soon as the reserved request count is exhausted, reporting 'reservation_exhausted' instead of retrying."
+      },
+      {
+        "severity": "P1",
+        "title": "Unconditional rmtree of a user-supplied --out-dir",
+        "file": "tools/brief_studio.py:296",
+        "issue": "main() does `if out.exists(): shutil.rmtree(out)` on the raw --out-dir argument. A typo or an intentional shared path (repo root, data/, a home directory) is recursively deleted before writing artifacts — silent, unrecoverable data loss in a tool whose job is to write files.",
+        "fix": "Never delete a caller-supplied directory. Write into a fresh subdirectory or refuse to run when the target exists and is non-empty, and if cleanup is needed restrict it to a directory the tool itself created and marked (e.g. with a manifest file)."
+      },
+      {
+        "severity": "P1",
+        "title": "confirm_preference one-use is a non-transactional check-then-act on autocommit connections",
+        "file": "src/prm/memory_library.py:395",
+        "issue": "The store connects with isolation_level=None (autocommit) and confirm_preference reads `consumed`, then issues a separate UPDATE and a separate revision query. Two concurrent confirms of the same proposal both read consumed=0 and both apply it, creating duplicate preference revisions and defeating the documented 'applies it once' guarantee.",
+        "fix": "Run the read-check, the consumed=1 update (as a conditional UPDATE ... WHERE consumed=0 checking rowcount) and the revision insert inside one transaction (BEGIN IMMEDIATE), raising if zero rows were updated."
+      },
+      {
+        "severity": "P1",
+        "title": "Dedup identity depends on the authoritative deadline's calendar day, and the suites use wall-clock NOW",
+        "file": "src/prm/academic_inbox.py:305",
+        "issue": "deduplicate_candidates keys on (source_kind, title, authoritative_deadline.due_at.date()). The same assignment seen via Canvas (+24h) and via mail (+30h) gets different keys whenever the two instants straddle midnight, so the 'same item seen through several sources' is emitted twice instead of merged. The tests build all timestamps from datetime.now() at import, so tests/test_assistant_academic.py's merge test is flaky (it fails when the run time is late in the day), violating the deterministic-synthetic-tests rule.",
+        "fix": "Key on a stable item identity (source/candidate ref family plus casefolded title, with an explicit tolerance window on deadline instants) and surface residual deadline differences as a conflict. Pin all test clocks to a fixed synthetic datetime instead of datetime.now()."
+      },
+      {
+        "severity": "P1",
+        "title": "--send performs a live Telegram delivery with no typed authorization or consent literal",
+        "file": "tools/profile_ranked_brief.py:325",
+        "issue": "The tool reads TELEGRAM_BOT_TOKEN/TELEGRAM_OWNER_CHAT_ID from .env and POSTs the generated PDF to the Telegram API whenever --send is passed. Unlike the editorial route (which demands the exact 'enable-opencode-editorial' literal and a PA-02 reservation), delivery here has no confirmation, no delivery-authorization check and no purpose grant, so a stray flag sends private brief content to a live account.",
+        "fix": "Require an explicit one-use, owner-bound confirmation plus a typed delivery authorization before any send, and route the upload through the existing delivery/effect boundary instead of a raw requests.post with a token from .env."
+      },
+      {
+        "severity": "P2",
+        "title": "API bearer key is sent to an unvalidated base URL (http or foreign host allowed)",
+        "file": "src/prm/editorial_transport.py:195",
+        "issue": "_call_model (and the equivalent helpers in tools/prm_product_ux_eval.py, assistant_visual_judge.py, brief_studio.py) takes OPENCODE_GO_BASE_URL from the environment and posts the OpenCode key as a Bearer token with no https requirement and no host allowlist (marked nosec B310). A misconfigured or injected env value exfiltrates the credential in plaintext, which undercuts the documented 'never send this key to another endpoint' rule.",
+        "fix": "Validate the resolved base URL against an https scheme and an explicit host allowlist (default opencode.ai) before building the request, and fail closed with a non-secret error otherwise."
+      },
+      {
+        "severity": "P2",
+        "title": "Fixed-page renderer silently clips content with overflow:hidden",
+        "file": "src/prm/report_exports.py:645",
+        "issue": "render_paginated_html packs cards by _estimate_card_mm and renders .page/.page-body with overflow:hidden. When the estimate is low (long titles, tall anchors, font fallback), the excess content — potentially a deadline or caveat — is cut from the PDF with no error and no deterministic check unless the caller happens to pass --expect.",
+        "fix": "Detect overflow before emitting the artifact (measure or conservatively bound card height, or compare extracted PDF text against the input strings) and fail with an explicit 'page_overflow' error instead of hiding the clipped text."
+      },
+      {
+        "severity": "P2",
+        "title": "MemoryLibraryStore never closes its SQLite connections",
+        "file": "src/prm/memory_library.py:262",
+        "issue": "Every store method uses `with self._connect() as conn:` (and __init__ uses `with sqlite3.connect(...)`), but a sqlite3 connection context manager only commits/rollbacks — it does not close. Each save/get/list/confirm leaks a connection and file handle; mail_connector.MailDerivedStore got this right with closing().",
+        "fix": "Wrap connections in contextlib.closing (as MailDerivedStore does) or close explicitly in a finally block for every method, including __init__."
+      },
+      {
+        "severity": "P2",
+        "title": "voice.transcription purpose/capability is not registered in TRANSPORT_PURPOSES despite the documented contract",
+        "file": "src/prm/capabilities.py:95",
+        "issue": "media_connectors.require_media_egress_access maps voice.transcription to capability 'media.transcribe', but TRANSPORT_PURPOSES registers only media.vision, media.document and media.speech for provider_openai. The PA-15 evidence claims all four purposes are registered, so transport_purpose for transcription raises and the claimed per-purpose separation for voice is not actually enforceable/consistent with the other surfaces.",
+        "fix": "Register ('provider_openai','media.transcribe','model_egress') -> 'voice.transcription' in TRANSPORT_PURPOSES and add a test asserting the mapping, matching the other three media purposes."
+      },
+      {
+        "severity": "P2",
+        "title": "Tariff treats unknown cached/reasoning prices as 0.0",
+        "file": "src/prm/model_cost.py:40",
+        "issue": "cached_per_mtok and reasoning_per_mtok default to 0.0 and are optional, so a tariff that only knows input/output prices silently prices cached and reasoning tokens at zero and estimate_cost under-reports spend — the same 'unknown is never zero' failure the module otherwise prevents.",
+        "fix": "Make cached/reasoning prices explicit Optional[float] = None and have estimate_cost return None whenever a non-zero token class has an unknown price."
+      }
+    ],
+    "not_verified": [
+      "The bodies of prm.capabilities.require_authorized_operation/require_authorized_egress (whether reservations are consumed per call and whether a nil/foreign AuthorizationDecision always denies) are outside this diff.",
+      "Whether the executor/adapter protocols are ever wired to a live provider (the reviewed range ships only contracts and synthetic tests), so the duplicate-send paths are latent until an adapter exists.",
+      "Actual pytest/test_tiers results and the claimed 535-576 focused-prm counts; several suites use datetime.now() at import and may be time-of-day flaky.",
+      "WeasyPrint/Chrome rendering behaviour behind render_paginated_* and the visual-judge probes; only the HTML string content was reviewed.",
+      "Whether a future mail/calendar/academic adapter actually calls require_*_access before fetch_page (stated as unverified in the handoff)."
+    ],
+    "summary": "No P0: nothing in this range turns a denial or unknown into an allow at a live boundary, and the fail-closed posture of the contracts (explicit provider selection, body/attachment refusals, purpose-separated grants, unknown-pricing-is-None, media allowlists) is generally sound. The P1s are concentrated in exactly the guarantees the project treats as safety invariants: one-use confirmed actions are not idempotent across exceptions or concurrent clicks and the receipt/confirmation state is not transactional; a single 1-request egress reservation authorizes a multi-attempt model loop; a CLI flag recursively deletes an arbitrary output directory; the memory store's one-use preference confirm is a non-atomic check-then-act (and leaks connections); Academic Inbox dedup identity is calendar-day dependent and the tests are wall-clock based; and profile_ranked_brief --send performs a live Telegram delivery without the consent/authorization gating used everywhere else. Fix these before relying on these contracts as the safety layer."
+  }
+}

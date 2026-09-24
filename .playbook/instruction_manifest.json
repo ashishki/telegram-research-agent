@@ -1,0 +1,12 @@
+{
+  "schema_version": "playbook.instruction_manifest.v1",
+  "artifacts": [
+    {"path":"docs/ASSISTANT_BOUNDARIES.md","authority":"normative","target_roles":["implementer","reviewer","design_author"],"stability":"stable","load_policy":"always","source_authority":"docs/IMPLEMENTATION_CONTRACT.md and applicable ADRs","executable_consumer":"tools/playbook.py render_slice_context"},
+    {"path":"docs/PERSONAL_ASSISTANT_SPEC.md","authority":"normative","target_roles":["design_author","product_design_review","implementer"],"stability":"phase","load_policy":"on_demand","source_authority":"owner-requested target specification, not runtime approval","executable_consumer":"tools/check_personal_assistant_plan.py"},
+    {"path":"docs/design/PA.md","authority":"normative","target_roles":["design_author","implementer","reviewer"],"stability":"phase","load_policy":"on_demand","source_authority":"paired exact design after human approval","executable_consumer":"tools/playbook.py feature_workflow"},
+    {"path":"docs/tasks.md","authority":"projection","target_roles":["implementer","reviewer"],"stability":"task","load_policy":"on_demand","source_authority":"current task plus docs/design/PA.design.json","executable_consumer":"tools/playbook.py feature_workflow"},
+    {"path":"docs/IMPLEMENTATION_CONTRACT.md","authority":"normative","target_roles":["implementer","reviewer"],"stability":"stable","load_policy":"on_demand","source_authority":"accepted operating contract and ADRs","executable_consumer":"tools/playbook.py render_codex_exec_prompt"},
+    {"path":"docs/tasks.before-pa-20260918.md","authority":"reference","target_roles":["reviewer"],"stability":"historical","load_policy":"never_by_default","source_authority":"pre-PA Git snapshot","executable_consumer":"explicit historical investigation only"},
+    {"path":"AGENTS.before-pa-20260918.md","authority":"reference","target_roles":["reviewer"],"stability":"historical","load_policy":"never_by_default","source_authority":"pre-PA Git snapshot","executable_consumer":"explicit historical investigation only"}
+  ]
+}

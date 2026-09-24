@@ -1,0 +1,4 @@
+# Development-only checks; application dependencies remain in requirements.txt.
+pytest==9.0.2
+jsonschema==4.26.0
+PyYAML==6.0.3

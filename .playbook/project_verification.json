@@ -1,27 +1,11 @@
 {
   "schema_version": "playbook.project_verification.v1",
   "checks": [
-    {
-      "id": "playbook_contract",
-      "argv": [
-        "{python}",
-        "tools/playbook_validate.py",
-        "--root",
-        ".",
-        "--check",
-        "tasks",
-        "--check",
-        "placeholders",
-        "--check",
-        "readiness",
-        "--check",
-        "delivery",
-        "--check",
-        "references"
-      ],
-      "required": true,
-      "expected_exit_code": 0,
-      "timeout_seconds": 60
-    }
+    {"id":"playbook_contract","argv":["{python}","tools/playbook.py","playbook_validate","--root",".","--check","tasks","--check","readiness","--check","delivery","--check","references"],"required":true,"expected_exit_code":0,"timeout_seconds":120},
+    {"id":"pa_plan","argv":["{python}","tools/check_personal_assistant_plan.py"],"required":true,"expected_exit_code":0,"timeout_seconds":120},
+    {"id":"playbook_bridge","argv":["{python}","-m","pytest","tests/test_playbook_bridge.py","-q"],"required":true,"expected_exit_code":0,"timeout_seconds":120},
+    {"id":"focused_prm","argv":["{python}","tools/test_tiers.py","focused-prm"],"required":true,"expected_exit_code":0,"timeout_seconds":600},
+    {"id":"retrofit_boundaries","argv":["{python}","tools/test_tiers.py","retrofit-boundaries"],"required":true,"expected_exit_code":0,"timeout_seconds":600},
+    {"id":"mat_safety","argv":["{python}","tools/prm_mat_eval.py","--check","safety"],"required":true,"expected_exit_code":0,"timeout_seconds":600}
   ]
 }

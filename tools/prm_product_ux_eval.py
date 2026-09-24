@@ -17,6 +17,8 @@ import sys
 import tempfile
 import time
 from typing import Any, Callable, Mapping, Sequence, cast
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SRC_ROOT = PROJECT_ROOT / "src"
@@ -41,6 +43,18 @@ DEFAULT_CODEX_EXEC_REASONING_EFFORT = os.environ.get(
 CODEX_EXEC_REASONING_EFFORTS = frozenset(
     ("low", "medium", "high", "xhigh", "max", "ultra")
 )
+# Non-Codex judge route: OpenCode Go (OpenAI-compatible) served at
+# https://opencode.ai/zen/go/v1. The secret is the OpenCode Go key; the local
+# file was historically (accidentally) named "openrouter_api_key". The key is
+# never logged and a file indirection keeps it out of shell history/Git.
+DEFAULT_OPENCODE_BASE_URL = os.environ.get(
+    "OPENCODE_GO_BASE_URL",
+    os.environ.get("OPENCODE_BASE_URL", "https://opencode.ai/zen/go/v1"),
+)
+DEFAULT_OPENCODE_MODEL = os.environ.get(
+    "PRM_JUDGE_MODEL", os.environ.get("OPENCODE_GO_MODEL", "mimo-v2.6-pro")
+)
+OPENCODE_JUDGE_PROVIDERS = frozenset(("opencode-go", "openrouter"))
 
 JUDGE_SCORE_FIELDS = (
     "naturalness_score",
@@ -287,10 +301,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--md-report", type=Path, default=DEFAULT_MD_REPORT)
     parser.add_argument(
         "--provider",
-        choices=("none", "codex-exec"),
+        choices=("none", "codex-exec", "opencode-go", "openrouter"),
         default=DEFAULT_PROVIDER,
     )
-    parser.add_argument("--model", default=DEFAULT_CODEX_EXEC_MODEL)
+    parser.add_argument("--model", default="")
+    parser.add_argument(
+        "--judge-base-url",
+        default=DEFAULT_OPENCODE_BASE_URL,
+    )
+    parser.add_argument(
+        "--judge-api-key-file",
+        default=os.environ.get("OPENCODE_API_KEY_FILE", ""),
+    )
     parser.add_argument(
         "--provider-reasoning-effort",
         choices=tuple(sorted(CODEX_EXEC_REASONING_EFFORTS)),
@@ -389,6 +411,35 @@ def _add_prm_one_turn_cases(cases: list[dict[str, Any]]) -> None:
                 "surface": "prm_application",
                 "primary_intent": "topic_edition",
                 "mode": "brief",
+            },
+        }
+    )
+    cases.append(
+        {
+            "case_id": "one:prm:bound_inline:project_provenance",
+            "surface": "prm_application",
+            "message": "inline control fixture",
+            "bound_inline_source": {
+                "title": "Связанный вывод",
+                "query": "agent evaluation",
+                "body": "Точный сохранённый вывод из ответа.",
+                "source_refs": ["https://t.me/example/agent-evals"],
+                "evidence_items": [{
+                    "source_url": "https://t.me/example/agent-evals",
+                    "snippet": "Точный сохранённый вывод из ответа.",
+                }],
+                "project_name": "telegram-research-agent",
+                "primary_intent": "archive_to_action",
+                "response_contract_id": "archive_research.v2",
+                "direct_count": 1,
+                "partial_count": 0,
+                "offered_action_codes": ["n", "p"],
+            },
+            "expected": {
+                "surface": "prm_application",
+                "primary_intent": "archive_to_action",
+                "mode": "research",
+                "project_context_required": True,
             },
         }
     )
@@ -511,16 +562,10 @@ def _add_prm_dialogues(dialogues: list[dict[str, Any]]) -> None:
                         _prm_turn(
                             f"turn:06:{slug}",
                             "сохрани заметку, но сначала покажи что именно сохранишь",
-                            expected_intent="memory_action",
-                            expected_project_context=True,
-                            expects_confirmation=True,
                         ),
                         _prm_turn(
                             f"turn:07:{slug}",
                             "следи за этой темой, но без автомутации профиля",
-                            expected_intent="memory_action",
-                            expected_project_context=True,
-                            expects_confirmation=True,
                         ),
                         _prm_turn(
                             f"turn:08:{slug}",
@@ -946,7 +991,7 @@ def _simulate_prm_application(
     state: Mapping[str, Any],
     assistant_cache: dict[str, Any],
 ) -> SimulatedTurn:
-    from assistant.prm_post_answer_actions import select_post_answer_action_codes
+    from assistant.prm_post_answer_actions import canonicalize_prm_action_snapshot, select_post_answer_action_codes
     from bot import prm_handlers
     from config.settings import load_settings
     from llm.client import suppress_usage_recording
@@ -958,6 +1003,33 @@ def _simulate_prm_application(
         assistant = PersonalResearchAssistant(settings=load_settings())
         assistant_cache["assistant"] = assistant
     message = str(turn.get("message") or "")
+    bound_source = turn.get("bound_inline_source")
+    if isinstance(bound_source, Mapping):
+        snapshot = canonicalize_prm_action_snapshot(bound_source)
+        if snapshot is None:
+            return _turn_result(
+                turn,
+                index=index,
+                message="Bound inline source is unavailable.",
+                actual={"surface": "prm_application", "status": "action_unavailable"},
+            )
+        return _turn_result(
+            turn,
+            index=index,
+            message=snapshot["body"],
+            actual={
+                "surface": "prm_application", "status": "bound_inline", "mode": "research",
+                "primary_intent": snapshot["primary_intent"],
+                "response_contract_id": snapshot["response_contract_id"],
+                "project_context_required": bool(snapshot["project_name"]),
+                "external_verification_required": False, "current_fact_boundary": False,
+                "source_count": len(snapshot["source_refs"]), "direct_count": snapshot["direct_count"],
+                "partial_count": snapshot["partial_count"], "adjacent_count": 0,
+                "answer_chars": len(snapshot["body"]), "action_codes": snapshot["offered_action_codes"],
+                "dialog_context_used": False, "unsupported_claim_rate": 0.0,
+                "current_fact_violations": 0,
+            },
+        )
     if str(turn.get("synthetic_fixture") or "") == "positive_topic_edition":
         result = assistant.render_topic_edition(
             OperatorRequest(query=message, mode="brief", chat_id="product-ux-edition"),
@@ -1005,23 +1077,32 @@ def _simulate_prm_application(
         )
     mode = str(turn.get("mode") or "auto")
     chat_id = str(state.get("prm_chat_id") or f"product-ux-eval-{_stable_hash(message)[:10]}")
-    dialog = prm_handlers._resolve_prm_dialog_query(chat_id, message, mode=mode)
-    if dialog.get("kind") == "post_answer_action":
-        preview = _simulate_post_answer_preview(dialog, state=state)
-        prm_handlers._remember_pending_prm_action(
-            chat_id,
-            action=str(dialog.get("post_answer_action") or ""),
-            message=preview,
-        )
+    if prm_handlers._is_memory_action_followup(message):
         return _turn_result(
             turn,
             index=index,
-            message=preview,
+            message="Это действие недоступно. Отправь запрос заново, чтобы получить новую кнопку действия.",
+            actual={
+                "surface": "prm_application", "status": "action_unavailable", "mode": "research",
+                "primary_intent": "", "response_contract_id": "archive_research.v2",
+                "project_context_required": False, "external_verification_required": False,
+                "current_fact_boundary": False, "source_count": 0, "direct_count": 0,
+                "partial_count": 0, "adjacent_count": 0, "answer_chars": 87,
+                "action_codes": [], "dialog_context_used": False,
+                "unsupported_claim_rate": 0.0, "current_fact_violations": 0,
+            },
+        )
+    dialog = prm_handlers._resolve_prm_dialog_query(chat_id, message, mode=mode)
+    if dialog.get("kind") == "post_answer_action":
+        return _turn_result(
+            turn,
+            index=index,
+            message="Это действие недоступно. Отправь запрос заново, чтобы получить новую кнопку действия.",
             actual={
                 "surface": "prm_application",
-                "status": "needs_confirmation",
+                "status": "action_unavailable",
                 "mode": "research",
-                "primary_intent": "memory_action",
+                "primary_intent": "",
                 "response_contract_id": "archive_research.v2",
                 "project_context_required": False,
                 "external_verification_required": False,
@@ -1030,9 +1111,9 @@ def _simulate_prm_application(
                 "direct_count": 0,
                 "partial_count": 0,
                 "adjacent_count": 0,
-                "answer_chars": 180,
-                "action_codes": ["confirm"],
-                "dialog_context_used": True,
+                "answer_chars": 87,
+                "action_codes": [],
+                "dialog_context_used": False,
                 "unsupported_claim_rate": 0.0,
                 "current_fact_violations": 0,
             },
@@ -1603,6 +1684,10 @@ def run_judge_sync(
     verdicts: list[dict[str, Any]] = []
     failures: list[dict[str, Any]] = []
 
+    is_opencode = provider in OPENCODE_JUDGE_PROVIDERS
+    resolved_model = model or (
+        DEFAULT_OPENCODE_MODEL if is_opencode else DEFAULT_CODEX_EXEC_MODEL
+    )
     if provider == "none":
         judge_status = "not_requested"
         status = "deterministic_pass" if not deterministic_failures else "needs_human_review"
@@ -1611,14 +1696,18 @@ def run_judge_sync(
         judge_status = "no_model_configured"
         status = "skipped_fail_closed"
         reason = "provider egress was not explicitly allowed"
+    elif is_opencode and not _opencode_api_key():
+        judge_status = "no_provider_credentials"
+        status = "skipped_fail_closed"
+        reason = "OPENCODE_API_KEY was not present in the process environment"
     else:
-        caller = judge_caller or judge_one_case_codex_exec
+        caller = judge_caller or _default_judge_caller(provider)
         consecutive_provider_failures = 0
         aborted_reason = ""
         for index, case in enumerate(cases, start=1):
             result = caller(
                 case,
-                model or DEFAULT_CODEX_EXEC_MODEL,
+                resolved_model,
                 provider_timeout,
                 max_output_tokens,
                 provider_reasoning_effort or DEFAULT_CODEX_EXEC_REASONING_EFFORT,
@@ -1656,7 +1745,7 @@ def run_judge_sync(
                     status="running_partial",
                     reason=f"processed {index}/{len(cases)} judge cases",
                     provider=provider,
-                    model=model,
+                    model=resolved_model,
                     provider_reasoning_effort=provider_reasoning_effort,
                     allow_provider_egress=allow_provider_egress,
                     dataset_output_path=dataset_output_path,
@@ -1695,7 +1784,7 @@ def run_judge_sync(
         status=status,
         reason=reason,
         provider=provider,
-        model=model,
+        model=resolved_model,
         provider_reasoning_effort=provider_reasoning_effort,
         allow_provider_egress=allow_provider_egress,
         dataset_output_path=dataset_output_path,
@@ -1729,6 +1818,139 @@ def judge_one_case_codex_exec(
     if raw.get("status") != "ok":
         return {"case_id": case["case_id"], **raw}
     return normalize_judgment(str(case["case_id"]), _mapping(raw.get("json")))
+
+
+def _default_judge_caller(provider: str) -> JudgeCaller:
+    if provider in OPENCODE_JUDGE_PROVIDERS:
+        return judge_one_case_opencode
+    return judge_one_case_codex_exec
+
+
+def _opencode_api_key() -> str:
+    # The endpoint is always OpenCode Go, so only OpenCode credentials are
+    # accepted. An explicit operator key file (--judge-api-key-file, surfaced as
+    # OPENCODE_API_KEY_FILE) wins over an ambient environment variable so the
+    # operator's intent is never silently overridden.
+    key_file = os.environ.get("OPENCODE_API_KEY_FILE", "").strip()
+    if key_file and Path(key_file).is_file():
+        key = Path(key_file).read_text(encoding="utf-8").strip()
+        if key:
+            return key
+    return os.environ.get("OPENCODE_API_KEY", "").strip()
+
+
+def judge_one_case_opencode(
+    case: dict[str, Any],
+    model: str,
+    timeout: int,
+    max_output_tokens: int,
+    reasoning_effort: str,
+) -> dict[str, Any]:
+    raw = call_openai_compatible_json(
+        prompt=PROMPT_TEXT,
+        payload={"return_schema": judge_return_schema(), "case": case},
+        model=model or DEFAULT_OPENCODE_MODEL,
+        timeout=timeout,
+        max_output_tokens=max_output_tokens,
+    )
+    if raw.get("status") != "ok":
+        return {"case_id": case["case_id"], **raw}
+    return normalize_judgment(str(case["case_id"]), _mapping(raw.get("json")))
+
+
+def call_openai_compatible_json(
+    *,
+    prompt: str,
+    payload: dict[str, Any],
+    model: str,
+    timeout: int,
+    max_output_tokens: int,
+) -> dict[str, Any]:
+    api_key = _opencode_api_key()
+    if not api_key:
+        return {"status": "provider_error", "error": "missing_api_key"}
+    base_url = (
+        os.environ.get("OPENCODE_GO_BASE_URL", DEFAULT_OPENCODE_BASE_URL)
+        or DEFAULT_OPENCODE_BASE_URL
+    ).rstrip("/")
+    body = {
+        "model": model,
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    f"{prompt}\n\nReturn only one compact JSON object matching the "
+                    "requested schema. Do not add prose, markdown or code fences."
+                ),
+            },
+            {
+                "role": "user",
+                "content": json.dumps(
+                    redact_case_for_judge(payload),
+                    ensure_ascii=False,
+                    sort_keys=True,
+                ),
+            },
+        ],
+        "temperature": 0,
+        "max_tokens": max(256, max_output_tokens),
+        "response_format": {"type": "json_object"},
+    }
+    request = Request(
+        f"{base_url}/chat/completions",
+        data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "User-Agent": "personal-assistant-judge/1.0",
+            "x-opencode-session": "personal-assistant-judge",
+            "HTTP-Referer": "https://local.openclaw/personal-assistant",
+            "X-Title": "personal-assistant-judge",
+        },
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=max(10, timeout)) as response:  # nosec B310
+            result = json.loads(response.read())
+    except HTTPError as error:
+        return {"status": "provider_error", "error": f"http_error_{error.code}"}
+    except URLError as error:
+        return {"status": "provider_error", "error": f"url_error_{type(error.reason).__name__}"}
+    except Exception as error:  # pragma: no cover - network dependent
+        return {"status": "provider_error", "error": type(error).__name__}
+    text = _chat_completion_text(result)
+    if not text:
+        return {"status": "invalid_response", "error": "missing_message_content"}
+    try:
+        parsed = json_from_text(text)
+    except Exception as error:
+        return {"status": "invalid_response", "error": f"invalid_json:{type(error).__name__}"}
+    return {"status": "ok", "json": parsed}
+
+
+def _chat_completion_text(result: object) -> str | None:
+    if not isinstance(result, dict):
+        return None
+    choices = result.get("choices")
+    if not isinstance(choices, list) or not choices:
+        return None
+    first = choices[0]
+    if not isinstance(first, dict):
+        return None
+    message = first.get("message")
+    if not isinstance(message, dict):
+        return None
+    content = message.get("content")
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = [
+            item.get("text")
+            for item in content
+            if isinstance(item, dict) and isinstance(item.get("text"), str)
+        ]
+        return "".join(parts) or None
+    return None
 
 
 def call_codex_exec_json(
@@ -2187,25 +2409,51 @@ def run_product_ux_eval(args: argparse.Namespace) -> dict[str, Any]:
                 _simulate_judge_case(spec, assistant_cache=assistant_cache)
                 for spec in selected_specs
             ]
-    return run_judge_sync(
-        cases,
-        output_path=args.output,
-        dataset_output_path=args.dataset_output,
-        md_report_path=args.md_report,
-        provider=args.provider,
-        model=args.model,
-        provider_reasoning_effort=args.provider_reasoning_effort,
-        allow_provider_egress=bool(args.allow_provider_egress),
-        provider_timeout=args.provider_timeout,
-        max_output_tokens=args.max_output_tokens,
-        quality_floor=args.quality_floor,
-        case_delay_seconds=args.case_delay_seconds,
-        progress_every=args.progress_every,
-        partial_every=args.partial_every,
-        abort_provider_failures=args.abort_provider_failures,
-        case_selection=selection,
-        corpus_metrics=_mapping(corpus.get("metrics")),
+    with _judge_provider_env(args):
+        return run_judge_sync(
+            cases,
+            output_path=args.output,
+            dataset_output_path=args.dataset_output,
+            md_report_path=args.md_report,
+            provider=args.provider,
+            model=args.model,
+            provider_reasoning_effort=args.provider_reasoning_effort,
+            allow_provider_egress=bool(args.allow_provider_egress),
+            provider_timeout=args.provider_timeout,
+            max_output_tokens=args.max_output_tokens,
+            quality_floor=args.quality_floor,
+            case_delay_seconds=args.case_delay_seconds,
+            progress_every=args.progress_every,
+            partial_every=args.partial_every,
+            abort_provider_failures=args.abort_provider_failures,
+            case_selection=selection,
+            corpus_metrics=_mapping(corpus.get("metrics")),
+        )
+
+
+@contextmanager
+def _judge_provider_env(args: argparse.Namespace) -> Any:
+    """Expose the operator-owned OpenCode Go endpoint to the judge caller only."""
+    if args.provider not in OPENCODE_JUDGE_PROVIDERS:
+        yield
+        return
+    previous = {
+        key: os.environ.get(key)
+        for key in ("OPENCODE_GO_BASE_URL", "OPENCODE_API_KEY_FILE")
+    }
+    os.environ["OPENCODE_GO_BASE_URL"] = str(
+        args.judge_base_url or DEFAULT_OPENCODE_BASE_URL
     )
+    if args.judge_api_key_file:
+        os.environ["OPENCODE_API_KEY_FILE"] = str(args.judge_api_key_file)
+    try:
+        yield
+    finally:
+        for key, value in previous.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
 
 
 class _runtime_env:

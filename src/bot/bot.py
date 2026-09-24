@@ -7,12 +7,23 @@ import json
 import logging
 import os
 import signal
-from typing import Any
+from typing import Any, Callable
 from urllib import parse, request
 
 from config.settings import Settings
-from .callbacks import handle_prm_post_answer_callback, record_callback
-from .prm_handlers import dispatch_prm_command, send_message
+from .callbacks import (
+    record_callback,
+)
+from .prm_handlers import (
+    consume_private_reply_authorization,
+    dispatch_prm_command,
+    issue_private_reply_authorizations,
+    send_message,
+)
+from prm.capabilities import AuthorizationDecision
+from prm.archive_contract import ARCHIVE_RESPONSE_INTENTS
+from prm.contracts import ArchiveSynthesisAccess, ModelEgressAccess
+from prm.routing import decide_route
 from .runtime import (
     BOT_RUNTIME_LEGACY,
     BOT_RUNTIME_PRM_ASSISTANT,
@@ -22,6 +33,9 @@ from .voice import VoiceTranscriptionUnavailable, transcribe_telegram_voice
 
 LOGGER = logging.getLogger(__name__)
 BOT_API_BASE = "https://api.telegram.org"
+
+# Kept as a parser-facing namespace inventory for legacy tests and adapters.
+# PA-02 denies every one before validation, row access or mutation.
 _PRM_CALLBACK_PREFIXES = ("prma:", "prmc:", "utdp:", "utdc:", "utdw:", "utds:")
 
 
@@ -81,6 +95,34 @@ def _telegram_answer_callback(token: str, callback_query_id: str, text: str) -> 
         raise RuntimeError(f"Telegram API returned error: {decoded!r}")
 
 
+def _answer_prm_callback(
+    token: str,
+    callback_query_id: str,
+    text: str,
+    *,
+    delivery_authorization: AuthorizationDecision | None,
+    chat_id: str,
+    actor_id: str | None,
+    owner_chat_id: str | None,
+) -> bool:
+    """Acknowledge a PA callback only through its inbound reply envelope."""
+
+    if not consume_private_reply_authorization(
+        token=token,
+        chat_id=chat_id,
+        authorization=delivery_authorization,
+        actor_id=actor_id,
+        owner_chat_id=owner_chat_id,
+    ):
+        return False
+    try:
+        _telegram_answer_callback(token, callback_query_id, text)
+    except Exception:
+        LOGGER.warning("Failed to acknowledge PRM callback")
+        return False
+    return True
+
+
 def _extract_message(update: dict[str, Any]) -> dict[str, Any] | None:
     return update.get("message") or update.get("edited_message")
 
@@ -104,13 +146,36 @@ def dispatch_command(
     text: str,
     settings: Settings,
     *,
-    runtime_mode: str = BOT_RUNTIME_LEGACY,
+    runtime_mode: str = BOT_RUNTIME_PRM_ASSISTANT,
+    actor_id: str | None = None,
+    owner_chat_id: str | None = None,
+    delivery_authorizations: tuple[AuthorizationDecision, ...] = (),
+    utd_draft_authorization: AuthorizationDecision | None = None,
+    model_access: ModelEgressAccess | None = None,
+    archive_synthesis_access: ArchiveSynthesisAccess | None = None,
 ) -> None:
-    """Stable patch point and explicit compatibility dispatcher."""
+    """Stable patch point and explicit compatibility dispatcher.
+
+    The default is the gated PRM assistant so that omitting ``runtime_mode``
+    can never silently reach the ungated legacy sender. Legacy dispatch still
+    works when a caller passes ``runtime_mode="legacy"`` explicitly.
+    """
 
     mode = normalize_bot_runtime_mode(runtime_mode)
     if mode == BOT_RUNTIME_PRM_ASSISTANT:
-        dispatch_prm_command(chat_id, text, settings)
+        prm_kwargs: dict[str, object] = {
+            "actor_id": actor_id,
+            "owner_chat_id": owner_chat_id,
+        }
+        if delivery_authorizations:
+            prm_kwargs["delivery_authorizations"] = delivery_authorizations
+        if utd_draft_authorization is not None:
+            prm_kwargs["utd_draft_authorization"] = utd_draft_authorization
+        if model_access is not None:
+            prm_kwargs["model_access"] = model_access
+        if archive_synthesis_access is not None:
+            prm_kwargs["archive_synthesis_access"] = archive_synthesis_access
+        dispatch_prm_command(chat_id, text, settings, **prm_kwargs)
         return
     legacy = import_module("bot.legacy_handlers")
     legacy.dispatch_command(
@@ -146,7 +211,7 @@ def _voice_received_message(runtime_mode: str) -> str:
 def _voice_unavailable_message(runtime_mode: str) -> str:
     if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT:
         return (
-            "Голосовое распознавание недоступно: OPENAI_API_KEY не настроен. "
+            "Голосовое распознавание недоступно по текущей политике доступа. "
             "Отправь обычное текстовое сообщение."
         )
     return (
@@ -161,7 +226,20 @@ def _voice_failed_message(runtime_mode: str) -> str:
     return "Не смог распознать голосовое. Отправь сообщение текстом."
 
 
-def run_bot(settings: Settings, *, runtime_mode: str = BOT_RUNTIME_LEGACY) -> None:
+def run_bot(
+    settings: Settings,
+    *,
+    runtime_mode: str = BOT_RUNTIME_PRM_ASSISTANT,
+    model_access_provider: Callable[[str, str, str], ModelEgressAccess | None] | None = None,
+    archive_synthesis_access_provider: Callable[[str, str, str], ArchiveSynthesisAccess | None] | None = None,
+) -> None:
+    """Run the PA-safe polling surface; legacy polling is opt-in only.
+
+    The historical legacy runtime retains unguarded compatibility transports.
+    It must therefore never be selected by omission from the PA entrypoint:
+    callers that maintain that separate surface must name ``legacy`` explicitly.
+    """
+
     runtime_mode = normalize_bot_runtime_mode(runtime_mode)
     token, owner_chat_id = _load_bot_env()
     if not token or not owner_chat_id:
@@ -173,17 +251,16 @@ def run_bot(settings: Settings, *, runtime_mode: str = BOT_RUNTIME_LEGACY) -> No
     state = _BotState()
     _install_signal_handlers(state)
     offset: int | None = None
-    LOGGER.info(
-        "Telegram polling started owner_chat_id=%s runtime_mode=%s",
-        owner_chat_id,
-        runtime_mode,
-    )
+    LOGGER.info("Telegram polling started runtime_mode=%s", runtime_mode)
 
     while True:
         try:
             updates = _telegram_get_updates(token=token, offset=offset)
         except Exception:
-            LOGGER.warning("Telegram getUpdates failed", exc_info=True)
+            # Provider exceptions can include a request URL (and therefore a
+            # bot credential) or response metadata.  Do not attach them to
+            # the ordinary PA runtime log.
+            LOGGER.warning("Telegram getUpdates failed")
             if state.stop_requested:
                 break
             continue
@@ -205,11 +282,25 @@ def run_bot(settings: Settings, *, runtime_mode: str = BOT_RUNTIME_LEGACY) -> No
             if message is None or not _is_authorized_message(message, owner_chat_id):
                 continue
             chat_id = str((message.get("chat") or {}).get("id", owner_chat_id))
+            actor_id = str((message.get("from") or {}).get("id") or "")
             # PRM answers can contain private archive excerpts.  Sender-based
             # owner authorization is retained for legacy operations, but the
             # PRM surface is deliberately private-chat-only.
-            if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT and chat_id != owner_chat_id:
+            if (
+                runtime_mode == BOT_RUNTIME_PRM_ASSISTANT
+                and (chat_id != owner_chat_id or actor_id != owner_chat_id)
+            ):
                 continue
+            delivery_authorizations = (
+                issue_private_reply_authorizations(
+                    token=token,
+                    chat_id=chat_id,
+                    actor_id=actor_id,
+                    owner_chat_id=owner_chat_id,
+                )
+                if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT
+                else ()
+            )
             text = str(message.get("text") or "").strip()
             if text:
                 command = (
@@ -218,60 +309,234 @@ def run_bot(settings: Settings, *, runtime_mode: str = BOT_RUNTIME_LEGACY) -> No
                     else _operator_text_command(text, runtime_mode=runtime_mode)
                 )
                 if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT:
+                    model_access = _model_access_for_command(
+                        model_access_provider,
+                        command=command,
+                        chat_id=chat_id,
+                        actor_id=actor_id,
+                        owner_chat_id=owner_chat_id,
+                    )
+                    archive_synthesis_access = _archive_synthesis_access_for_command(
+                        archive_synthesis_access_provider,
+                        command=command,
+                        chat_id=chat_id,
+                        actor_id=actor_id,
+                        owner_chat_id=owner_chat_id,
+                    )
                     dispatch_command(
                         chat_id=chat_id,
                         text=command,
                         settings=settings,
                         runtime_mode=runtime_mode,
+                        actor_id=actor_id,
+                        owner_chat_id=owner_chat_id,
+                        delivery_authorizations=delivery_authorizations,
+                        model_access=model_access,
+                        archive_synthesis_access=archive_synthesis_access,
                     )
                 else:
-                    dispatch_command(chat_id=chat_id, text=command, settings=settings)
+                    dispatch_command(chat_id=chat_id, text=command, settings=settings, runtime_mode=runtime_mode)
                 continue
 
             transcript = _embedded_voice_transcript(message)
             if transcript:
                 command = _voice_text_command(transcript, runtime_mode=runtime_mode)
                 if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT:
+                    model_access = _model_access_for_command(
+                        model_access_provider,
+                        command=command,
+                        chat_id=chat_id,
+                        actor_id=actor_id,
+                        owner_chat_id=owner_chat_id,
+                    )
+                    archive_synthesis_access = _archive_synthesis_access_for_command(
+                        archive_synthesis_access_provider,
+                        command=command,
+                        chat_id=chat_id,
+                        actor_id=actor_id,
+                        owner_chat_id=owner_chat_id,
+                    )
                     dispatch_command(
                         chat_id=chat_id,
                         text=command,
                         settings=settings,
                         runtime_mode=runtime_mode,
+                        actor_id=actor_id,
+                        owner_chat_id=owner_chat_id,
+                        delivery_authorizations=delivery_authorizations,
+                        model_access=model_access,
+                        archive_synthesis_access=archive_synthesis_access,
                     )
                 else:
-                    dispatch_command(chat_id=chat_id, text=command, settings=settings)
+                    dispatch_command(chat_id=chat_id, text=command, settings=settings, runtime_mode=runtime_mode)
                 continue
             if not message.get("voice"):
                 continue
 
-            send_message(token, chat_id, _voice_received_message(runtime_mode))
+            send_message(
+                token,
+                chat_id,
+                _voice_received_message(runtime_mode),
+                delivery_authorization=delivery_authorizations[0] if delivery_authorizations else None,
+                actor_id=actor_id,
+                owner_chat_id=owner_chat_id,
+            )
             try:
                 transcript = transcribe_telegram_voice(
                     token=token,
                     file_id=str((message.get("voice") or {}).get("file_id") or ""),
                 )
             except VoiceTranscriptionUnavailable:
-                send_message(token, chat_id, _voice_unavailable_message(runtime_mode))
+                send_message(
+                    token,
+                    chat_id,
+                    _voice_unavailable_message(runtime_mode),
+                    delivery_authorization=delivery_authorizations[1] if len(delivery_authorizations) > 1 else None,
+                    actor_id=actor_id,
+                    owner_chat_id=owner_chat_id,
+                )
                 continue
             except Exception:
-                LOGGER.warning("Voice transcription failed chat_id=%s", chat_id, exc_info=True)
-                send_message(token, chat_id, _voice_failed_message(runtime_mode))
+                # A provider exception may contain attachment, account or
+                # transport details.  The reply is intentionally generic too.
+                LOGGER.warning("Voice transcription failed")
+                send_message(
+                    token,
+                    chat_id,
+                    _voice_failed_message(runtime_mode),
+                    delivery_authorization=delivery_authorizations[1] if len(delivery_authorizations) > 1 else None,
+                    actor_id=actor_id,
+                    owner_chat_id=owner_chat_id,
+                )
                 continue
             command = _voice_text_command(transcript, runtime_mode=runtime_mode)
             if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT:
+                model_access = _model_access_for_command(
+                    model_access_provider,
+                    command=command,
+                    chat_id=chat_id,
+                    actor_id=actor_id,
+                    owner_chat_id=owner_chat_id,
+                )
+                archive_synthesis_access = _archive_synthesis_access_for_command(
+                    archive_synthesis_access_provider,
+                    command=command,
+                    chat_id=chat_id,
+                    actor_id=actor_id,
+                    owner_chat_id=owner_chat_id,
+                )
                 dispatch_command(
                     chat_id=chat_id,
                     text=command,
                     settings=settings,
                     runtime_mode=runtime_mode,
+                    actor_id=actor_id,
+                    owner_chat_id=owner_chat_id,
+                    delivery_authorizations=delivery_authorizations[1:],
+                    model_access=model_access,
+                    archive_synthesis_access=archive_synthesis_access,
                 )
             else:
-                dispatch_command(chat_id=chat_id, text=command, settings=settings)
+                dispatch_command(chat_id=chat_id, text=command, settings=settings, runtime_mode=runtime_mode)
 
         if state.stop_requested:
             break
 
     LOGGER.info("Telegram polling stopped runtime_mode=%s", runtime_mode)
+
+
+def _model_access_for_private_turn(
+    provider: Callable[[str, str, str], ModelEgressAccess | None] | None,
+    *,
+    chat_id: str,
+    actor_id: str,
+    owner_chat_id: str,
+) -> ModelEgressAccess | None:
+    """Obtain one injected, already-reserved model access without minting grants.
+
+    The runtime has no durable grant source. A separately authorized deployment
+    may provide a fresh typed reservation per private turn; malformed values or
+    provider failures remain default-deny.
+    """
+
+    if provider is None:
+        return None
+    try:
+        access = provider(chat_id, actor_id, owner_chat_id)
+    except Exception:
+        LOGGER.warning("PA model access provider failed")
+        return None
+    return access if isinstance(access, ModelEgressAccess) else None
+
+
+def _model_access_for_command(
+    provider: Callable[[str, str, str], ModelEgressAccess | None] | None,
+    *,
+    command: str,
+    chat_id: str,
+    actor_id: str,
+    owner_chat_id: str,
+) -> ModelEgressAccess | None:
+    """Reserve model access only for a turn that the local router classifies as chat."""
+
+    clean = str(command or "").strip()
+    parts = clean.split(maxsplit=1)
+    name = parts[0].split("@", 1)[0].casefold() if parts else "/auto"
+    query = parts[1].strip() if len(parts) > 1 else ""
+    requested_mode = {"/chat": "chat", "/research": "research", "/brief": "brief"}.get(name, "auto")
+    if decide_route(query, requested_mode=requested_mode).mode != "chat":
+        return None
+    return _model_access_for_private_turn(
+        provider,
+        chat_id=chat_id,
+        actor_id=actor_id,
+        owner_chat_id=owner_chat_id,
+    )
+
+
+def _archive_synthesis_access_for_private_turn(
+    provider: Callable[[str, str, str], ArchiveSynthesisAccess | None] | None,
+    *,
+    chat_id: str,
+    actor_id: str,
+    owner_chat_id: str,
+) -> ArchiveSynthesisAccess | None:
+    """Receive one externally reserved paired access; never mint a grant here."""
+
+    if provider is None:
+        return None
+    try:
+        access = provider(chat_id, actor_id, owner_chat_id)
+    except Exception:
+        LOGGER.warning("PA archive synthesis access provider failed")
+        return None
+    return access if isinstance(access, ArchiveSynthesisAccess) else None
+
+
+def _archive_synthesis_access_for_command(
+    provider: Callable[[str, str, str], ArchiveSynthesisAccess | None] | None,
+    *,
+    command: str,
+    chat_id: str,
+    actor_id: str,
+    owner_chat_id: str,
+) -> ArchiveSynthesisAccess | None:
+    """Request paired access only for local archive intents, never chat/current facts."""
+
+    clean = str(command or "").strip()
+    parts = clean.split(maxsplit=1)
+    name = parts[0].split("@", 1)[0].casefold() if parts else "/auto"
+    query = parts[1].strip() if len(parts) > 1 else ""
+    requested_mode = {"/chat": "chat", "/research": "research", "/brief": "brief"}.get(name, "auto")
+    route = decide_route(query, requested_mode=requested_mode)
+    if route.primary_intent not in ARCHIVE_RESPONSE_INTENTS:
+        return None
+    return _archive_synthesis_access_for_private_turn(
+        provider,
+        chat_id=chat_id,
+        actor_id=actor_id,
+        owner_chat_id=owner_chat_id,
+    )
 
 
 def _handle_callback(
@@ -283,64 +548,63 @@ def _handle_callback(
     runtime_mode: str,
 ) -> None:
     callback_id = str(callback.get("id") or "")
-    if not _is_authorized_callback(callback, owner_chat_id):
-        if callback_id:
-            _telegram_answer_callback(token, callback_id, "Not authorized")
-        return
-    callback_chat_id = str((((callback.get("message") or {}).get("chat") or {}).get("id")) or "")
-    if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT and callback_chat_id != owner_chat_id:
-        if callback_id:
-            _telegram_answer_callback(token, callback_id, "PRM доступен только в личном чате владельца")
-        return
     data = str(callback.get("data") or "")
+    callback_chat_id = str((((callback.get("message") or {}).get("chat") or {}).get("id")) or "")
+    callback_actor_id = str((callback.get("from") or {}).get("id") or "")
+    callback_delivery_authorizations = (
+        issue_private_reply_authorizations(
+            token=token,
+            chat_id=callback_chat_id,
+            actor_id=callback_actor_id,
+            owner_chat_id=owner_chat_id,
+        )
+        if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT
+        else ()
+    )
+
+    callback_decisions = iter(callback_delivery_authorizations)
+
+    def next_callback_decision() -> AuthorizationDecision | None:
+        return next(callback_decisions, None)
+
+    def acknowledge_callback(text: str) -> bool:
+        if not callback_id:
+            return False
+        if runtime_mode != BOT_RUNTIME_PRM_ASSISTANT:
+            _telegram_answer_callback(token, callback_id, text)
+            return True
+        return _answer_prm_callback(
+            token,
+            callback_id,
+            text,
+            delivery_authorization=next_callback_decision(),
+            chat_id=callback_chat_id,
+            actor_id=callback_actor_id,
+            owner_chat_id=owner_chat_id,
+        )
+
+    if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT:
+        # A callback can name an already persisted PRM/UTD proposal, but the
+        # PA-02 return envelope only authorizes a bounded reply. It grants no
+        # local mutation authority. Do not validate, load or apply any callback
+        # action until its owning slice supplies an exact write capability.
+        acknowledge_callback("Action unavailable")
+        return
+    if not _is_authorized_callback(callback, owner_chat_id):
+        acknowledge_callback("Not authorized")
+        return
     english_feedback = data.startswith("utdw:") and data.endswith(":en")
     answer = "Готово"
-    callback_acknowledged = False
-    if (
-        callback_id
-        and runtime_mode == BOT_RUNTIME_PRM_ASSISTANT
-        and data.startswith(_PRM_CALLBACK_PREFIXES)
-        and not english_feedback
-    ):
-        try:
-            _telegram_answer_callback(token, callback_id, "Принято")
-            callback_acknowledged = True
-        except Exception:
-            LOGGER.warning(
-                "Failed to answer callback query id=%s", callback_id, exc_info=True
-            )
     try:
-        if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT:
-            if not data.startswith(_PRM_CALLBACK_PREFIXES):
-                answer = "PRM safe mode: legacy callbacks are disabled."
-            else:
-                chat_id = callback_chat_id
-                result = handle_prm_post_answer_callback(
-                    settings, data, chat_id=chat_id, actor_id=str((callback.get("from") or {}).get("id") or "")
-                )
-                message = str(result.get("message") or "")
-                if message:
-                    send_message(
-                        token,
-                        chat_id,
-                        message,
-                        parse_mode=None,
-                        reply_markup=result.get("reply_markup"),
-                    )
-                if english_feedback:
-                    answer = "Recorded"
-        else:
-            answer = record_callback(settings, data)
+        answer = record_callback(settings, data)
     except Exception:
-        LOGGER.warning("Callback handling failed data=%s", data, exc_info=True)
+        LOGGER.warning("Callback handling failed")
         answer = "Could not record feedback" if english_feedback else "Не смог обработать действие"
-    if callback_id and not callback_acknowledged:
+    if callback_id:
         try:
-            _telegram_answer_callback(token, callback_id, answer)
+            acknowledge_callback(answer)
         except Exception:
-            LOGGER.warning(
-                "Failed to answer callback query id=%s", callback_id, exc_info=True
-            )
+            LOGGER.warning("Failed to answer callback query")
 
 
 def _embedded_voice_transcript(message: dict[str, Any]) -> str:

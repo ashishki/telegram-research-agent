@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://telegram-research-agent.local/schemas/assistant_capability_grant.v1.schema.json",
+  "title": "CapabilityGrant v1",
+  "description": "A versioned, machine-checkable grant. It is an authorization record, not a provider credential.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "grant_id", "owner_ref", "connection_ref", "capability", "provider_policy", "validity", "status"],
+  "properties": {
+    "schema_version": {"const": "assistant.capability_grant.v1"},
+    "grant_id": {"type": "string", "pattern": "^grant_[a-z0-9_-]{3,120}$"},
+    "owner_ref": {"type": "string", "pattern": "^owner_[a-z0-9_-]{3,120}$"},
+    "connection_ref": {"type": ["string", "null"], "pattern": "^connection_[a-z0-9_-]{3,120}$"},
+    "capability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "resource_refs", "operations", "data_classes", "purpose"],
+      "properties": {
+        "name": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]{2,80}$"},
+        "resource_refs": {"type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 512}},
+        "operations": {"type": "array", "minItems": 1, "maxItems": 8, "uniqueItems": true, "items": {"type": "string", "enum": ["read", "prepare", "deliver", "write", "delete", "model_egress"]}},
+        "data_classes": {"type": "array", "minItems": 1, "maxItems": 8, "uniqueItems": true, "items": {"type": "string", "enum": ["public", "user_provided", "private_archive", "private_connector_metadata", "private_connector_content", "model_generated"]}},
+        "purpose": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]{2,80}$"}
+      }
+    },
+    "provider_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["egress", "permitted_provider_refs", "fallback_allowed", "maximum_request_count"],
+      "properties": {
+        "egress": {"type": "string", "enum": ["deny", "allow"]},
+        "permitted_provider_refs": {"type": "array", "maxItems": 16, "uniqueItems": true, "items": {"type": "string", "pattern": "^provider_[a-z0-9_.-]{3,120}$"}},
+        "fallback_allowed": {"type": "boolean"},
+        "maximum_request_count": {"type": "integer", "minimum": 0, "maximum": 100000}
+      }
+    },
+    "validity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["issued_at", "expires_at", "revision", "revoked_at"],
+      "properties": {
+        "issued_at": {"type": "string", "format": "date-time"},
+        "expires_at": {"type": ["string", "null"], "format": "date-time"},
+        "revision": {"type": "integer", "minimum": 1},
+        "revoked_at": {"type": ["string", "null"], "format": "date-time"}
+      }
+    },
+    "status": {"type": "string", "enum": ["active", "revoked", "expired"]}
+  },
+  "allOf": [
+    {"if": {"properties": {"provider_policy": {"properties": {"egress": {"const": "deny"}}, "required": ["egress"]}}}, "then": {"properties": {"provider_policy": {"properties": {"permitted_provider_refs": {"maxItems": 0}}}}}},
+    {"if": {"properties": {"provider_policy": {"properties": {"egress": {"const": "allow"}}, "required": ["egress"]}}}, "then": {"properties": {"provider_policy": {"properties": {"permitted_provider_refs": {"minItems": 1}}}}}},
+    {"if": {"properties": {"status": {"const": "revoked"}}, "required": ["status"]}, "then": {"properties": {"validity": {"properties": {"revoked_at": {"type": "string"}}}}}},
+    {"if": {"properties": {"status": {"const": "active"}}, "required": ["status"]}, "then": {"properties": {"validity": {"properties": {"revoked_at": {"type": "null"}}}}}}
+  ]
+}

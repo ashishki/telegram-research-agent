@@ -5,7 +5,9 @@ import tempfile
 import time
 import types
 import unittest
-from dataclasses import FrozenInstanceError
+from datetime import datetime, timedelta, timezone
+from dataclasses import FrozenInstanceError, replace
+from threading import Event, Thread
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -35,7 +37,57 @@ _install_stub(
 )
 
 import llm.client as client  # noqa: E402
+import llm.vision as vision  # noqa: E402
 from db.migrate import run_migrations  # noqa: E402
+from prm.capabilities import AuthorizationRequest, CapabilityGrant, CapabilityRegistry, ProviderPolicy  # noqa: E402
+
+
+SYNTHETIC_ANTHROPIC_KEY = "synthetic-anthropic-key"
+SYNTHETIC_ANTHROPIC_CONNECTION = client._anthropic_connection_ref(SYNTHETIC_ANTHROPIC_KEY)
+assert SYNTHETIC_ANTHROPIC_CONNECTION is not None
+
+AUTH_SCOPE = {
+    "owner_ref": "owner_synthetic_primary",
+    "connection_ref": SYNTHETIC_ANTHROPIC_CONNECTION,
+    "resource_ref": "resource_conversation",
+}
+
+
+def _authorization(
+    *,
+    capability: str = "model.generate",
+    purpose: str = "answer.request",
+    data_class: str = "user_provided",
+    operation_ref: str | None = "operation_synthetic_anthropic_001",
+):
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    grant = CapabilityGrant(
+        grant_id=f"grant_synthetic_{capability.replace('.', '_')}",
+        owner_ref="owner_synthetic_primary",
+        connection_ref=SYNTHETIC_ANTHROPIC_CONNECTION,
+        capability=capability,
+        resource_refs=("resource_conversation",),
+        operations=("model_egress",),
+        data_classes=(data_class,),
+        purpose=purpose,
+        provider_policy=ProviderPolicy(("provider_anthropic",)),
+        issued_at=now - timedelta(minutes=1),
+        expires_at=now + timedelta(hours=1),
+        revision=1,
+    )
+    request = AuthorizationRequest(
+        owner_ref="owner_synthetic_primary",
+        capability=capability,
+        resource_ref="resource_conversation",
+        operation="model_egress",
+        data_class=data_class,
+        provider_ref="provider_anthropic",
+        purpose=purpose,
+        connection_ref=SYNTHETIC_ANTHROPIC_CONNECTION,
+        expected_grant_revision=1,
+        operation_ref=operation_ref,
+    )
+    return CapabilityRegistry((grant,)).authorize_and_reserve(request, now=now)
 
 
 class TestLLMClient(unittest.TestCase):
@@ -43,15 +95,179 @@ class TestLLMClient(unittest.TestCase):
         self.tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
         self.tmp.close()
         self.db_path = self.tmp.name
+        self.credential_env = patch.dict(
+            os.environ,
+            {"ANTHROPIC_API_KEY": SYNTHETIC_ANTHROPIC_KEY},
+            clear=False,
+        )
+        self.credential_env.start()
         client.set_usage_db_path("")
         with patch.dict(os.environ, {"AGENT_DB_PATH": self.db_path}):
             run_migrations()
+        self.text_authorization = _authorization()
+        self.vision_authorization = _authorization(capability="model.vision")
 
     def tearDown(self) -> None:
+        self.credential_env.stop()
         client.set_usage_db_path("")
         os.unlink(self.db_path)
 
-    def test_complete_records_llm_usage_row(self):
+    def test_get_client_disables_sdk_retries_for_a_granted_transport(self):
+        constructed = object()
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "synthetic-key"}, clear=True):
+            with patch.object(client, "Anthropic", return_value=constructed) as anthropic:
+                assert client._get_client() is constructed
+
+        anthropic.assert_called_once_with(api_key="synthetic-key", max_retries=0)
+
+    def test_text_transport_rejects_a_reservation_for_another_purpose_before_provider_call(self):
+        fake_transport = unittest.mock.Mock()
+        fake_client = SimpleNamespace(messages=SimpleNamespace(create=fake_transport))
+
+        with patch.object(client, "_get_client", return_value=fake_client):
+            with self.assertRaises(client.LLMError):
+                client.complete(
+                    prompt="Synthetic question",
+                    authorization=_authorization(purpose="answer.context"),
+                    **AUTH_SCOPE,
+                )
+
+        fake_transport.assert_not_called()
+
+    def test_text_transport_rejects_private_archive_even_with_a_matching_grant_before_provider_call(self):
+        fake_transport = unittest.mock.Mock()
+        fake_client = SimpleNamespace(messages=SimpleNamespace(create=fake_transport))
+
+        with patch.object(client, "_get_client", return_value=fake_client):
+            with self.assertRaisesRegex(client.LLMError, "direct user-provided"):
+                client.complete(
+                    prompt="private archive sentinel",
+                    authorization=_authorization(data_class="private_archive"),
+                    data_class="private_archive",
+                    **AUTH_SCOPE,
+                )
+
+        fake_transport.assert_not_called()
+
+    def test_text_transport_rejects_a_grant_for_another_active_credential_before_provider_call(self):
+        granted_key = "synthetic-anthropic-grant-a"
+        active_key = "synthetic-anthropic-credential-b"
+        granted_connection_ref = client._anthropic_connection_ref(granted_key)
+        assert granted_connection_ref is not None
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        grant = CapabilityGrant(
+            grant_id="grant_synthetic_anthropic_connection_a",
+            owner_ref="owner_synthetic_primary",
+            connection_ref=granted_connection_ref,
+            capability="model.generate",
+            resource_refs=("resource_conversation",),
+            operations=("model_egress",),
+            data_classes=("user_provided",),
+            purpose="answer.request",
+            provider_policy=ProviderPolicy(("provider_anthropic",)),
+            issued_at=now - timedelta(minutes=1),
+            expires_at=now + timedelta(hours=1),
+            revision=1,
+        )
+        decision = CapabilityRegistry((grant,)).authorize_and_reserve(
+            AuthorizationRequest(
+                owner_ref="owner_synthetic_primary",
+                connection_ref=granted_connection_ref,
+                capability="model.generate",
+                resource_ref="resource_conversation",
+                operation="model_egress",
+                data_class="user_provided",
+                provider_ref="provider_anthropic",
+                purpose="answer.request",
+                expected_grant_revision=1,
+            ),
+            now=now,
+        )
+        fake_transport = unittest.mock.Mock()
+        fake_client = SimpleNamespace(messages=SimpleNamespace(create=fake_transport))
+
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": active_key}, clear=False), patch.object(
+            client, "_get_client", return_value=fake_client
+        ):
+            with self.assertRaises(client.LLMError):
+                client.complete(
+                    prompt="Synthetic question",
+                    authorization=decision,
+                    owner_ref="owner_synthetic_primary",
+                    connection_ref=granted_connection_ref,
+                    resource_ref="resource_conversation",
+                )
+
+        fake_transport.assert_not_called()
+
+    def test_text_transport_rejects_a_null_connection_ref_before_provider_call(self):
+        fake_transport = unittest.mock.Mock()
+        fake_client = SimpleNamespace(messages=SimpleNamespace(create=fake_transport))
+
+        with patch.object(client, "_get_client", return_value=fake_client):
+            with self.assertRaises(client.LLMError):
+                client.complete(
+                    prompt="Synthetic question",
+                    authorization=self.text_authorization,
+                    owner_ref="owner_synthetic_primary",
+                    connection_ref=None,
+                    resource_ref="resource_conversation",
+                )
+
+        fake_transport.assert_not_called()
+
+    def test_revoked_or_revision_stale_text_reservation_cannot_write_usage(self):
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        for change in ("revoke", "revision"):
+            with self.subTest(change=change):
+                grant = CapabilityGrant(
+                    grant_id=f"grant_synthetic_usage_{change}",
+                    owner_ref="owner_synthetic_primary",
+                    connection_ref=SYNTHETIC_ANTHROPIC_CONNECTION,
+                    capability="model.generate",
+                    resource_refs=("resource_conversation",),
+                    operations=("model_egress",),
+                    data_classes=("user_provided",),
+                    purpose="answer.request",
+                    provider_policy=ProviderPolicy(("provider_anthropic",)),
+                    issued_at=now - timedelta(minutes=1),
+                    expires_at=now + timedelta(hours=1),
+                    revision=1,
+                )
+                registry = CapabilityRegistry((grant,))
+                decision = registry.authorize_and_reserve(
+                    AuthorizationRequest(
+                        owner_ref="owner_synthetic_primary",
+                        connection_ref=SYNTHETIC_ANTHROPIC_CONNECTION,
+                        capability="model.generate",
+                        resource_ref="resource_conversation",
+                        operation="model_egress",
+                        data_class="user_provided",
+                        provider_ref="provider_anthropic",
+                        purpose="answer.request",
+                        expected_grant_revision=1,
+                    ),
+                    now=now,
+                )
+                if change == "revoke":
+                    registry.revoke_grant(grant.grant_id)
+                else:
+                    registry.replace_grant(replace(grant, revision=2))
+                fake_transport = unittest.mock.Mock()
+                fake_client = SimpleNamespace(messages=SimpleNamespace(create=fake_transport))
+                with patch.object(client, "_get_client", return_value=fake_client):
+                    with self.assertRaises(client.LLMError):
+                        client.complete(
+                            prompt="Synthetic question",
+                            authorization=decision,
+                            **AUTH_SCOPE,
+                        )
+                fake_transport.assert_not_called()
+                with sqlite3.connect(self.db_path) as connection:
+                    count = connection.execute("SELECT COUNT(*) FROM llm_usage").fetchone()[0]
+                self.assertEqual(count, 0)
+
+    def test_complete_does_not_persist_llm_usage_without_a_local_write_grant(self):
         response = SimpleNamespace(
             content=[SimpleNamespace(type="text", text="hello world")],
             usage=SimpleNamespace(input_tokens=123, output_tokens=45),
@@ -60,7 +276,10 @@ class TestLLMClient(unittest.TestCase):
 
         with patch.dict(os.environ, {"AGENT_DB_PATH": self.db_path}, clear=False):
             with patch.object(client, "_get_client", return_value=mock_client):
-                result = client.complete(prompt="hi", category="test", model="claude-haiku-4-5")
+                result = client.complete(
+                    prompt="hi", category="test", model="claude-haiku-4-5",
+                    authorization=self.text_authorization, **AUTH_SCOPE,
+                )
 
         self.assertEqual(result, "hello world")
         with sqlite3.connect(self.db_path) as connection:
@@ -73,10 +292,7 @@ class TestLLMClient(unittest.TestCase):
                 """
             ).fetchone()
 
-        self.assertEqual(row[0], "claude-haiku-4-5")
-        self.assertEqual(row[1], "test")
-        self.assertEqual(row[2], 123)
-        self.assertEqual(row[3], 45)
+        self.assertIsNone(row)
 
     def test_complete_with_receipt_returns_immutable_usage_metadata(self):
         response = SimpleNamespace(
@@ -91,6 +307,8 @@ class TestLLMClient(unittest.TestCase):
                     prompt="hi",
                     category="test",
                     model="claude-haiku-4-5",
+                    authorization=self.text_authorization,
+                    **AUTH_SCOPE,
                 )
 
         self.assertEqual(receipt.text, "receipt text")
@@ -100,40 +318,193 @@ class TestLLMClient(unittest.TestCase):
         self.assertAlmostEqual(receipt.estimated_cost_usd, 0.0002)
         self.assertGreaterEqual(receipt.duration_ms, 0)
         self.assertEqual(receipt.attempts, 1)
-        self.assertTrue(receipt.usage_recorded)
+        self.assertFalse(receipt.usage_recorded)
         with self.assertRaises(FrozenInstanceError):
             receipt.text = "changed"
 
-    def test_complete_with_receipt_reports_successful_retry_attempt_count(self):
-        response = SimpleNamespace(
-            content=[SimpleNamespace(type="text", text="retried")],
-            usage=SimpleNamespace(input_tokens=10, output_tokens=5),
-        )
+    def test_complete_with_receipt_does_not_retry_an_unknown_provider_outcome(self):
         calls = 0
 
         def create(**_kwargs):
             nonlocal calls
             calls += 1
-            if calls == 1:
-                raise RuntimeError("temporary failure")
-            return response
+            raise RuntimeError("temporary failure")
 
         mock_client = SimpleNamespace(messages=SimpleNamespace(create=create))
         with patch.dict(os.environ, {"AGENT_DB_PATH": self.db_path}, clear=False):
-            with (
-                patch.object(client, "_get_client", return_value=mock_client),
-                patch.object(client, "_should_retry", return_value=True),
-                patch.object(client.time, "sleep"),
-            ):
-                receipt = client.complete_with_receipt(
-                    prompt="retry",
-                    category="test",
-                    model="claude-haiku-4-5",
+            with patch.object(client, "_get_client", return_value=mock_client):
+                with self.assertRaises(client.LLMError):
+                    client.complete_with_receipt(
+                        prompt="retry",
+                        category="test",
+                        model="claude-haiku-4-5",
+                        max_attempts=3,
+                        authorization=self.text_authorization,
+                        **AUTH_SCOPE,
+                    )
+
+        self.assertEqual(calls, 1)
+
+    def test_unknown_anthropic_outcome_blocks_same_operation_until_reconciliation(self):
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        operation_ref = "operation_synthetic_anthropic_unknown_001"
+        grant = CapabilityGrant(
+            grant_id="grant_synthetic_anthropic_unknown",
+            owner_ref="owner_synthetic_primary",
+            connection_ref=SYNTHETIC_ANTHROPIC_CONNECTION,
+            capability="model.generate",
+            resource_refs=("resource_conversation",),
+            operations=("model_egress",),
+            data_classes=("user_provided",),
+            purpose="answer.request",
+            provider_policy=ProviderPolicy(("provider_anthropic",), maximum_request_count=3),
+            issued_at=now - timedelta(minutes=1),
+            expires_at=now + timedelta(hours=1),
+            revision=1,
+        )
+        request = AuthorizationRequest(
+            owner_ref="owner_synthetic_primary",
+            connection_ref=SYNTHETIC_ANTHROPIC_CONNECTION,
+            capability="model.generate",
+            resource_ref="resource_conversation",
+            operation="model_egress",
+            data_class="user_provided",
+            provider_ref="provider_anthropic",
+            purpose="answer.request",
+            expected_grant_revision=1,
+            operation_ref=operation_ref,
+        )
+        registry = CapabilityRegistry((grant,))
+        calls = 0
+
+        def create(**_kwargs):
+            nonlocal calls
+            calls += 1
+            raise TimeoutError("synthetic unknown provider outcome")
+
+        fake_client = SimpleNamespace(messages=SimpleNamespace(create=create))
+        with patch.object(client, "_get_client", return_value=fake_client):
+            with self.assertRaises(client.LLMOutcomeUnknown) as error:
+                client.complete_with_receipt(
+                    prompt="retry sentinel",
+                    authorization=registry.authorize_and_reserve(request),
+                    **AUTH_SCOPE,
                 )
 
-        self.assertEqual(receipt.text, "retried")
-        self.assertEqual(receipt.attempts, 2)
-        self.assertTrue(receipt.usage_recorded)
+        self.assertTrue(error.exception.receipt.external_call_attempted)
+        self.assertEqual(error.exception.receipt.delivery_outcome, "unknown")
+        self.assertEqual(calls, 1)
+        self.assertEqual(
+            registry.authorize_and_reserve(request).reason,
+            "operation_outcome_unknown",
+        )
+        self.assertTrue(registry.reconcile_unknown_operation(operation_ref, delivery_outcome="delivered"))
+        self.assertEqual(
+            registry.authorize_and_reserve(request).reason,
+            "operation_already_delivered",
+        )
+
+        recovered_request = replace(
+            request,
+            operation_ref="operation_synthetic_anthropic_not_delivered_001",
+        )
+        recovered = registry.authorize_and_reserve(recovered_request)
+        assert recovered.reservation is not None
+        self.assertTrue(recovered.reservation.consume())
+        recovered.reservation.record_delivery_outcome("unknown")
+        self.assertTrue(
+            registry.reconcile_unknown_operation(
+                recovered_request.operation_ref or "",
+                delivery_outcome="not_delivered",
+            )
+        )
+        self.assertTrue(registry.authorize_and_reserve(recovered_request).allowed)
+
+    def test_anthropic_committed_reservation_cannot_reopen_before_fake_transport(self):
+        operation_ref = "operation_synthetic_anthropic_committed_001"
+        authorization = _authorization(operation_ref=operation_ref)
+        assert authorization.reservation is not None
+        registry = authorization.reservation.registry
+        request = authorization.reservation._request
+        transport_entered = Event()
+        release_transport = Event()
+        calls = 0
+        errors: list[BaseException] = []
+        response = SimpleNamespace(
+            content=[SimpleNamespace(type="text", text="synthetic response")],
+            usage=SimpleNamespace(input_tokens=1, output_tokens=1),
+        )
+
+        def create(**_kwargs):
+            nonlocal calls
+            calls += 1
+            transport_entered.set()
+            assert release_transport.wait(timeout=5)
+            return response
+
+        fake_client = SimpleNamespace(messages=SimpleNamespace(create=create))
+
+        def transport() -> None:
+            try:
+                client.complete_with_receipt(
+                    prompt="committed transport sentinel",
+                    authorization=authorization,
+                    **AUTH_SCOPE,
+                )
+            except BaseException as error:
+                errors.append(error)
+
+        with patch.object(client, "_get_client", return_value=fake_client):
+            thread = Thread(target=transport)
+            thread.start()
+            self.assertTrue(transport_entered.wait(timeout=5))
+            authorization.reservation.abandon_before_transport()
+            self.assertEqual(
+                registry.authorize_and_reserve(request).reason,
+                "operation_in_progress",
+            )
+            release_transport.set()
+            thread.join(timeout=5)
+
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(errors, [])
+        self.assertEqual(calls, 1)
+
+    def test_anthropic_transport_requires_a_sealed_operation_ref_before_fake_call(self):
+        fake_transport = unittest.mock.Mock()
+        fake_client = SimpleNamespace(messages=SimpleNamespace(create=fake_transport))
+
+        with patch.object(client, "_get_client", return_value=fake_client):
+            with self.assertRaises(client.LLMError):
+                client.complete(
+                    prompt="missing operation ref",
+                    authorization=_authorization(operation_ref=None),
+                    **AUTH_SCOPE,
+                )
+
+        fake_transport.assert_not_called()
+
+    def test_text_completion_redacts_provider_exception_from_logs_and_error_chain(self):
+        mock_client = SimpleNamespace(
+            messages=SimpleNamespace(
+                create=lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("provider-payload-sentinel"))
+            )
+        )
+        with patch.object(client, "_get_client", return_value=mock_client):
+            with self.assertLogs(client.LOGGER, level="WARNING") as logs:
+                with self.assertRaises(client.LLMError) as error:
+                    client.complete(
+                        prompt="private-prompt-sentinel",
+                        category="test",
+                        authorization=self.text_authorization,
+                        **AUTH_SCOPE,
+                    )
+
+        assert "provider-payload-sentinel" not in str(error.exception)
+        assert error.exception.__cause__ is None
+        rendered = "\n".join(logs.output)
+        assert "provider-payload-sentinel" not in rendered
+        assert "private-prompt-sentinel" not in rendered
 
     def test_complete_with_receipt_honors_single_attempt_budget(self):
         calls = 0
@@ -146,7 +517,6 @@ class TestLLMClient(unittest.TestCase):
         mock_client = SimpleNamespace(messages=SimpleNamespace(create=create))
         with (
             patch.object(client, "_get_client", return_value=mock_client),
-            patch.object(client, "_should_retry", return_value=True),
             patch.object(client.time, "sleep") as sleep_mock,
         ):
             with self.assertRaises(client.LLMError):
@@ -155,6 +525,8 @@ class TestLLMClient(unittest.TestCase):
                     category="test",
                     model="claude-haiku-4-5",
                     max_attempts=1,
+                    authorization=self.text_authorization,
+                    **AUTH_SCOPE,
                 )
 
         self.assertEqual(calls, 1)
@@ -175,6 +547,8 @@ class TestLLMClient(unittest.TestCase):
                 prompt="audit actual model",
                 category="test",
                 model="requested-model",
+                authorization=self.text_authorization,
+                **AUTH_SCOPE,
             )
 
         self.assertEqual(receipt.model, "provider-resolved-model")
@@ -199,6 +573,8 @@ class TestLLMClient(unittest.TestCase):
                 max_tokens=99,
                 category="test",
                 model="claude-haiku-4-5",
+                authorization=self.text_authorization,
+                **AUTH_SCOPE,
             )
 
         self.assertEqual(result, "exact string")
@@ -208,9 +584,12 @@ class TestLLMClient(unittest.TestCase):
             max_tokens=99,
             category="test",
             model="claude-haiku-4-5",
+            authorization=self.text_authorization,
+            data_class="user_provided",
+            **AUTH_SCOPE,
         )
 
-    def test_complete_records_llm_usage_row_with_set_usage_db_path(self):
+    def test_complete_does_not_persist_llm_usage_with_an_explicit_usage_db_path(self):
         response = SimpleNamespace(
             content=[SimpleNamespace(type="text", text="hello world")],
             usage=SimpleNamespace(input_tokens=123, output_tokens=45),
@@ -218,9 +597,15 @@ class TestLLMClient(unittest.TestCase):
         mock_client = SimpleNamespace(messages=SimpleNamespace(create=lambda **_: response))
         client.set_usage_db_path(self.db_path)
 
-        with patch.dict(os.environ, {}, clear=True):
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": SYNTHETIC_ANTHROPIC_KEY}, clear=True):
             with patch.object(client, "_get_client", return_value=mock_client):
-                result = client.complete(prompt="hi", category="test", model="claude-haiku-4-5")
+                result = client.complete(
+                    prompt="hi",
+                    category="test",
+                    model="claude-haiku-4-5",
+                    authorization=self.text_authorization,
+                    **AUTH_SCOPE,
+                )
 
         self.assertEqual(result, "hello world")
         with sqlite3.connect(self.db_path) as connection:
@@ -233,12 +618,9 @@ class TestLLMClient(unittest.TestCase):
                 """
             ).fetchone()
 
-        self.assertEqual(row[0], "claude-haiku-4-5")
-        self.assertEqual(row[1], "test")
-        self.assertEqual(row[2], 123)
-        self.assertEqual(row[3], 45)
+        self.assertIsNone(row)
 
-    def test_complete_skips_usage_recording_when_database_is_locked(self):
+    def test_complete_never_touches_a_locked_usage_database_without_a_local_write_grant(self):
         response = SimpleNamespace(
             content=[SimpleNamespace(type="text", text="hello world")],
             usage=SimpleNamespace(input_tokens=123, output_tokens=45),
@@ -251,7 +633,13 @@ class TestLLMClient(unittest.TestCase):
             with patch.dict(os.environ, {"AGENT_DB_PATH": self.db_path}, clear=False):
                 with patch.object(client, "_get_client", return_value=mock_client):
                     started_at = time.monotonic()
-                    result = client.complete(prompt="hi", category="test", model="claude-haiku-4-5")
+                    result = client.complete(
+                        prompt="hi",
+                        category="test",
+                        model="claude-haiku-4-5",
+                        authorization=self.text_authorization,
+                        **AUTH_SCOPE,
+                    )
                     elapsed = time.monotonic() - started_at
         finally:
             locker.rollback()
@@ -263,23 +651,30 @@ class TestLLMClient(unittest.TestCase):
             count = connection.execute("SELECT COUNT(*) FROM llm_usage").fetchone()[0]
         self.assertEqual(count, 0)
 
-    def test_complete_vision_returns_text(self):
-        response = SimpleNamespace(
-            content=[SimpleNamespace(type="text", text="diagram with service boundaries")],
-            usage=SimpleNamespace(input_tokens=10, output_tokens=7),
-        )
-        mock_client = SimpleNamespace(messages=SimpleNamespace(create=lambda **_: response))
-        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as image_file:
-            image_file.write(b"fake image bytes")
-            image_path = image_file.name
-
-        try:
+    def test_complete_vision_rejects_direct_local_path_before_read_or_provider_egress(self):
+        mock_client = SimpleNamespace(messages=SimpleNamespace(create=lambda **_: self.fail("provider must not run")))
+        with tempfile.NamedTemporaryFile(prefix="private-image-path-sentinel-", suffix=".jpg") as image_file:
+            image_file.write(b"synthetic image bytes")
+            image_file.flush()
             with patch.object(client, "_get_client", return_value=mock_client):
-                result = client.complete_vision(prompt="analyze", image_path=image_path, model="claude-haiku-4-5")
-        finally:
-            os.unlink(image_path)
+                with patch("builtins.open") as open_file:
+                    with self.assertRaisesRegex(client.LLMError, "ingress-verified attachment"):
+                        client.complete_vision(
+                            prompt="synthetic vision prompt",
+                            image_path=image_file.name,
+                            authorization=self.vision_authorization,
+                            **AUTH_SCOPE,
+                        )
 
-        self.assertEqual(result, "diagram with service boundaries")
+        open_file.assert_not_called()
+
+    def test_analyze_photo_denies_unbound_bytes_before_tempfile_or_provider_egress(self):
+        with patch("tempfile.NamedTemporaryFile") as temp_file:
+            with patch("llm.client.LLMClient.complete_vision") as complete_vision:
+                assert vision.analyze_photo(b"private-image-bytes", "image/png") is None
+
+        temp_file.assert_not_called()
+        complete_vision.assert_not_called()
 
     def test_feedback_intake_strategist_model_route_and_override(self):
         with patch.dict(os.environ, {}, clear=True):

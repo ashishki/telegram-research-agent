@@ -1,6 +1,11 @@
 data/agent.db
 data/agent.db-wal
 data/agent.db-shm
+data/agent.db.pre-*
+data/agent.db.bak-*
+data/*.sqlite
+data/*.sqlite-wal
+data/*.sqlite-shm
 data/utd_shadow.db
 data/utd_shadow.db-wal
 data/utd_shadow.db-shm
