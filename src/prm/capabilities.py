@@ -88,6 +88,11 @@ TRANSPORT_PURPOSES: dict[tuple[str, str, str], str] = {
     # never authorize sending mail or changing a calendar event.
     ("provider_microsoft_graph", "assistant.action_execute", "write"): "action.execute",
     ("provider_google", "assistant.action_execute", "write"): "action.execute",
+    # PA-14 local memory management. Reads, revisions and deletions share one
+    # local purpose; no provider egress is involved.
+    ("provider_local", "assistant.memory", "read"): "memory.manage",
+    ("provider_local", "assistant.memory", "write"): "memory.manage",
+    ("provider_local", "assistant.memory", "delete"): "memory.manage",
 }
 
 
