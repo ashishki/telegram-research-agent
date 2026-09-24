@@ -36,6 +36,8 @@ PRM_ACTIVE_TESTS = (
     # PA-11 read-only calendar/contacts contracts.
     "tests/test_assistant_calendar.py",
     "tests/test_assistant_contacts.py",
+    # PA-12 Academic Inbox normalization/authority/conflict/reminder contracts.
+    "tests/test_assistant_academic.py",
     # The judge layer (text answers + visual layout) is safety-relevant and
     # must keep its fail-closed holdouts in the active tier.
     "tests/test_assistant_answer_judge.py",

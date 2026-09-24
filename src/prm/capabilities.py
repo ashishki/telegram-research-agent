@@ -82,6 +82,8 @@ TRANSPORT_PURPOSES: dict[tuple[str, str, str], str] = {
     ("provider_google", "assistant.calendar_read", "read"): "calendar.read",
     ("provider_microsoft_graph", "assistant.contacts_read", "read"): "contacts.read",
     ("provider_google", "assistant.contacts_read", "read"): "contacts.read",
+    # PA-12 Academic Inbox reads Canvas separately from mail or calendar.
+    ("provider_canvas", "assistant.academic_read", "read"): "academic.read",
 }
 
 
