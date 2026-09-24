@@ -11,6 +11,8 @@ from prm.report_exports import (
     BriefReportRenderError,
     render_designed_html,
     render_designed_pdf,
+    render_paginated_html,
+    render_paginated_pdf,
     render_html,
     render_markdown,
     render_pdf,
@@ -265,5 +267,26 @@ def test_designed_export_has_cover_kpis_and_safe_chart_svg() -> None:
 
 def test_designed_pdf_is_a_local_pdf() -> None:
     pdf = render_designed_pdf(_editorial_document())
+    assert pdf.media_type == "application/pdf"
+    assert isinstance(pdf.body, bytes) and pdf.body.startswith(b"%PDF-")
+
+
+def test_paginated_export_uses_fixed_pages_without_orphan_headings() -> None:
+    document = _editorial_document()
+    html = render_paginated_html(document, stories_per_page=1, sources_per_page=1)
+    body = str(html.body)
+    # Explicit A4 page containers, each with a running head and page number.
+    assert body.count('class="page"') >= 3
+    assert 'class="page-head"' in body
+    assert "Страница 1 /" in body
+    # A heading never sits alone: every story card is inside a page body.
+    assert 'class="story-stack"' in body
+    assert "brief-doc" in body
+    assert "<img" not in body.casefold()
+    validate_report_html(body)
+
+
+def test_paginated_pdf_is_a_local_pdf() -> None:
+    pdf = render_paginated_pdf(_editorial_document())
     assert pdf.media_type == "application/pdf"
     assert isinstance(pdf.body, bytes) and pdf.body.startswith(b"%PDF-")

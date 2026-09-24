@@ -15,7 +15,7 @@ from html.parser import HTMLParser
 import hmac
 from pathlib import Path
 import secrets
-from typing import Callable, Literal
+from typing import Any, Callable, Literal, Sequence
 from urllib.parse import urlsplit
 import zlib
 
@@ -359,6 +359,148 @@ def render_designed_pdf(document: BriefDocument) -> BriefReportArtifact:
     if not isinstance(body, bytes) or not body.startswith(b"%PDF-"):
         raise BriefReportRenderUnavailable("local PDF renderer returned an invalid artifact")
     return BriefReportArtifact("pdf", "application/pdf", body, html_artifact.identity)
+
+
+def _chunk(items: Sequence[Any], size: int) -> list[list[Any]]:
+    size = max(1, size)
+    return [list(items[index:index + size]) for index in range(0, len(items), size)]
+
+
+def render_paginated_html(
+    document: BriefDocument,
+    *,
+    stories_per_page: int | None = None,
+    sources_per_page: int | None = None,
+) -> BriefReportArtifact:
+    """Fixed A4 page composition: no engine pagination, no orphan headings."""
+
+    _require_document(document)
+    if stories_per_page is None:
+        # Editorial cards are large; bounded excerpt cards are small.
+        stories_per_page = 1 if document.editorial is not None else 3
+    if sources_per_page is None:
+        sources_per_page = 2
+    identity = report_identity(document)
+    topic = _html_text(document.topic)
+    period = _html_text(_period_text(document))
+    cover_eyebrow = (
+        "Аналитический бриф"
+        if document.editorial is not None
+        else "Выдержки из источников (без редакторской переработки)"
+    )
+    lead = ""
+    if document.editorial is not None and document.editorial.stories:
+        lead = f'<p class="cover-lead">{_html_text(document.editorial.stories[0].summary)}</p>'
+    kpis = (
+        ("items", len(document.items), "пунктов"),
+        ("sources", len(document.evidence), "источников"),
+        ("conflicts", len(document.conflicts), "конфликтов дат"),
+        ("coverage", "полное" if document.coverage_manifest.complete else "частичное", "покрытие"),
+    )
+    kpi_html = "".join(
+        f'<div class="kpi"><span class="kpi-value">{_html_text(value)}</span>'
+        f'<span class="kpi-label">{_html_text(label)}</span></div>'
+        for _, value, label in kpis
+    )
+    limitation = "".join(f"<li>{_html_text(item)}</li>" for item in document.coverage_manifest.limitations)
+    coverage_rows = "".join(
+        "<tr><td>{source}</td><td>{state}</td><td>{reason}</td></tr>".format(
+            source=_html_source_label(item.source_ref),
+            state=_html_text(item.state),
+            reason=_html_text(item.reason or "—"),
+        )
+        for item in document.coverage_manifest.sources
+    )
+    pages: list[str] = []
+
+    def add_page(section_title: str, body: str) -> None:
+        pages.append(
+            '<section class="page">'
+            f'<header class="page-head"><span>{topic}</span>'
+            f'<span>{_html_text(section_title)}</span><span>{period}</span></header>'
+            f'<div class="page-body">{body}</div>'
+            f'<footer class="page-foot">Страница {len(pages) + 1} / __TOTAL__</footer>'
+            "</section>"
+        )
+
+    if document.editorial is not None and document.editorial.stories:
+        titles = [story.title for story in document.editorial.stories]
+    else:
+        titles = [item.title for section in document.sections for item in section.items]
+    contents = "".join(f"<li>{_html_text(title)}</li>" for title in titles[:10])
+    toc = f'<ol class="toc">{contents}</ol>' if contents else ""
+    chart = _designed_chart_svg(document)
+    cover_chart = f'<div class="cover-chart"><h3>Наблюдения по дням</h3>{chart}</div>' if chart else ""
+    add_page(
+        "Обзор",
+        f'<div class="cover"><p class="eyebrow">{cover_eyebrow}</p><h1>{topic}</h1>'
+        f'<p class="period">{period}</p>{lead}<div class="kpis">{kpi_html}</div>'
+        f'{toc}{cover_chart}</div>',
+    )
+    for chunk in _chunk(_story_card_blocks(document), stories_per_page):
+        add_page("Главное", f'<div class="story-stack">{"".join(chunk)}</div>')
+    top_sources = _designed_top_sources_svg(document)
+    coverage_chart = f"<h3>Пункты по источникам</h3>{top_sources}" if top_sources else ""
+    add_page(
+        "Покрытие",
+        f"{coverage_chart}"
+        f'<div class="table-wrap"><table><thead><tr><th>Источник</th><th>Состояние</th>'
+        f"<th>Ограничение</th></tr></thead><tbody>{coverage_rows}</tbody></table></div>"
+        f"{_html_limitations(limitation)}",
+    )
+    for chunk in _chunk(_source_card_blocks(document), sources_per_page):
+        add_page("Источники", f'<div class="source-grid">{"".join(chunk)}</div>')
+    total = len(pages)
+    body = "".join(pages).replace("__TOTAL__", str(total))
+    html = f"""<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="{_CSP}">
+<title>{topic}</title>
+<style>{_stylesheet()}{_designed_stylesheet()}{_paginated_stylesheet()}</style>
+</head>
+<body>
+<main class="brief-doc" data-surface="private_brief_report" data-brief-id="{_html_attr(document.brief_id)}" data-version="{document.version}" data-content-digest="{_html_attr(document.content_digest)}">
+{body}
+</main>
+</body>
+</html>"""
+    validate_report_html(html)
+    return BriefReportArtifact("html", "text/html; charset=utf-8", html, identity)
+
+
+def render_paginated_pdf(document: BriefDocument) -> BriefReportArtifact:
+    """Render the fixed-page HTML to PDF locally; fall back to the plain PDF."""
+
+    html_artifact = render_paginated_html(document)
+    try:
+        body = _render_with_weasyprint(str(html_artifact.body))
+    except Exception:
+        body = _render_fallback_pdf(document)
+    if not isinstance(body, bytes) or not body.startswith(b"%PDF-"):
+        raise BriefReportRenderUnavailable("local PDF renderer returned an invalid artifact")
+    return BriefReportArtifact("pdf", "application/pdf", body, html_artifact.identity)
+
+
+def _paginated_stylesheet() -> str:
+    return """
+.brief-doc { background: var(--bg); }
+.page { position: relative; width: 210mm; height: 297mm; box-sizing: border-box; padding: 13mm 14mm 16mm; background: var(--bg); break-after: page; break-inside: avoid; overflow: hidden; }
+.page:last-of-type { break-after: auto; }
+.page-head { display: flex; justify-content: space-between; gap: 8px; font-size: 8pt; color: var(--muted); border-bottom: 1px solid var(--line); padding-bottom: 3mm; margin-bottom: 6mm; }
+.page-body { height: 236mm; overflow: hidden; }
+.page-foot { position: absolute; left: 14mm; right: 14mm; bottom: 6mm; text-align: center; font-size: 8pt; color: var(--muted); }
+.page .cover { padding: 0; border: 0; }
+.page .cover h1 { font-size: 2.4rem; max-width: 22ch; }
+.page .toc { margin: 16px 0 0; padding-left: 22px; }
+.page .toc li { margin: 5px 0; font-size: .95rem; }
+.page .cover-chart { margin-top: 16px; }
+.page .cover-chart h3 { margin: 0 0 4px; font-size: 1rem; }
+.page .story-stack .story:first-child { margin-top: 0; }
+@media print { .page { break-after: page; } .page:last-of-type { break-after: auto; } }
+"""
 
 
 def _designed_chart_svg(document: BriefDocument) -> str:
@@ -783,17 +925,14 @@ def _markdown_story_or_item_lines(document: BriefDocument) -> list[str]:
     return lines
 
 
-def _html_story_or_item_sections(document: BriefDocument) -> str:
+def _story_card_blocks(document: BriefDocument) -> list[str]:
+    """One HTML card per editorial story (or per item), for fixed-page packing."""
+
     sources = document.evidence_by_ref()
     if document.editorial is not None:
         if not document.editorial.stories:
-            message = (
-                "В проверенной области важных изменений не выделено."
-                if document.coverage_manifest.complete
-                else "В доступной выборке событий не выделено; это не вывод за весь период."
-            )
-            return f"<p class=\"empty\">{_html_text(message)}</p>"
-        blocks = []
+            return []
+        blocks: list[str] = []
         for number, story in enumerate(document.editorial.stories, start=1):
             anchors = "".join(
                 "<li>{source}<blockquote>{quote}</blockquote></li>".format(
@@ -820,22 +959,49 @@ def _html_story_or_item_sections(document: BriefDocument) -> str:
                     anchors=anchors,
                 )
             )
-        return "".join(blocks)
-    if not document.items:
-        return "<p class=\"empty\">В этой выбранной области нет пунктов для подробного разбора.</p>"
+        return blocks
     blocks = []
     for section in document.sections:
-        items = "".join(
-            "<article class=\"story\"><h3>{title}</h3><p class=\"takeaway\">{summary}</p>"
-            "<ul>{sources}</ul></article>".format(
-                title=_html_text(item.title),
-                summary=_html_text(item.summary),
-                sources="".join(f"<li>{_html_source_label(sources[ref].source_ref)}</li>" for ref in item.evidence_refs),
+        for item in section.items:
+            blocks.append(
+                "<article class=\"story\"><p class=\"story-number\">{section}</p><h3>{title}</h3>"
+                "<p class=\"takeaway\">{summary}</p><ul>{sources}</ul></article>".format(
+                    section=_html_text(section.title),
+                    title=_html_text(item.title),
+                    summary=_html_text(item.summary),
+                    sources="".join(
+                        f"<li>{_html_source_label(sources[ref].source_ref)}</li>" for ref in item.evidence_refs
+                    ),
+                )
             )
-            for item in section.items
+    return blocks
+
+
+def _source_card_blocks(document: BriefDocument) -> list[str]:
+    return [
+        "<article class=\"source-card\"><h3>{title}</h3><p>{summary}</p><p>{source}</p>"
+        "<p class=\"source-meta\">{time} · {state}</p></article>".format(
+            title=_html_text(evidence.title),
+            summary=_html_text(evidence.summary),
+            source=_html_source(evidence.source_ref),
+            time=_html_text(_display_time(evidence)),
+            state=_html_text(evidence.source_state),
         )
-        blocks.append(f"<section class=\"section\"><h3>{_html_text(section.title)}</h3>{items}</section>")
-    return "".join(blocks)
+        for evidence in document.evidence
+    ]
+
+
+def _html_story_or_item_sections(document: BriefDocument) -> str:
+    if document.editorial is not None and not document.editorial.stories:
+        message = (
+            "В проверенной области важных изменений не выделено."
+            if document.coverage_manifest.complete
+            else "В доступной выборке событий не выделено; это не вывод за весь период."
+        )
+        return f"<p class=\"empty\">{_html_text(message)}</p>"
+    if not document.items and document.editorial is None:
+        return "<p class=\"empty\">В этой выбранной области нет пунктов для подробного разбора.</p>"
+    return "".join(_story_card_blocks(document))
 
 
 def _html_limitations(items: str) -> str:

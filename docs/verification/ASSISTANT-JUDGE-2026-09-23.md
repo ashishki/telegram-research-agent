@@ -210,6 +210,24 @@ there are no orphan headings or empty fragments), not more CSS tuning. A Chrome
 `--print-to-pdf` path is available in the studio (`--chrome-pdf`) but scored the
 same, confirming the issue is composition, not the engine.
 
+## Fixed-page composer (`render_paginated_html` / `render_paginated_pdf`)
+
+Implemented the fixed-page approach: the renderer packs content into explicit
+A4 `.page` containers (cover, story pages, coverage page, source pages), each
+with its own running head and page number, `break-inside: avoid` and
+`height: 297mm`, so the engine never paginates and no heading can be orphaned.
+Density is adaptive (one large editorial story per page; three bounded excerpt
+cards per page; two sources per page) and validated against real PDFs so pages
+do not spill.
+
+Results on the real archive brief: best run 12 pages, **0 layout failures**,
+7 pass / 5 warn; non-editorial run 9 pages, 5 pass / 4 warn, layout 1. Mean
+scores now all ≥ 4 (contrast 4.9, readability 4.75 on the best run). The cover
+carries a table of contents and the observations chart, so it is full; the
+source chart is merged onto the coverage page. Remaining warns are minor
+(chart has no axis scale, short pages leave whitespace on 2-source pages, a
+long table identifier breaks) and the usual vision noise.
+
 ## How to run
 
 ```bash

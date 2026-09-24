@@ -298,6 +298,8 @@ def main() -> int:
         ("brief.pdf", report_exports.render_pdf(document)),
         ("brief_designed.html", report_exports.render_designed_html(document)),
         ("brief_designed.pdf", report_exports.render_designed_pdf(document)),
+        ("brief_paginated.html", report_exports.render_paginated_html(document)),
+        ("brief_paginated.pdf", report_exports.render_paginated_pdf(document)),
     ):
         body = artifact.body if isinstance(artifact.body, bytes) else artifact.body.encode("utf-8")
         (out / name).write_bytes(body)
