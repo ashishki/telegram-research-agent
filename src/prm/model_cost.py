@@ -37,8 +37,10 @@ class Tariff:
     version: str
     input_per_mtok: float
     output_per_mtok: float
-    cached_per_mtok: float = 0.0
-    reasoning_per_mtok: float = 0.0
+    # None means the price for this token class is unknown, so any non-zero
+    # usage of it must not be priced at zero.
+    cached_per_mtok: float | None = None
+    reasoning_per_mtok: float | None = None
 
     def __post_init__(self) -> None:
         _REF_full = re.fullmatch(r"^[A-Za-z0-9][A-Za-z0-9_.:/@+-]{0,191}$", self.version)
@@ -50,8 +52,10 @@ class Tariff:
             ("cached_per_mtok", self.cached_per_mtok),
             ("reasoning_per_mtok", self.reasoning_per_mtok),
         ):
+            if value is None:
+                continue
             if not isinstance(value, (int, float)) or isinstance(value, bool) or value < 0:
-                raise ValueError(f"{name} must be a non-negative number")
+                raise ValueError(f"{name} must be a non-negative number or None")
 
 
 @dataclass(frozen=True, slots=True)
@@ -149,11 +153,16 @@ def estimate_cost(entry: ModelCatalogEntry, usage: "UsageRecord") -> float | Non
     if entry.tariff is None:
         return None
     tariff = entry.tariff
+    # Unknown price for a token class that was actually used => unknown total.
+    if usage.cached_tokens > 0 and tariff.cached_per_mtok is None:
+        return None
+    if usage.reasoning_tokens > 0 and tariff.reasoning_per_mtok is None:
+        return None
     return (
         usage.input_tokens * tariff.input_per_mtok
         + usage.output_tokens * tariff.output_per_mtok
-        + usage.cached_tokens * tariff.cached_per_mtok
-        + usage.reasoning_tokens * tariff.reasoning_per_mtok
+        + usage.cached_tokens * (tariff.cached_per_mtok or 0.0)
+        + usage.reasoning_tokens * (tariff.reasoning_per_mtok or 0.0)
     ) / 1_000_000
 
 

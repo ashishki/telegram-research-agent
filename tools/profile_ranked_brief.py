@@ -249,6 +249,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--attempts", type=int, default=4)
     parser.add_argument("--consent", default="")
     parser.add_argument("--send", action="store_true")
+    parser.add_argument(
+        "--send-consent",
+        default="",
+        help="Required with --send; must be the exact literal 'send-to-owner-telegram'.",
+    )
     parser.add_argument("--dump-ranked", action="store_true")
     return parser
 
@@ -289,6 +294,7 @@ def main() -> int:
             connection_ref="connection_profile_brief",
             resource_ref="resource_profile_brief",
             consent=str(args.consent),
+            attempts=int(args.attempts),
         )
         editorial, editorial_meta = synthesize_opencode_editorial(
             document,
@@ -326,6 +332,9 @@ def main() -> int:
     print(json.dumps({"editorial": editorial_meta, "stories": manifest["stories"],
                       "pool": len(scored), "pdf": manifest["pdf"]}, ensure_ascii=False))
 
+    if args.send and str(args.send_consent) != "send-to-owner-telegram":
+        print("refused: --send requires --send-consent send-to-owner-telegram")
+        args.send = False
     if args.send and (out / "brief_paginated.pdf").is_file():
         try:
             import requests

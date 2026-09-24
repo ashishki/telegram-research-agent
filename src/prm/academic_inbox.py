@@ -301,12 +301,10 @@ def deduplicate_candidates(candidates: tuple[AcademicCandidate, ...]) -> tuple[A
     groups: dict[tuple[str, str, str], list[AcademicCandidate]] = {}
     order: list[tuple[str, str, str]] = []
     for candidate in candidates:
-        deadline = authoritative_deadline(candidate)
-        key = (
-            candidate.source_kind,
-            candidate.title.casefold(),
-            deadline.due_at.date().isoformat() if deadline else "",
-        )
+        # Stable identity: source kind + casefolded title. Deadline instants are
+        # unioned below and surfaced as conflicts, never used as the key, so the
+        # same item is not duplicated when two sources' times straddle midnight.
+        key = (candidate.source_kind, candidate.title.casefold())
         if key not in groups:
             groups[key] = []
             order.append(key)

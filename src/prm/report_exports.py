@@ -372,8 +372,9 @@ def _estimate_card_mm(html: str) -> float:
 
     text = re.sub(r"<[^>]+>", " ", html)
     text = " ".join(text.split())
-    lines = max(3, len(text) / 60.0)
-    return 16.0 + lines * 5.2
+    # Deliberately conservative so an underestimate cannot silently clip text.
+    lines = max(3, len(text) / 55.0)
+    return 18.0 + lines * 5.6
 
 
 def _pack_cards(cards: Sequence[str], *, page_mm: float = 232.0) -> list[list[str]]:
@@ -384,6 +385,10 @@ def _pack_cards(cards: Sequence[str], *, page_mm: float = 232.0) -> list[list[st
     used = 0.0
     for card in cards:
         height = _estimate_card_mm(card)
+        if height > page_mm:
+            # Refuse to silently clip: a single card that cannot fit a fixed page
+            # is an explicit render error, not hidden overflow.
+            raise BriefReportRenderError("page_overflow: a single card exceeds one page")
         if current and used + height > page_mm:
             pages.append(current)
             current = []

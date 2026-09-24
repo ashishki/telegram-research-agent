@@ -66,12 +66,21 @@ quotes); a title describes an event and never starts with '@'."""
 
 @dataclass(frozen=True, slots=True)
 class OpenCodeEditorialAccess:
-    """One typed, already-reserved PA-02 egress decision for the editorial call."""
+    """Typed PA-02 egress access plus a re-reservable budget for retries.
+
+    ``authorization`` is the first sealed reservation. ``registry`` and
+    ``request_template`` let the transport reserve a *fresh* decision before
+    every additional provider attempt, so a grant with a bounded request count
+    cannot be exceeded by an internal retry loop.
+    """
 
     authorization: AuthorizationDecision
     owner_ref: str
     connection_ref: str
     resource_ref: str
+    registry: CapabilityRegistry | None = None
+    request_template: AuthorizationRequest | None = None
+    max_attempts: int = 1
 
     def __post_init__(self) -> None:
         decision = self.authorization
@@ -91,6 +100,17 @@ class OpenCodeEditorialAccess:
             or decision.purpose != OPENCODE_EDITORIAL_PURPOSE
         ):
             raise ValueError("editorial access does not match the required typed scope")
+        if not isinstance(self.max_attempts, int) or isinstance(self.max_attempts, bool) or not 1 <= self.max_attempts <= 8:
+            raise ValueError("max_attempts is out of range")
+        if self.max_attempts > 1 and (self.registry is None or self.request_template is None):
+            raise ValueError("multi-attempt access requires a re-reservable budget")
+
+    def reserve_attempt(self, *, now: datetime) -> AuthorizationDecision | None:
+        """Return the first sealed decision, then a fresh one per extra attempt."""
+
+        if self.registry is None or self.request_template is None:
+            return self.authorization
+        return self.registry.authorize_and_reserve(self.request_template, now=now)
 
 
 def editorial_enabled() -> bool:
@@ -116,16 +136,20 @@ def build_operator_editorial_access(
     consent: str,
     now: datetime | None = None,
     ttl_minutes: int = 10,
+    attempts: int = 1,
     registry: CapabilityRegistry | None = None,
 ) -> OpenCodeEditorialAccess:
-    """Compose the one typed reservation from an explicit operator action.
+    """Compose the typed reservations from an explicit operator action.
 
     ``consent`` must be the exact literal acknowledgement so a mis-set flag or a
-    stray import can never mint provider egress on its own.
+    stray import can never mint provider egress on its own. ``attempts`` bounds
+    the grant's request count so a retry loop cannot exceed it.
     """
 
     if consent != "enable-opencode-editorial":
         raise ValueError("explicit editorial consent is required")
+    if not isinstance(attempts, int) or isinstance(attempts, bool) or not 1 <= attempts <= 8:
+        raise ValueError("attempts is out of range")
     moment = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     grant = CapabilityGrant(
         grant_id="grant_editorial_opencode",
@@ -136,27 +160,28 @@ def build_operator_editorial_access(
         operations=(OPENCODE_EDITORIAL_OPERATION,),
         data_classes=(OPENCODE_EDITORIAL_DATA_CLASS,),
         purpose=OPENCODE_EDITORIAL_PURPOSE,
-        provider_policy=ProviderPolicy((OPENCODE_EDITORIAL_PROVIDER,), maximum_request_count=1),
+        provider_policy=ProviderPolicy((OPENCODE_EDITORIAL_PROVIDER,), maximum_request_count=attempts),
         issued_at=moment - timedelta(minutes=1),
         expires_at=moment + timedelta(minutes=max(1, ttl_minutes)),
         revision=1,
     )
     active = registry or CapabilityRegistry((grant,))
-    decision = active.authorize_and_reserve(
-        AuthorizationRequest(
-            owner_ref=owner_ref,
-            connection_ref=connection_ref,
-            capability=OPENCODE_EDITORIAL_CAPABILITY,
-            resource_ref=resource_ref,
-            operation=OPENCODE_EDITORIAL_OPERATION,
-            data_class=OPENCODE_EDITORIAL_DATA_CLASS,
-            provider_ref=OPENCODE_EDITORIAL_PROVIDER,
-            purpose=OPENCODE_EDITORIAL_PURPOSE,
-            operation_ref="operation_editorial_opencode",
-        ),
-        now=moment,
+    template = AuthorizationRequest(
+        owner_ref=owner_ref,
+        connection_ref=connection_ref,
+        capability=OPENCODE_EDITORIAL_CAPABILITY,
+        resource_ref=resource_ref,
+        operation=OPENCODE_EDITORIAL_OPERATION,
+        data_class=OPENCODE_EDITORIAL_DATA_CLASS,
+        provider_ref=OPENCODE_EDITORIAL_PROVIDER,
+        purpose=OPENCODE_EDITORIAL_PURPOSE,
+        operation_ref="operation_editorial_opencode",
     )
-    return OpenCodeEditorialAccess(decision, owner_ref, connection_ref, resource_ref)
+    decision = active.authorize_and_reserve(template, now=moment)
+    return OpenCodeEditorialAccess(
+        decision, owner_ref, connection_ref, resource_ref,
+        registry=active, request_template=template, max_attempts=attempts,
+    )
 
 
 def _parse_json(text: str) -> Any:
@@ -177,7 +202,23 @@ def _parse_json(text: str) -> Any:
     raise ValueError("unparsable_model_json")
 
 
+def _validated_base_url() -> str:
+    """Only the operator-owned https OpenCode Go host may receive the key."""
+
+    from urllib.parse import urlparse
+
+    url = (os.environ.get(BASE_URL_ENV, DEFAULT_BASE_URL) or DEFAULT_BASE_URL).rstrip("/")
+    parsed = urlparse(url)
+    if parsed.scheme != "https" or (parsed.hostname or "") not in {"opencode.ai", "api.opencode.ai"}:
+        raise ValueError("provider base url must be https://opencode.ai")
+    return url
+
+
 def _call_model(*, prompt: str, payload: Mapping[str, Any], model: str, timeout: int) -> dict[str, Any]:
+    try:
+        base_url = _validated_base_url()
+    except ValueError:
+        return {"_error": "invalid_base_url"}
     body = {
         "model": model,
         "messages": [
@@ -189,7 +230,7 @@ def _call_model(*, prompt: str, payload: Mapping[str, Any], model: str, timeout:
         "response_format": {"type": "json_object"},
     }
     request = Request(
-        f"{os.environ.get(BASE_URL_ENV, DEFAULT_BASE_URL).rstrip('/')}/chat/completions",
+        f"{base_url}/chat/completions",
         data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
         headers={
             "Authorization": f"Bearer {_api_key()}",
@@ -254,19 +295,6 @@ def synthesize_opencode_editorial(
         return None, {"status": "authorization_required", "provider_egress_attempted": False}
     if not document.evidence or len(document.evidence) > MAX_EVIDENCE:
         return None, {"status": "context_unavailable", "provider_egress_attempted": False}
-    try:
-        require_authorized_egress(
-            access.authorization,
-            capability=OPENCODE_EDITORIAL_CAPABILITY,
-            provider_ref=OPENCODE_EDITORIAL_PROVIDER,
-            data_class=OPENCODE_EDITORIAL_DATA_CLASS,
-            owner_ref=access.owner_ref,
-            connection_ref=access.connection_ref,
-            resource_ref=access.resource_ref,
-            purpose=OPENCODE_EDITORIAL_PURPOSE,
-        )
-    except CapabilityDenied:
-        return None, {"status": "provider_unavailable_or_denied", "provider_egress_attempted": False}
     if not _api_key():
         return None, {"status": "provider_unavailable_or_denied", "provider_egress_attempted": False}
     payload = _evidence_payload(document, question)
@@ -274,8 +302,25 @@ def synthesize_opencode_editorial(
     base_prompt = (persona.strip() + "\n\n" + EDITORIAL_PROMPT) if persona.strip() else EDITORIAL_PROMPT
     feedback = ""
     last: dict[str, object] = {"status": "provider_error", "provider_egress_attempted": True}
-    total = max(1, int(attempts))
+    total = min(max(1, int(attempts)), access.max_attempts)
     for attempt in range(1, total + 1):
+        # Reserve a fresh, bounded PA-02 decision before every provider request.
+        decision = access.authorization if attempt == 1 else access.reserve_attempt(now=datetime.now(timezone.utc))
+        if decision is None:
+            return None, {**last, "status": "reservation_exhausted", "attempts": attempt - 1}
+        try:
+            require_authorized_egress(
+                decision,
+                capability=OPENCODE_EDITORIAL_CAPABILITY,
+                provider_ref=OPENCODE_EDITORIAL_PROVIDER,
+                data_class=OPENCODE_EDITORIAL_DATA_CLASS,
+                owner_ref=access.owner_ref,
+                connection_ref=access.connection_ref,
+                resource_ref=access.resource_ref,
+                purpose=OPENCODE_EDITORIAL_PURPOSE,
+            )
+        except CapabilityDenied:
+            return None, {"status": "provider_unavailable_or_denied", "provider_egress_attempted": False}
         response = _call_model(
             prompt=base_prompt + feedback,
             payload=payload,

@@ -74,6 +74,20 @@ private DB backup was moved out of the repo to
 git-ignored. `tests/test_handlers.py` remains a pre-existing stale report-era
 suite with 56 failures at baseline; it is in no tier and is not a regression.
 
+PA-10..PA-17 local contracts are implemented and registered in `focused-prm`
+(mail, calendar/contacts, academic inbox, confirmed actions, memory library,
+media, model/cost, operations). An independent read-only deep review of the
+whole session range (`1a1ac5c..1e83cdc`) was run with `mimo-v2.6-pro` via
+`tools/mimo_code_review.py` (replacing the Codex reviewer role): verdict
+`FIX_P1_FIRST`, no P0. All P1s and the actionable P2s are fixed (atomic
+one-use action claim, per-attempt bounded editorial reservation, no recursive
+`--out-dir` delete, transactional preference confirm, stable academic dedup,
+consent-gated `--send`, validated provider base URL, closed SQLite connections,
+explicit page-overflow error). Report:
+`docs/verification/PA-deep-review-1e83cdc-mimo.md`. `focused-prm` 576 and
+`retrofit-boundaries` 150 pass. PA-18 remains the human/runtime acceptance
+gate.
+
 The judge layer is now three tools: text/product-UX
 (`tools/prm_product_ux_eval.py --provider opencode-go`, model `mimo-v2.6-pro`),
 text answer/brief (`tools/assistant_answer_judge.py`), and visual/layout

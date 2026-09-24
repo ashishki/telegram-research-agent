@@ -26,6 +26,36 @@ The new plan develops the whole assistant without restarting old report timers
 or claiming a finished product from fixtures. Current deployed state was not
 observed. Baseline focused CI has a known UX evaluation failure assigned PA-00.
 
+## Local PA slices and evaluation tooling
+
+All PA slices **PA-00..PA-17** now have local, fail-closed contracts with
+deterministic synthetic tests (no live network, account, database, timer or
+deployment), and each is registered in the `focused-prm` tier:
+
+- PA-10 `src/prm/mail_connector.py`, PA-11 `src/prm/schedule_connectors.py`
+  (calendar + contacts), PA-12 `src/prm/academic_inbox.py`,
+  PA-13 `src/prm/confirmed_actions.py`, PA-14 `src/prm/memory_library.py`,
+  PA-15 `src/prm/media_connectors.py`, PA-16 `src/prm/model_cost.py`,
+  PA-17 `src/prm/operations.py`.
+- Every new transport is purpose-separated in `src/prm/capabilities.py` and
+  re-checks a typed PA-02 reservation before egress or a write.
+
+Evaluation runs without Codex, through the operator-owned OpenCode Go endpoint:
+
+- `tools/prm_product_ux_eval.py --provider opencode-go` (text/product UX),
+- `tools/assistant_answer_judge.py` (archive answers + weekly brief text),
+- `tools/assistant_visual_judge.py` (rendered PDF pages / Telegram dialogue,
+  vision model `deepseek-v4-flash-vision-exp`),
+- `tools/pdf_ocr_crosscheck.py` (optional SotaOCR cross-check),
+- `tools/profile_ranked_brief.py` (profile-ranked brief + persona editorial),
+- `tools/mimo_code_review.py` (independent read-only deep review via
+  `mimo-v2.6-pro`).
+
+These tools are advisory and fail-closed; they are not runtime acceptance.
+**PA-18 (full acceptance)** still requires exact-HEAD checks, owner visual
+review and authorized real use, and the runtime gates for each connector remain
+open.
+
 Original implementation documentation and evidence remain available:
 [architecture](docs/ARCHITECTURE.md), [contract](docs/IMPLEMENTATION_CONTRACT.md),
 [Academic Inbox handoff](docs/UTD_ACADEMIC_INBOX_RESEARCH_HANDOFF.md),

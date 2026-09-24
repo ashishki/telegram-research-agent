@@ -11,11 +11,12 @@ and a receipt always reflects what actually happened.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 import hashlib
 import json
 import re
+import threading
 from typing import Any, Literal, Mapping, Protocol
 
 from prm.capabilities import (
@@ -293,15 +294,33 @@ class ActionReceiptStore:
 
     def __init__(self) -> None:
         self._receipts: dict[str, ActionReceipt] = {}
+        self._lock = threading.Lock()
 
     def get(self, idempotency_key: str) -> ActionReceipt | None:
-        return self._receipts.get(idempotency_key)
+        with self._lock:
+            return self._receipts.get(idempotency_key)
 
     def put(self, receipt: ActionReceipt) -> None:
-        self._receipts[receipt.idempotency_key] = receipt
+        with self._lock:
+            self._receipts[receipt.idempotency_key] = receipt
+
+    def claim(self, receipt: ActionReceipt) -> ActionReceipt | None:
+        """Atomically insert a pending receipt; return the existing one if any.
+
+        This closes the check-then-act window so two concurrent clicks cannot
+        both reach the provider.
+        """
+
+        with self._lock:
+            existing = self._receipts.get(receipt.idempotency_key)
+            if existing is not None:
+                return existing
+            self._receipts[receipt.idempotency_key] = receipt
+            return None
 
     def all(self) -> tuple[ActionReceipt, ...]:
-        return tuple(self._receipts.values())
+        with self._lock:
+            return tuple(self._receipts.values())
 
 
 @dataclass(frozen=True, slots=True)
@@ -353,22 +372,32 @@ def execute_action(
     ):
         raise ValueError("execute request does not match the confirmed proposal")
     require_action_execute_access(request)
-    existing = store.get(action.idempotency_key)
-    if existing is not None:
-        return existing
-    consumed = action.consume(now=now)
-    if consumed is None:
+    if action.consume(now=now) is None:
         raise ValueError("confirmation is expired, already used or the proposal changed")
-    outcome = executor.execute(consumed)
-    receipt = ActionReceipt(
+    # Claim the idempotency key *before* the provider call so a concurrent or
+    # retried click cannot send twice, and so a crash mid-call leaves a durable
+    # unknown outcome that requires reconciliation instead of a silent resend.
+    pending = ActionReceipt(
         idempotency_key=action.idempotency_key,
         proposal_ref=proposal.proposal_ref,
         proposal_version=proposal.version,
         content_digest=proposal.digest,
+        status="unknown",
+        error_code="in_flight",
+        created_at=_utc(now),
+    )
+    existing = store.claim(pending)
+    if existing is not None:
+        return existing
+    try:
+        outcome = executor.execute(action)
+    except Exception as error:  # a raised adapter is exactly an unknown outcome
+        outcome = ExecutionOutcome(status="unknown", error_code=type(error).__name__)
+    receipt = replace(
+        pending,
         status=outcome.status,
         provider_operation_ref=outcome.provider_operation_ref,
         error_code=outcome.error_code,
-        created_at=_utc(now),
     )
     store.put(receipt)
     return receipt

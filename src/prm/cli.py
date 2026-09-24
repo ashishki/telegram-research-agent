@@ -27,6 +27,8 @@ def build_parser() -> argparse.ArgumentParser:
     editorial.add_argument("question")
     editorial.add_argument("--out-dir", default=".playbook-artifacts/editorial_brief")
     editorial.add_argument("--model", default="")
+    editorial.add_argument("--provider-timeout", type=int, default=120)
+    editorial.add_argument("--attempts", type=int, default=3)
     editorial.add_argument(
         "--consent",
         default="",
@@ -68,9 +70,15 @@ def _run_editorial_brief(args: argparse.Namespace, settings) -> int:
         connection_ref="connection_editorial_cli",
         resource_ref="resource_editorial_cli",
         consent=str(args.consent or ""),
+        attempts=int(args.attempts),
     )
     editorial, measurement = synthesize_opencode_editorial(
-        document, question=str(args.question), access=access, model=str(args.model or "") or None
+        document,
+        question=str(args.question),
+        access=access,
+        model=str(args.model or "") or None,
+        timeout=int(args.provider_timeout),
+        attempts=int(args.attempts),
     )
     if editorial is not None:
         from dataclasses import replace

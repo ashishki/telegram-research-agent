@@ -11,6 +11,7 @@ unrelated archive data.
 
 from __future__ import annotations
 
+from contextlib import closing
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 import hashlib
@@ -248,7 +249,7 @@ class MemoryLibraryStore:
     def __init__(self, db_path: str | Path) -> None:
         self.db_path = str(db_path)
         Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
-        with sqlite3.connect(self.db_path, isolation_level=None) as conn:
+        with closing(sqlite3.connect(self.db_path, isolation_level=None)) as conn:
             conn.executescript(_SCHEMA)
 
     def _connect(self) -> sqlite3.Connection:
@@ -256,7 +257,7 @@ class MemoryLibraryStore:
 
     # --- items -------------------------------------------------------------
     def save_item(self, item: MemoryItem) -> None:
-        with self._connect() as conn:
+        with closing(self._connect()) as conn:
             conn.execute(
                 "INSERT OR REPLACE INTO pa_memory_items(owner_ref,item_ref,version,payload,state,engagement,updated_at)"
                 " VALUES(?,?,?,?,?,?,?)",
@@ -266,7 +267,7 @@ class MemoryLibraryStore:
             )
 
     def _latest_item(self, owner_ref: str, item_ref: str) -> MemoryItem | None:
-        with self._connect() as conn:
+        with closing(self._connect()) as conn:
             row = conn.execute(
                 "SELECT payload FROM pa_memory_items WHERE owner_ref=? AND item_ref=? ORDER BY version DESC LIMIT 1",
                 (owner_ref, item_ref),
@@ -282,7 +283,7 @@ class MemoryLibraryStore:
 
     def list_items(self, owner_ref: str, *, include_forgotten: bool = False) -> tuple[MemoryItem, ...]:
         _ref(owner_ref, field="owner_ref")
-        with self._connect() as conn:
+        with closing(self._connect()) as conn:
             rows = conn.execute(
                 "SELECT payload, version FROM pa_memory_items WHERE owner_ref=? ORDER BY item_ref, version DESC",
                 (owner_ref,),
@@ -297,7 +298,7 @@ class MemoryLibraryStore:
     def item_history(self, owner_ref: str, item_ref: str) -> tuple[MemoryItem, ...]:
         _ref(owner_ref, field="owner_ref")
         _ref(item_ref, field="item_ref")
-        with self._connect() as conn:
+        with closing(self._connect()) as conn:
             rows = conn.execute(
                 "SELECT payload FROM pa_memory_items WHERE owner_ref=? AND item_ref=? ORDER BY version",
                 (owner_ref, item_ref),
@@ -348,7 +349,7 @@ class MemoryLibraryStore:
     # --- preferences -------------------------------------------------------
     def active_preferences(self, owner_ref: str) -> tuple[MemoryPreference, ...]:
         _ref(owner_ref, field="owner_ref")
-        with self._connect() as conn:
+        with closing(self._connect()) as conn:
             rows = conn.execute(
                 "SELECT payload, active FROM pa_memory_preferences WHERE owner_ref=? ORDER BY preference_ref, revision DESC",
                 (owner_ref,),
@@ -361,7 +362,7 @@ class MemoryLibraryStore:
 
     def history_preferences(self, owner_ref: str) -> tuple[MemoryPreference, ...]:
         _ref(owner_ref, field="owner_ref")
-        with self._connect() as conn:
+        with closing(self._connect()) as conn:
             rows = conn.execute(
                 "SELECT payload FROM pa_memory_preferences WHERE owner_ref=? ORDER BY preference_ref, revision",
                 (owner_ref,),
@@ -396,7 +397,7 @@ class MemoryLibraryStore:
             created_at=moment,
             expires_at=moment + timedelta(seconds=max(30, ttl_seconds)),
         )
-        with self._connect() as conn:
+        with closing(self._connect()) as conn:
             conn.execute(
                 "INSERT OR REPLACE INTO pa_memory_proposals(owner_ref,proposal_ref,payload,consumed) VALUES(?,?,?,0)",
                 (owner_ref, proposal.proposal_ref, json.dumps(_proposal_payload(proposal), ensure_ascii=False, sort_keys=True)),
@@ -414,38 +415,52 @@ class MemoryLibraryStore:
             raise ValueError("preference identity mismatch")
         if proposal.state_at(now) != "active":
             raise ValueError("preference proposal has expired")
-        with self._connect() as conn:
+        conn = self._connect()
+        try:
+            # One atomic transaction: the conditional update is the one-use gate.
+            conn.execute("BEGIN IMMEDIATE")
             row = conn.execute(
                 "SELECT consumed FROM pa_memory_proposals WHERE owner_ref=? AND proposal_ref=?",
                 (owner_ref, proposal.proposal_ref),
             ).fetchone()
             if row is None:
                 raise ValueError("unknown preference proposal")
-            if row[0]:
-                raise ValueError("preference proposal was already applied")
-            conn.execute(
-                "UPDATE pa_memory_proposals SET consumed=1 WHERE owner_ref=? AND proposal_ref=?",
+            cursor = conn.execute(
+                "UPDATE pa_memory_proposals SET consumed=1 WHERE owner_ref=? AND proposal_ref=? AND consumed=0",
                 (owner_ref, proposal.proposal_ref),
             )
+            if cursor.rowcount != 1:
+                raise ValueError("preference proposal was already applied")
             prior = conn.execute(
                 "SELECT revision FROM pa_memory_preferences WHERE owner_ref=? AND preference_ref=? ORDER BY revision DESC LIMIT 1",
                 (owner_ref, proposal.proposal_ref),
             ).fetchone()
-        revision = (prior[0] + 1) if prior else 1
-        moment = _utc(now)
-        pref = MemoryPreference(
-            preference_ref=proposal.proposal_ref,
-            owner_ref=owner_ref,
-            kind=proposal.kind,  # type: ignore[arg-type]
-            value=proposal.value,
-            source=proposal.source,
-            revision=revision,
-            active=True,
-            created_at=moment,
-            updated_at=moment,
-        )
-        self._write_preference(pref)
-        return pref
+            revision = (prior[0] + 1) if prior else 1
+            moment = _utc(now)
+            pref = MemoryPreference(
+                preference_ref=proposal.proposal_ref,
+                owner_ref=owner_ref,
+                kind=proposal.kind,  # type: ignore[arg-type]
+                value=proposal.value,
+                source=proposal.source,
+                revision=revision,
+                active=True,
+                created_at=moment,
+                updated_at=moment,
+            )
+            conn.execute(
+                "INSERT OR REPLACE INTO pa_memory_preferences(owner_ref,preference_ref,revision,payload,active,updated_at)"
+                " VALUES(?,?,?,?,?,?)",
+                (pref.owner_ref, pref.preference_ref, pref.revision,
+                 json.dumps(pref.to_payload(), ensure_ascii=False, sort_keys=True), 1, _iso(pref.updated_at)),
+            )
+            conn.execute("COMMIT")
+            return pref
+        except Exception:
+            conn.execute("ROLLBACK")
+            raise
+        finally:
+            conn.close()
 
     def deactivate_preference(self, owner_ref: str, preference_ref: str, *, now: datetime) -> MemoryPreference:
         current = next(
@@ -458,7 +473,7 @@ class MemoryLibraryStore:
         return updated
 
     def _write_preference(self, pref: MemoryPreference) -> None:
-        with self._connect() as conn:
+        with closing(self._connect()) as conn:
             conn.execute(
                 "INSERT OR REPLACE INTO pa_memory_preferences(owner_ref,preference_ref,revision,payload,active,updated_at)"
                 " VALUES(?,?,?,?,?,?)",

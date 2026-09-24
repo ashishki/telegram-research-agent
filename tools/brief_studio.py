@@ -288,8 +288,10 @@ def main() -> int:
         editorial_meta = {"status": "skipped_no_egress"}
 
     out = args.out_dir
-    if out.exists():
-        shutil.rmtree(out)
+    # Never recursively delete a caller-supplied directory: refuse instead.
+    if out.exists() and any(out.iterdir()) and not (out / "manifest.json").is_file():
+        print(json.dumps({"status": "refused", "reason": f"non-empty output dir: {out}"}, ensure_ascii=False))
+        return 1
     out.mkdir(parents=True, exist_ok=True)
     written: dict[str, str] = {}
     for name, artifact in (
