@@ -76,6 +76,12 @@ TRANSPORT_PURPOSES: dict[tuple[str, str, str], str] = {
     # for the other.
     ("provider_opencode_go", "model.generate", "model_egress"): "answer.request",
     ("provider_opencode_go", "model.context_egress", "model_egress"): "answer.context",
+    # PA-11 read-only schedule/contacts transports. Calendar and contacts are
+    # separate reads: a calendar grant never authorizes a directory read.
+    ("provider_microsoft_graph", "assistant.calendar_read", "read"): "calendar.read",
+    ("provider_google", "assistant.calendar_read", "read"): "calendar.read",
+    ("provider_microsoft_graph", "assistant.contacts_read", "read"): "contacts.read",
+    ("provider_google", "assistant.contacts_read", "read"): "contacts.read",
 }
 
 
