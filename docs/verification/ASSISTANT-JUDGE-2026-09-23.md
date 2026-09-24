@@ -248,6 +248,26 @@ git-ignored directory. Verified fail-closed: with the env flag unset it prints
 "disabled" and performs no network call. Enabling it is a separate live
 decision; the Telegram assistant remains fail-closed regardless.
 
+## Profile-aware re-ranking (`tools/profile_ranked_brief.py`)
+
+The plain archive search returns only top-8 by the generic query, which pulled
+generic AI news and missed the operator's actual vector. The new operator tool
+widens the pool to the whole window, scores every post against the operator
+profile (active `projects.keywords`, channel feedback from `channel_memory`,
+weighted English + Russian interest families with diminishing returns, phrase
+and core-concept bonuses, noise penalties) and selects a capped top-N. Yandex
+and Sber are excluded per owner direction. Editorial drafting then uses a
+persona prompt built from the operator's projects, interests and channel
+preferences, so the model rewrites only what plausibly changes his tooling,
+architecture, evaluation or strategy.
+
+Result on the real week: ARTEMIS, Nvidia SoL-Pi harness, Anthropic Embedded
+Evaluators, Cloud.ru Agents Space, GLM-5.3 inference report and agent-orchestration
+posts surface, while meme/generic items drop. Fixed-page reader layout was also
+tightened: adaptive card packing, no standalone chart page, TOC on the cover,
+numbered source rows with word-boundary labels. Vision judge on the final
+editorial PDF: 5 pass / 2 warn / 1 layout, all content means >= 4.
+
 ## How to run
 
 ```bash

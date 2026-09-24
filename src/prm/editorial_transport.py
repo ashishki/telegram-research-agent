@@ -185,7 +185,7 @@ def _call_model(*, prompt: str, payload: Mapping[str, Any], model: str, timeout:
             {"role": "user", "content": json.dumps(payload, ensure_ascii=False, sort_keys=True)},
         ],
         "temperature": 0,
-        "max_tokens": 6000,
+        "max_tokens": 9000,
         "response_format": {"type": "json_object"},
     }
     request = Request(
@@ -243,6 +243,8 @@ def synthesize_opencode_editorial(
     access: OpenCodeEditorialAccess | None,
     model: str | None = None,
     timeout: int = 60,
+    attempts: int = 3,
+    persona: str = "",
 ) -> tuple[BriefEditorial | None, Mapping[str, object]]:
     """Draft and validate editorial stories; fail closed on every other path."""
 
@@ -267,32 +269,49 @@ def synthesize_opencode_editorial(
         return None, {"status": "provider_unavailable_or_denied", "provider_egress_attempted": False}
     if not _api_key():
         return None, {"status": "provider_unavailable_or_denied", "provider_egress_attempted": False}
-    response = _call_model(
-        prompt=EDITORIAL_PROMPT,
-        payload=_evidence_payload(document, question),
-        model=model or os.environ.get(MODEL_ENV, DEFAULT_MODEL),
-        timeout=timeout,
-    )
-    if "_error" in response:
-        return None, {"status": "provider_error", "provider_egress_attempted": True, "error": response["_error"]}
-    text = _response_text(response)
-    if not text:
-        return None, {"status": "provider_empty_response", "provider_egress_attempted": True}
-    try:
-        if len(text) > 18000:
-            raise ValueError("editorial response too large")
-        editorial = BriefEditorial.from_dict(_parse_json(text), document.evidence)
-        if not editorial.stories or any(not story.plain_explanation for story in editorial.stories):
-            raise ValueError("editorial lacks a plain-language continuation")
-    except (ValueError, TypeError, RecursionError) as error:
-        return None, {
-            "status": "editorial_rejected",
+    payload = _evidence_payload(document, question)
+    resolved_model = model or os.environ.get(MODEL_ENV, DEFAULT_MODEL)
+    base_prompt = (persona.strip() + "\n\n" + EDITORIAL_PROMPT) if persona.strip() else EDITORIAL_PROMPT
+    feedback = ""
+    last: dict[str, object] = {"status": "provider_error", "provider_egress_attempted": True}
+    total = max(1, int(attempts))
+    for attempt in range(1, total + 1):
+        response = _call_model(
+            prompt=base_prompt + feedback,
+            payload=payload,
+            model=resolved_model,
+            timeout=timeout,
+        )
+        if "_error" in response:
+            last = {"status": "provider_error", "provider_egress_attempted": True, "error": response["_error"]}
+            continue
+        choices = response.get("choices")
+        finish = str(choices[0].get("finish_reason")) if isinstance(choices, list) and choices else ""
+        text = _response_text(response)
+        if not text or finish == "length":
+            last = {"status": "provider_empty_response", "provider_egress_attempted": True}
+            continue
+        try:
+            if len(text) > 18000:
+                raise ValueError("editorial response too large")
+            editorial = BriefEditorial.from_dict(_parse_json(text), document.evidence)
+            if not editorial.stories or any(not story.plain_explanation for story in editorial.stories):
+                raise ValueError("editorial lacks a plain-language continuation")
+        except (ValueError, TypeError, RecursionError) as error:
+            last = {"status": "editorial_rejected", "provider_egress_attempted": True, "error": str(error)[:160]}
+            feedback = (
+                "\n\nYour previous reply failed validation: "
+                + str(error)[:200]
+                + ". Fix exactly this: quotes must be verbatim substrings of the item's "
+                "summary (>=16 chars), any digit in your prose must appear in a quote, "
+                "and every evidence_ref is used or omitted exactly once."
+            )
+            continue
+        return editorial, {
+            "status": "drafted",
             "provider_egress_attempted": True,
-            "error": type(error).__name__,
+            "stories": len(editorial.stories),
+            "attempts": attempt,
+            "provider": OPENCODE_EDITORIAL_PROVIDER,
         }
-    return editorial, {
-        "status": "drafted",
-        "provider_egress_attempted": True,
-        "stories": len(editorial.stories),
-        "provider": OPENCODE_EDITORIAL_PROVIDER,
-    }
+    return None, {**last, "attempts": total}

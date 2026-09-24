@@ -14,6 +14,7 @@ from html import escape
 from html.parser import HTMLParser
 import hmac
 from pathlib import Path
+import re
 import secrets
 from typing import Any, Callable, Literal, Sequence
 from urllib.parse import urlsplit
@@ -366,6 +367,34 @@ def _chunk(items: Sequence[Any], size: int) -> list[list[Any]]:
     return [list(items[index:index + size]) for index in range(0, len(items), size)]
 
 
+def _estimate_card_mm(html: str) -> float:
+    """Rough card height in mm from its visible text, deliberately generous."""
+
+    text = re.sub(r"<[^>]+>", " ", html)
+    text = " ".join(text.split())
+    lines = max(3, len(text) / 60.0)
+    return 16.0 + lines * 5.2
+
+
+def _pack_cards(cards: Sequence[str], *, page_mm: float = 232.0) -> list[list[str]]:
+    """Greedy single-column packing so fixed pages are never nearly empty."""
+
+    pages: list[list[str]] = []
+    current: list[str] = []
+    used = 0.0
+    for card in cards:
+        height = _estimate_card_mm(card)
+        if current and used + height > page_mm:
+            pages.append(current)
+            current = []
+            used = 0.0
+        current.append(card)
+        used += height
+    if current:
+        pages.append(current)
+    return pages
+
+
 def render_paginated_html(
     document: BriefDocument,
     *,
@@ -375,11 +404,9 @@ def render_paginated_html(
     """Fixed A4 page composition: no engine pagination, no orphan headings."""
 
     _require_document(document)
-    if stories_per_page is None:
-        # Editorial cards are large; bounded excerpt cards are small.
-        stories_per_page = 1 if document.editorial is not None else 3
+    # stories_per_page None means adaptive packing by estimated card height.
     if sources_per_page is None:
-        sources_per_page = 2
+        sources_per_page = 8  # compact reader rows are short
     identity = report_identity(document)
     topic = _html_text(document.topic)
     period = _html_text(_period_text(document))
@@ -391,33 +418,40 @@ def render_paginated_html(
     lead = ""
     if document.editorial is not None and document.editorial.stories:
         lead = f'<p class="cover-lead">{_html_text(document.editorial.stories[0].summary)}</p>'
+    stories = document.editorial.stories if document.editorial is not None else ()
+    shown = len(stories) if stories else len(document.items)
+    try:
+        days = max(1, (document.window.end_at - document.window.start_at).days)
+    except Exception:
+        days = 7
     kpis = (
-        ("items", len(document.items), "пунктов"),
-        ("sources", len(document.evidence), "источников"),
-        ("conflicts", len(document.conflicts), "конфликтов дат"),
-        ("coverage", "полное" if document.coverage_manifest.complete else "частичное", "покрытие"),
+        ("sources", len(document.evidence), "материалов"),
+        ("stories", shown, "тем"),
+        ("days", days, "дней"),
     )
     kpi_html = "".join(
         f'<div class="kpi"><span class="kpi-value">{_html_text(value)}</span>'
         f'<span class="kpi-label">{_html_text(label)}</span></div>'
         for _, value, label in kpis
     )
-    limitation = "".join(f"<li>{_html_text(item)}</li>" for item in document.coverage_manifest.limitations)
-    coverage_rows = "".join(
-        "<tr><td>{source}</td><td>{state}</td><td>{reason}</td></tr>".format(
-            source=_html_source_label(item.source_ref),
-            state=_html_text(item.state),
-            reason=_html_text(item.reason or "—"),
-        )
-        for item in document.coverage_manifest.sources
+    coverage_note = (
+        "Все выбранные материалы показаны."
+        if document.coverage_manifest.complete
+        else "Показаны не все материалы периода: это ограниченная выборка поиска по архиву."
     )
+    select_note = (
+        f'<p class="select-note">Поиск по «{topic}» за {period}. Из {len(document.evidence)} '
+        f"найденных материалов отобрано {shown} тем по релевантности поиска и редакционной "
+        f"оценке. {coverage_note}</p>"
+    )
+    reader_sources = _reader_source_card_blocks(document)
     pages: list[str] = []
 
     def add_page(section_title: str, body: str) -> None:
         pages.append(
             '<section class="page">'
             f'<header class="page-head"><span>{topic}</span>'
-            f'<span>{_html_text(section_title)}</span><span>{period}</span></header>'
+            f'<span>{_html_text(section_title)}</span></header>'
             f'<div class="page-body">{body}</div>'
             f'<footer class="page-foot">Страница {len(pages) + 1} / __TOTAL__</footer>'
             "</section>"
@@ -429,27 +463,21 @@ def render_paginated_html(
         titles = [item.title for section in document.sections for item in section.items]
     contents = "".join(f"<li>{_html_text(title)}</li>" for title in titles[:10])
     toc = f'<ol class="toc">{contents}</ol>' if contents else ""
-    chart = _designed_chart_svg(document)
-    cover_chart = f'<div class="cover-chart"><h3>Наблюдения по дням</h3>{chart}</div>' if chart else ""
     add_page(
         "Обзор",
         f'<div class="cover"><p class="eyebrow">{cover_eyebrow}</p><h1>{topic}</h1>'
         f'<p class="period">{period}</p>{lead}<div class="kpis">{kpi_html}</div>'
-        f'{toc}{cover_chart}</div>',
+        f"{select_note}{toc}</div>",
     )
-    for chunk in _chunk(_story_card_blocks(document), stories_per_page):
+    story_cards = _story_card_blocks(document)
+    if stories_per_page is None:
+        story_pages = _pack_cards(story_cards)
+    else:
+        story_pages = _chunk(story_cards, stories_per_page)
+    for chunk in story_pages:
         add_page("Главное", f'<div class="story-stack">{"".join(chunk)}</div>')
-    top_sources = _designed_top_sources_svg(document)
-    coverage_chart = f"<h3>Пункты по источникам</h3>{top_sources}" if top_sources else ""
-    add_page(
-        "Покрытие",
-        f"{coverage_chart}"
-        f'<div class="table-wrap"><table><thead><tr><th>Источник</th><th>Состояние</th>'
-        f"<th>Ограничение</th></tr></thead><tbody>{coverage_rows}</tbody></table></div>"
-        f"{_html_limitations(limitation)}",
-    )
-    for chunk in _chunk(_source_card_blocks(document), sources_per_page):
-        add_page("Источники", f'<div class="source-grid">{"".join(chunk)}</div>')
+    for chunk in _chunk(reader_sources, sources_per_page):
+        add_page("Источники", f'<div class="source-list">{"".join(chunk)}</div>')
     total = len(pages)
     body = "".join(pages).replace("__TOTAL__", str(total))
     html = f"""<!doctype html>
@@ -498,6 +526,12 @@ def _paginated_stylesheet() -> str:
 .page .toc li { margin: 5px 0; font-size: .95rem; }
 .page .cover-chart { margin-top: 16px; }
 .page .cover-chart h3 { margin: 0 0 4px; font-size: 1rem; }
+.select-note { margin: 14px 0 0; font-size: .9rem; color: var(--muted); line-height: 1.45; }
+.source-list { display: block; }
+.source-row { display: block; padding: 11px 2px; border-bottom: 1px solid var(--line); line-height: 1.4; }
+.source-row .source-num { display: inline-block; min-width: 22px; color: var(--accent); font-weight: 700; }
+.source-row .source-title { display: block; margin: 0 0 3px 22px; font-size: .98rem; font-weight: 650; color: var(--ink); }
+.source-row .source-link { display: block; margin-left: 22px; font-size: .86rem; }
 .page .story-stack .story:first-child { margin-top: 0; }
 @media print { .page { break-after: page; } .page:last-of-type { break-after: auto; } }
 """
@@ -1005,6 +1039,26 @@ def _source_card_blocks(document: BriefDocument) -> list[str]:
     ]
 
 
+def _reader_source_card_blocks(document: BriefDocument) -> list[str]:
+    """Compact reader-facing source rows: title + link, no audit metadata."""
+
+    rows = []
+    for index, evidence in enumerate(document.evidence, start=1):
+        title = " ".join(str(evidence.title or "").split())
+        if len(title) > 110:
+            title = (title[:110].rsplit(" ", 1)[0] or title[:110]) + "…"
+        rows.append(
+            '<div class="source-row"><span class="source-num">{number}</span>'
+            '<span class="source-title">{title}</span>'
+            '<span class="source-link">{source}</span></div>'.format(
+                number=index,
+                title=_html_text(title),
+                source=_html_source_label(evidence.source_ref),
+            )
+        )
+    return rows
+
+
 def _html_story_or_item_sections(document: BriefDocument) -> str:
     if document.editorial is not None and not document.editorial.stories:
         message = (
@@ -1088,8 +1142,9 @@ def _html_source_label(value: str) -> str:
             label = f"{label}/{path.split('/')[0]}"
     else:
         label = shown
-    if len(label) > 44:
-        label = label[:41] + "…"
+    if len(label) > 60:
+        cut = label[:60].rsplit(" ", 1)[0] or label[:60]
+        label = cut + "…"
     return f"<a href=\"{_html_attr(value)}\">{_html_text(label or shown)}</a>"
 
 
