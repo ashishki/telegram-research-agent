@@ -44,6 +44,8 @@ PRM_ACTIVE_TESTS = (
     "tests/test_assistant_memory.py",
     # PA-15 media safety: allowlist, bounded OCR, page refs, cleanup, egress.
     "tests/test_assistant_media.py",
+    # PA-16 quality-first routing, honest cost accounting and matched-quality savings.
+    "tests/test_assistant_cost.py",
     # The judge layer (text answers + visual layout) is safety-relevant and
     # must keep its fail-closed holdouts in the active tier.
     "tests/test_assistant_answer_judge.py",
