@@ -21,6 +21,12 @@ ROLES = {
     "program_design_review": "PROGRAM_DESIGN_REVIEW",
 }
 MAX_INPUT_BYTES = 200_000
+REVIEW_GROUPS = {"foundation": range(0, 7), "product": range(7, 16),
+                 "sources": range(16, 21), "completeness": range(21, 32)}
+SPEC_GROUPS = {"foundation": {0, 2, 9, 10, 11, 14, 15},
+               "product": {1, 3, 4, 5, 6, 7, 9, 10, 13, 15},
+               "sources": {8, 9, 10, 13, 15},
+               "completeness": {4, 9, 10, 11, 12, 13, 14, 15}}
 VERDICT_SCHEMA = {
     "type": "object", "additionalProperties": False,
     "required": ["verdict", "findings", "not_verified", "summary"],
@@ -107,7 +113,8 @@ def pinned_modules(root: Path):
     return feature_design_lib, feature_workflow, approve_feature_design
 
 
-def prepare_packet(root: Path, task: str, feature: str, role: str, tooling_review: bool = False):
+def prepare_packet(root: Path, task: str, feature: str, role: str, tooling_review: bool = False,
+                   slice_group: str | None = None):
     if role not in ROLES or not re.fullmatch(r"[A-Za-z][A-Za-z0-9._-]*", feature):
         raise ReviewBlocked("unsupported role or feature")
     lib, workflow, _ = pinned_modules(root)
@@ -122,8 +129,9 @@ def prepare_packet(root: Path, task: str, feature: str, role: str, tooling_revie
     if tooling_review:
         if role != "program_design_review": raise ReviewBlocked("tooling audit requires program role")
         refs = tuple(ref for ref in refs if ref not in {registry_ref, f"docs/design/{feature}.md", "docs/design/PAI.requirements.json"})
-        refs += ("tools/opencode_role_review.py", "tools/run_codex_role.py", "tools/mimo_code_review.py", "tools/check_pai_plan.py", "tests/test_pai_plan.py")
+        refs += ("tools/opencode_role_review.py", "tools/run_codex_role.py", "tools/mimo_code_review.py", "tools/check_pai_plan.py", "tests/test_pai_plan.py", "tools/finalize_opencode_design_reviews.py")
     manifest, sections = [], []
+    selected = {f"PAI-{n:02}" for n in REVIEW_GROUPS[slice_group]} if slice_group else None
     for ref in refs:
         path = lib.safe_repo_path(root, ref)
         if path is None or not path.is_file() or path.is_symlink():
@@ -131,11 +139,30 @@ def prepare_packet(root: Path, task: str, feature: str, role: str, tooling_revie
         data = path.read_bytes()
         manifest.append({"path": ref, "sha256": digest(data), "bytes": len(data)})
         content = data.decode("utf-8")
-        if ref in {registry_ref, "docs/design/PAI.requirements.json"}:
+        if selected and ref == "docs/PERSONAL_ASSISTANT_SPEC.md":
+            chunks = re.split(r"(?=^## [0-9]+\.)", content, flags=re.M)
+            chosen = [chunks[0]]
+            for chunk in chunks[1:]:
+                section = int(re.match(r"## ([0-9]+)\.", chunk).group(1))
+                if section in SPEC_GROUPS[slice_group]: chosen.append(chunk)
+            content = "".join(chosen)
+            content = "Declared spec sections for this phase: " + str(sorted(SPEC_GROUPS[slice_group])) + "; all 0..15 are mandatory across the completed review set.\n" + content
+        elif selected and ref == registry_ref:
+            subset = json.loads(content)
+            subset["slices"] = [s for s in subset["slices"] if s["slice_id"] in selected]
+            content = json.dumps(subset, ensure_ascii=False, separators=(",", ":"))
+        elif selected and ref == "docs/design/PAI.requirements.json":
+            subset = json.loads(content)
+            subset["requirements"] = [r for r in subset["requirements"] if set(r["slices"]) & selected]
+            subset["scenarios"] = [r for r in subset["scenarios"] if set(r["slices"]) & selected]
+            needed = set(selected) | {s for row in subset["requirements"] for s in row["slices"]} | {s for row in subset["scenarios"] for s in row["slices"]}
+            subset["slice_bindings"] = {k: v for k, v in subset["slice_bindings"].items() if k in needed}
+            content = json.dumps(subset, ensure_ascii=False, separators=(",", ":"))
+        elif ref in {registry_ref, "docs/design/PAI.requirements.json"}:
             # Whitespace reduction preserves every field and scope; the
             # manifest remains bound to the exact original registry bytes.
             content = json.dumps(factor_json(json.loads(content)), ensure_ascii=False, separators=(",", ":"))
-        if ref in {"tools/opencode_role_review.py", "tools/run_codex_role.py", "tools/check_pai_plan.py", "tests/test_pai_plan.py"}:
+        if ref in {"tools/opencode_role_review.py", "tools/run_codex_role.py", "tools/check_pai_plan.py", "tests/test_pai_plan.py", "tools/finalize_opencode_design_reviews.py"}:
             # AST normalization retains the complete executable source and
             # docstrings; original bytes/hashes remain in the manifest.
             content = ast.unparse(ast.parse(content))
@@ -171,6 +198,11 @@ def prepare_packet(root: Path, task: str, feature: str, role: str, tooling_revie
     )
     if tooling_review:
         instruction += "Scope is the actual review transport/checker code only, not full feature design approval. Challenge budget/credentials, schema, provenance, source coverage, tamper guards and negative tests.\n"
+    if selected:
+        instruction += ("This is one declared phase of a COMPLETE programme review. Review only these slice scopes: "
+                        + ",".join(sorted(selected)) + ". The full spec and architecture remain supplied. "
+                        "Other phases need their own independent review; this part alone cannot approve the full design. "
+                        "Focus on real defects in this phase and its cross-phase interfaces; concise findings, no spec restatement.\n")
     packet = instruction + json.dumps({"task": task, "role": role}) + "".join(sections)
     if len(packet.encode("utf-8")) > MAX_INPUT_BYTES:
         raise ReviewBlocked("packet exceeds authorized input bound; never truncate silently")
@@ -214,7 +246,9 @@ def parse_response(payload: dict, requested_model: str) -> dict:
 def execute(args):
     root = args.root.resolve()
     tooling_review = getattr(args, "tooling_review", False)
-    packet, manifest, design = prepare_packet(root, args.task, args.feature_id, args.role, tooling_review)
+    slice_group = getattr(args, "slice_group", None)
+    if tooling_review and slice_group: raise ReviewBlocked("tooling and phase scopes cannot be combined")
+    packet, manifest, design = prepare_packet(root, args.task, args.feature_id, args.role, tooling_review, slice_group)
     lib, workflow, approval = pinned_modules(root)
     try:
         workflow.validate_task_feature_slice_binding(
@@ -300,6 +334,9 @@ def execute(args):
         "provider": "opencode_go", "run_id": run_id, "task": args.task,
         "role": args.role, "feature_id": args.feature_id, "reviewed_head": head,
         "review_scope": "tooling" if tooling_review else "complete_design",
+        "slice_group": slice_group,
+        "reviewed_slice_ids": [f"PAI-{n:02}" for n in REVIEW_GROUPS[slice_group]] if slice_group else [s["slice_id"] for s in design["slices"]],
+        "reviewed_spec_sections": sorted(SPEC_GROUPS[slice_group]) if slice_group else list(range(16)),
         "requested_model": args.model, "observed_model": response["model"],
         "requested_effort": "not_requested", "observed_effort": "unknown",
         "generated_at": datetime.now(timezone.utc).isoformat(), "read_only": True,
@@ -313,14 +350,14 @@ def execute(args):
     (run_dir / "result.json.sha256").write_text(digest(result.read_bytes()) + "\n")
     # Use the real pinned consumer and an honest non-Codex binding. Never create
     # codex_role_run events/results or human approval fields.
-    if not tooling_review:
+    if not tooling_review and not slice_group:
         approval.write_design_review_record(
             root=root, feature_id=args.feature_id, role=args.role,
             report_path=report.relative_to(root).as_posix(), reviewed_design=design,
             reviewer_binding="opencode_go:" + result.relative_to(root).as_posix(),
             read_only=True,
         )
-    print(json.dumps({"status": "tooling_review_completed" if tooling_review else "review_record_written", "provider": "opencode_go",
+    print(json.dumps({"status": "scoped_review_completed" if tooling_review or slice_group else "review_record_written", "provider": "opencode_go",
                       "verdict": verdict["verdict"], "result": str(result)}))
     return 0 if verdict["verdict"] != "STOP_SHIP" else 1
 
@@ -342,6 +379,8 @@ def main(argv=None):
     parser.add_argument("--prepare-only", action="store_true")
     parser.add_argument("--tooling-review", action="store_true",
                         help="separate narrow code audit; never publishes full-design approval evidence")
+    parser.add_argument("--slice-group", choices=sorted(REVIEW_GROUPS),
+                        help="one phase; full-design evidence requires independent coverage of every phase")
     args = parser.parse_args(argv)
     try:
         if not 30 <= args.timeout_seconds <= 300:

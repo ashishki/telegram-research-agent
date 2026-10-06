@@ -45,7 +45,7 @@ def test_invalid_identity_or_verdict_cannot_be_published(change):
 def setup_run(tmp_path, monkeypatch, *, planning_block=False):
     doc = tmp_path / "design.md"
     doc.write_text("synthetic review input")
-    design = {"feature_id": "F"}
+    design = {"feature_id": "F", "slices": []}
     manifest = [{"path": "design.md", "sha256": review.digest(doc.read_bytes()), "bytes": len(doc.read_bytes())}]
     monkeypatch.setattr(review, "prepare_packet", lambda *args: ("synthetic packet", manifest, design))
     calls, records = [], []
@@ -53,7 +53,8 @@ def setup_run(tmp_path, monkeypatch, *, planning_block=False):
         if planning_block:
             raise SystemExit("planning decision needs_input")
     workflow = SimpleNamespace(validate_task_feature_slice_binding=preflight, git_commit=lambda root: "a" * 40)
-    lib = SimpleNamespace(design_hashes=lambda root, design: {"markdown_sha256": "b" * 64, "registry_payload_sha256": "c" * 64})
+    lib = SimpleNamespace(design_hashes=lambda root, design: {"markdown_sha256": "b" * 64, "registry_payload_sha256": "c" * 64},
+                          safe_repo_path=lambda root, ref: root / ref)
     approval = SimpleNamespace(write_design_review_record=lambda **kwargs: records.append(kwargs))
     monkeypatch.setattr(review, "pinned_modules", lambda root: (lib, workflow, approval))
     monkeypatch.setattr(mimo_code_review, "_api_key", lambda path: calls.append("key") or "synthetic-key")
@@ -307,3 +308,71 @@ def test_explicit_design_recheck_output_cap_reaches_provider_and_receipt(tmp_pat
     result = json.loads(next((tmp_path / ".playbook-artifacts/opencode-runs").glob("*/result.json")).read_text())
     assert result["output_token_cap"] == 16000
     assert records
+
+
+def test_independent_phase_partition_covers_every_slice_and_spec_section():
+    assert {n for group in review.REVIEW_GROUPS.values() for n in group} == set(range(32))
+    assert sum(len(group) for group in review.REVIEW_GROUPS.values()) == 32
+    assert set().union(*review.SPEC_GROUPS.values()) == set(range(16))
+
+
+def test_phase_result_never_becomes_full_design_approval(tmp_path, monkeypatch):
+    args, calls, records = setup_run(tmp_path, monkeypatch)
+    args.slice_group = "foundation"
+    assert review.execute(args) == 0
+    assert records == []
+    result=json.loads(next((tmp_path/".playbook-artifacts/opencode-runs").glob("*/result.json")).read_text())
+    assert result["slice_group"] == "foundation"
+    assert set(result["reviewed_slice_ids"]) == {f"PAI-{n:02}" for n in range(7)}
+    assert result["reviewed_spec_sections"] == sorted(review.SPEC_GROUPS["foundation"])
+
+
+def test_complete_review_rejects_missing_phases_without_approval(tmp_path, monkeypatch):
+    import finalize_opencode_design_reviews as complete
+    args, calls, records=setup_run(tmp_path,monkeypatch)
+    args.slice_group="foundation"
+    assert review.execute(args)==0
+    result=next((tmp_path/".playbook-artifacts/opencode-runs").glob("*/result.json"))
+    (tmp_path/"docs/design").mkdir(parents=True)
+    (tmp_path/"docs/design/F.design.json").write_text(json.dumps({"slices":[{"slice_id":f"PAI-{n:02}"} for n in range(32)]}))
+    monkeypatch.setattr(complete,"pinned_modules",review.pinned_modules)
+    with pytest.raises(ValueError,match="all four"):
+        complete.finalize(tmp_path,"F",args.role,[result])
+    assert records==[]
+
+
+def test_complete_review_requires_all_phases_and_keeps_one_marker(tmp_path, monkeypatch):
+    import finalize_opencode_design_reviews as complete
+    args, calls, records=setup_run(tmp_path,monkeypatch)
+    (tmp_path/"docs/design").mkdir(parents=True)
+    (tmp_path/"docs/design/F.design.json").write_text(json.dumps({"slices":[{"slice_id":f"PAI-{n:02}"} for n in range(32)]}))
+    results=[]
+    for group in review.REVIEW_GROUPS:
+        args.slice_group=group
+        assert review.execute(args)==0
+        results=sorted((tmp_path/".playbook-artifacts/opencode-runs").glob("*/result.json"))
+        assert records==[]
+    monkeypatch.setattr(complete,"pinned_modules",review.pinned_modules)
+    assert complete.finalize(tmp_path,"F",args.role,results)==0
+    assert len(records)==1
+    assert records[0]["reviewer_binding"].startswith("opencode_go_complete:")
+    report=(tmp_path/records[0]["report_path"]).read_text()
+    assert report.count("PROGRAM_DESIGN_REVIEW:")==1
+    assert len(results)==4
+
+
+def test_complete_review_rejects_scope_or_head_drift(tmp_path, monkeypatch):
+    import finalize_opencode_design_reviews as complete
+    args,calls,records=setup_run(tmp_path,monkeypatch)
+    args.slice_group="foundation"
+    review.execute(args)
+    result=next((tmp_path/".playbook-artifacts/opencode-runs").glob("*/result.json"))
+    payload=json.loads(result.read_text());payload["reviewed_head"]="f"*40
+    result.write_text(json.dumps(payload))
+    result.with_suffix(".json.sha256").write_text(review.digest(result.read_bytes()))
+    (tmp_path/"docs/design").mkdir(parents=True)
+    (tmp_path/"docs/design/F.design.json").write_text(json.dumps({"slices":[{"slice_id":f"PAI-{n:02}"} for n in range(32)]}))
+    monkeypatch.setattr(complete,"pinned_modules",review.pinned_modules)
+    with pytest.raises(ValueError,match="different HEAD"):
+        complete.finalize(tmp_path,"F",args.role,[result])
+    assert records==[]

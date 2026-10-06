@@ -280,3 +280,25 @@ recheck option. Total call cap 30, input 200KB, selected Mimo/default thinking,
 CLI now requires explicit --output-token-cap 16000; default stays 8000.
 A provider/receipt test verifies the actual bound, not an invented measurement.
 No private/live/feature approval is inferred from this funding amendment.
+
+## Model latency and complete phase review strategy
+
+All three 16000-token full-packet attempts on 61b3c50 exited TimeoutError at the
+bounded 300 s timeout. Unknown outcomes count conservatively: 11 calls consumed
+out of 30 before the next explicit attempts. No automatic restart/fallback.
+
+The review scope is now split into foundation (00..06), product (07..15),
+sources (16..20) and completeness (21..31), executed sequentially. Each carries
+the complete shared architecture/contracts plus exact phase clauses, unchanged
+source hashes, relevant requirements/scenarios and declared full-spec section
+coverage. Together the phases cover every slice and every spec section 0..15;
+this is partitioning work, never dropping a requirement or accepting a subset.
+A phase cannot create a complete-design approval record.
+
+The deterministic finalizer requires all four actual independent same-HEAD/
+same-design/model/context-hash results, validates their exact slice/section
+coverage and report hashes, and preserves the worst verdict. No implementer
+review judgment is added. Missing phases, stale HEAD/context, mismatched
+model/scope, or STOP_SHIP cannot become a full PASS. The generic pinned consumer
+receives only that completed reviewed set. Model/thinking defaults remain the
+owner's Mimo choice. No private/live authority or feature approval is invented.
