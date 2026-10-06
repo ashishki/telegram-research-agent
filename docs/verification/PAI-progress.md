@@ -104,3 +104,8 @@ PAI-06 locally verified: 45 passed in 22.50 s; phase-B focused-prm 652
 passed in 110.62 s. Receipt PAI-06-workers.md. All PAI-02..06 now have actual
 local behavior; default runtime/ingress composition remains PAI-07.
 Next independent accumulated Mimo review; twenty of 30 calls consumed.
+
+Phase-B Mimo call #21 on a601c80 returned invalid_identity_or_completion; no
+valid verdict/report and no approval implied. Calls consumed: 21/30. Under
+owner ADR-014 proceed with local implementation; review remains pending,
+without another upfront reviewer-framework loop. Next PAI-07.

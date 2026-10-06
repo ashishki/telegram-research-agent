@@ -11,13 +11,14 @@ Receipt: docs/verification/PAI-02-storage.md. PAI-03 shared policy is locally ve
 durable proposals/confirmations/attempts/receipts now locally verified (36
 cases). PAI-05 persistence locally verified (26 cases). Current next card:
 PAI-06 queue/worker locally verified (45 cases). Phase-B floor: 652 passed.
-Next: independent accumulated phase-B Mimo diff review, fix/recheck P0/P1,
-then PAI-07 real ingress/durable inbox/runtime composition.
+Phase-B Mimo call #21 returned no valid completion; keep it pending without
+restarting reviewer-framework work. Proceed under ADR-014 to PAI-07 real
+ingress/durable inbox/runtime composition; fix actual P0/P1 when received.
 Use .venv-pai/bin/python (psycopg 3.3.6 installed with verified wheel hash).
 Do not read .env/production DSNs or change services/timers/live accounts.
 
 Keep Mimo as independent reviewer at accumulated phase boundaries, not every
-patch. Twenty of 30 developer-review calls consumed; source/tooling attempt #20
+patch. Twenty-one of 30 developer-review calls consumed; source/tooling attempt #20
 on 2fb4e75 hit finish_reason length at 16000 output tokens (no valid verdict).
 Earlier foundation STOP_SHIP and local fixes are preserved. Formal PA/PAI
 states remain review_required/draft/planned; no acceptance fields were forged.
