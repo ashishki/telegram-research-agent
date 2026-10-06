@@ -20,6 +20,23 @@ ROLES = {
     "program_design_review": "PROGRAM_DESIGN_REVIEW",
 }
 MAX_INPUT_BYTES = 200_000
+VERDICT_SCHEMA = {
+    "type": "object", "additionalProperties": False,
+    "required": ["verdict", "findings", "not_verified", "summary"],
+    "properties": {
+        "verdict": {"type": "string", "enum": ["PASS", "ADVISORY", "STOP_SHIP"]},
+        "findings": {"type": "array", "maxItems": 50, "items": {
+            "type": "object", "additionalProperties": False,
+            "required": ["severity", "title", "issue", "fix"],
+            "properties": {
+                "severity": {"type": "string", "enum": ["P0", "P1", "P2"]},
+                **{key: {"type": "string"} for key in ("title", "issue", "fix")},
+            },
+        }},
+        "not_verified": {"type": "array", "items": {"type": "string"}},
+        "summary": {"type": "string"},
+    },
+}
 PACKET_REFS = (
     "docs/PERSONAL_ASSISTANT_SPEC.md", "docs/PERSONAL_ASSISTANT_BRIEF.md",
     "docs/PROJECT_BRIEF.md", "docs/ASSISTANT_BOUNDARIES.md",
@@ -186,7 +203,8 @@ def execute(args):
     try:
         response = _call_model(api_key=key, base_url="https://opencode.ai/zen/go/v1",
                                model=args.model, prompt=packet, timeout=args.timeout_seconds,
-                               max_output_tokens=8000)
+                               max_output_tokens=8000, response_schema=VERDICT_SCHEMA,
+                               session_id=run_id.removeprefix("opencode-"))
         verdict = parse_response(response, args.model)
     except Exception as exc:
         code = getattr(exc, "code", None)
@@ -250,7 +268,7 @@ def main(argv=None):
     parser.add_argument("--role", choices=sorted(ROLES), required=True)
     parser.add_argument("--model", choices=["mimo-v2.6-pro"], default="mimo-v2.6-pro")
     parser.add_argument("--key-file", default=os.environ.get("OPENCODE_API_KEY_FILE", ""))
-    parser.add_argument("--timeout-seconds", type=int, default=180)
+    parser.add_argument("--timeout-seconds", type=int, default=300)
     parser.add_argument("--call-cap", type=int, default=0)
     parser.add_argument("--allow-provider-egress", action="store_true")
     parser.add_argument("--prepare-only", action="store_true")

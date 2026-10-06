@@ -227,3 +227,31 @@ def test_failed_actual_attempt_keeps_safe_evidence_and_never_publishes_verdict(t
     assert "synthetic-secret-value" not in (attempt_dirs[0] / "failure.json").read_text()
     assert records == []
     assert not (attempt_dirs[0] / "result.json").exists()
+
+
+def test_transport_matches_navigator_two_messages_strict_schema_and_fresh_session(monkeypatch):
+    captures = []
+    class FakeHTTP:
+        def __enter__(self): return self
+        def __exit__(self, *args): return False
+        def read(self, limit): return json.dumps(response()).encode()
+    def fake_open(request, timeout):
+        captures.append((json.loads(request.data), dict(request.header_items()), timeout))
+        return FakeHTTP()
+    monkeypatch.setattr(mimo_code_review, "urlopen", fake_open)
+    for _ in range(2):
+        mimo_code_review._call_model(
+            api_key="synthetic-key", base_url="https://opencode.ai/zen/go/v1",
+            model="mimo-v2.6-pro", prompt="synthetic document", timeout=300,
+            max_output_tokens=8000, response_schema=review.VERDICT_SCHEMA,
+        )
+    body, headers, timeout = captures[0]
+    assert [message["role"] for message in body["messages"]] == ["system", "user"]
+    assert body["messages"][1]["content"] == "synthetic document"
+    assert body["response_format"]["type"] == "json_schema"
+    assert body["response_format"]["json_schema"]["strict"] is True
+    assert body["response_format"]["json_schema"]["schema"] == review.VERDICT_SCHEMA
+    assert body["max_tokens"] == 8000 and timeout == 300
+    assert "temperature" not in body
+    sessions = [next(value for key, value in record[1].items() if key.lower() == "x-opencode-session") for record in captures]
+    assert len(set(sessions)) == 2 and all(len(value) == 32 for value in sessions)

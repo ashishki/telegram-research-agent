@@ -187,3 +187,12 @@ hash-bound feature approval remain separate; none of PAI-02..26 is implemented.
 Published continuation checkpoint: 985f8f2ecbbbe0ab28a62e8a4cd09295a0d2266e.
 git push origin HEAD exited 0 and updated the assigned branch. Existing user
 local documents remain preserved; no production/release action was performed.
+
+## Navigator protocol correction and successful actual smoke
+
+The owner requested inspecting the working Navigator invocation. Source commit
+5f26418921246c3e24a967532225dfe3d274b1cb uses system/user, strict json_schema, fresh session UUID and
+300 s timeout. Client aligned; 29 targeted tests pass. One tiny synthetic
+connectivity probe for that new request succeeded with observed mimo-v2.6-pro
+and usage 61+51=112 tokens. It is not a full design verdict or a renewal of the
+exhausted two-review-call cap. Full details: PAI-MIMO-CALL-PROTOCOL.md.

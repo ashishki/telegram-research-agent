@@ -34,7 +34,7 @@
     },
     {
       "path": "docs/CODEX_PROMPT.md",
-      "sha256": "7726caddd809430dd0477a850ff770f76ec3b207438ebac2686dcfc765f26d71"
+      "sha256": "2c8a23c04f6024ce9f705f4ebfc4893b760a7ea167098a6b37abde67daf7e5cb"
     },
     {
       "path": "docs/IMPLEMENTATION_CONTRACT.md",
@@ -126,11 +126,11 @@
     },
     {
       "path": "docs/verification/PAI-00-reconciliation.md",
-      "sha256": "2f94d9d9962e6397907841b5730a4a70db490c3a5f46080ad9d3fe1b26fb1a9a"
+      "sha256": "f700388ca14d5d313ec1bb5dcdd20da9bafdd6ef341fb56f19bb8e2d488f5e57"
     },
     {
       "path": "docs/verification/PAI-01-durable-design.md",
-      "sha256": "75dae5d2c4482e214144ee145c9e1e1365aac921858165d9401fa863ba666a13"
+      "sha256": "de5d1e00abc053fbc49f89659d040676280c194a8128175bde82557b3b336c30"
     },
     {
       "path": "docs/verification/PAI-access-release-pilot-packet.md",
@@ -138,7 +138,7 @@
     },
     {
       "path": "docs/verification/PAI-progress.md",
-      "sha256": "00f10be0d4373b20fae6539ce4f8d7555278fc7a2b5997fb4c0f485bbbf5fe56"
+      "sha256": "d71ac04419d39788c291b8b0d5204086ec64751b768d1524e0bab50ab1bed1cb"
     },
     {
       "path": "tests/test_assistant_conversation.py",
@@ -150,7 +150,7 @@
     },
     {
       "path": "tests/test_opencode_role_review.py",
-      "sha256": "b8097da8ef06fb972fb62d38118e8611c6a853d0540fc6cc89a0277d5fdbb08c"
+      "sha256": "88901932ece79edb7c80d5f23c75c0f9bb3766ddad14e92700808ec31388de56"
     },
     {
       "path": "tests/test_pai_plan.py",
@@ -166,11 +166,11 @@
     },
     {
       "path": "tools/mimo_code_review.py",
-      "sha256": "31beafe3ec29212576be1c66752352d6aba6e03a84ba7ebbefbf4d358e8db25b"
+      "sha256": "0afa54feff9c0206e584e9dbaccd6b3ac3121609aa418bbffc2f197f09bd00b2"
     },
     {
       "path": "tools/opencode_role_review.py",
-      "sha256": "d972b84b2e2a6fbecbb862943e189bc081104dda897099248757b0041d0b7fe9"
+      "sha256": "888e6276c2110d0ea76777ebbb1ded6f65b94a6654afa59668c007664068fed7"
     },
     {
       "path": "tools/playbook.py",
@@ -183,6 +183,10 @@
     {
       "path": "tools/test_tiers.py",
       "sha256": "42e16edbe26c4bc7d1a96234d47b7c730b7b00f00722e6bfea3a76bad0dd8e74"
+    },
+    {
+      "path": "docs/verification/PAI-MIMO-CALL-PROTOCOL.md",
+      "sha256": "380d3eed401d491482682529b1e6c2b334c2d798cf9edb1d63ea9d20d24dc689"
     }
   ],
   "preserved_unrelated_paths": [
@@ -203,5 +207,17 @@
   },
   "snapshot_commit": "ba170d4ba2fa339a5d2c90fd3f1aeae85b394de1",
   "latest_code_checkpoint": "985f8f2ecbbbe0ab28a62e8a4cd09295a0d2266e",
-  "snapshot_note": "Exact content hashes at snapshot_commit; this manifest excludes itself."
+  "snapshot_note": "Exact content hashes at snapshot_commit; this manifest excludes itself.",
+  "actual_mimo_requests": {
+    "failed_initial_design_attempts": 2,
+    "successful_owner_requested_connectivity_diagnostic": 1,
+    "total": 3,
+    "diagnostic_observed_model": "mimo-v2.6-pro",
+    "diagnostic_usage": {
+      "prompt_tokens": 61,
+      "completion_tokens": 51,
+      "total_tokens": 112
+    },
+    "valid_independent_design_verdicts": 0
+  }
 }

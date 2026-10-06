@@ -67,3 +67,7 @@ The two actual Mimo attempts failed without verdict. They are not synthetic
 PASS or design acceptance. New bounded-call scope is pending; source/data
 permissions otherwise persist unchanged. Current goal remains active.
 \nPublication: git push origin HEAD succeeded, 8faee42..985f8f2 on the assigned\nbranch. No release/deployment claim. Latest handoff is the current CODEX_PROMPT.\n
+Navigator protocol found at 5f26418921246c3e24a967532225dfe3d274b1cb; shared client aligned. Actual
+synthetic smoke succeeded: observed mimo-v2.6-pro, strict JSON, 112 tokens.
+Current actual Mimo requests: 3 total (2 failed design + 1 tiny diagnostic).
+Full reviews and exact feature acceptance remain pending the new call cap.

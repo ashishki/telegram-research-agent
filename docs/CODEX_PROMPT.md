@@ -40,7 +40,7 @@ model/effort/usage/cost unknown. Original failure status/body was unavailable.
 Exact input manifests and conservative failure-from-tool-output records stay in
 .playbook-artifacts/opencode-runs/. No raw error body/credential was logged.
 
-Two attempts consumed the initial cap, including failures/unknown outcomes.
+Two design attempts consumed the initial review cap, including failures/unknown outcomes.
 The follow-up question offers total 30 bounded calls for local PAI-00..26,
 or 8 for phase A, or retaining cap 2. It is still unanswered. Do not infer
 consent from elapsed time or the UI default, and do not repeat model calls yet.
@@ -103,3 +103,15 @@ documented key file for execution only. Each attempt counts against the total.
 Freeze HEAD/documents during a review, resolve P0/P1 with independent recheck,
 then get exact hash-bound feature approval through the pinned workflow. Continue
 the first ready assigned card without repeated per-file consent.
+
+## Latest Mimo method correction
+
+Owner requested checking the working Navigator client. Commit 5f26418921246c3e24a967532225dfe3d274b1cb
+uses separate system/user messages, strict json_schema, a fresh session UUID
+and 300 s judge timeout. Shared client is now aligned; 29 targeted tests pass.
+One bounded synthetic diagnostic for that new request succeeded: actual model
+mimo-v2.6-pro, strict JSON, 61 input + 51 output tokens. No design verdict is
+inferred. Total actual requests are 3; the original 2-review cap is exhausted.
+See docs/verification/PAI-MIMO-CALL-PROTOCOL.md. Overall follow-up cap is still
+pending; after it is authorized, use the corrected client for full independent
+program/product reviews and then the exact design approval gate.
