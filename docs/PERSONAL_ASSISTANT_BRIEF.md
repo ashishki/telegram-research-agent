@@ -1,7 +1,7 @@
 # Personal Assistant — Owner Intent Brief
 
 Status: owner-requested product direction captured; exact design approval pending.
-Date: 2026-09-18
+Date: 2026-09-18; current assignment reconciliation 2026-10-06
 Canonical requirements: `docs/PERSONAL_ASSISTANT_SPEC.md`.
 
 ## Pain and current workaround
@@ -37,14 +37,18 @@ The owner is willing to provide available access and models. Exact accounts,
 provider scopes, data-egress permission, budgets and live schedules remain
 explicit decisions; willingness is not a configured grant or infinite spend.
 Preserve one bot, existing canonical archive, privacy and confirmation rules.
-The current session only documents, updates tooling and publishes changes.
+The current assignment permits safe local implementation, synthetic fixtures
+and isolated test PostgreSQL. Exact design/live/paid/production approval is
+separate; no capability is accepted by publishing these documents.
 
 ## Development
 
 Mode: Standard. Proposed planning depth: designed_slices.
 Execution: Codex Direct with independent, risk-targeted read-only review.
-Design: `docs/design/PA.md` + `docs/design/PA.design.json`.
+Original requirement design: docs/design/PA.md + docs/design/PA.design.json.
+Remaining execution draft: docs/design/PAI.md + docs/design/PAI.design.json.
 Current regression command: `python tools/test_tiers.py focused-prm`.
-Known baseline failure must remain visible until its cause is corrected.
+Current baseline results are recorded in docs/verification/PAI-00-reconciliation.md;
+historical failures are not presented as current without reproduction.
 Full verification uses `python tools/playbook.py verify_project --root .`;
 no release claim without current passing project and real-user evidence.

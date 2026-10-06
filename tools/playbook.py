@@ -16,6 +16,7 @@ TOOLS = frozenset({
     'render_slice_context', 'check_maintainability', 'planning_depth',
     'receipt_run', 'cognition_index', 'context_packet_builder',
     'cost_rollup', 'integrity_check', 'skill_security_gate',
+    'create_feature_design', 'validate_feature_design',
 })
 
 

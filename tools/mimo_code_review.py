@@ -18,13 +18,23 @@ import subprocess
 import sys
 from typing import Any, Mapping
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.request import Request, HTTPRedirectHandler, build_opener
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_BASE_URL = os.environ.get("OPENCODE_GO_BASE_URL", "https://opencode.ai/zen/go/v1")
 DEFAULT_MODEL = os.environ.get("MIMO_REVIEW_MODEL", "mimo-v2.6-pro")
 MAX_DIFF_CHARS = 900_000
+
+
+class _NoReviewRedirects(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        # Do not forward reviewer credentials to a redirect destination.
+        raise ValueError("review_provider_redirect_denied")
+
+
+def urlopen(request, *, timeout):
+    return build_opener(_NoReviewRedirects()).open(request, timeout=timeout)
 
 PROMPT = """You are a strict, independent code reviewer for a private personal-assistant
 project. Review ONLY the supplied git diff. Report real defects, not style nits.
@@ -66,14 +76,17 @@ def _api_key(explicit_file: str) -> str:
     return ""
 
 
-def _call_model(*, api_key: str, base_url: str, model: str, prompt: str, timeout: int) -> dict[str, Any]:
+def _call_model(*, api_key: str, base_url: str, model: str, prompt: str, timeout: int,
+                max_output_tokens: int = 12000) -> dict[str, Any]:
+    if type(max_output_tokens) is not int or not 1 <= max_output_tokens <= 12000:
+        raise ValueError("invalid_review_output_bound")
     body = {
         "model": model,
         "messages": [
             {"role": "system", "content": prompt},
         ],
         "temperature": 0,
-        "max_tokens": 12000,
+        "max_tokens": max_output_tokens,
         "response_format": {"type": "json_object"},
     }
     request = Request(
@@ -88,7 +101,10 @@ def _call_model(*, api_key: str, base_url: str, model: str, prompt: str, timeout
         method="POST",
     )
     with urlopen(request, timeout=max(30, timeout)) as response:  # nosec B310
-        return json.loads(response.read())
+        raw = response.read(1_048_577)
+        if len(raw) > 1_048_576:
+            raise ValueError("review_response_too_large")
+        return json.loads(raw)
 
 
 def _response_text(payload: Mapping[str, Any]) -> str | None:

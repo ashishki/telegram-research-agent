@@ -46,23 +46,15 @@ python tools/feature_workflow.py --root . plan --task PA-00
 python tools/feature_workflow.py --root . review --task PA-00 --feature-id PA --role auto
 ```
 
-Inspect prompts and policy before invoking a reviewer. The primary implementer
-uses the current session's default Codex model/reasoning mode and does not
-self-review. Every independent reviewer is a fresh, separate, read-only
-process requested as `gpt-5.6-terra` with `high` reasoning. For a role supported
-by Role Runner, use the runner directly:
-
-```bash
-python tools/run_codex_role.py run --root . --task PA-00 --feature-id PA \
-  --role program_design_review --model gpt-5.6-terra --reasoning-effort high
-```
-
-For any other prescribed review role, start a fresh read-only `codex exec`
-instead; never silently substitute it for a Role Runner-supported role. A
-reviewer does not edit, commit, push or fix its findings. The implementer or a
-separate scoped fix agent fixes P0/P1, then a new independent reviewer rechecks
-the affected diff/evidence. Record the requested and observed model/effort,
-exact command, inputs, reviewed SHA/diff and artifact hash.
+Inspect prompts and [current review policy](REVIEW_POLICY.md) before execution.
+The primary implementer inherits the active session model/reasoning mode.
+The later owner amendment selects a non-Codex reviewer; the pinned Role Runner
+upstream harness launches Codex only; the local --provider opencode-go route
+now supports generic product/program design records through the actual pinned
+consumer. It uses a separate OpenCode evidence schema, not Codex events/receipts.
+Slice/maintainability extension and real independent validation remain pending.
+Do not substitute the historical Terra/high recipe. Phase cadence and required
+risk reviews are defined in the current policy, with independent P0/P1 rechecks.
 
 No review is claimed by rendering a prompt. Design approval is the existing
 interactive hash-bound human flow; the registry remains review_required now.
@@ -109,8 +101,9 @@ has yet been measured. Runtime model efficiency is separately designed in
 product tests and safety/boundary checks as well as governance, rather than a
 contract-only result. Full historical pytest remains prohibited. The new
 planning CI is separate from product CI; a green plan is not a green product.
-Current baseline product CI has one known UX evaluation failure, assigned PA-00.
-Nothing in this update removes it or declares the app ready.
+The historical PA-00 UX failure has local repair evidence. Current focused
+results and any newly reproduced failures are recorded in PAI-00 evidence;
+these do not establish full current product CI or runtime readiness.
 
 Local bridge tests were actually run against the authored files on Python
 3.13.5: 6 passed. A full repository checkout could not be obtained in the

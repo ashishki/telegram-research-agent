@@ -1,12 +1,24 @@
 # Active Personal Assistant Task Graph
 
-Status: active programme; PA-00 has local technical evidence and recorded human high-risk slice acceptance; formal feature-design approval remains required before PA-01.
-Updated: 2026-09-18
+Status: active PA / PAI programme; historical PA engineering evidence is preserved; exact PA and new PAI design approval remain required.
+Updated: 2026-10-06
 Feature: PA • Mode: standard • Planning depth: designed_slices
 
 The full target is `docs/PERSONAL_ASSISTANT_SPEC.md`. Exact slice scope, files, interfaces, dependencies, change budgets and rollback are in `docs/design/PA.design.json`. The design is review_required, not self-approved. Follow `docs/CODEX_PROMPT.md` and `docs/PLAYBOOK_ADOPTION.md`.
 
 Historical PRM-SN/RFX/UTD task records are preserved byte-for-byte at `docs/tasks.before-pa-20260918.md`; their statuses and evidence are not rewritten or imported as new PA completion. Read that snapshot only for a relevant maintenance issue. This graph is the new end-to-end goal, not permission to restart completed work or activate accounts/jobs.
+
+## Owner-requested execution breakdown — 2026-10-06
+
+[PA implementation tasks](PA_IMPLEMENTATION_TASKS.md) break the remaining work
+into 30 mandatory engineering packets (PAI-00..29) and two conditional scaling
+packets (PAI-30..31), with dependencies, acceptance commands and rollback.
+Use the [Sol launch prompt](prompts/pa_sol_implementation.md) when the owner
+assigns implementation. Start at PAI-00 to reconcile actual evidence, then
+PAI-01 to bind scope/design through the pinned workflow. PAI IDs are registered below against the new draft PAI feature; their PA-Refs
+map requirement coverage without altering original PA task/approval states.
+See docs/design/PAI.md and docs/verification/PAI-progress.md. Draft registration
+is not design/live/release approval.
 
 ## Verification rule
 
@@ -552,3 +564,813 @@ Context-Refs:
   - docs/REVIEW_POLICY.md
 Design-Refs:
   - docs/design/PA.design.json
+
+## PAI execution tasks — draft scope registration 2026-10-06
+
+These formal tasks map the engineering task pack to feature PAI. The original
+PA feature and all historic states/receipts above are unchanged. All formal
+PAI states remain planned until the workflow records legitimate acceptance.
+PAI-30/31 are conditional, never executed without their measured triggers.
+
+### PAI-00: Убрать противоречия из инструкций и зафиксировать старт
+Owner: codex
+Phase: pai-a
+Type: eval:gate
+Status: planned
+Depends-On: none
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: not_required
+Correction-Budget: 2
+Planning-Depth: designed_slices
+Slice-ID: PAI-00
+Objective: следующий исполнитель однозначно понимает, что уже написано, что подключено и что ему разрешено.
+Acceptance-Criteria:
+  - одна текущая задача/граница, нет ложного «PA-00 снова сломан»; формальные approval ошибки объяснены, но не подавлены. Исторические статусы сохранены. Есть соответствие всех PAI-карточек PA-требованиям.
+  - Structural preparation is not independent design review or human approval.
+Verification:
+  - python3 tools/check_pai_plan.py
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_playbook_bridge.py tests/test_assistant_conversation.py tests/test_prm_product_ux_eval.py tests/test_pai_plan.py tests/test_opencode_role_review.py tests/test_memory_research.py
+Context-Refs:
+  - docs/PA_IMPLEMENTATION_TASKS.md#pai-00
+  - docs/design/PAI.md
+  - docs/REVIEW_POLICY.md
+Design-Refs:
+  - docs/design/PAI.design.json
+
+### PAI-01: Принять исполнимый дизайн хранения и фоновой работы
+Owner: codex
+Phase: pai-a
+Type: agent:design
+Status: planned
+Depends-On: PAI-00
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: not_required
+Correction-Budget: 2
+Planning-Depth: designed_slices
+Slice-ID: PAI-01
+Objective: конкретный согласованный проект, по которому можно писать код.
+Acceptance-Criteria:
+  - scope и новые acceptance suites оформлены через pinned workflow; обязательный независимый design review выполнен разрешённым способом; нужное hash-bound human approval получено реально. Если approval отсутствует, design пакет завершён, gate отмечен; изменять его вручную нельзя.
+  - Structural preparation is not independent design review or human approval.
+Verification:
+  - python3 tools/check_pai_plan.py
+Context-Refs:
+  - docs/PA_IMPLEMENTATION_TASKS.md#pai-01
+  - docs/design/PAI.md
+  - docs/REVIEW_POLICY.md
+Design-Refs:
+  - docs/design/PAI.design.json
+
+### PAI-02: Подготовить PostgreSQL для локальной разработки и тестов
+Owner: codex
+Phase: pai-b
+Type: agent:runtime
+Status: planned
+Depends-On: PAI-01
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: required
+Correction-Budget: 2
+Planning-Depth: designed_slices
+Slice-ID: PAI-02
+Objective: тестовый runtime с явным выбором backend и воспроизводимой схемой.
+Acceptance-Criteria:
+  - чистая test DB создаётся и восстанавливается; migration повторяемо отказывает на неправильном target/version; real PostgreSQL tests идут на synthetic data, а не заменены SQLite mocks. Прежний архив читается.
+  - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
+Verification:
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_storage.py tests/test_assistant_contracts.py tests/test_archive_search.py
+Context-Refs:
+  - docs/PA_IMPLEMENTATION_TASKS.md#pai-02
+  - docs/design/PAI.md
+  - docs/REVIEW_POLICY.md
+Design-Refs:
+  - docs/design/PAI.design.json
+
+### PAI-03: Сделать разрешения и бюджеты общими для всех процессов
+Owner: codex
+Phase: pai-b
+Type: agent:runtime
+Status: planned
+Depends-On: PAI-02
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: required
+Correction-Budget: 2
+Planning-Depth: designed_slices
+Slice-ID: PAI-03
+Objective: два workers видят один отзыв разрешения и не тратят один бюджет дважды.
+Acceptance-Criteria:
+  - multiprocess race допускает ровно доступный лимит; revoke/revision между enqueue и transport запрещает вызов; restart не сбрасывает расход; request/context pair потребляется корректно.
+  - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
+Verification:
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_durable_policy.py tests/test_assistant_permissions.py tests/test_assistant_egress.py tests/test_assistant_grant_codec.py
+Context-Refs:
+  - docs/PA_IMPLEMENTATION_TASKS.md#pai-03
+  - docs/design/PAI.md
+  - docs/REVIEW_POLICY.md
+Design-Refs:
+  - docs/design/PAI.design.json
+
+### PAI-04: Сохранять подтверждения, попытки и квитанции действий
+Owner: codex
+Phase: pai-b
+Type: agent:runtime
+Status: planned
+Depends-On: PAI-03
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: required
+Correction-Budget: 2
+Planning-Depth: designed_slices
+Slice-ID: PAI-04
+Objective: повторное нажатие или рестарт не повторяет внешнее действие.
+Acceptance-Criteria:
+  - гонка двух процессов, double click, restart после effect до receipt, stale proposal, foreign owner и revoke покрыты; ни один неизвестный исход не становится автоматическим retry.
+  - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
+Verification:
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_durable_actions.py tests/test_assistant_actions.py tests/test_prm_post_answer_actions.py
+Context-Refs:
+  - docs/PA_IMPLEMENTATION_TASKS.md#pai-04
+  - docs/design/PAI.md
+  - docs/REVIEW_POLICY.md
+Design-Refs:
+  - docs/design/PAI.design.json
+
+### PAI-05: Сохранять беседу и точные версии результатов
+Owner: codex
+Phase: pai-b
+Type: agent:runtime
+Status: planned
+Depends-On: PAI-03 PAI-04
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: required
+Correction-Budget: 2
+Planning-Depth: designed_slices
+Slice-ID: PAI-05
+Objective: после перезапуска «объясни второй пункт» относится к правильному отчёту, а «да» — только к одному текущему предложению.
+Acceptance-Criteria:
+  - restart, новая тема, отмена, старый callback, две pending proposals и expiry дают правильный результат; retained history удаляется по выбранной политике; беседа другого owner недоступна.
+  - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
+Verification:
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_durable_conversation.py tests/test_assistant_conversation.py tests/test_assistant_report_dialogue.py
+Context-Refs:
+  - docs/PA_IMPLEMENTATION_TASKS.md#pai-05
+  - docs/design/PAI.md
+  - docs/REVIEW_POLICY.md
+Design-Refs:
+  - docs/design/PAI.design.json
+
+### PAI-06: Реализовать очередь и worker, переживающие падение
+Owner: codex
+Phase: pai-b
+Type: agent:runtime
+Status: planned
+Depends-On: PAI-03 PAI-04
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: required
+Correction-Budget: 2
+Planning-Depth: designed_slices
+Slice-ID: PAI-06
+Objective: задача выполняется отдельным процессом и возобновляется с безопасного checkpoint.
+Acceptance-Criteria:
+  - реальные два test processes не берут один claim; старое поколение не записывает результат; killed worker восстанавливает compute, но не пересылает unknown action; limits/backpressure работают.
+  - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
+Verification:
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_workers.py tests/test_assistant_jobs.py tests/test_assistant_research.py
+Context-Refs:
+  - docs/PA_IMPLEMENTATION_TASKS.md#pai-06
+  - docs/design/PAI.md
+  - docs/REVIEW_POLICY.md
+Design-Refs:
+  - docs/design/PAI.design.json
+
+### PAI-07: Освободить Telegram polling от долгих задач
+Owner: codex
+Phase: pai-c
+Type: agent:runtime
+Status: planned
+Depends-On: PAI-05 PAI-06
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: required
+Correction-Budget: 2
+Planning-Depth: designed_slices
+Slice-ID: PAI-07
+Objective: бот принимает новый запрос и отмену, пока готовится предыдущий.
+Acceptance-Criteria:
+  - через настоящий ingress fake long job не блокирует другой запрос; duplicate update не создаёт вторую job; restart сохраняет status; cancel прекращает будущие steps. Не писать «в фоне», если enqueue не состоялся.
+  - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
+Verification:
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_ingress_jobs.py tests/test_prm_bot_dispatch.py tests/test_callbacks.py tests/test_prm_cli.py
+Context-Refs:
+  - docs/PA_IMPLEMENTATION_TASKS.md#pai-07
+  - docs/design/PAI.md
+  - docs/REVIEW_POLICY.md
+Design-Refs:
+  - docs/design/PAI.design.json
+
+### PAI-08: Подключить планировщик и жизненный цикл Watch
+Owner: codex
+Phase: pai-c
+Type: agent:runtime
+Status: planned
+Depends-On: PAI-06 PAI-07
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: required
+Correction-Budget: 2
+Planning-Depth: designed_slices
+Slice-ID: PAI-08
+Objective: подтверждённая подписка действительно создаёт задания по времени и восстанавливается без лавины старых уведомлений.
+Acceptance-Criteria:
+  - два scheduler, повтор tick, downtime, DST, изменение срока, revoke и paused scope проходят; UI различает сохранённое намерение и реально работающий scheduler. Никакой systemd timer не включён этим тестом.
+  - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
+Verification:
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_scheduler.py tests/test_assistant_jobs.py tests/test_assistant_subscriptions.py
+Context-Refs:
+  - docs/PA_IMPLEMENTATION_TASKS.md#pai-08
+  - docs/design/PAI.md
+  - docs/REVIEW_POLICY.md
+Design-Refs:
+  - docs/design/PAI.design.json
+
+### PAI-09: Сделать общий executor доставки и сверки исходов
+Owner: codex
+Phase: pai-c
+Type: agent:runtime
+Status: planned
+Depends-On: PAI-04 PAI-07 PAI-08
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: required
+Correction-Budget: 2
+Planning-Depth: designed_slices
+Slice-ID: PAI-09
+Objective: ответ, Watch и действие проходят один контракт последнего разрешения и правдиво показывают исход.
+Acceptance-Criteria:
+  - fake server принял effect, но ACK потерян — повтор не происходит; pause/revoke race и старый lease не обходят guard; unknown без возможности проверки остаётся unknown. Реальных отправок ещё нет.
+  - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
+Verification:
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_delivery.py tests/test_assistant_jobs.py tests/test_assistant_actions.py tests/test_assistant_egress.py
+Context-Refs:
+  - docs/PA_IMPLEMENTATION_TASKS.md#pai-09
+  - docs/design/PAI.md
+  - docs/REVIEW_POLICY.md
+Design-Refs:
+  - docs/design/PAI.design.json
+
+### PAI-10: Подключить нормальный AI Chat к рабочему приложению
+Owner: codex
+Phase: pai-d
+Type: agent:runtime
+Status: planned
+Depends-On: PAI-03 PAI-05 PAI-07 PAI-09
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: required
+Correction-Budget: 2
+Planning-Depth: designed_slices
+Slice-ID: PAI-10
+Objective: приветствие, объяснение и редактирование текста проходят реальный model route и возвращаются в ту же беседу.
+Acceptance-Criteria:
+  - 10–20 последовательных ходов, смена темы, «коротко» и неоднозначное «да» ведут себя правильно; отсутствие grants не делает HTTP вызов. Наличие fake client только в unit test недостаточно для wiring.
+  - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
+Verification:
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_chat_runtime.py tests/test_assistant_conversation.py tests/test_prm_application.py tests/test_openai_provider.py tests/test_llm_client.py
+Context-Refs:
+  - docs/PA_IMPLEMENTATION_TASKS.md#pai-10
+  - docs/design/PAI.md
+  - docs/REVIEW_POLICY.md
+Design-Refs:
+  - docs/design/PAI.design.json
+
+### PAI-11: Довести архивный AI Search до полезного ответа
+Owner: codex
+Phase: pai-d
+Type: agent:runtime
+Status: planned
+Depends-On: PAI-10
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: required
+Correction-Budget: 2
+Planning-Depth: designed_slices
+Slice-ID: PAI-11
+Objective: запрос на русском/английском находит нужные материалы и даёт синтез с проверяемыми основаниями.
+Acceptance-Criteria:
+  - end-to-end positive/empty/conflict/revoked cases проходят; bounded excerpts действительно совпадают с разрешёнными источниками; улучшения recall не скрывают ухудшение factual support.
+  - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
+Verification:
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_archive_search.py tests/test_archive_search.py tests/test_prm_synthesis.py tests/test_prm_intent_archive_contract.py
+Context-Refs:
+  - docs/PA_IMPLEMENTATION_TASKS.md#pai-11
+  - docs/design/PAI.md
+  - docs/REVIEW_POLICY.md
+Design-Refs:
+  - docs/design/PAI.design.json
+
+### PAI-12: Подключить внешний поиск и контекст GitHub
+Owner: codex
+Phase: pai-d
+Type: agent:runtime
+Status: planned
+Depends-On: PAI-10 PAI-11
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: required
+Correction-Budget: 2
+Planning-Depth: designed_slices
+Slice-ID: PAI-12
+Objective: приложение умеет проверить свежий факт и сравнить его с материалами владельца/выбранным ref репозитория.
+Acceptance-Criteria:
+  - через fake HTTP проверены snippets-vs-read-doc distinction, timestamps, partial/conflicting sources, SSRF, redirect/DNS смена, malicious content; GitHub answer называет действительно прочитанный ref.
+  - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
+Verification:
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_web_github.py tests/test_assistant_web_search.py tests/test_assistant_research.py
+Context-Refs:
+  - docs/PA_IMPLEMENTATION_TASKS.md#pai-12
+  - docs/design/PAI.md
+  - docs/REVIEW_POLICY.md
+Design-Refs:
+  - docs/design/PAI.design.json
+
+### PAI-13: Сделать глубокое исследование отменяемой durable задачей
+Owner: codex
+Phase: pai-d
+Type: agent:runtime
+Status: planned
+Depends-On: PAI-06 PAI-11 PAI-12
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: required
+Correction-Budget: 2
+Planning-Depth: designed_slices
+Slice-ID: PAI-13
+Objective: большой вопрос переживает рестарт, показывает прогресс и заканчивается синтезом, а не списком ссылок.
+Acceptance-Criteria:
+  - kill/resume в каждом phase, отмена, потеря провайдера, исчерпание steps/time/cost и новый вопрос в той же беседе корректны; выводы о проекте опираются на актуальный ref, а не общий фон модели.
+  - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
+Verification:
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_deep_research.py tests/test_assistant_research.py tests/test_prm_research_planner.py
+Context-Refs:
+  - docs/PA_IMPLEMENTATION_TASKS.md#pai-13
+  - docs/design/PAI.md
+  - docs/REVIEW_POLICY.md
+Design-Refs:
+  - docs/design/PAI.design.json
+
+### PAI-14: Собрать полезный недельный Brief и его продолжения
+Owner: codex
+Phase: pai-d
+Type: agent:runtime
+Status: planned
+Depends-On: PAI-05 PAI-08 PAI-09 PAI-11 PAI-13
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: required
+Correction-Budget: 2
+Planning-Depth: designed_slices
+Slice-ID: PAI-14
+Objective: «что важного за неделю» даёт редакционный обзор событий, который можно обсудить и обновить.
+Acceptance-Criteria:
+  - quiet/partial week, дубли, противоречия, delayed source, DST и followups проходят; смена представления не перегенерирует факты. Fixture quality не выдаётся за human/live quality.
+  - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
+Verification:
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_brief_runtime.py tests/test_assistant_briefs.py tests/test_assistant_brief_editorial.py tests/test_assistant_report_dialogue.py
+Context-Refs:
+  - docs/PA_IMPLEMENTATION_TASKS.md#pai-14
+  - docs/design/PAI.md
+  - docs/REVIEW_POLICY.md
+Design-Refs:
+  - docs/design/PAI.design.json
+
+### PAI-15: Сделать приватное чтение и качественный экспорт отчётов
+Owner: codex
+Phase: pai-d
+Type: agent:runtime
+Status: planned
+Depends-On: PAI-07 PAI-14
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: required
+Correction-Budget: 2
+Planning-Depth: designed_slices
+Slice-ID: PAI-15
+Objective: один отчёт читается с телефона в Telegram и приватном reader, экспортируется в HTML/PDF/Markdown с одинаковыми фактами.
+Acceptance-Criteria:
+  - чужой/отозванный/истёкший доступ не читает artifact; Telegram/HTML/PDF показывают те же story/source IDs, ничего не обрезано. Человеческая визуальная приёмка остаётся в PAI-27/29.
+  - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
+Verification:
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_report_runtime.py tests/test_assistant_report_exports.py tests/test_assistant_report_access.py tests/test_pdf_inspection.py
+Context-Refs:
+  - docs/PA_IMPLEMENTATION_TASKS.md#pai-15
+  - docs/design/PAI.md
+  - docs/REVIEW_POLICY.md
+Design-Refs:
+  - docs/design/PAI.design.json
+
+### PAI-16: Сделать безопасный жизненный цикл подключения аккаунта
+Owner: codex
+Phase: pai-e
+Type: agent:runtime
+Status: planned
+Depends-On: PAI-03 PAI-07
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: required
+Correction-Budget: 2
+Planning-Depth: designed_slices
+Slice-ID: PAI-16
+Objective: пользователь видит scope подключения, может подтвердить его, проверить состояние, отозвать и удалить производные данные.
+Acceptance-Criteria:
+  - foreign owner/state, redirect substitution, expired refresh, revoke во время job и restart корректны; UI не называет configured account подключённым без успешного handshake. Здесь handshake только synthetic.
+  - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
+Verification:
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_connections.py tests/test_assistant_mail.py tests/test_assistant_calendar.py tests/test_assistant_egress.py
+Context-Refs:
+  - docs/PA_IMPLEMENTATION_TASKS.md#pai-16
+  - docs/design/PAI.md
+  - docs/REVIEW_POLICY.md
+Design-Refs:
+  - docs/design/PAI.design.json
+
+### PAI-17: Подключить выбранную почту Microsoft Graph
+Owner: codex
+Phase: pai-e
+Type: agent:runtime
+Status: planned
+Depends-On: PAI-10 PAI-14 PAI-16
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: required
+Correction-Budget: 2
+Planning-Depth: designed_slices
+Slice-ID: PAI-17
+Objective: «что требует ответа в почте» и раздел Brief используют выбранную почту с понятными ссылками, сроками и ограничениями покрытия.
+Acceptance-Criteria:
+  - настоящий adapter с fake HTTP проходит multi-page, deadline conflict, missing data и revoke/delete; беседа даёт сводку, а не дамп заголовков и не выдуманные действия. Sync cursor продвигается только после durable обработки страницы.
+  - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
+Verification:
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_graph_mail.py tests/test_assistant_mail.py tests/test_pai_brief_runtime.py
+Context-Refs:
+  - docs/PA_IMPLEMENTATION_TASKS.md#pai-17
+  - docs/design/PAI.md
+  - docs/REVIEW_POLICY.md
+Design-Refs:
+  - docs/design/PAI.design.json
+
+### PAI-18: Подключить календарь и контакты
+Owner: codex
+Phase: pai-e
+Type: agent:runtime
+Status: planned
+Depends-On: PAI-10 PAI-16
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: required
+Correction-Budget: 2
+Planning-Depth: designed_slices
+Slice-ID: PAI-18
+Objective: ассистент показывает конфликты расписания и находит адресата, не путая аккаунты, зоны времени и совпадающие имена.
+Acceptance-Criteria:
+  - DST, all-day, recurring exception, несколько аккаунтов, неоднозначный recipient и revoked calendar видны пользователю; read grant не выполняет write, email по имени не угадывается.
+  - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
+Verification:
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_schedule_runtime.py tests/test_assistant_calendar.py tests/test_assistant_contacts.py
+Context-Refs:
+  - docs/PA_IMPLEMENTATION_TASKS.md#pai-18
+  - docs/design/PAI.md
+  - docs/REVIEW_POLICY.md
+Design-Refs:
+  - docs/design/PAI.design.json
+
+### PAI-19: Объединить Academic Inbox и минимальный Canvas adapter
+Owner: codex
+Phase: pai-e
+Type: agent:runtime
+Status: planned
+Depends-On: PAI-08 PAI-14 PAI-17 PAI-18
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: required
+Correction-Budget: 2
+Planning-Depth: designed_slices
+Slice-ID: PAI-19
+Objective: академическая сводка различает обязательства, возможности и чтение; напоминания опираются на актуальный подтверждённый срок.
+Acceptance-Criteria:
+  - письмо и Canvas с разными сроками дают видимый конфликт; изменённый срок пересчитывает jobs; локальное «готово» не становится source submission; повтор кандидата не создаёт второе обязательство.
+  - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
+Verification:
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_academic_runtime.py tests/test_assistant_academic.py tests/test_assistant_subscriptions.py
+Context-Refs:
+  - docs/PA_IMPLEMENTATION_TASKS.md#pai-19
+  - docs/design/PAI.md
+  - docs/REVIEW_POLICY.md
+Design-Refs:
+  - docs/design/PAI.design.json
+
+### PAI-20: Довести подтверждённые mail/calendar действия до адаптеров
+Owner: codex
+Phase: pai-e
+Type: agent:runtime
+Status: planned
+Depends-On: PAI-04 PAI-09 PAI-17 PAI-18
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: required
+Correction-Budget: 2
+Planning-Depth: designed_slices
+Slice-ID: PAI-20
+Objective: находка превращается в редактируемое предложение, точное подтверждение и проверяемую квитанцию выполнения.
+Acceptance-Criteria:
+  - настоящий путь preview→edit→confirm→fake provider→receipt проходит; content/recipient/time change, two clicks, kill/ACK loss, version conflict и revoke не дают неожиданную запись. Payments/submission/registration остаются вне tools.
+  - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
+Verification:
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_action_runtime.py tests/test_assistant_actions.py tests/test_pai_delivery.py tests/test_prm_post_answer_actions.py
+Context-Refs:
+  - docs/PA_IMPLEMENTATION_TASKS.md#pai-20
+  - docs/design/PAI.md
+  - docs/REVIEW_POLICY.md
+Design-Refs:
+  - docs/design/PAI.design.json
+
+### PAI-21: Подключить память, исправление и сквозное удаление
+Owner: codex
+Phase: pai-f
+Type: agent:runtime
+Status: planned
+Depends-On: PAI-05 PAI-14 PAI-17
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: required
+Correction-Budget: 2
+Planning-Depth: designed_slices
+Slice-ID: PAI-21
+Objective: владелец видит, что сохранено, может исправить/забыть/экспортировать; удалённое не возвращается из кэша или отложенной job.
+Acceptance-Criteria:
+  - inspect→edit→forget→restart→search и concurrent running job не воскрешают данные; независимый архив не удалён; opened/read/applied не выводятся из факта индексации. Restore/delete ограничения объяснены честно.
+  - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
+Verification:
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_memory_runtime.py tests/test_assistant_memory.py tests/test_assistant_report_dialogue.py
+Context-Refs:
+  - docs/PA_IMPLEMENTATION_TASKS.md#pai-21
+  - docs/design/PAI.md
+  - docs/REVIEW_POLICY.md
+Design-Refs:
+  - docs/design/PAI.design.json
+
+### PAI-22: Подключить голос, изображения и документы к той же беседе
+Owner: codex
+Phase: pai-f
+Type: agent:runtime
+Status: planned
+Depends-On: PAI-10 PAI-15 PAI-21
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: required
+Correction-Budget: 2
+Planning-Depth: designed_slices
+Slice-ID: PAI-22
+Objective: voice/image/PDF input продолжает правильный разговор, показывает редактируемую расшифровку и source/page references.
+Acceptance-Criteria:
+  - исправленная транскрипция не наследует старую confirmation; page citations сохраняются; malicious/oversized file не исполняется; неразрешённый fallback provider не получает документ.
+  - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
+Verification:
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_media_runtime.py tests/test_assistant_media.py tests/test_voice_transcription.py tests/test_pdf_inspection.py
+Context-Refs:
+  - docs/PA_IMPLEMENTATION_TASKS.md#pai-22
+  - docs/design/PAI.md
+  - docs/REVIEW_POLICY.md
+Design-Refs:
+  - docs/design/PAI.design.json
+
+### PAI-23: Измерять качество, стоимость и полезный эффект кэша
+Owner: codex
+Phase: pai-f
+Type: agent:runtime
+Status: planned
+Depends-On: PAI-03 PAI-13 PAI-15 PAI-20 PAI-22
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: required
+Correction-Budget: 2
+Planning-Depth: designed_slices
+Slice-ID: PAI-23
+Objective: видны стоимость целой задачи, задержка, маршрут модели и ограничения; оптимизация не ухудшает согласованное качество.
+Acceptance-Criteria:
+  - synthetic usage доказывает отсутствие двойного счёта; unknown price не ноль; limits общие; cache не раскрывает отозванный результат. Экономия не заявляется до сопоставимого quality evidence.
+  - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
+Verification:
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_cost_cache.py tests/test_assistant_cost.py tests/test_pai_durable_policy.py
+Context-Refs:
+  - docs/PA_IMPLEMENTATION_TASKS.md#pai-23
+  - docs/design/PAI.md
+  - docs/REVIEW_POLICY.md
+Design-Refs:
+  - docs/design/PAI.design.json
+
+### PAI-24: Сделать наблюдаемость, восстановление и пакет запуска
+Owner: codex
+Phase: pai-f
+Type: agent:runtime
+Status: planned
+Depends-On: PAI-09 PAI-16 PAI-21 PAI-22 PAI-23
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: required
+Correction-Budget: 2
+Planning-Depth: designed_slices
+Slice-ID: PAI-24
+Objective: оператор понимает состояние системы и может восстановить её по проверенному runbook.
+Acceptance-Criteria:
+  - реальный synthetic backup восстанавливается, unknown effects не повторяются; DB loss, disk full, 429, revoked token и logs с secret-shaped fixture values проверены; измерены rehearsal RPO/RTO.
+  - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
+Verification:
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_operations_runtime.py tests/test_assistant_ops.py tests/test_delivery_health.py
+Context-Refs:
+  - docs/PA_IMPLEMENTATION_TASKS.md#pai-24
+  - docs/design/PAI.md
+  - docs/REVIEW_POLICY.md
+Design-Refs:
+  - docs/design/PAI.design.json
+
+### PAI-25: Прорепетировать перенос состояния и откат без потери квитанций
+Owner: codex
+Phase: pai-f
+Type: agent:runtime
+Status: planned
+Depends-On: PAI-02 PAI-04 PAI-05 PAI-08 PAI-21 PAI-24
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: required
+Correction-Budget: 2
+Planning-Depth: designed_slices
+Slice-ID: PAI-25
+Objective: готов конкретный cutover plan для выбранных PA-таблиц, который воспроизведён на копиях synthetic data.
+Acceptance-Criteria:
+  - rehearsal before/after/rollback совпадает по IDs/digests, grants/tombstones/receipts; повреждённая запись блокирует переключение; искусственный crash в каждом шаге не создаёт второго writer или отправки.
+  - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
+Verification:
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_migration.py tests/test_pai_storage.py tests/test_pai_durable_actions.py tests/test_prm_post_answer_actions.py
+Context-Refs:
+  - docs/PA_IMPLEMENTATION_TASKS.md#pai-25
+  - docs/design/PAI.md
+  - docs/REVIEW_POLICY.md
+Design-Refs:
+  - docs/design/PAI.design.json
+
+### PAI-26: Проверить полный продукт без живых аккаунтов
+Owner: codex
+Phase: pai-f
+Type: eval:gate
+Status: planned
+Depends-On: PAI-15 PAI-19 PAI-20 PAI-22 PAI-23 PAI-24 PAI-25
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: required
+Correction-Budget: 2
+Planning-Depth: designed_slices
+Slice-ID: PAI-26
+Objective: один release candidate с полной requirement-to-evidence матрицей и конкретным списком оставшихся live-gates.
+Acceptance-Criteria:
+  - каждая обязательная PA-возможность имеет wired positive и failure evidence, нет открытых P0/P1; отсутствие provider/human proof указано отдельно. Generic tier и judge не заменяют эту матрицу.
+  - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
+Verification:
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_end_to_end.py tests/test_pai_load_recovery.py
+  - python3 tools/test_tiers.py focused-prm
+  - python3 tools/test_tiers.py retrofit-boundaries
+Context-Refs:
+  - docs/PA_IMPLEMENTATION_TASKS.md#pai-26
+  - docs/design/PAI.md
+  - docs/REVIEW_POLICY.md
+Design-Refs:
+  - docs/design/PAI.design.json
+
+### PAI-27: Проверить реальные подключения в ограниченном canary
+Owner: codex
+Phase: pai-g
+Type: eval:gate
+Status: planned
+Depends-On: PAI-26
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: required
+Correction-Budget: 2
+Planning-Depth: designed_slices
+Slice-ID: PAI-27
+Objective: реальные integrations подтверждены наблюдениями, а не mocks.
+Acceptance-Criteria:
+  - для каждого выбранного обязательного подключения записаны точные scope/time/version, observed outcome и ограничения; приватные receipts в защищённом хранилище, в Git только sanitized metadata. Отсутствующий Canvas или model grant имеет свой blocker и не тормозит независимые проверки.
+  - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
+Verification:
+  - python3 tools/check_pai_plan.py
+Context-Refs:
+  - docs/PA_IMPLEMENTATION_TASKS.md#pai-27
+  - docs/design/PAI.md
+  - docs/REVIEW_POLICY.md
+Design-Refs:
+  - docs/design/PAI.design.json
+
+### PAI-28: Выполнить согласованный production cutover и deployment
+Owner: codex
+Phase: pai-g
+Type: eval:gate
+Status: planned
+Depends-On: PAI-25 PAI-27
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: required
+Correction-Budget: 2
+Planning-Depth: designed_slices
+Slice-ID: PAI-28
+Objective: нужный SHA работает в назначенной среде с проверенной БД, worker, scheduler и управляемыми capabilities.
+Acceptance-Criteria:
+  - deployment/migration receipts и наблюдаемый SHA совпадают; нет второго polling/executor, выполнены restore/rollback prerequisites; ошибки переключают систему в заранее согласованный безопасный режим.
+  - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
+Verification:
+  - python3 tools/check_pai_plan.py
+Context-Refs:
+  - docs/PA_IMPLEMENTATION_TASKS.md#pai-28
+  - docs/design/PAI.md
+  - docs/REVIEW_POLICY.md
+Design-Refs:
+  - docs/design/PAI.design.json
+
+### PAI-29: Пройти пользовательский пилот и закрыть полную PA-18 приёмку
+Owner: codex
+Phase: pai-g
+Type: eval:gate
+Status: planned
+Depends-On: PAI-28
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: required
+Correction-Budget: 2
+Planning-Depth: designed_slices
+Slice-ID: PAI-29
+Objective: владелец принимает полный персональный ассистент по своим задачам, качеству ответов и эксплуатации.
+Acceptance-Criteria:
+  - финальная requirement matrix полна, exact-HEAD checks и обязательные reviews пройдены, человек явно принял продукт через workflow. Неподключённый обязательный источник/формат/действие оставляет незавершённость; не переименовывать результат в MVP или full done с исключением по умолчанию.
+  - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
+Verification:
+  - python3 tools/check_pai_plan.py
+Context-Refs:
+  - docs/PA_IMPLEMENTATION_TASKS.md#pai-29
+  - docs/design/PAI.md
+  - docs/REVIEW_POLICY.md
+Design-Refs:
+  - docs/design/PAI.design.json
+
+### PAI-30: Добавить Redis, только если он устраняет измеренный предел
+Owner: codex
+Phase: pai-conditional
+Type: eval:gate
+Status: planned
+Depends-On: PAI-23 PAI-24 PAI-26
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: required
+Correction-Budget: 2
+Planning-Depth: designed_slices
+Slice-ID: PAI-30
+Objective: Measured conditional outcome: Добавить Redis, только если он устраняет измеренный предел
+Acceptance-Criteria:
+  - cache/broker outage, redelivery и stale state не обходят policy; paired load доказывает пользу с учётом новой операционной цены. Production включение отдельно разрешается; обновить PAI-26…29 evidence.
+  - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
+Verification:
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_redis.py tests/test_pai_cost_cache.py tests/test_pai_delivery.py
+Context-Refs:
+  - docs/PA_IMPLEMENTATION_TASKS.md#pai-30
+  - docs/design/PAI.md
+  - docs/REVIEW_POLICY.md
+Design-Refs:
+  - docs/design/PAI.design.json
+
+### PAI-31: Перенести архив/FTS в PostgreSQL, если SQLite стал ограничением
+Owner: codex
+Phase: pai-conditional
+Type: eval:gate
+Status: planned
+Depends-On: PAI-11 PAI-25 PAI-26
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: required
+Correction-Budget: 2
+Planning-Depth: designed_slices
+Slice-ID: PAI-31
+Objective: Measured conditional outcome: Перенести архив/FTS в PostgreSQL, если SQLite стал ограничением
+Acceptance-Criteria:
+  - data parity и agreed retrieval/SLO выполнены; проверены backup/restore/rollback. Реальный перенос только по отдельному migration разрешению с повтором затронутой приёмки PAI-26…29.
+  - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
+Verification:
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_archive_migration.py tests/test_archive_search.py tests/test_archive_documents.py tests/test_pai_migration.py
+Context-Refs:
+  - docs/PA_IMPLEMENTATION_TASKS.md#pai-31
+  - docs/design/PAI.md
+  - docs/REVIEW_POLICY.md
+Design-Refs:
+  - docs/design/PAI.design.json

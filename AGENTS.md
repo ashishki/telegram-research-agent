@@ -18,36 +18,34 @@ map and `docs/design/PA.design.json` is its machine-readable slice registry.
 
 ## Authority
 
-The owner requested specification, Playbook update, commit and publication.
-This change is NOT product implementation, live account consent, a production
-migration, deployment, timer enablement, paid model work or release approval.
-The exact feature design remains review_required until human approval through
-the Playbook workflow. Do not forge approval or mark unimplemented slices done.
+Current scope and stop point come from the owner's active assignment and
+`docs/CODEX_PROMPT.md`. The 2026-10-06 assignment authorizes sequential safe
+local PAI implementation, synthetic fixtures and scoped tests, including an
+isolated test PostgreSQL in PAI-02. It does not approve the exact design or
+live accounts, paid egress, production migrations, services, timers or release.
+Prepare a concrete design before requesting a missing human decision; continue
+independent authorized work. Never forge approval or mark missing slices done.
 
 Implement directly in the assigned branch. Do not edit master directly, reset
 another user's work, force-push, or rerun completed historical tasks. The old
 instructions and task states are preserved in `*.before-pa-20260918.md` files;
 read them only when resolving a specific historical boundary.
 
-Use Codex Direct for implementation in the active session's current default
-Codex model/reasoning mode; do not pin or override the primary implementer
-model for this programme. Independent reviewers run as fresh, separate,
-read-only processes on `gpt-5.6-terra` with `high` reasoning. Route every role
-supported by Playbook Role Runner through
-`tools/run_codex_role.py run`; invoke every other prescribed review role with
-a fresh read-only `codex exec`. The implementer must not review its own work.
-Reviewers neither commit/push nor fix their own findings; the implementer or a
-separate scoped fix agent fixes P0/P1 findings, then an independent reviewer
-rechecks the changed scope. Deep Review is accumulated at the declared phase
-boundaries, not after every small patch, unless an immediate safety trigger
-applies. No child grants human completion authority. Record requested and
-observed model/effort and reviewed SHA/diff.
+Use Codex Direct in the active session's default model/reasoning mode; do not
+pin or override the implementer. `docs/REVIEW_POLICY.md` is the current role,
+runner and cadence policy, with the 2026-09-23 owner amendment taking precedence
+over the older Terra prescription. Reviews are independent and read-only;
+reviewers do not fix, commit/push or grant human acceptance. Fix P0/P1 and get
+an independent recheck before dependent work. Deep Review is batched at PAI
+phase boundaries unless an immediate safety trigger applies. Record requested
+and observed model/effort, reviewed SHA/diff and runner/receipt provenance.
 
 ## Verification
 
 Run the smallest appropriate existing test tier plus new slice-specific tests.
 Do not run the full historical pytest suite or weaken tests to make CI green.
-Current baseline has a known focused UX test failure; PA-00 must diagnose it.
+The historical PA-00 UX failure is repaired; use dated evidence and reproduce
+current failures. See `docs/verification/PAI-00-reconciliation.md` for this baseline.
 Fixture, CI, visual review, actual provider integration and operator usefulness
 are distinct evidence. Preserve failures and unknowns. Before handoff record
 changed files, exact commands/results, reviewed commit, remaining gates and the

@@ -498,6 +498,7 @@ class TestMemoryResearch(unittest.TestCase):
         result = answer_memory_research(
             "что из постов за последние месяцы говорит что AI трансформация не дала прироста и почему?",
             facade=_AITransformationFacade(),
+            now=datetime(2026, 8, 11, 12, 0, tzinfo=timezone.utc),
         )
 
         self.assertEqual(result["status"], "ok")

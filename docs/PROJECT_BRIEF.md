@@ -2,8 +2,8 @@
 
 Project: telegram-research-agent
 Mode: Standard
-Status: draft; owner-requested direction recorded, exact new-design approval pending.
-Updated: 2026-09-18
+Status: approved by owner in the active session on 2026-10-06; exact feature-design approval pending.
+Updated: 2026-10-06
 Current Playbook: d570163ab17ec3b4245187c778f1e8d89af9690f.
 
 This is the current project-level intake read by Feature Workflow. It supersedes
@@ -31,8 +31,9 @@ explicitly requested the full result rather than an MVP-only scope.
 
 ## Evidence from the beginning
 
-PA-00 reproduces current focused CI and diagnoses its known confirmation-context
-evaluation failure. PA-01 binds concrete interfaces and acceptance scenarios.
+Historical PA-00 has local repair evidence; PAI-00 records the current focused
+baseline, including a date-dependent conversation fixture correction. PAI-01
+prepares the durable runtime design and exact acceptance scope.
 Existing regression tiers are floors; each new capability needs exact positive,
 negative and recovery tests wired into project verification. Retrieval quality,
 claim support, useful versus wrong refusals, relevance, delivery, latency and
@@ -75,3 +76,11 @@ The whole programme is PA-00..PA-18, with scopes/dependencies/rollback in
 Preserve original implementation/privacy/academic boundaries unless a later
 explicit decision changes the relevant boundary; a target specification does
 not itself widen runtime permissions.
+
+## Owner brief decision — 2026-10-06
+
+The owner answered “да, всё разрешаю” to the specific brief and two bounded
+Mimo review questions. Approved pre-decision brief SHA-256:
+7cf9adde93f48f17afef4707e02399c2a180339f4c3acc41e3520309cdfa8458.
+This approves project intent only; no feature approval/real account/deployment
+state is set by this receipt. Planning depth remains the assigned designed_slices.

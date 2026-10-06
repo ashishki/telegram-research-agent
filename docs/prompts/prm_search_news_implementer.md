@@ -1,3 +1,7 @@
+Workstream: historical maintenance/PRM-SN
+Status: explicit-use reference
+Superseded-By: [PA Sol assignment](pa_sol_implementation.md) for current PA work
+
 # Goal: реализовать Personal Search And News от начала до конца
 
 Это готовое поручение агенту-имплементатору. Передача этого промпта владельцем

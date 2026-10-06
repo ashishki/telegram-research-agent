@@ -1,0 +1,115 @@
+# PAI-01 durable design receipt — 2026-10-06
+
+Engineering status: in_progress; reviewable design packet complete, mandatory
+actual independent reviews and human approval pending.
+Source HEAD: 8faee4232cb30e6b6f39cfbd974c151846f79da6, uncommitted local diff.
+Actual reviewed commit/model: none. New PAI code slices are unimplemented.
+
+## Prepared decision
+
+Paired design: docs/design/PAI.md / docs/design/PAI.design.json.
+Proposed ADR: docs/adr/ADR-013-pa-durable-runtime.md.
+32 formal task scopes in docs/tasks.md; original PA registry remains unchanged.
+The full specification was read for design. The draft covers complete product
+outcomes, explicit table ownership, small PostgreSQL queue, versioned payloads,
+fencing, atomic budgets/confirmations, a precommitted effect attempt with narrow
+final locks, conservative unknown reconciliation, retention/deletion/restore,
+test DB, load/SLO proposals and single-writer cutover/reverse-delta rollback.
+It neither activates PostgreSQL nor claims a worker/integration is implemented.
+
+Queue choice is a bounded own repository, avoiding a second state source.
+Library/broker/Redis/archive migration alternatives and reconsideration triggers
+are recorded. Test-only lease/concurrency/load parameters are proposals, not
+live/financial consent. Every new suite is registered but explicitly absent
+until implementation; structure checks do not stand in for vertical behavior.
+Live/canary/release/pilot decision packet is PAI-access-release-pilot-packet.md;
+actual runtime commands must be created/verified in PAI-24..26.
+
+## Pinned workflow observations
+
+python3 tools/playbook.py create_feature_design --root . --feature-id PAI
+--planning-depth designed_slices --owner codex-direct --risk-level high
+--brief-ref docs/PERSONAL_ASSISTANT_BRIEF.md
+--architecture-ref docs/PA_SCALING_STRATEGY_2026-10-06.md
+--architecture-ref docs/PA_IMPLEMENTATION_TASKS.md
+was executed as one command: exit 0; real pinned scaffold produced the paired
+draft. Existing PA records were not overwritten. The local bridge allowlist
+exposes that pinned tool plus validate_feature_design, with forwarding tests.
+
+python3 tools/playbook.py feature_workflow --root . plan --task PAI-01:
+exit 1, needs_input, recommendation designed_slices. The actual project-level
+PROJECT_BRIEF.md is draft. Decision artifact is
+.playbook-artifacts/planning/PAI-01/planning_decision.json; no human fields set.
+
+python3 tools/playbook.py feature_workflow --root . review --task PAI-01
+--feature-id PAI --role auto:
+exit 1, planning decision needs_input blocks workflow draft/start/check.
+It was preparation/preflight only, no independent reviewer launched.
+
+python3 tools/playbook.py validate_feature_design --root .
+--design docs/design/PAI.design.json:
+exit 0, schema/reference/dependency checks, 0 errors/warnings.
+python3 tools/check_personal_assistant_plan.py: exit 0, original review_required.
+python3 tools/check_pai_plan.py: exit 0, all 32 cards/PA coverage/dependencies;
+28 future test files absent. Strict implemented-tests check exits 1.
+Pinned task/reference validator exits 1 with 51 missing-approval errors;
+19 are unchanged PA records, 32 are the new draft PAI scopes, no structural errors.
+
+## Mimo review preparation and compatibility
+
+The owner explicitly retained Mimo in the active session. The separate local
+OpenCode design backend has synthetic proof of the genuine pinned generic
+record writer/parser, honest provider/model telemetry and stale-hash denial.
+Reports stay in .playbook-artifacts/opencode-runs/<id>/, not the old default
+Codex report projection. That old projection would overwrite provenance with
+codex_exec; do not feed these outputs through it. No Codex traces are forged.
+
+Actual reviewer requested: mimo-v2.6-pro; observed: not run. Effort is not
+requested for this API, observed effort unknown. No actual PASS/ADVISORY review
+is claimed, and the new adapter needs independent review before real use.
+Program packet includes full specification, exact paired design, boundaries,
+review policy, ADR and the new runner source/changed transport definitions.
+Registry whitespace is compacted without dropping a field/requirement.
+All original document hashes are retained, including the non-repeated intake
+brief. Total input is bounded to 200000 bytes; output request is really 8000
+tokens. One provider request per process, no redirects or automatic retries.
+
+Prepared safe command:
+python3 tools/run_codex_role.py run --provider opencode-go --task PAI-01
+--feature-id PAI --role program_design_review --prepare-only
+Exit 0, provider_call false, genuine needs_input gate and exact packet hashes.
+This is no reviewer verdict.
+
+## Actual next gates
+
+Owner brief approval question is bound to PROJECT_BRIEF.md SHA-256
+7cf9adde93f48f17afef4707e02399c2a180339f4c3acc41e3520309cdfa8458.
+Separate question asks two Mimo calls, each <=200 KB input/8000 output tokens,
+no automatic retries/private payload. The owner answered “да, всё разрешаю” to both questions. The brief decision is
+recorded; two bounded initial reviewer calls are authorized.
+This explicit scope decision goes beyond the earlier model selection alone.
+
+After real brief approval, rerun plan and obtain real human select-plan through
+the pinned interactive workflow. Do not fake owner identity/TTY answers.
+Then draft captures the exact current design-session boundary. Run independent
+product/program Mimo reviews via the new backend only with agreed scoped call
+limits/credentials for actual execution, never availability scanning. Resolve
+P0/P1 and obtain independent recheck with additional scope if needed. The actual
+hash-bound feature approval must occur through:
+python3 tools/playbook.py feature_workflow --root . approve --feature-id PAI
+This is a later human action after required review, not a command run here.
+
+No approval fields, human acceptance or release state were hand-edited.
+PAI-02..26 depend on this design gate. Continue the first ready card after it;
+do not create a second authorization question for each already-assigned file.
+
+Rollback: withdraw the draft through legitimate workflow/revert owned changes;
+preserve prior PA states and other authors' work. No runtime/data changes.
+
+## Authorized workflow continuation
+
+After the owner decision, pinned plan returned ready (exit 0). Interactive
+select-plan recorded assigned designed_slices (exit 0), with owner alias
+human:owner entered under explicit delegation. Feature draft initially refused
+the dirty tree; scoped checkpoint publication/preservation is being prepared.
+No interactive feature approval or real independent verdict has occurred yet.

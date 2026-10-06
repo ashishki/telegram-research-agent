@@ -11,7 +11,7 @@ weekly/topic Briefs, controlled Watch and confirmed Act in one conversation.
   wishes, UX, weekly reports, search, connectors, Academic Inbox, permissions,
   architecture, models, evidence, operations and full completion criteria.
 - [Current handoff](docs/CODEX_PROMPT.md) and
-  [next-session assignment](docs/prompts/personal_assistant_implementer.md).
+  [Sol implementation assignment](docs/prompts/pa_sol_implementation.md).
 - [Compact programme design](docs/design/PA.md),
   [slice registry](docs/design/PA.design.json), [active tasks](docs/tasks.md).
 - [Pinned Playbook setup](docs/PLAYBOOK_ADOPTION.md) and
@@ -19,12 +19,25 @@ weekly/topic Briefs, controlled Watch and confirmed Act in one conversation.
 
 ## Current implementation versus target
 
-Existing archive search/evidence, confirmed saved actions and bounded public
-UTD watch are useful foundations. The inspected active application blocks free
-AI chat/synthesis and does not provide working personal mail/Canvas connections.
-The new plan develops the whole assistant without restarting old report timers
-or claiming a finished product from fixtures. Current deployed state was not
-observed. Baseline focused CI has a known UX evaluation failure assigned PA-00.
+Observed source baseline: `8faee4232cb30e6b6f39cfbd974c151846f79da6`;
+reconciliation: 2026-10-06. Deployed state has not been observed.
+
+| Capability | Default/application wiring | Local contract | Live evidence |
+| --- | --- | --- | --- |
+| Archive Search | Application retrieval/evidence and bounded synthesis seam | PA-04/06 | Not established for current SHA |
+| AI Chat | Calls an injected model only with typed per-turn authorization; none by default | PA-03 | Not established |
+| Public web/GitHub | Explicit adapter injection; no default web provider | PA-05/06 | Not established |
+| Brief/read/export | Versioned brief application methods and private export helpers | PA-07/08 | Owner visual/runtime acceptance pending |
+| Watch | Explicit-path SQLite subscriptions/jobs; no general scheduler composition | PA-09 | Historical bounded UTD evidence is separate |
+| Mail/calendar/academic, Act, memory/media/ops | Separate local contracts; end-to-end composition remains PAI work | PA-10..17 | Not established |
+
+The historical PA-00 confirmation-context UX regression passes in the current
+focused check. Another conversation fixture depended on the calendar date;
+its diagnosis and deterministic correction are in
+[PAI-00 evidence](docs/verification/PAI-00-reconciliation.md). This is focused
+evidence, not a claim that all CI is green. The remaining implementation queue
+is [PAI tasks](docs/PA_IMPLEMENTATION_TASKS.md); actual wiring, review and gates
+are tracked in [PAI progress](docs/verification/PAI-progress.md).
 
 ## Local PA slices and evaluation tooling
 

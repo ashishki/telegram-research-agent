@@ -23,7 +23,8 @@ and applicable ADRs. PA target design does not grant runtime authority.
   operations and repo modification by the product remain out of scope.
 - Never invent deadlines, source support, eligibility, read/learning states,
   completion, delivery, model identity, measurements or human approval.
-- This publication changes docs/tooling only. No production DB, .env, service,
-  timer or actual account is to be modified without separate scoped authority.
+- The current PAI assignment permits safe local implementation and synthetic
+  tests. Exact design approval remains separate. No production DB, .env,
+  service, timer or actual account changes without separate scoped authority.
 - Implementer is not independent reviewer. Children never commit/push or grant
   acceptance. Use focused tests, no full historical pytest suite. Record failures.

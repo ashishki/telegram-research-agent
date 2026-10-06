@@ -1,3 +1,7 @@
+Workstream: historical maintenance/PRM-SN
+Status: explicit-use reference
+Superseded-By: [PA Sol assignment](pa_sol_implementation.md) for current PA work
+
 # Workflow Prompt: Claude Reviewer
 
 ## How to use this template

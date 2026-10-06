@@ -59,6 +59,12 @@ PRM_ACTIVE_TESTS = (
     "tests/test_profile_ranked_brief.py",
     "tests/test_callbacks.py",
     "tests/test_prm_application.py",
+    # PA-03 application confirmation tests must remain date-independent and
+    # run in the active tier, including expired and missing-version denial.
+    "tests/test_assistant_conversation.py",
+    # PAI task/design coverage is structural evidence, separate from product.
+    "tests/test_pai_plan.py",
+    "tests/test_opencode_role_review.py",
     # PA-06 is a high-risk worker/checkpoint boundary. Keep its dedicated
     # adversarial suite in the required active tier rather than relying on a
     # separate optional command.

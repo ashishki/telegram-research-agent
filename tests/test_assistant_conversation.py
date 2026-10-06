@@ -316,7 +316,17 @@ def test_cancel_request_discards_a_model_result_after_the_model_boundary(monkeyp
     assert state is not None and state.pending_request_ids == ()
 
 
-def test_application_plain_yes_does_not_reroute_or_execute_without_pa13_version_loader(monkeypatch) -> None:
+@pytest.mark.parametrize(
+    ("elapsed", "expected_status"),
+    [
+        (timedelta(minutes=1), "stale_or_unavailable"),
+        (timedelta(minutes=6), "unavailable"),
+        (timedelta(days=17), "unavailable"),
+    ],
+)
+def test_application_plain_yes_does_not_reroute_or_execute_without_pa13_version_loader(
+    monkeypatch, elapsed, expected_status,
+) -> None:
     def forbidden_archive(*args, **kwargs):
         raise AssertionError("plain yes must not reroute")
 
@@ -325,10 +335,13 @@ def test_application_plain_yes_does_not_reroute_or_execute_without_pa13_version_
     state = store.record_response("42", text="Preview A", now=NOW)
     confirmation = _confirmation(state)
     store.offer_confirmation("42", confirmation, now=NOW)
+    # Application calls use the store's clock implicitly. Keep fixture creation
+    # and application time in the same controlled timeline, including expiry.
+    monkeypatch.setattr("prm.conversation._utc", lambda value: (value or NOW + elapsed).astimezone(timezone.utc))
     assistant = PersonalResearchAssistant(settings=SimpleNamespace(db_path=":memory:"), conversations=store)
 
     result = assistant.answer(OperatorRequest(query="да", mode="auto", chat_id="42", actor_id="42", owner_chat_id="42"))
 
     assert result.status == "confirmation_unavailable"
-    assert result.payload["confirmation_status"] == "stale_or_unavailable"
+    assert result.payload["confirmation_status"] == expected_status
     assert "прошлой теме" in result.text

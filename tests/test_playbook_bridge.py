@@ -5,6 +5,7 @@ from pathlib import Path
 import subprocess
 import sys
 from unittest.mock import patch
+import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = Path(__file__).resolve().parents[1] / 'tools/playbook.py'
@@ -73,14 +74,15 @@ def test_symlink_rejected(tmp_path):
         assert bridge.main(['--check-pin']) == 2
 
 
-def test_forwarding_preserves_arguments_and_exit_code(tmp_path):
+@pytest.mark.parametrize("tool_name", ["feature_workflow", "create_feature_design", "validate_feature_design"])
+def test_forwarding_preserves_arguments_and_exit_code(tmp_path, tool_name):
     upstream, _ = fixture(tmp_path)
     (upstream / 'tools').mkdir()
-    (upstream / 'tools/feature_workflow.py').write_text('# inert fixture\n')
+    (upstream / 'tools' / (tool_name + '.py')).write_text('# inert fixture\n')
     with patch.object(bridge, 'ROOT', tmp_path), patch.object(bridge, 'verified_upstream', return_value=upstream), patch.object(bridge.subprocess, 'run') as run:
         run.return_value.returncode = 17
-        assert bridge.main(['feature_workflow', '--root', '.', 'plan', '--task', 'PA-00']) == 17
-        assert run.call_args.args[0] == [bridge.sys.executable, str(upstream / 'tools/feature_workflow.py'), '--root', '.', 'plan', '--task', 'PA-00']
+        assert bridge.main([tool_name, '--root', '.', 'plan', '--task', 'PA-00']) == 17
+        assert run.call_args.args[0] == [bridge.sys.executable, str(upstream / 'tools' / (tool_name + '.py')), '--root', '.', 'plan', '--task', 'PA-00']
         assert 'shell' not in run.call_args.kwargs
 
 

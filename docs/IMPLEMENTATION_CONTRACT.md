@@ -3,11 +3,20 @@
 Status: current operating contract. Changes to an accepted decision require a
 new ADR under `docs/adr/`.
 
-Version: 4.2
+Version: 4.3
 
-Effective date: 2026-09-17
+Effective date: 2026-10-06
 
 ## Product Authority
+
+ADR-012 records the 2026-10-06 PA implementation assignment and instruction
+reconciliation. This extends the applicable local development workstream to
+PAI-00..26 without granting exact design, account, paid provider, production or
+release approval. PAI design approval gates dependency work; independent local
+maintenance/design preparation continues. ADR-013 proposes the durable runtime
+architecture; its status is proposed, so it grants no implementation acceptance.
+The complete PA target includes Chat/Search/Brief/Watch/Act; the older PRM-SN
+paragraphs below describe the reused foundation, not a reduced PA outcome.
 
 ADR-009 registers the owner-requested Personal Search And News task queue.
 An explicitly assigned PRM-SN scope permits its local implementation and
@@ -132,8 +141,13 @@ states.
 - External skills and community runtimes are untrusted until reviewed.
 - Skills may not inspect broad filesystem areas, secrets, or private Telegram
   data without a trust record and explicit human approval.
-- During this planning retrofit all listed external skills are
-  project-disabled or pending trust tasks; none is approved.
+- Reading a skill's instructions/public methodology is allowed within the
+  assigned development scope; it does not activate executables or grant access.
+- Existing reviewed local tools may operate on synthetic fixtures in scope.
+  New third-party executables/installers/hooks need a pinned trust review before
+  execution. Accounts, secrets, private corpus, paid APIs and side effects need
+  their specific authority even when a skill is available.
+- No external skill has been approved as a product runtime capability here.
 
 ## Playbook Execution
 

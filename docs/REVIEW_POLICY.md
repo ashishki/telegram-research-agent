@@ -1,71 +1,78 @@
-# Review Policy — PA
+# Review Policy — PA / PAI
 
-Updated: 2026-09-18
-Playbook pin: d570163ab17ec3b4245187c778f1e8d89af9690f
-Historical policy: `docs/REVIEW_POLICY.before-pa-20260918.md` (unchanged snapshot).
+Updated: 2026-10-06. Pin: d570163ab17ec3b4245187c778f1e8d89af9690f.
 
-## Authority and execution
+## Authority and provenance
 
-Standard governance, designed_slices programme. Human remains final authority
-for exact design, high-risk slice acceptance, account/runtime permissions and
-release. Direct implementer writes; independent reviewer reads only. Children
-never commit/push, self-review or grant approval. A drafting agent cannot record
-its own design as approved. Existing source/privacy/runtime gates stay intact.
+The current implementer uses the active session model/reasoning mode with no
+programme override. It never reviews its own work. Independent reviewers are
+fresh and read-only, do not fix/commit/push, and cannot grant human acceptance.
+The owner’s [2026-09-23 amendment](CODEX_PROMPT.before-pai-20261006.md#owner-amendment-2026-09-23--solution-first-non-codex-judge)
+selects a non-Codex reviewer via OpenCode Go, default mimo-v2.6-pro, and batches
+review at phase boundaries. It supersedes the older Terra/high prescription in
+AGENTS/adoption/prompts. This is reviewer selection, not a new paid-call budget
+or permission to send private data. The 2026-10-06 Sol prompt explicitly keeps
+paid model calls behind scoped authority. The owner reconfirmed Mimo in the active session on 2026-10-06. No new paid
+reviewer call/budget is inferred from that selection; do not read keys merely
+to check availability. The pending brief/budget questions name the exact scope.
 
-The primary implementer inherits the current session's default Codex
-model/reasoning mode and does not set a programme-wide model override. It must
-not review its own implementation. Every independent reviewer is a fresh,
-separate, read-only process requested as `gpt-5.6-terra` with `high` reasoning.
-Record both requested and observed model/effort; an unavailable or substituted
-runtime is a recorded evidence mismatch, not Terra/High evidence.
+## Roles, runners and receipt compatibility
 
-## Required reviews
+| Role | Required route/evidence | Current integration |
+| --- | --- | --- |
+| Product/program design; slice; maintainability | Pinned Role Runner, independent process, hash-bound role receipt | local --provider opencode-go backend supports product/program design records; native Codex receipt schema stays separate; slice/maintainability extension pending |
+| Accumulated Deep Review | Fresh non-Codex process, exact SHA/diff and hash, frozen findings | tools/mimo_code_review.py reviews a committed Git range; advisory JSON/Markdown, not a governed role receipt |
+| Test Critic; privacy/security | Fresh independent read-only reviewer, bounded inputs, identity and findings | Non-Codex governed role adapter is pending; no self-review substitution |
+| Text/content/visual judges | Explicit provider scope/budget and deterministic dataset/render provenance | Existing judge tools are advisory; neither safety nor release approval |
 
-Before capability implementation: independent product_design_review and
-program_design_review of the paired PA design, followed by hash-bound human
-approval using Feature Workflow. For the four governed feature roles
-(product_design_review, program_design_review, slice_review,
-maintainability_review), use `tools/run_codex_role.py run` from the pinned kit.
-An invalid runner execution is missing evidence; do not silently fall back to
-a direct reviewer command. Use a fresh read-only `codex exec` process for every
-other prescribed review role (for example Test Critic, privacy/security or a
-Deep Review role not supported by Role Runner). Reviewers do not edit, commit,
-push or fix their own findings. The implementer or an explicitly scoped fix
-agent resolves P0/P1 findings; then a new independent reviewer rechecks the
-affected diff and evidence before dependent work continues. Record the command,
-observed identity, reviewed commit/diff, inputs, verdict, findings and artifact
-hashes.
+Do not label a Mimo verdict as a successful Role Runner execution or synthesize
+runner telemetry/approval fields. Rendering a role prompt is preparation only.
+The owner retained Mimo on 2026-10-06. The local Role Runner now routes
+explicit --provider opencode-go to tools/opencode_role_review.py for product/
+program design roles. It checks the real pinned task/feature/planning gate,
+bounded input, one explicit budgeted call, observed model/complete JSON,
+P0/P1 verdict consistency and document/HEAD drift before publication.
+The caller is a fresh separate Python process; the model has no tools or writes.
 
-For semantic changes use a focused Test Critic and relevant slice review.
-Privacy/security review is mandatory on new egress, OAuth/secrets, retention,
-confirmation/writes, source-fetch boundaries, scheduling or recovery. Tests must
-include useful positives as well as denial/attack cases. A keyword assertion
-or model judge cannot prove end-to-end correctness.
+Evidence uses assistant.opencode_design_review.v1, records actual provider,
+requested/observed model/effort, SHA and input/report hashes, and publishes via
+the genuine pinned write_design_review_record consumer with reviewer_binding
+opencode_go:<result-path>. Synthetic tests confirm that the pinned parser
+accepts that generic design record and rejects stale hashes. These are not
+codex_role_run traces; no Codex events or human approval fields are produced.
+The backend itself still requires independent risk review before real use.
 
-## Proportionate batching
+Current pinned feature_workflow review would manufacture a codex_exec binding
+when it sees a report at its default report path. Therefore the OpenCode backend
+keeps reports in its distinct immutable run directory and writes generic
+design records directly through the pinned consumer. Do not copy them to the
+default Codex report path or refresh them through that old projection. The
+approve workflow reads the hash-bound generic records via the real consumer.
+No upstream pin or approval checker was altered to accommodate this route.
+Slice/maintainability and other non-Codex roles remain future scoped extension,
+not silently supported. No-provider run is denied instead of falling back to
+Codex. Legacy verify/help remains available for historical receipt inspection.
 
-Within a phase review the actual changed surface and tests. Batch the full
-META -> ARCH -> CODE -> CONSOLIDATED chain at these accumulated boundaries:
-foundation (PA-00..02); chat/search (PA-03..06); brief/watch (PA-07..09);
-personal sources (PA-10..12); actions/memory/media (PA-13..15); final reliability
-and acceptance (PA-16..18). These are risk checkpoints, not a mandatory call
-fan-out after each trivial edit. Immediate safety review applies before a
-changed risky boundary is exercised or dependent work proceeds.
+## Review cadence and risk
 
-Preserve old domain-specific gates when maintaining the corresponding legacy
-surface. Do not reread every historical report unless a concrete finding needs
-it. Freeze findings, fix P0/P1, rerun affected evidence and do not consume
-unbounded correction rounds. Missing independent review remains pending.
+PAI phase boundaries: A=00..01, B=02..06, C=07..09, D=10..15,
+E=16..20, F=21..26, G=27..29. Required reviews examine accumulated changes and
+specific acceptance evidence; do not launch all reviewers for every small patch.
+Immediate review applies before exercising new egress, OAuth/secrets, retention,
+confirmation/writes, scheduling or recovery boundaries. Resolve P0/P1 and obtain
+an independent recheck before dependent work. Preserve unreviewed limitations.
+Historical PA phase receipts remain references to their exact SHA, not approval
+of a new PAI design. Existing legacy/domain gates remain when that surface changes.
 
-## Completion evidence
+Product/program design review precedes hash-bound human design approval.
+High-risk slice acceptance, account/institution grants, paid egress, background
+jobs, production migration/deploy and release are separate decisions. Missing
+review remains pending; local synthetic passes never fill that gap.
 
-Exact changed files and SHA/diff; new acceptance tests plus appropriate
-existing tier; commands and exit/results; visible before/after UX where relevant;
-privacy/cost/recovery evidence; limitations; human/live decisions. All PA code
-slices must replace generic regression-only evidence with their feature-specific
-checks before acceptance. Full historical pytest runs remain prohibited.
+## Evidence
 
-Visual report acceptance requires actual Telegram/HTML/PDF render inspection,
-not just a schema or model judgment. Real account integration and owner
-usefulness remain separate from synthetic/CI evidence. A passing planning
-workflow does not imply a passing product or authorize release.
+Record requested/observed provider/model/effort (unknown when unavailable), runner
+version, reviewed commit and diff/input hashes, command and exit, findings and
+recheck. Distinguish acceptance tests, regressions, fixtures, real provider I/O,
+actual rendered views and human usefulness. Full historical pytest is prohibited.
+No private corpus, account payload or credentials in reviewer packets or Git.

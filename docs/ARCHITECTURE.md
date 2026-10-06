@@ -1,14 +1,24 @@
 # Architecture
 
-Status: current
-Version: 2.1
-Last updated: 2026-09-18
+Status: observed source architecture plus explicitly proposed target
+Version: 2.2
+Last updated: 2026-10-06
+Source baseline: 8faee4232cb30e6b6f39cfbd974c151846f79da6
 
 ## Product boundary
 
-`telegram-research-agent` is a private Personal Telegram Research Memory and Grounded Assistant for one operator. Search and grounded answers are the primary product. Reports are optional secondary projections.
+`telegram-research-agent` is a private Personal Telegram Research Memory and Grounded Assistant for one operator. The complete PA target is Chat/Search/Brief/Watch/Act. Weekly Briefs are a primary user outcome; the older archive-centered foundation remains reusable.
 
-## Active flow
+## Proposed durable target
+
+[PAI design](design/PAI.md) and proposed [ADR-013](adr/ADR-013-pa-durable-runtime.md)
+describe PostgreSQL authority/jobs with the canonical SQLite archive retained.
+This is a draft requiring independent review and human approval. PostgreSQL,
+scheduler, multiprocess authority and new live integrations are not implemented
+by this documentation. [PAI progress](verification/PAI-progress.md) distinguishes
+contracts from application wiring and current evidence.
+
+## Observed source flow
 
 ```text
 Telegram / CLI / Eval
@@ -93,9 +103,9 @@ delivery is best-effort receipt deduplication, not proven exactly-once.
 
 `docs/UTD_ACADEMIC_INBOX_RESEARCH_HANDOFF.md` records an optional future
 read-only Academic Inbox research direction (mail, Canvas and selected public
-UTD context). It is deliberately outside the active watch: no connector,
-credential flow, storage, source permission or runtime is implemented or
-authorized by that document.
+UTD context). It is deliberately outside the active watch: that document grants no runtime authority. PA-10..12 now supply local
+mail/calendar/academic contracts; OAuth and integrated account use remain
+PAI-16..19 work.
 
 The general search/news evolution in ADR-009 and
 `docs/PRM_SEARCH_NEWS_PLAN.md` is implemented locally: archive-grounded answers,
@@ -127,7 +137,7 @@ Conversation is ephemeral by default. Notes, watches, project links, actions and
 
 ## Runtime boundary
 
-Active runtime templates:
+Runtime templates present in source (no current service observation):
 
 - `systemd/telegram-prm-assistant.service`;
 - `systemd/telegram-prm-archive-refresh.service`;
@@ -153,4 +163,4 @@ The repository retrofit uses a strangler approach:
 - a second bot;
 - unrestricted autonomous web research;
 - automatic long-term preference learning;
-- a new weekly-report product.
+- restarting the legacy report pipeline; PA Brief remains a primary target.
