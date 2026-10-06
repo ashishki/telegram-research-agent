@@ -326,3 +326,12 @@ python3 tools/run_codex_role.py run --provider opencode-go --task PAI-01 --featu
 After deadline choice: rerun actual phases sequentially, complete both required
 roles and tooling audit, resolve/recheck any remaining findings, then seek the
 actual hash-bound human feature approval. PAI-02..26 remain unimplemented.
+
+## Owner deadline amendment
+
+Owner answered “да” to the pending 900-second design/recheck question.
+The runner permits explicit deadlines 30..900 s, default 300 s unchanged.
+Total funding remains 30 calls (14 consumed); input <=200000 bytes, output
+<=16000, selected Mimo, public/synthetic scope and no automatic retry remain.
+Targeted role/strategy/checker suite: 51 passed in 10.00 s.
+Next actual review freezes this source and uses explicit approved bounds.

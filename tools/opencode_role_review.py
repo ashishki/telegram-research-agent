@@ -371,7 +371,8 @@ def main(argv=None):
     parser.add_argument("--role", choices=sorted(ROLES), required=True)
     parser.add_argument("--model", choices=["mimo-v2.6-pro"], default="mimo-v2.6-pro")
     parser.add_argument("--key-file", default=os.environ.get("OPENCODE_API_KEY_FILE", ""))
-    parser.add_argument("--timeout-seconds", type=int, default=300)
+    parser.add_argument("--timeout-seconds", type=int, default=300,
+                        help="up to 900 requires the owner's separately approved design/recheck scope")
     parser.add_argument("--call-cap", type=int, default=0)
     parser.add_argument("--output-token-cap", type=int, choices=[8000, 16000], default=8000,
                         help="16000 requires the owner's separately approved design/recheck scope")
@@ -383,7 +384,7 @@ def main(argv=None):
                         help="one phase; full-design evidence requires independent coverage of every phase")
     args = parser.parse_args(argv)
     try:
-        if not 30 <= args.timeout_seconds <= 300:
+        if not 30 <= args.timeout_seconds <= 900:
             raise ReviewBlocked("timeout outside bounded review scope")
         return execute(args)
     except Exception as exc:

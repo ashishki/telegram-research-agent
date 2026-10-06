@@ -100,6 +100,19 @@ def test_one_fake_provider_call_emits_distinct_hash_bound_non_codex_evidence(tmp
     assert records[0]["read_only"] is True
 
 
+@pytest.mark.parametrize("timeout,expected", [(300, 0), (900, 0), (901, 2), (29, 2)])
+def test_design_review_deadline_bounds_reach_actual_transport(tmp_path, monkeypatch, timeout, expected):
+    _, calls, records = setup_run(tmp_path, monkeypatch)
+    assert review.main(["run", "--root", str(tmp_path), "--task", "T1", "--feature-id", "F",
+                        "--role", "program_design_review", "--allow-provider-egress", "--call-cap", "1",
+                        "--timeout-seconds", str(timeout)]) == expected
+    if expected == 0:
+        assert calls[1]["timeout"] == timeout
+        assert len(records) == 1
+    else:
+        assert calls == [] and records == []
+
+
 def test_input_drift_during_provider_call_never_creates_a_review_record(tmp_path, monkeypatch):
     args, calls, records = setup_run(tmp_path, monkeypatch)
     def changing_provider(**kwargs):
