@@ -15,3 +15,6 @@ pypdf>=4,<7
 pypdfium2>=4,<6
 # Optional external OCR cross-check transport (lazy import in the tool).
 requests>=2.31,<3
+
+# PAI durable state driver; pure wheel uses the existing system libpq.
+psycopg==3.3.6

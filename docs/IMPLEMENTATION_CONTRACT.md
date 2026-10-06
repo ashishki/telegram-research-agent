@@ -12,8 +12,9 @@ Effective date: 2026-10-06
 ADR-012 records the 2026-10-06 PA implementation assignment and instruction
 reconciliation. This extends the applicable local development workstream to
 PAI-00..26 without granting exact design, account, paid provider, production or
-release approval. PAI design approval gates dependency work; independent local
-maintenance/design preparation continues. ADR-013 proposes the durable runtime
+release approval. ADR-014 records the owner’s subsequent instruction to proceed with local
+PAI-02..26 implementation while design reviews/formal acceptance remain open.
+Accumulate independent Mimo review at phase boundaries. ADR-013 proposes the durable runtime
 architecture; its status is proposed, so it grants no implementation acceptance.
 The complete PA target includes Chat/Search/Brief/Watch/Act; the older PRM-SN
 paragraphs below describe the reused foundation, not a reduced PA outcome.

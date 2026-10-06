@@ -7,7 +7,10 @@ Initial source: 8faee4232cb30e6b6f39cfbd974c151846f79da6.
 Full programme remains unfinished; owner resumed the existing goal. Formal PA/PAI states are preserved; engineering
 status below does not grant independent, human or runtime acceptance.
 
-Current card: PAI-01. Draft/brief/planning are prepared and authorized.
+Current card: PAI-03. PAI-02 locally verified under owner proceed instruction ADR-014.
+Formal design states remain unchanged. Previous design-only stop no longer blocks local code.
+
+Historical design preparation checkpoint: PAI-01. Draft/brief/planning are prepared and authorized.
 Original complete product review returned STOP_SHIP; its two P1 findings were
 independently resolved by a scoped PASS. Foundation program STOP_SHIP on a6a7d00 identified trust/no-skip gaps now fixed
 locally; independent tooling/phase rechecks and complete design remain pending.
@@ -18,7 +21,7 @@ Nineteen calls are consumed before the separate tooling audit.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | PAI-00 / PA-00, PA-01, PA-18 | local_verified | instruction/tool/test and bounded Mimo design backend diff | current entrypoints inventoried; no product runtime added | focused-prm 620 pass; latest bridge/role/guard/plan/strategy suite 92 pass | phase-A independent review pending | none | none | PAI-01 brief/planning/review/design gate |
 | PAI-01 / PA-01, PA-02, PA-09, PA-13, PA-16, PA-17 | in_progress | draft paired design + proposed ADR-013 | proposed topology only | pinned schema/mapping pass | two original product P1 independently resolved by scoped PASS; full review missing | none | none | brief/planning funded; complete independent reviews/exact design approval pending |
-| PAI-02 / PA-01, PA-17 | planned | existing PA contracts to reuse; no new PAI code | integration/restart/concurrency not demonstrated for PAI | new acceptance not run | none for new scope | none for new scope | none | PAI-01; PAI-01 design gate |
+| PAI-02 / PA-01, PA-17 | local_verified | PostgreSQL target/UOW/versioned objects/migration | actual CLI, separate-process DB and dump/restore | 31 passed in 9.55 s; zero skips | phase-B pending | no production/account | none claimed | next PAI-03 |
 | PAI-03 / PA-02, PA-16 | planned | existing PA contracts to reuse; no new PAI code | integration/restart/concurrency not demonstrated for PAI | new acceptance not run | none for new scope | none for new scope | none | PAI-02; PAI-01 design gate |
 | PAI-04 / PA-00, PA-13 | planned | existing PA contracts to reuse; no new PAI code | integration/restart/concurrency not demonstrated for PAI | new acceptance not run | none for new scope | none for new scope | none | PAI-03; PAI-01 design gate |
 | PAI-05 / PA-03, PA-07, PA-14 | planned | existing PA contracts to reuse; no new PAI code | integration/restart/concurrency not demonstrated for PAI | new acceptance not run | none for new scope | none for new scope | none | PAI-03, PAI-04; PAI-01 design gate |
@@ -75,3 +78,14 @@ Exact paired-feature human approval remains necessary after complete reviews.
 Next: obtain independent critical-source tooling audit, then collect all four
 program and product phase reviews on frozen source,
 aggregate only complete coverage; resolve P0/P1, prepare exact approval package, then PAI-02.
+
+## Owner proceed and PAI-02 implementation
+
+Owner requested moving beyond bureaucracy into implementation; ADR-014 records
+local scope, without fabricated design/live/release acceptance. PAI-02 receipt:
+PAI-02-storage.md. Actual acceptance: 31 passed in 9.55 s, zero skips/failures.
+Changes: src/prm/storage/{__init__,postgres,testing,__main__}.py, new real
+PostgreSQL tests, pinned driver, ignored isolated venv and current instructions.
+No production DB/service/timer/private account changed. Twenty of 30 model
+requests consumed; tooling #20 ended length at 16000, no valid verdict.
+Next card PAI-03: persist shared grants, budgets and reservation lifecycle.
