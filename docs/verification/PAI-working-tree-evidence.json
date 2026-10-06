@@ -2,7 +2,7 @@
   "schema_version": "assistant.pai_working_tree_evidence.v1",
   "source_head": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
   "reviewed_commit": null,
-  "independent_review": "pending",
+  "independent_review": "current tooling re-audit pending; foundation a6a7d00 STOP_SHIP preserved separately",
   "paths": [
     {
       "path": ".playbook/instruction_manifest.json",
@@ -34,7 +34,7 @@
     },
     {
       "path": "docs/CODEX_PROMPT.md",
-      "sha256": "38074670fcdc5a733de04540057e4277909e7436a49e67f7afe3b55bfdd1ef83"
+      "sha256": "e1ac9591a302a15a065815b4e0d509d0072e120622bb6d3cbf93a62bf10526a5"
     },
     {
       "path": "docs/IMPLEMENTATION_CONTRACT.md",
@@ -42,7 +42,7 @@
     },
     {
       "path": "docs/PA_IMPLEMENTATION_TASKS.md",
-      "sha256": "1685422be6d23b25cda15262720a3af4ffc7843c87e181f30d53b9c544e018d3"
+      "sha256": "cf996420553670d2a3a639fac286162aae6e52c37a6714e2f1394a53dc5d30e7"
     },
     {
       "path": "docs/PA_SCALING_STRATEGY_2026-10-06.md",
@@ -62,7 +62,7 @@
     },
     {
       "path": "docs/REVIEW_POLICY.md",
-      "sha256": "01290fb7367f148ba801d5247b3fbc12da95cd1e42847603179456717de246a1"
+      "sha256": "1033b0beafa76c28ea302f3c21141d11ade955d7c6b642574d47bf3c6f3d7a5c"
     },
     {
       "path": "docs/adr/ADR-012-pa-assignment-and-instruction-scope.md",
@@ -70,15 +70,19 @@
     },
     {
       "path": "docs/adr/ADR-013-pa-durable-runtime.md",
-      "sha256": "ff6b4984b1dce72d04b6f765be579620d106684d183098c805331502bd07a6bf"
+      "sha256": "1c700325af9c36d85873eea03249601a13168112dc862ff752a06225788615ca"
     },
     {
       "path": "docs/design/PAI.design.json",
-      "sha256": "5760c06210f445ed1252810dff95c6e07b199fe28054c9b8c85b63a040811208"
+      "sha256": "41ef94fbc7f390bc59df9c9957dc11a66c76aeb9087a30ba66d952841dcafceb"
     },
     {
       "path": "docs/design/PAI.md",
-      "sha256": "6d9119c389f60fc80b869aadc031fa308919e7958817abef5b394a59b082c119"
+      "sha256": "0a30c7688cd2ce3a40f03a8e3db787eca5bfc51e192d4d56849ab88ce47debbe"
+    },
+    {
+      "path": "docs/design/PAI.requirements.json",
+      "sha256": "ca19e6417b95556578dd776bcf3033953ab4482f05a716c201454bd32d3acff6"
     },
     {
       "path": "docs/prompts/ORCHESTRATOR.md",
@@ -122,7 +126,7 @@
     },
     {
       "path": "docs/tasks.md",
-      "sha256": "d6b010a9492300a4f4e7f2d4e479f111a4d99aeba425cfd95658f2d5b645947a"
+      "sha256": "a9e594cb3bad378c74398d7e44dab1c4615853f147ca7097c8a5fbd6007dbd38"
     },
     {
       "path": "docs/verification/PAI-00-reconciliation.md",
@@ -130,7 +134,43 @@
     },
     {
       "path": "docs/verification/PAI-01-durable-design.md",
-      "sha256": "ebde6252cb5fe530cee87b0b1206ec4798255acda7377695d454c8c8aa3368fc"
+      "sha256": "6688921be320d2c1f6434cdf2233240fac0b398eac68dcb9ed03d89c2ef04932"
+    },
+    {
+      "path": "docs/verification/PAI-01-product-P1-recheck.json",
+      "sha256": "54e777db8b8db5eba1d231a29d68b413b9fed64b46bf7b534a069f7daff65648"
+    },
+    {
+      "path": "docs/verification/PAI-01-product-review-04c4efa.md",
+      "sha256": "7746ae3c555f93eec24ca2fb4a9ce1034892abc6443899d567500f468193726b"
+    },
+    {
+      "path": "docs/verification/PAI-01-recheck-failure-opencode-0e0de111ad6a4ec4874692092971e13a.json",
+      "sha256": "bfe2a684eb165487bbed8b295be1ca03e80e2f19e0cc909eca74beba0d6a10b2"
+    },
+    {
+      "path": "docs/verification/PAI-01-recheck-failure-opencode-a555e37f79224009b6fb1a771fc760ee.json",
+      "sha256": "3f2ca57672bff39afb0b0ffa1ca7425906ac7d9c3cf7abbc182bbd264304e035"
+    },
+    {
+      "path": "docs/verification/PAI-01-recheck-failure-opencode-c80df329c1f448eb90f313d07fb85a62.json",
+      "sha256": "53a109572e07fe44e0283763d55c35299204a717db8fd9fac08cbc2387f2d349"
+    },
+    {
+      "path": "docs/verification/PAI-01-review-failure-1136863.json",
+      "sha256": "6b1d78e2c8d7c6bc110d13c75859462c240afbe66e4b40e6466f693e92542ce3"
+    },
+    {
+      "path": "docs/verification/PAI-01-review-failure-a5cd3d2.json",
+      "sha256": "b184a5825bb4c5b5baec460b5f46d2516946624a8ed2409519a6e0aee68d4089"
+    },
+    {
+      "path": "docs/verification/PAI-MIMO-CALL-PROTOCOL.md",
+      "sha256": "06d756079ec9a129ebadf0c1907465072654ee7f367b3f2c232cb89ebafcc3ef"
+    },
+    {
+      "path": "docs/verification/PAI-MIMO-SSE-diagnostic.json",
+      "sha256": "a4f559b4bb89c57f0a7150f89c8d27a569d2748a443a29bf7f2efdd789ed815f"
     },
     {
       "path": "docs/verification/PAI-access-release-pilot-packet.md",
@@ -138,7 +178,15 @@
     },
     {
       "path": "docs/verification/PAI-progress.md",
-      "sha256": "2a40fc8970bd80522c716fe19a793dbcfb695c633965482fab5edada4349bf3e"
+      "sha256": "5afca2b56477051c7c1589fb1e089133315678b2513aa2bb59037d4202a6bb5a"
+    },
+    {
+      "path": "docs/verification/PAI-review-continuation.json",
+      "sha256": "6c2e5f34d46eb0f696508930853cf7dacf2061841dd231d98d3566b52ffc3087"
+    },
+    {
+      "path": "docs/verification/PAI-tooling-maintenance-packet.md",
+      "sha256": "9c68d11d914479146fd9b41414b6014b1b6bf9fc91ea4d38f10febca976d712a"
     },
     {
       "path": "tests/test_assistant_conversation.py",
@@ -150,59 +198,51 @@
     },
     {
       "path": "tests/test_opencode_role_review.py",
-      "sha256": "c59b50bb2be6f6611998983ebf9968dece65df61c5441c6a8597b33d620360f6"
+      "sha256": "bee55e0d37aed101ac6d52f05a7965b32372af9bcff45ea6e7f6126c483bab74"
+    },
+    {
+      "path": "tests/test_pai_acceptance_guard.py",
+      "sha256": "c65da235de1079c2d5b7bb317ec6288cf248a39aed5e2c090b08041f51b81e91"
     },
     {
       "path": "tests/test_pai_plan.py",
-      "sha256": "8989ee11b081d07e48b20a04e58a7a0ff1c8f53b11a28b2a95b51aba6ab0481e"
+      "sha256": "18779ee7a260d3dba7f5b9d4b7cb4ef14d4c92c4d8ae038e94fa06a1b36ac005"
     },
     {
       "path": "tests/test_playbook_bridge.py",
-      "sha256": "ef36e569a4cea7fe8133951b188469383589f5fc3ff85e6fd8483d09bc5febe1"
+      "sha256": "326c2f4a994f81308fcc0bbafd1b5388c12022151ef29106c52a4be65dead8d8"
     },
     {
       "path": "tools/check_pai_plan.py",
-      "sha256": "4e3a62d60c6ff963f6e5bed02a614ca7989ef68e70b0bbc8f5e46efeb20a812a"
+      "sha256": "57d818ddfc7b472ef021dcdf4342705f409a78bcf401cbaf2b38c823f4b1d655"
+    },
+    {
+      "path": "tools/finalize_opencode_design_reviews.py",
+      "sha256": "f1f15a8b5b882ca968207992637201c11ae3677e585304c4f18c09ea292debaf"
     },
     {
       "path": "tools/mimo_code_review.py",
-      "sha256": "3b336a86516cfdb6ee499c4659a0fa4e5d3cc3cbebf1951a3bbd31a9d87d1d98"
+      "sha256": "2ba3cbf032166616aa2eeba61f654308379b32d228e98f389f2099a02679262f"
     },
     {
       "path": "tools/opencode_role_review.py",
-      "sha256": "5982d0b490c3f1853c01fc61776c211f4dec71fdfa53dd9d647431e9d951f593"
+      "sha256": "de7c4cdc43ea1960b8ef8f1067e63bc2e4e01a04dc534a5b736fa94c40cddcd2"
     },
     {
       "path": "tools/playbook.py",
-      "sha256": "40721bd143607e2ed62cfa4ce0d90b2f81db9f4921f1c5e3ca1b24bba302f89c"
+      "sha256": "9d8663cb4d3bbdcb7b88ec544fb43bde5c48cf93bdb6f727e3573f4c67cd1cb0"
     },
     {
       "path": "tools/run_codex_role.py",
       "sha256": "f4bc0939c5c4742f3645ef2f33ea8b6b84f7abf78f5608f51a29c0e16f7da8b2"
     },
     {
+      "path": "tools/run_pai_acceptance.py",
+      "sha256": "5aaec32d0b256f85dee4f462b4dd9bf6a4232eb970e6931877de5a94c2aecb0c"
+    },
+    {
       "path": "tools/test_tiers.py",
       "sha256": "42e16edbe26c4bc7d1a96234d47b7c730b7b00f00722e6bfea3a76bad0dd8e74"
-    },
-    {
-      "path": "docs/verification/PAI-MIMO-CALL-PROTOCOL.md",
-      "sha256": "380d3eed401d491482682529b1e6c2b334c2d798cf9edb1d63ea9d20d24dc689"
-    },
-    {
-      "path": "docs/design/PAI.requirements.json",
-      "sha256": "d785a60ea94d68f7c45d167c1738321233cd8b3d41b1ad06ec55828ef92a5139"
-    },
-    {
-      "path": "docs/verification/PAI-01-product-review-04c4efa.md",
-      "sha256": "7746ae3c555f93eec24ca2fb4a9ce1034892abc6443899d567500f468193726b"
-    },
-    {
-      "path": "tools/finalize_opencode_design_reviews.py",
-      "sha256": "c553de486156116319d65c98b86563a841a3b0cf1d5a9dfbddc1972d780b7ed2"
-    },
-    {
-      "path": "docs/verification/PAI-01-product-P1-recheck.json",
-      "sha256": "54e777db8b8db5eba1d231a29d68b413b9fed64b46bf7b534a069f7daff65648"
     }
   ],
   "preserved_unrelated_paths": [

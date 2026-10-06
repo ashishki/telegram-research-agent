@@ -354,3 +354,26 @@ the existing complete four-phase strategy, all slices/spec sections preserved.
 Phase-scope amendment validates structurally (32 slices, 69 requirements, ten
 scenarios). Terminal diagnostic test preserves safe metadata and excludes
 provider/secret text. Latest targeted suite: 62 passed; phase reviews next.
+
+## Actual independent foundation review and remediation
+
+Call #19, a6a7d00: observed/requested Mimo; STOP_SHIP, 23308 prompt + 10638
+completion tokens. Full unedited model finding data and dispositions are in
+PAI-review-continuation.json. Two absence findings derive from phase filtering;
+canonical 32/69/10 files existed and still validate. New phase packets preserve
+complete canonical registries. Genuine trust/no-skip P1s are locally fixed:
+separate complete critical-source audit gates new design calls/aggregation and
+PAI human approval; changed code/policy/audit references invalidate receipts.
+Strict acceptance prohibits implicit full suite/filter bypasses, skips/xfail,
+zero/missing cases; PAI-26 enumerates all 69 requirement and ten scenario nodes.
+All contract P2s are addressed in paired design/ADR; peer recheck pending.
+
+Exact latest targeted command:
+PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_playbook_bridge.py tests/test_opencode_role_review.py tests/test_pai_plan.py tests/test_pai_acceptance_guard.py tests/test_strategy_reviewer.py
+Result: 92 passed in 16.40 s.
+Strict command: PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_plan.py tests/test_pai_acceptance_guard.py
+Result: 13 passed in 3.90 s; 13 cases, zero skips/failures.
+Pinned design validator: zero errors/warnings; checker: 32 slices/69 IDs/ten
+scenarios, 28 future test files absent. No product code or acceptance claimed.
+Nineteen paid calls consumed; next is separate critical-source audit, then
+complete phase review pair and real hash-bound owner feature approval.

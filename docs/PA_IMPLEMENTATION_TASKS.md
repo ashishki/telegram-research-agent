@@ -94,7 +94,7 @@ scope — docs/design/PAI.md. Design/live approval этим не создаёт�
 | B | [PAI-03](#pai-03) | Общие grants, отзыв и атомарный бюджет | 02 |
 | B | [PAI-04](#pai-04) | Подтверждения и квитанции переживают рестарт | 03 |
 | B | [PAI-05](#pai-05) | Беседа и версии результатов переживают рестарт | 03, 04 |
-| B | [PAI-06](#pai-06) | Настоящая очередь, worker, checkpoints | 03, 04 |
+| B | [PAI-06](#pai-06) | Настоящая очередь, worker, checkpoints | 03, 04, 05 |
 | C. Исполнение | [PAI-07](#pai-07) | Быстрый Telegram ingress, status/cancel | 05, 06 |
 | C | [PAI-08](#pai-08) | Scheduler и восстановимые Watch | 06, 07 |
 | C | [PAI-09](#pai-09) | Общая доставка и безопасное восстановление исходов | 04, 07, 08 |
@@ -227,7 +227,7 @@ production migrations не исполнять.
 повторяемо отказывает на неправильном target/version; real PostgreSQL tests
 идут на synthetic data, а не заменены SQLite mocks. Прежний архив читается.
 
-**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_storage.py tests/test_assistant_contracts.py tests/test_archive_search.py`.
+**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_storage.py tests/test_assistant_contracts.py tests/test_archive_search.py`.
 
 **Откат:** выключить новый backend; удалять можно только явно созданную test DB.
 
@@ -259,7 +259,7 @@ contract; перед вызовом проверять текущий grant. Ato
 revoke/revision между enqueue и transport запрещает вызов; restart не
 сбрасывает расход; request/context pair потребляется корректно.
 
-**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_durable_policy.py tests/test_assistant_permissions.py tests/test_assistant_egress.py tests/test_assistant_grant_codec.py`.
+**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_durable_policy.py tests/test_assistant_permissions.py tests/test_assistant_egress.py tests/test_assistant_grant_codec.py`.
 
 **Откат:** остановить новые egress; не возвращаться к in-memory budget при
 включённом multi-worker runtime.
@@ -290,7 +290,7 @@ storage, `tests/test_pai_durable_actions.py`.
 до receipt, stale proposal, foreign owner и revoke покрыты; ни один
 неизвестный исход не становится автоматическим retry.
 
-**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_durable_actions.py tests/test_assistant_actions.py tests/test_prm_post_answer_actions.py`.
+**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_durable_actions.py tests/test_assistant_actions.py tests/test_prm_post_answer_actions.py`.
 
 **Откат:** выключить execution, сохранить ledger; старый writer только после drain.
 
@@ -321,7 +321,7 @@ request status, history policy, pending confirmation binding и expiry.
 proposals и expiry дают правильный результат; retained history удаляется
 по выбранной политике; беседа другого owner недоступна.
 
-**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_durable_conversation.py tests/test_assistant_conversation.py tests/test_assistant_report_dialogue.py`.
+**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_durable_conversation.py tests/test_assistant_conversation.py tests/test_assistant_report_dialogue.py`.
 
 **Откат:** читать сохранённые объекты; отключить неподдерживаемые переходы,
 не превращать старые ссылки в новое подтверждение.
@@ -329,7 +329,7 @@ proposals и expiry дают правильный результат; retained h
 <a id="pai-06"></a>
 ### PAI-06 — Реализовать очередь и worker, переживающие падение
 
-Depends-On: PAI-03, PAI-04
+Depends-On: PAI-03, PAI-04, PAI-05
 
 PA-Refs: PA-06, PA-09, PA-17
 
@@ -353,7 +353,7 @@ effect. Начать с небольшой реализации выбранно
 поколение не записывает результат; killed worker восстанавливает compute,
 но не пересылает unknown action; limits/backpressure работают.
 
-**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_workers.py tests/test_assistant_jobs.py tests/test_assistant_research.py`.
+**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_workers.py tests/test_assistant_jobs.py tests/test_assistant_research.py`.
 
 **Откат:** прекратить claims, drain/record in-flight; jobs не удалять.
 
@@ -382,7 +382,7 @@ acknowledgement только после сохранения. Подключит
 запрос; duplicate update не создаёт вторую job; restart сохраняет status;
 cancel прекращает будущие steps. Не писать «в фоне», если enqueue не состоялся.
 
-**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_ingress_jobs.py tests/test_prm_bot_dispatch.py tests/test_callbacks.py tests/test_prm_cli.py`.
+**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_ingress_jobs.py tests/test_prm_bot_dispatch.py tests/test_callbacks.py tests/test_prm_cli.py`.
 
 **Откат:** прекратить новый job intake, сохранить доступ к status/cancel/results.
 
@@ -413,7 +413,7 @@ pause/unsubscribe/snooze/done и caps. Background collection/delivery grants
 revoke и paused scope проходят; UI различает сохранённое намерение и реально
 работающий scheduler. Никакой systemd timer не включён этим тестом.
 
-**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_scheduler.py tests/test_assistant_jobs.py tests/test_assistant_subscriptions.py`.
+**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_scheduler.py tests/test_assistant_jobs.py tests/test_assistant_subscriptions.py`.
 
 **Откат:** остановить scheduler, сохранить subscriptions/occurrences/receipts.
 
@@ -444,7 +444,7 @@ adapter и UI для unknown; receipts выдаются после реальн�
 происходит; pause/revoke race и старый lease не обходят guard; unknown без
 возможности проверки остаётся unknown. Реальных отправок ещё нет.
 
-**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_delivery.py tests/test_assistant_jobs.py tests/test_assistant_actions.py tests/test_assistant_egress.py`.
+**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_delivery.py tests/test_assistant_jobs.py tests/test_assistant_actions.py tests/test_assistant_egress.py`.
 
 **Откат:** stop новых effects, reconciliation/read-only оставить доступными.
 
@@ -475,7 +475,7 @@ fallback, timeouts, отмена и usage settlement обязательны.
 неоднозначное «да» ведут себя правильно; отсутствие grants не делает HTTP
 вызов. Наличие fake client только в unit test недостаточно для wiring.
 
-**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_chat_runtime.py tests/test_assistant_conversation.py tests/test_prm_application.py tests/test_openai_provider.py tests/test_llm_client.py`.
+**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_chat_runtime.py tests/test_assistant_conversation.py tests/test_prm_application.py tests/test_openai_provider.py tests/test_llm_client.py`.
 
 **Откат:** отключить модельный маршрут; доступный локальный поиск сохранить.
 
@@ -506,7 +506,7 @@ insufficient evidence. Не добавлять vector DB без отдельно
 bounded excerpts действительно совпадают с разрешёнными источниками;
 улучшения recall не скрывают ухудшение factual support.
 
-**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_archive_search.py tests/test_archive_search.py tests/test_prm_synthesis.py tests/test_prm_intent_archive_contract.py`.
+**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_archive_search.py tests/test_archive_search.py tests/test_prm_synthesis.py tests/test_prm_intent_archive_contract.py`.
 
 **Откат:** прежний FTS/evidence fallback; канонический архив не переписывается.
 
@@ -537,7 +537,7 @@ connection, size/time/content type; untrusted text не выдаёт инстр�
 timestamps, partial/conflicting sources, SSRF, redirect/DNS смена, malicious
 content; GitHub answer называет действительно прочитанный ref.
 
-**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_web_github.py tests/test_assistant_web_search.py tests/test_assistant_research.py`.
+**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_web_github.py tests/test_assistant_web_search.py tests/test_assistant_research.py`.
 
 **Откат:** отключить конкретный adapter, честно сохранить локальный ответ/пробел.
 
@@ -568,7 +568,7 @@ step без основания. Внешние side effects в research не р�
 исчерпание steps/time/cost и новый вопрос в той же беседе корректны;
 выводы о проекте опираются на актуальный ref, а не общий фон модели.
 
-**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_deep_research.py tests/test_assistant_research.py tests/test_prm_research_planner.py`.
+**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_deep_research.py tests/test_assistant_research.py tests/test_prm_research_planner.py`.
 
 **Откат:** запрет новых deep jobs; уже готовые checkpoints/results доступны.
 
@@ -600,7 +600,7 @@ Status: planned
 DST и followups проходят; смена представления не перегенерирует факты.
 Fixture quality не выдаётся за human/live quality.
 
-**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_brief_runtime.py tests/test_assistant_briefs.py tests/test_assistant_brief_editorial.py tests/test_assistant_report_dialogue.py`.
+**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_brief_runtime.py tests/test_assistant_briefs.py tests/test_assistant_brief_editorial.py tests/test_assistant_report_dialogue.py`.
 
 **Откат:** отключить schedule/editorial route; сохранить принятые версии отчётов.
 
@@ -632,7 +632,7 @@ Renderer изолировать от сети, ограничить ресурс
 Telegram/HTML/PDF показывают те же story/source IDs, ничего не обрезано.
 Человеческая визуальная приёмка остаётся в PAI-27/29.
 
-**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_report_runtime.py tests/test_assistant_report_exports.py tests/test_assistant_report_access.py tests/test_pdf_inspection.py`.
+**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_report_runtime.py tests/test_assistant_report_exports.py tests/test_assistant_report_access.py tests/test_pdf_inspection.py`.
 
 **Откат:** отключить reader/экспорт, сохранить исходный BriefDocument.
 
@@ -665,7 +665,7 @@ UI различает ширину provider token и фильтр приложе
 revoke во время job и restart корректны; UI не называет configured account
 подключённым без успешного handshake. Здесь handshake только synthetic.
 
-**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_connections.py tests/test_assistant_mail.py tests/test_assistant_calendar.py tests/test_assistant_egress.py`.
+**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_connections.py tests/test_assistant_mail.py tests/test_assistant_calendar.py tests/test_assistant_egress.py`.
 
 **Откат:** disconnect и запрет refresh/egress; сохранность/удаление токенов
 согласно выбранной политике, не через вывод в отчёт.
@@ -699,7 +699,7 @@ deadline conflict, missing data и revoke/delete; беседа даёт свод
 дамп заголовков и не выдуманные действия. Sync cursor продвигается только
 после durable обработки страницы.
 
-**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_graph_mail.py tests/test_assistant_mail.py tests/test_pai_brief_runtime.py`.
+**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_graph_mail.py tests/test_assistant_mail.py tests/test_pai_brief_runtime.py`.
 
 **Откат:** отключить sync/source; сохранить независимый Telegram-архив.
 
@@ -730,7 +730,7 @@ events. Contacts — отдельный scope/adapter. Сначала выбра
 неоднозначный recipient и revoked calendar видны пользователю; read grant
 не выполняет write, email по имени не угадывается.
 
-**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_schedule_runtime.py tests/test_assistant_calendar.py tests/test_assistant_contacts.py`.
+**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_schedule_runtime.py tests/test_assistant_calendar.py tests/test_assistant_contacts.py`.
 
 **Откат:** отключить connector; pending actions по нему становятся unavailable.
 
@@ -762,7 +762,7 @@ institutional permission до live подключения; offline adapter пр�
 изменённый срок пересчитывает jobs; локальное «готово» не становится source
 submission; повтор кандидата не создаёт второе обязательство.
 
-**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_academic_runtime.py tests/test_assistant_academic.py tests/test_assistant_subscriptions.py`.
+**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_academic_runtime.py tests/test_assistant_academic.py tests/test_assistant_subscriptions.py`.
 
 **Откат:** выключить Canvas scope; не скрывать отсутствие источника за «задач нет».
 
@@ -795,7 +795,7 @@ content digest, version/ETag и free/busy где нужно. Provider draft то
 conflict и revoke не дают неожиданную запись. Payments/submission/registration
 остаются вне tools.
 
-**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_action_runtime.py tests/test_assistant_actions.py tests/test_pai_delivery.py tests/test_prm_post_answer_actions.py`.
+**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_action_runtime.py tests/test_assistant_actions.py tests/test_pai_delivery.py tests/test_prm_post_answer_actions.py`.
 
 **Откат:** отключить executor, оставить preview и reconciliation существующих
 attempts; не удалять receipts.
@@ -827,7 +827,7 @@ workflow инвалидирует derived rows, indexes, caches, jobs и artifac
 не воскрешают данные; независимый архив не удалён; opened/read/applied не
 выводятся из факта индексации. Restore/delete ограничения объяснены честно.
 
-**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_memory_runtime.py tests/test_assistant_memory.py tests/test_assistant_report_dialogue.py`.
+**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_memory_runtime.py tests/test_assistant_memory.py tests/test_assistant_report_dialogue.py`.
 
 **Откат:** остановить новые mutations; deletion tombstones не откатывать молча.
 
@@ -859,7 +859,7 @@ model adapters, `tests/test_pai_media_runtime.py`.
 page citations сохраняются; malicious/oversized file не исполняется;
 неразрешённый fallback provider не получает документ.
 
-**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_media_runtime.py tests/test_assistant_media.py tests/test_voice_transcription.py tests/test_pdf_inspection.py`.
+**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_media_runtime.py tests/test_assistant_media.py tests/test_voice_transcription.py tests/test_pdf_inspection.py`.
 
 **Откат:** отключить новые media types, сохранить plain text и гарантировать cleanup.
 
@@ -892,7 +892,7 @@ strong baseline vs candidate; платное сравнение только в 
 unknown price не ноль; limits общие; cache не раскрывает отозванный результат.
 Экономия не заявляется до сопоставимого quality evidence.
 
-**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_cost_cache.py tests/test_assistant_cost.py tests/test_pai_durable_policy.py`.
+**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_cost_cache.py tests/test_assistant_cost.py tests/test_pai_durable_policy.py`.
 
 **Откат:** фиксированный разрешённый baseline, cache bypass с сохранением caps.
 
@@ -925,7 +925,7 @@ graceful drain, secret rotation и kill switch; templates не активиро�
 effects не повторяются; DB loss, disk full, 429, revoked token и logs с
 secret-shaped fixture values проверены; измерены rehearsal RPO/RTO.
 
-**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_operations_runtime.py tests/test_assistant_ops.py tests/test_delivery_health.py`;
+**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_operations_runtime.py tests/test_assistant_ops.py tests/test_delivery_health.py`;
 `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/test_tiers.py retrofit-boundaries`.
 
 **Откат:** выключить новые процессы/egress, удержать безопасный read-only status;
@@ -960,7 +960,7 @@ memory stores, `tests/test_pai_migration.py`, новый cutover runbook.
 grants/tombstones/receipts; повреждённая запись блокирует переключение;
 искусственный crash в каждом шаге не создаёт второго writer или отправки.
 
-**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_migration.py tests/test_pai_storage.py tests/test_pai_durable_actions.py tests/test_prm_post_answer_actions.py`.
+**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_migration.py tests/test_pai_storage.py tests/test_pai_durable_actions.py tests/test_prm_post_answer_actions.py`.
 
 **Откат:** описанный и испытанный reverse-delta/forward-fix путь. Production
 cutover не выполнять в этой карточке.
@@ -997,7 +997,7 @@ lease, budget contention, lost ACK, DB outage, restore и injection из каж�
 и failure evidence, нет открытых P0/P1; отсутствие provider/human proof
 указано отдельно. Generic tier и judge не заменяют эту матрицу.
 
-**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_end_to_end.py tests/test_pai_load_recovery.py`;
+**Проверить:** `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_end_to_end.py tests/test_pai_load_recovery.py`;
 `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/test_tiers.py focused-prm`;
 `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/test_tiers.py retrofit-boundaries`;
 `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/playbook.py verify_project --root .`.
@@ -1005,6 +1005,11 @@ lease, budget contention, lost ACK, DB outage, restore и injection из каж�
 Любой formal approval failure сохранить отдельно, не назвать весь gate PASS.
 
 **Откат:** не продвигать release candidate; исправлять конкретные findings.
+
+
+Дополнительная обязательная проверка всех 69 requirement cases и десяти сценариев:
+`python3 tools/run_pai_acceptance.py --require-spec-matrix -q tests/test_pai_academic_runtime.py tests/test_pai_acceptance_guard.py tests/test_pai_action_runtime.py tests/test_pai_archive_search.py tests/test_pai_brief_runtime.py tests/test_pai_chat_runtime.py tests/test_pai_connections.py tests/test_pai_cost_cache.py tests/test_pai_deep_research.py tests/test_pai_delivery.py tests/test_pai_durable_actions.py tests/test_pai_durable_conversation.py tests/test_pai_durable_policy.py tests/test_pai_end_to_end.py tests/test_pai_graph_mail.py tests/test_pai_ingress_jobs.py tests/test_pai_load_recovery.py tests/test_pai_media_runtime.py tests/test_pai_memory_runtime.py tests/test_pai_migration.py tests/test_pai_operations_runtime.py tests/test_pai_plan.py tests/test_pai_report_runtime.py tests/test_pai_schedule_runtime.py tests/test_pai_scheduler.py tests/test_pai_storage.py tests/test_pai_web_github.py tests/test_pai_workers.py`.
+Нулевой набор, пропущенный case, skipped/xfail или отсутствующий файл дают failure.
 
 <a id="pai-27"></a>
 ### PAI-27 — Проверить реальные подключения в ограниченном canary
@@ -1147,7 +1152,7 @@ policy; paired load доказывает пользу с учётом новой
 Production включение отдельно разрешается; обновить PAI-26…29 evidence.
 
 **Проверить:** создать `tests/test_pai_redis.py` только при реализации;
-`PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_redis.py tests/test_pai_cost_cache.py tests/test_pai_delivery.py`.
+`PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_redis.py tests/test_pai_cost_cache.py tests/test_pai_delivery.py`.
 
 **Откат:** cache bypass или восстановленный PostgreSQL dispatch без потери
 domain jobs; никаких повторных effects из потерянного Redis state.
@@ -1179,7 +1184,7 @@ exact matches, ranking, source/citation integrity. Cutover одним writer,
 migration разрешению с повтором затронутой приёмки PAI-26…29.
 
 **Проверить:** создать `tests/test_pai_archive_migration.py` при реализации;
-`PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_archive_migration.py tests/test_archive_search.py tests/test_archive_documents.py tests/test_pai_migration.py`.
+`PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_archive_migration.py tests/test_archive_search.py tests/test_archive_documents.py tests/test_pai_migration.py`.
 
 **Откат:** испытанный reader/writer switch, сохранение новых данных;
 старый архив не удалять до завершения agreed rollback window.

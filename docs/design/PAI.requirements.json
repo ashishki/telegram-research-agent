@@ -18,7 +18,8 @@
         "tests/test_prm_product_ux_eval.py",
         "tests/test_pai_plan.py",
         "tests/test_opencode_role_review.py",
-        "tests/test_memory_research.py"
+        "tests/test_memory_research.py",
+        "tests/test_pai_acceptance_guard.py"
       ],
       "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
       "evidence_status": "planned; no implementation or review acceptance implied"
@@ -508,7 +509,8 @@
         "PAI-26/acceptance",
         "PAI-26/focused-prm",
         "PAI-26/retrofit-boundaries",
-        "PAI-26/project_verifier"
+        "PAI-26/project_verifier",
+        "PAI-26/complete_requirement_scenarios"
       ],
       "test_files": [
         "tests/test_pai_end_to_end.py",

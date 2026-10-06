@@ -53,6 +53,13 @@ PACKET_REFS = (
     "docs/adr/ADR-013-pa-durable-runtime.md",
     "docs/design/PAI.requirements.json",
 )
+TOOLING_REFS = (
+    "docs/REVIEW_POLICY.md", "tools/playbook.py", "tools/run_codex_role.py",
+    "tools/opencode_role_review.py", "tools/mimo_code_review.py", "tools/check_pai_plan.py",
+    "tools/finalize_opencode_design_reviews.py", "tools/run_pai_acceptance.py",
+    "tests/test_playbook_bridge.py", "tests/test_pai_plan.py",
+    "tests/test_opencode_role_review.py", "tests/test_pai_acceptance_guard.py",
+)
 
 
 
@@ -113,6 +120,56 @@ def pinned_modules(root: Path):
     return feature_design_lib, feature_workflow, approve_feature_design
 
 
+def require_tooling_audit(root: Path) -> str:
+    """Only independent, unchanged, complete tooling evidence unlocks design records."""
+    for path in sorted((root / ".playbook-artifacts/opencode-runs").glob("*/result.json"), reverse=True):
+        try:
+            if path.is_symlink() or not path.resolve().is_relative_to(root / ".playbook-artifacts/opencode-runs"): continue
+            report = path.parent / "report.md"
+            if report.is_symlink() or path.with_suffix(".json.sha256").is_symlink(): continue
+            raw = path.read_bytes()
+            if path.with_suffix(".json.sha256").read_text().strip() != digest(raw): continue
+            result = json.loads(raw)
+            if (result.get("review_scope") != "tooling" or result.get("role") != "program_design_review"
+                or result.get("provider") != "opencode_go" or result.get("read_only") is not True
+                or result.get("requested_model") != "mimo-v2.6-pro" or result.get("observed_model") != "mimo-v2.6-pro"
+                or result.get("verdict") not in {"PASS", "ADVISORY"}): continue
+            manifest = {item["path"]: item for item in result["documents"]}
+            if not set(TOOLING_REFS) <= set(manifest): continue
+            if any((root / ref).is_symlink() or not (root / ref).resolve().is_relative_to(root)
+                   or digest((root / ref).read_bytes()) != manifest[ref]["sha256"] for ref in TOOLING_REFS): continue
+            if digest(report.read_bytes()) != result["report_sha256"]: continue
+            markers = re.findall(r"(?m)^PROGRAM_DESIGN_REVIEW:\s*(PASS|ADVISORY|STOP_SHIP)\s*$", report.read_text())
+            if markers != [result["verdict"]]: continue
+            content = "{" + report.read_text().split("\n{", 1)[1]
+            verdict = parse_response({"model": result["observed_model"], "choices": [{
+                "finish_reason": "stop", "message": {"content": content}}]}, result["observed_model"])
+            if verdict["verdict"] != result["verdict"]: continue
+            return path.relative_to(root).as_posix()
+        except (OSError, ValueError, KeyError, TypeError, IndexError):
+            continue
+    raise ReviewBlocked("independent current tooling audit required before design review/record publication")
+
+
+def require_trusted_design_records(root: Path, feature: str) -> None:
+    """Do not let old tooling receipts bypass the owner's final approval gate."""
+    audit = require_tooling_audit(root)
+    lib, _, approval = pinned_modules(root)
+    _, design = lib.validate_design_file(root, root / f"docs/design/{feature}.design.json")
+    approval.required_design_review_refs(root, feature, design)
+    for role in ROLES:
+        record = json.loads(approval.design_review_record_path(root, feature, role).read_text())
+        binding = record.get("reviewer_binding", "")
+        if not binding.startswith(("opencode_go:", "opencode_go_complete:")):
+            raise ReviewBlocked("design record has no honest OpenCode provenance")
+        result_path = lib.safe_repo_path(root, binding.split(":", 1)[1])
+        if result_path is None or result_path.is_symlink():
+            raise ReviewBlocked("unsafe design evidence path")
+        evidence = json.loads(result_path.read_text())
+        if evidence.get("tooling_audit_ref") != audit:
+            raise ReviewBlocked("design receipt requires re-validation under current independent tooling audit")
+
+
 def prepare_packet(root: Path, task: str, feature: str, role: str, tooling_review: bool = False,
                    slice_group: str | None = None):
     if role not in ROLES or not re.fullmatch(r"[A-Za-z][A-Za-z0-9._-]*", feature):
@@ -125,11 +182,13 @@ def prepare_packet(root: Path, task: str, feature: str, role: str, tooling_revie
     findings, design = lib.validate_design_file(root, root / registry_ref)
     if any(f.severity == "error" for f in findings):
         raise ReviewBlocked("invalid feature design")
+    matrix_sha = digest((root / "docs/design/PAI.requirements.json").read_bytes())
+    if "Requirements-matrix-SHA256: " + matrix_sha not in (root / f"docs/design/{feature}.md").read_text():
+        raise ReviewBlocked("design/matrix hash binding is stale")
     refs = (f"docs/design/{feature}.md", registry_ref, *PACKET_REFS)
     if tooling_review:
         if role != "program_design_review": raise ReviewBlocked("tooling audit requires program role")
-        refs = tuple(ref for ref in refs if ref not in {registry_ref, f"docs/design/{feature}.md", "docs/design/PAI.requirements.json"})
-        refs += ("tools/opencode_role_review.py", "tools/run_codex_role.py", "tools/mimo_code_review.py", "tools/check_pai_plan.py", "tests/test_pai_plan.py", "tools/finalize_opencode_design_reviews.py")
+        refs = ("docs/ASSISTANT_BOUNDARIES.md", "docs/IMPLEMENTATION_CONTRACT.md", *TOOLING_REFS)
     manifest, sections = [], []
     selected = {f"PAI-{n:02}" for n in REVIEW_GROUPS[slice_group]} if slice_group else None
     for ref in refs:
@@ -147,22 +206,11 @@ def prepare_packet(root: Path, task: str, feature: str, role: str, tooling_revie
                 if section in SPEC_GROUPS[slice_group]: chosen.append(chunk)
             content = "".join(chosen)
             content = "Declared spec sections for this phase: " + str(sorted(SPEC_GROUPS[slice_group])) + "; all 0..15 are mandatory across the completed review set.\n" + content
-        elif selected and ref == registry_ref:
-            subset = json.loads(content)
-            subset["slices"] = [s for s in subset["slices"] if s["slice_id"] in selected]
-            content = json.dumps(subset, ensure_ascii=False, separators=(",", ":"))
-        elif selected and ref == "docs/design/PAI.requirements.json":
-            subset = json.loads(content)
-            subset["requirements"] = [r for r in subset["requirements"] if set(r["slices"]) & selected]
-            subset["scenarios"] = [r for r in subset["scenarios"] if set(r["slices"]) & selected]
-            needed = set(selected) | {s for row in subset["requirements"] for s in row["slices"]} | {s for row in subset["scenarios"] for s in row["slices"]}
-            subset["slice_bindings"] = {k: v for k, v in subset["slice_bindings"].items() if k in needed}
-            content = json.dumps(subset, ensure_ascii=False, separators=(",", ":"))
         elif ref in {registry_ref, "docs/design/PAI.requirements.json"}:
             # Whitespace reduction preserves every field and scope; the
             # manifest remains bound to the exact original registry bytes.
             content = json.dumps(factor_json(json.loads(content)), ensure_ascii=False, separators=(",", ":"))
-        if ref in {"tools/opencode_role_review.py", "tools/run_codex_role.py", "tools/check_pai_plan.py", "tests/test_pai_plan.py", "tools/finalize_opencode_design_reviews.py"}:
+        if ref in {"tools/opencode_role_review.py", "tools/run_codex_role.py", "tools/mimo_code_review.py", "tools/check_pai_plan.py", "tests/test_pai_plan.py", "tools/finalize_opencode_design_reviews.py", "tools/run_pai_acceptance.py"}:
             # AST normalization retains the complete executable source and
             # docstrings; original bytes/hashes remain in the manifest.
             content = ast.unparse(ast.parse(content))
@@ -170,16 +218,6 @@ def prepare_packet(root: Path, task: str, feature: str, role: str, tooling_revie
             # Its full intent is already in the feature brief/spec. Keep the
             # exact authority hash and drift guard while avoiding repetition.
             content = "Authority hash retained in manifest; full feature brief/spec included."
-        if ref == "tools/mimo_code_review.py":
-            # Review the changed shared transport and credential boundary in
-            # full, without pretending to include the unrelated legacy CLI.
-            names = {"_api_key", "_call_model", "_read_review_stream", "urlopen", "_NoReviewRedirects"}
-            nodes = [node for node in ast.parse(content).body if getattr(node, "name", None) in names]
-            if {node.name for node in nodes} != names:
-                raise ReviewBlocked("shared review transport shape changed")
-            content = "Shared transport/credential definitions only:\n" + "\n\n".join(
-                ast.get_source_segment(content, node) for node in nodes
-            )
         sections.append(f"\n--- DOCUMENT: {ref} ---\n" + content)
     instruction = (
         f"You are an independent read-only {role} reviewer. Review the supplied "
@@ -200,7 +238,7 @@ def prepare_packet(root: Path, task: str, feature: str, role: str, tooling_revie
         instruction += "Scope is the actual review transport/checker code only, not full feature design approval. Challenge budget/credentials, schema, provenance, source coverage, tamper guards and negative tests.\n"
     if selected:
         instruction += ("This is one declared phase of a COMPLETE programme review. Review only these slice scopes: "
-                        + ",".join(sorted(selected)) + ". The full spec and architecture remain supplied. "
+                        + ",".join(sorted(selected)) + ". The COMPLETE canonical 32-slice registry and 69-requirement/10-scenario matrix are supplied as cross-phase context; only relevant specification sections are supplied. "
                         "Other phases need their own independent review; this part alone cannot approve the full design. "
                         "Focus on real defects in this phase and its cross-phase interfaces; concise findings, no spec restatement.\n")
     packet = instruction + json.dumps({"task": task, "role": role}) + "".join(sections)
@@ -266,6 +304,7 @@ def execute(args):
         raise ReviewBlocked(planning_error)
     if not args.allow_provider_egress or args.call_cap != 1:
         raise ReviewBlocked("explicit provider scope and exactly one budgeted call required")
+    tooling_audit_ref = None if tooling_review else require_tooling_audit(root)
     output_cap = getattr(args, "output_token_cap", 8000)
     if output_cap not in (8000, 16000): raise ReviewBlocked("unsupported review output cap")
     # No credential lookup before planning/scope/budget checks.
@@ -335,6 +374,8 @@ def execute(args):
             raise ReviewBlocked("reviewed document changed during execution")
     if lib.design_hashes(root, design) != before_hashes:
         raise ReviewBlocked("reviewed design changed during execution")
+    if not tooling_review and require_tooling_audit(root) != tooling_audit_ref:
+        raise ReviewBlocked("tooling audit changed during design execution")
     report = run_dir / "report.md"
     report.write_text(
         f"# Independent OpenCode Go {args.role}\n\n{ROLES[args.role]}: {verdict['verdict']}\n\n"
@@ -351,8 +392,8 @@ def execute(args):
         "role": args.role, "feature_id": args.feature_id, "reviewed_head": head,
         "review_scope": "tooling" if tooling_review else "complete_design",
         "slice_group": slice_group,
-        "reviewed_slice_ids": [f"PAI-{n:02}" for n in REVIEW_GROUPS[slice_group]] if slice_group else [s["slice_id"] for s in design["slices"]],
-        "reviewed_spec_sections": sorted(SPEC_GROUPS[slice_group]) if slice_group else list(range(16)),
+        "reviewed_slice_ids": [] if tooling_review else [f"PAI-{n:02}" for n in REVIEW_GROUPS[slice_group]] if slice_group else [s["slice_id"] for s in design["slices"]],
+        "reviewed_spec_sections": [] if tooling_review else sorted(SPEC_GROUPS[slice_group]) if slice_group else list(range(16)),
         "requested_model": args.model, "observed_model": response["model"],
         "requested_effort": "not_requested", "observed_effort": "unknown",
         "generated_at": datetime.now(timezone.utc).isoformat(), "read_only": True,
@@ -360,6 +401,7 @@ def execute(args):
         "design_hashes": before_hashes, "report_sha256": digest(report.read_bytes()),
         "verdict": verdict["verdict"], "call_cap": 1, "output_token_cap": output_cap,
         "transport": "sse",
+        "tooling_audit_ref": tooling_audit_ref,
         "usage": usage, "cost": "unknown",
     }
     result = run_dir / "result.json"

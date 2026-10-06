@@ -25,7 +25,10 @@ PAI-01 draft design is complete for review. Original full product review on
 04c4efa was STOP_SHIP; runtime/checker edit permission and fine requirement/
 scenario traceability P1 findings were fixed. Independent scoped Mimo recheck
 on e262f27 returned PASS for those two P1 findings only. It is not whole-design
-acceptance. No accepted complete program/product review pair exists yet.
+acceptance. Foundation program review on a6a7d00 returned STOP_SHIP. Two absence findings
+were caused by filtered phase inputs; all canonical registries are now supplied
+per phase. Genuine tooling-trust/no-skip P1s have local fixes, peer recheck
+pending. Contract P2s are clarified. No accepted complete design pair exists.
 PAI-02..26 are unimplemented and depend on the actual design gate.
 
 Relevant sources: docs/PA_IMPLEMENTATION_TASKS.md; docs/tasks.md;
@@ -38,7 +41,7 @@ files remain absent. Planning validation is not runtime evidence.
 ## Review funding and transport
 
 Owner explicitly funded 30 total local-program Mimo calls, including failures
-and the tiny diagnostic. Eighteen have been consumed before the next request.
+and the tiny diagnostic. Nineteen have been consumed before the separate tooling audit.
 Owner approved design/recheck output <=16000 tokens and now answered “да” to
 extending design/recheck deadlines to <=900 seconds. Other bounds unchanged:
 <=200000 input bytes; project/public/synthetic data only; no automatic retries,
@@ -64,10 +67,13 @@ never a whole-design record. Other role support must be extended before credit.
 
 ## Verification and continuation
 
-Latest focused-prm: 620 passed. Latest deadline/role/checker suite: 62 passed in 9.40 s at the terminal-diagnostic checkpoint. Full historical pytest is prohibited. Actual integrations, visual
+Latest focused-prm: 620 passed. Latest deadline/role/checker suite: 92 passed in 16.40 s at the trust/strict-acceptance checkpoint.
+Strict acceptance self-check: 13 cases, zero skips/failures. Full historical pytest is prohibited. Actual integrations, visual
 acceptance and operator usefulness remain distinct gates.
 
-Next: freeze committed source, run all four independent program/product design
+Next: freeze committed source, run separate --tooling-review first; source
+hashes/policy must be independently accepted before new design calls, aggregation
+or PAI approval via the bridge. Then run all four independent program/product design
 phases with --output-token-cap 16000 --timeout-seconds 900; aggregate only
 complete same-HEAD coverage with tools/finalize_opencode_design_reviews.py; fix P0/P1 and
 independently recheck. Then present the exact hash-bound feature package for

@@ -26,7 +26,7 @@ from urllib.request import Request, HTTPRedirectHandler, build_opener
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_BASE_URL = os.environ.get("OPENCODE_GO_BASE_URL", "https://opencode.ai/zen/go/v1")
 DEFAULT_MODEL = os.environ.get("MIMO_REVIEW_MODEL", "mimo-v2.6-pro")
-MAX_DIFF_CHARS = 900_000
+MAX_INPUT_BYTES = 200_000
 
 
 class _NoReviewRedirects(HTTPRedirectHandler):
@@ -79,7 +79,7 @@ def _api_key(explicit_file: str) -> str:
 
 
 def _call_model(*, api_key: str, base_url: str, model: str, prompt: str, timeout: int,
-                max_output_tokens: int = 12000, response_schema: dict | None = None,
+                max_output_tokens: int = 8000, response_schema: dict | None = None,
                 session_id: str | None = None, stream: bool = False) -> dict[str, Any]:
     if type(max_output_tokens) is not int or not 1 <= max_output_tokens <= 16000:
         raise ValueError("invalid_review_output_bound")
@@ -230,6 +230,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--base-url", default=DEFAULT_BASE_URL)
     parser.add_argument("--key-file", default=os.environ.get("OPENCODE_API_KEY_FILE", ""))
     parser.add_argument("--allow-provider-egress", action="store_true")
+    parser.add_argument("--call-cap", type=int, default=0)
     parser.add_argument("--timeout", type=int, default=300)
     parser.add_argument("--out", type=Path, required=True)
     return parser
@@ -241,13 +242,18 @@ def main() -> int:
     base_sha = _git("rev-parse", args.base).strip()
     log = _git("log", "--oneline", f"{base_sha}..{head_sha}")
     diff = _git("diff", f"{base_sha}..{head_sha}")
-    if len(diff) > MAX_DIFF_CHARS:
-        diff = diff[:MAX_DIFF_CHARS] + "\n[... diff truncated ...]\n"
-    if not args.allow_provider_egress:
+    if not args.allow_provider_egress or args.call_cap != 1:
         report = {"status": "skipped_fail_closed", "reason": "provider egress not allowed"}
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         print(json.dumps(report))
+        return 1
+    user = f"Reviewed range: {base_sha}..{head_sha}\nCommits:\n{log}\n\nDiff:\n{diff}"
+    prompt = PROMPT + "\n\n" + user
+    if (args.base_url.rstrip('/') != 'https://opencode.ai/zen/go/v1'
+        or args.model != 'mimo-v2.6-pro' or not 30 <= args.timeout <= 300
+        or len(prompt.encode()) > MAX_INPUT_BYTES):
+        print(json.dumps({"status": "outside_bounded_review_scope"}))
         return 1
     api_key = _api_key(args.key_file)
     if not api_key:
@@ -256,17 +262,10 @@ def main() -> int:
         args.out.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         print(json.dumps(report))
         return 1
-    from urllib.parse import urlparse
-
-    parsed = urlparse(args.base_url)
-    if parsed.scheme != "https" or (parsed.hostname or "") not in {"opencode.ai", "api.opencode.ai"}:
-        print(json.dumps({"status": "invalid_base_url"}))
-        return 1
-    user = f"Reviewed range: {base_sha}..{head_sha}\nCommits:\n{log}\n\nDiff:\n{diff}"
     try:
         payload = _call_model(
             api_key=api_key, base_url=args.base_url, model=args.model,
-            prompt=PROMPT + "\n\n" + user, timeout=args.timeout,
+            prompt=prompt, timeout=args.timeout, max_output_tokens=8000, stream=True,
         )
     except HTTPError as error:
         print(json.dumps({"status": "provider_error", "error": f"http_{error.code}"}))
@@ -274,14 +273,31 @@ def main() -> int:
     except URLError as error:
         print(json.dumps({"status": "provider_error", "error": f"url_{type(error.reason).__name__}"}))
         return 1
+    if payload.get('model') != args.model or len(payload.get('choices', [])) != 1 or payload['choices'][0].get('finish_reason') != 'stop':
+        print(json.dumps({"status": "invalid_identity_or_completion"}))
+        return 1
     text = _response_text(payload)
     if not text:
         print(json.dumps({"status": "invalid_response"}))
         return 1
     findings = _parse_json(text)
+    if (not isinstance(findings, dict) or findings.get('verdict') not in {'SHIP_OK','FIX_P1_FIRST','STOP_SHIP'}
+        or not isinstance(findings.get('findings'), list)
+        or len(findings['findings']) > 50
+        or not isinstance(findings.get('summary'), str) or not findings['summary'].strip()
+        or not isinstance(findings.get('not_verified'), list) or not all(isinstance(v, str) for v in findings['not_verified'])
+        or any(not isinstance(f, dict) or f.get('severity') not in {'P0','P1','P2'} for f in findings['findings'])
+        or findings['verdict'] == 'SHIP_OK' and any(f['severity'] in {'P0','P1'} for f in findings['findings'])):
+        print(json.dumps({"status": "invalid_verdict"}))
+        return 1
     report = {
         "status": "reviewed",
         "reviewer_model": args.model,
+        "requested_model": args.model, "observed_model": payload['model'],
+        "requested_effort": "not_requested", "observed_effort": "unknown",
+        "provider": "opencode_go", "read_only": True, "call_cap": 1,
+        "output_token_cap": 8000, "cost": "unknown",
+        "input_sha256": hashlib.sha256(prompt.encode()).hexdigest(),
         "reviewer_role": "deep_review",
         "base_sha": base_sha,
         "head_sha": head_sha,

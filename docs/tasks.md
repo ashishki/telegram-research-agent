@@ -728,7 +728,7 @@ Owner: codex
 Phase: pai-b
 Type: agent:runtime
 Status: planned
-Depends-On: PAI-03 PAI-04
+Depends-On: PAI-03 PAI-04 PAI-05
 Risk-Level: high
 Critic-Required: required
 Runtime-Verification: required

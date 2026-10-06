@@ -100,3 +100,20 @@ Idempotent per-store steps/watermarks mark unavailable cleanup pending/partial;
 serving checks deny stale data and unavailable authority. Restores replay
 authority tombstones before reads. Independent canonical archive records are
 preserved. PAI-21/25/26 test outage, restart/restore and partial deletion.
+
+## Contract clarifications after independent foundation review
+
+Durable effects have prepared and terminal states. dispatch_started is a
+transaction-local marker held with the final locks through transport/settlement;
+it need not become separately observable. Prepared may already have sent;
+recovery/operator views remain potentially unknown and never auto-resend.
+Grant/consent/proposal and per-attempt reservation locks span the call; shared
+budget-window locks do not. Synthetic lock/statement bounds are 1/2 s, call
+bound 10 s, final idle transaction bound 15 s with a separate effect pool.
+Timeout preserves prepared/unknown and conservatively consumed budget.
+Unknown blocks that effect identity and dependent job/group steps, while
+unrelated work continues. Heartbeat/fencing, input digest/visibility validation,
+safe compute recovery and version quarantine are explicit PAI interfaces.
+PAI-05 precedes PAI-06 to establish shared conversation/object contracts.
+The existing src/assistant/prm_post_answer_actions.py is a compatibility adapter
+calling shared src/prm action semantics; it is not a separate action engine.

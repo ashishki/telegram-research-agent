@@ -89,6 +89,15 @@ def load_generated_verifier(upstream: Path) -> ModuleType:
     return module
 
 
+def option_value(args: list[str], name: str) -> str | None:
+    for index, arg in enumerate(args):
+        if arg.startswith(name + '='):
+            return arg.split('=', 1)[1]
+        if arg == name and index + 1 < len(args):
+            return args[index + 1]
+    return None
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     if not argv or argv[0] in {'-h', '--help'}:
@@ -112,6 +121,13 @@ def main(argv: list[str] | None = None) -> int:
                 return int(verifier.main())
             finally:
                 sys.argv = previous_argv
+        if (name == 'feature_workflow' and 'approve' in args and not {'--help', '-h'} & set(args)
+            and option_value(args, '--feature-id') == 'PAI'):
+            target_root = option_value(args, '--root')
+            if target_root and Path(target_root).resolve() != ROOT:
+                raise ValueError('PAI approval must target the assigned workspace')
+            from opencode_role_review import require_trusted_design_records
+            require_trusted_design_records(ROOT, 'PAI')
         script = upstream / 'tools' / (name + '.py')
         if not script.is_file() or script.is_symlink():
             raise ValueError('Pinned tool is missing or symlinked')

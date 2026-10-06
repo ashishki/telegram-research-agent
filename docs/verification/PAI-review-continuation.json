@@ -1,21 +1,201 @@
 {
-  "schema_version": "assistant.opencode_review_attempt.v1",
-  "run_id": "opencode-677c56171c4f4de0a8d2dda8f577f3b5",
-  "role": "program_design_review",
-  "task": "PAI-01",
-  "reviewed_head": "4901d56a438b121bf93af0e475c60f24b1d9ae73",
-  "requested_model": "mimo-v2.6-pro",
-  "input_sha256": "90a0f02417bf8d77513257a0b7e59cefaec2233a921930d0dd6ebd48692b40fd",
-  "input_bytes": 193880,
-  "call_cap": 1,
-  "output_token_cap": 16000,
-  "timeout_seconds": 900,
-  "transport": "sse",
-  "status": "no_valid_verdict",
-  "cost": "unknown",
-  "error_type": "ValueError",
-  "http_status": null,
-  "provider_outcome": "unknown",
-  "observed_model": null,
-  "error_code": "review_stream_incomplete"
+  "complete_stream_failure": {
+    "schema_version": "assistant.opencode_review_attempt.v1",
+    "run_id": "opencode-677c56171c4f4de0a8d2dda8f577f3b5",
+    "role": "program_design_review",
+    "task": "PAI-01",
+    "reviewed_head": "4901d56a438b121bf93af0e475c60f24b1d9ae73",
+    "requested_model": "mimo-v2.6-pro",
+    "input_sha256": "90a0f02417bf8d77513257a0b7e59cefaec2233a921930d0dd6ebd48692b40fd",
+    "input_bytes": 193880,
+    "call_cap": 1,
+    "output_token_cap": 16000,
+    "timeout_seconds": 900,
+    "transport": "sse",
+    "status": "no_valid_verdict",
+    "cost": "unknown",
+    "error_type": "ValueError",
+    "http_status": null,
+    "provider_outcome": "unknown",
+    "observed_model": null,
+    "error_code": "review_stream_incomplete"
+  },
+  "foundation_review": {
+    "call_cap": 1,
+    "cost": "unknown",
+    "design_hashes": {
+      "markdown_sha256": "4e35c35f146cdf264a8dcc53c2fbc7944b3894cf4550e5c0ea34ee256f1ee18a",
+      "registry_payload_sha256": "b352a98f1a0a268da0f4e32827edab07076610c44261358b3a46497ee601216a"
+    },
+    "documents": [
+      {
+        "bytes": 15054,
+        "path": "docs/design/PAI.md",
+        "sha256": "4e35c35f146cdf264a8dcc53c2fbc7944b3894cf4550e5c0ea34ee256f1ee18a"
+      },
+      {
+        "bytes": 87478,
+        "path": "docs/design/PAI.design.json",
+        "sha256": "5f8e6ccc4d6950a24bc1a902c08d3590c784d105402f181666905118cda80900"
+      },
+      {
+        "bytes": 78379,
+        "path": "docs/PERSONAL_ASSISTANT_SPEC.md",
+        "sha256": "89a4fcf9010d79ca1d5a3f6b4e8799873356033525bd4268aba3867be39eecd8"
+      },
+      {
+        "bytes": 2903,
+        "path": "docs/PERSONAL_ASSISTANT_BRIEF.md",
+        "sha256": "6fef35df232e3c1b6f1f21b28e855cad1b954806458043e6a5d53b20db564c20"
+      },
+      {
+        "bytes": 4593,
+        "path": "docs/PROJECT_BRIEF.md",
+        "sha256": "bb32c12bb8a81b423776dd053aa7474fbfd44a44a9fff7e187a5b5fb4c8711b9"
+      },
+      {
+        "bytes": 2071,
+        "path": "docs/ASSISTANT_BOUNDARIES.md",
+        "sha256": "5f50392570a250032cb97e45fdd187ea891c1a2aafa3141247579e6e43fdccc3"
+      },
+      {
+        "bytes": 7305,
+        "path": "docs/IMPLEMENTATION_CONTRACT.md",
+        "sha256": "eb47c68e7d3e798aae2b8bd6e90298e4827a29d7062155e587a78b1e9311c6f8"
+      },
+      {
+        "bytes": 5804,
+        "path": "docs/REVIEW_POLICY.md",
+        "sha256": "716297b498cfe66955a362b6d177fc1d9492c320ffb1480403e403be4b684129"
+      },
+      {
+        "bytes": 6073,
+        "path": "docs/adr/ADR-013-pa-durable-runtime.md",
+        "sha256": "ff6b4984b1dce72d04b6f765be579620d106684d183098c805331502bd07a6bf"
+      },
+      {
+        "bytes": 63346,
+        "path": "docs/design/PAI.requirements.json",
+        "sha256": "d785a60ea94d68f7c45d167c1738321233cd8b3d41b1ad06ec55828ef92a5139"
+      }
+    ],
+    "feature_id": "PAI",
+    "generated_at": "2026-10-06T13:28:07.189600+00:00",
+    "input_sha256": "8eb1aa09f821ba049a8e8cc779023ba1be825d5fc46051d7a7b07d105fe3b731",
+    "observed_effort": "unknown",
+    "observed_model": "mimo-v2.6-pro",
+    "output_token_cap": 16000,
+    "provider": "opencode_go",
+    "read_only": true,
+    "report_sha256": "84f62e4533b7dfc6b067f924a2c80490fcc83c4cdff4bc92b7561d7938c9a5bd",
+    "requested_effort": "not_requested",
+    "requested_model": "mimo-v2.6-pro",
+    "review_scope": "complete_design",
+    "reviewed_head": "a6a7d00f8d59ec5a0e9ed93ab20ca7f5845202bc",
+    "reviewed_slice_ids": [
+      "PAI-00",
+      "PAI-01",
+      "PAI-02",
+      "PAI-03",
+      "PAI-04",
+      "PAI-05",
+      "PAI-06"
+    ],
+    "reviewed_spec_sections": [
+      0,
+      2,
+      9,
+      10,
+      11,
+      14,
+      15
+    ],
+    "role": "program_design_review",
+    "run_id": "opencode-28fcd3b0f3974840b0f1b4a828fd7fe8",
+    "schema_version": "assistant.opencode_design_review.v1",
+    "slice_group": "foundation",
+    "task": "PAI-01",
+    "transport": "sse",
+    "usage": {
+      "completion_tokens": 10638,
+      "prompt_tokens": 23308,
+      "total_tokens": 33946
+    },
+    "verdict": "STOP_SHIP"
+  },
+  "foundation_findings": {
+    "verdict": "STOP_SHIP",
+    "findings": [
+      {
+        "severity": "P1",
+        "title": "Requirement/scenario coverage registry is materially incomplete and its claims are false",
+        "issue": "PAI.md states PAI.requirements.json 'maps all 69 binding spec IDs and ten verbatim §13.2 scenarios', but the supplied file contains 20 requirement entries and 2 scenarios. Missing bindings include SEC-01/SEC-03/SEC-04, OPS-02, COST-02, MODEL-01/02, and 8 of the 10 required §13.2 reference scenarios, so PA-01's 'эталонные сценарии' deliverable and full-product coverage are unmet while the design asserts otherwise.",
+        "fix": "Expand the registry to the complete binding spec-ID set and all ten verbatim §13.2 scenarios with per-slice paths/test nodes/roles/evidence, or correct the claim and record every uncovered ID/scenario as an explicit unresolved gap; re-verify with an independent mapping check."
+      },
+      {
+        "severity": "P1",
+        "title": "Machine registry defines only 7 of the declared 32 packets",
+        "issue": "PAI.md calls PAI.design.json 'the draft machine registry for all 32 packets', but only PAI-00..06 exist in it. Requirements and scenario nodes reference PAI-07..29 (e.g. tests/test_pai_end_to_end.py, PAI-25/28 cutover, PAI-21/26 deletion), which have no allowed/forbidden files, change budgets, verification argv, rollback, or dependencies. Cross-phase interfaces consumed by this design (ingress wiring, scheduler, effects, migration/cutover) are unconstrained.",
+        "fix": "Either define PAI-07..29 packets (files, budgets, verification, rollback, dependencies) in the registry, or explicitly scope this feature design to PAI-00..06 and stop asserting 32-packet coverage; record the remainder as separately planned, unreviewed scope."
+      },
+      {
+        "severity": "P1",
+        "title": "PAI-00 can edit the review policy, receipt-producing reviewer tooling, and publication receipts",
+        "issue": "PAI-00's allowed_files include docs/REVIEW_POLICY.md, tools/run_codex_role.py, tools/opencode_role_review.py, tools/mimo_code_review.py, tools/finalize_opencode_design_reviews.py and their tests, plus 'bounded publication receipts' — the exact chain that manufactures the independent-review evidence this programme depends on. No gate requires independent diff review of changes to runner/receipt parser code before those receipts are trusted.",
+        "fix": "Move review-tooling and REVIEW_POLICY changes into a separate maintenance packet reviewed by an independent party; forbid PAI-00 from editing receipt-producing/parsing code or review policy without explicit approval, and require hash-bound re-validation of existing receipts after any such change."
+      },
+      {
+        "severity": "P1",
+        "title": "Declared verification policy is not enforceable by the registered commands",
+        "issue": "PAI.md requires 'missing files/skip are failures or unknown evidence, never PASS', but all registry verifications are plain `pytest -q ...` with expected_exit_code 0 — skips and missing optional nodes still exit 0. PAI-01's only check (tools/check_pai_plan.py) is structural, is itself owned/editable by PAI-00 (see related finding), and evidently does not detect the false 69/10/32 coverage claims in this very packet.",
+        "fix": "Register strict commands: enumerated node IDs with fail-on-skip/missing (`--strict-markers`, no `-q`-only), explicit counts, and a plan checker asserting markdown↔design.json↔requirements.json consistency and full ID/scenario coverage; have that checker independently verified and pinned."
+      },
+      {
+        "severity": "P2",
+        "title": "Durable effect state machine conflicts with the ADR dispatch protocol",
+        "issue": "PAI.md declares durable transitions prepared -> dispatching -> succeeded/known_no_effect/unknown, but ADR-013 has the second transaction 'mark dispatch_started' and hold row locks through the transport call and settlement — meaning `dispatching` is only committed together with the outcome, so it is never durably observable and a crash mid-call leaves state `prepared`. Recovery treats both as unknown, so safety holds, but the state contract, PAI-04's 'attempt fixed before fake provider effect', and operator-facing status disagree.",
+        "fix": "Specify exactly when dispatch_started commits (before the call, in its own transaction, with the same lock order), which states are durable, and that recovery/reporting treat prepared and dispatching identically as potentially-unknown."
+      },
+      {
+        "severity": "P2",
+        "title": "Lock scope of shared budget windows during transport is undefined",
+        "issue": "The final-effect transaction reacquires grant/proposal/reservation rows and holds locks through a bounded (10s) transport call plus settlement. If request/job/day/month budget window rows are in that lock set, unrelated reservations sharing a day/month window block for the call duration and a hung transport can starve the single effect executor's connection; no lock/statement timeout or over-bound behavior is specified.",
+        "fix": "Define the minimal lock set and window granularity, per-transaction lock/statement timeouts, separate effect pool sizing, and the outcome when the bound is exceeded (state remains prepared/unknown, no automatic retry, owner-visible status)."
+      },
+      {
+        "severity": "P2",
+        "title": "Blocking granularity of unresolved unknown/prepared effects is undefined",
+        "issue": "'Unknown or any unresolved prepared effect blocks re-dispatch' does not say whether it blocks only that effect, that job, that operation group, or the whole scope/queue. Without a bound this can head-of-line block unrelated work; with PAI-03's unknown-spend settlement it also determines how long budget stays conservatively consumed.",
+        "fix": "Specify blocking granularity (effect/operation group/job), the owner-visible status and cancel path, and that unrelated jobs/scopes continue within their own budgets and consents."
+      },
+      {
+        "severity": "P2",
+        "title": "PAI-05 and PAI-06 can run in parallel over the same storage modules and contracts",
+        "issue": "Both depend only on PAI-03/PAI-04 yet both write `src/prm/storage/**` and share job/object-ref contracts (conversation object_refs feed the PAI-06 job payload). No ordering or file-level partition is declared, so concurrent slices can conflict or diverge on repository semantics.",
+        "fix": "Serialize PAI-05 before PAI-06, or partition `src/prm/storage/**` modules and repository ownership per slice with explicit shared-interface ownership."
+      },
+      {
+        "severity": "P2",
+        "title": "Runtime interface contract omits mandatory operations",
+        "issue": "The listed interfaces cover begin/enqueue/claim/checkpoint/cancel/authorize_and_reserve/prepare_effect/dispatch/reconcile, but the design mandates 5s heartbeat lease extension and lease-expiry recovery/quarantine, and job payloads bind input object/version/digest. No heartbeat/extend, recover/expire, or digest-check signature or invariant is given, so fencing semantics for stale workers are only partially specified.",
+        "fix": "Add heartbeat(lease, token, generation) -> extended/stale, recover/expiry rules (safe compute checkpoints only, quarantine of versions, no effect reclaim), and require checkpoint/dispatch to verify the payload digest before committing."
+      },
+      {
+        "severity": "P2",
+        "title": "PAI-04 writes outside the declared code topology",
+        "issue": "PAI-04 allowed/expected path `src/assistant/prm_post_answer_actions.py` sits outside the declared layout (src/prm domain, src/prm/storage, src/prm/runtime, src/bot transport) and outside PAI-01's stated file areas; no design or ADR defines this boundary, its ownership, or why action logic is not in src/prm.",
+        "fix": "Relocate the module under src/prm (or record an ADR entry naming src/assistant as an explicit boundary with owner, tests, and permitted callers) before PAI-04 implementation."
+      }
+    ],
+    "not_verified": [
+      "Repository state at the reviewed baseline: existence/content of tools/check_pai_plan.py, tests/test_pai_* files, docs/verification/PAI-00-reconciliation.md, and whether the known CI failure test_product_ux_keeps_project_context_for_pendulum"
+    ],
+    "summary": "x"
+  },
+  "finding_dispositions": {
+    "coverage_missing": "disputed: reviewer saw filtered phase files; complete canonical files validate 32/69/10. All canonical registry/matrix fields now included per phase.",
+    "tooling_trust": "fixed locally: separate complete critical-source audit required before keys/design calls or aggregation; real independent audit pending.",
+    "strict_verification": "fixed locally: no implicit full suite, strict no-skip/zero guard, all mandatory cases/nodes required at PAI-26; peer recheck pending.",
+    "P2_contracts": "clarified durable prepared semantics, minimal locks/timeouts, unknown granularity, PAI-05/06 ordering, heartbeat/recovery/digest and compatibility adapter."
+  }
 }

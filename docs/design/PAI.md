@@ -36,6 +36,18 @@ PA-Refs preserve stage coverage; PAI.requirements.json maps all 69 binding spec
 IDs and ten verbatim §13.2 scenarios to slices, expected paths, acceptance
 commands/test nodes, independent roles and actual human evidence gates.
 
+### Review-tooling maintenance boundary
+
+PAI-00's owner-authorized local maintenance scope is separate from PAI-01
+feature authorship: runner/transport/checker/finalizer/strict-acceptance changes
+are reviewed in a distinct read-only tooling packet. They cannot validate
+themselves. Before any new design request or generic design record is trusted,
+require_tooling_audit checks an actual independent Mimo PASS/ADVISORY, complete
+critical-source manifest, immutable result/report hashes and unchanged current
+code/tests/REVIEW_POLICY. Any such change invalidates that gate; re-audit before
+consuming design receipts. Bootstrap diagnostics/historical provisional reports
+remain evidence only. No tooling reviewer grants human feature completion.
+
 ## 3. System Impact
 
 Proposed topology: ingress/application -> PostgreSQL inbox/state/jobs ->
@@ -71,6 +83,10 @@ versioned state schema; src/prm/runtime/ for composition, worker, scheduler,
 effect executor and connector transports. Existing domain modules remain the
 source of business semantics; src/bot/ stays transport. The companion registry
 specifies per-card allowed/forbidden files, verification, budgets and rollback.
+The existing src/assistant/prm_post_answer_actions.py remains a compatibility
+adapter for owner/result/version-bound post-answer callbacks; src/prm owns
+policy/proposal/receipt semantics. This reuse boundary delegates to the shared
+use cases and cannot create a second action engine or inherit a later topic.
 No application code or DB migration is implemented by this packet. PAI-00
 owns the bounded reviewer/checker/phase-finalizer tooling and owner strategy
 document. Its file budget is 64, covering 57 accumulated instruction/tooling/
@@ -82,6 +98,9 @@ subject to the same independent reviews and human approval.
 StateUnitOfWork.begin() -> transaction; enqueue(tx, JobIntent) -> JobRef;
 claim(queue, worker) -> Lease(job_id, generation, token, until);
 checkpoint(lease, expected_version, object_ref) -> applied/unavailable;
+heartbeat(lease, expected_generation, token) -> extended/stale;
+recover_expired(now_from_db) -> safe_checkpoint_requeued/quarantined/awaiting_reconciliation;
+verify_input(owner, object_id, version, digest) -> current/denied;
 cancel(owner, job_ref, expected_version) -> pending_stopped/already_started;
 authorize_and_reserve(tx, typed_request) -> current scope-bound reservation;
 prepare_effect(tx, exact_confirmation, reservation) -> unique AttemptRef;
@@ -99,10 +118,19 @@ a backend/runtime compatibility mismatch before intake.
 Jobs: queued -> leased -> running -> result_ready -> completed.
 Read-only failures may retry via retry_wait within bounds, else failed.
 Cancellation stops unstarted steps and moves safe work to cancelled.
-Effects are separate: prepared -> dispatching -> succeeded/known_no_effect/
-unknown. Lease expiry recovers safe compute checkpoints only. Unknown or any
+Durable effects are separate: prepared -> succeeded/known_no_effect/unknown.
+Dispatching/dispatch_started is an in-flight transaction marker, not a separately
+committed observable state: locks remain held through the bounded call. Crash
+or connection loss can therefore leave durable prepared even after a send.
+Operator status describes prepared as potentially started/awaiting evidence,
+never as known-no-effect. Recovery treats prepared and unknown identically. Lease expiry recovers safe compute checkpoints only. Unknown or any
 unresolved prepared effect blocks re-dispatch; it requires reconciliation.
 Progress is committed checkpoint metadata, not optimistic model narration.
+Heartbeat requires current lease/token/generation and DB validity; it cannot
+extend a cancelled/expired job. Recovery requeues only bounded safe compute,
+quarantines unsupported schema versions and never reclaims an effect to send.
+Checkpoint and final dispatch revalidate input object/version/digest and current
+source visibility; stale/missing/deleted inputs fail closed.
 
 DB time governs leases/validity; monotonic time governs local durations.
 Claims use ordered short transactions and SKIP LOCKED. Fenced CAS checks token,
@@ -128,6 +156,19 @@ Proposed test-only configuration: two read workers, one effect executor, one
 scheduler; 30 s job lease/5 s heartbeat; transport timeout 10 s; three bounded
 read retries including Retry-After; payload 64 KiB of refs/metadata; checkpoint
 bound 16 KiB. Actual provider defaults are pending measurements/configuration.
+Final effect locks cover only current scope grant/consent/proposal and the
+specific reservation/attempt. Shared request/job/day/month budget-window rows
+are locked only during short reserve/settle transactions, never across transport.
+Synthetic lock timeout 1 s and statement timeout 2 s apply to those transactions;
+transport bound 10 s, final transaction idle bound 15 s and separate effect pool
+prevent global starvation. Timeout/disconnect after prepared preserves unknown
+and conservative spend; no effect retry. Live bounds require measurements.
+
+Unknown fences block the same effect identity/confirmation and dependent steps
+of its job/operation group. Unrelated jobs/scopes continue under their own budgets
+and consents. Owner sees awaiting_reconciliation and can cancel unstarted work;
+the original attempt/reservation fence survives that cancellation.
+
 Model/provider financial caps inherit current COST_BUDGET until owner decision;
 do not substitute these test values for authorization.
 
@@ -208,8 +249,15 @@ archive migration remain measured conditional cards with new ADRs.
 
 ## 6. Verification Strategy
 
-Acceptance argv in PAI.design.json mirrors each card; new tests/test_pai_* files
-are planned and MUST be written and registered before code-card completion.
+Acceptance argv in PAI.design.json mirrors each card and uses
+tools/run_pai_acceptance.py: explicit test paths, strict markers, nonzero
+observed cases and failure on skip/xfail/error. PAI-26 additionally requires all
+69 named requirement cases and all exact scenario/recovery nodes from the matrix.
+Counts/identities prevent omissions; Test Critic and behavioral assertions still
+establish usefulness/correctness. Structural checks independently compare full
+Markdown/cards/registry/matrix IDs and dependencies; they are subject to the
+separate tooling audit above.
+New tests/test_pai_* files are planned and MUST be written and registered before code-card completion.
 Missing files/skip are failures or unknown evidence, never PASS.
 The phase-A checker verifies structure/mapping only, not new product behavior.
 focused-prm is the code-phase floor; retrofit-boundaries covers changed runtime/
@@ -239,6 +287,8 @@ pinned planning is selected. Mimo generic-record compatibility is tested, but
 independent design recheck and hash-bound feature approval remain pending. Live retention/cost/provider/account parameters
 remain owner decisions. Conditional Redis/archive migration needs measurements.
 No listed open decision is inferred from elapsed time or a configured key.
+
+Requirements-matrix-SHA256: ca19e6417b95556578dd776bcf3033953ab4482f05a716c201454bd32d3acff6
 
 ## 9. Human Approval
 

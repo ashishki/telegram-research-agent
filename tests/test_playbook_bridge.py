@@ -166,3 +166,16 @@ def test_renderer_proxy_exports_pinned_design_marker_parser():
         timeout=30,
     )
     assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize('flags', [['--feature-id', 'PAI'], ['--feature-id=PAI']])
+def test_pai_human_approval_cannot_bypass_current_independent_tooling(tmp_path, flags):
+    sys.path.insert(0, str(ROOT / 'tools'))
+    import opencode_role_review
+    upstream, _ = fixture(tmp_path)
+    with patch.object(bridge, 'ROOT', tmp_path), patch.object(bridge, 'verified_upstream', return_value=upstream), \
+         patch.object(opencode_role_review, 'require_trusted_design_records', side_effect=ValueError('audit required')) as audit, \
+         patch.object(bridge.subprocess, 'run') as run:
+        assert bridge.main(['feature_workflow', 'approve', *flags]) == 2
+        audit.assert_called_once_with(tmp_path, 'PAI')
+        run.assert_not_called()

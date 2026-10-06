@@ -9,13 +9,14 @@ status below does not grant independent, human or runtime acceptance.
 
 Current card: PAI-01. Draft/brief/planning are prepared and authorized.
 Original complete product review returned STOP_SHIP; its two P1 findings were
-independently resolved by a scoped PASS. Complete design rechecks remain pending.
+independently resolved by a scoped PASS. Foundation program STOP_SHIP on a6a7d00 identified trust/no-skip gaps now fixed
+locally; independent tooling/phase rechecks and complete design remain pending.
 Owner authorized 30 total calls, 16000-token output and 900-second design deadlines.
-Eighteen calls are consumed before the phase-review continuation.
+Nineteen calls are consumed before the separate tooling audit.
 
 | ID / PA-Refs | Engineering status | Code | Wiring | Tests | Review | Live | Human acceptance | Blocker / next |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| PAI-00 / PA-00, PA-01, PA-18 | local_verified | instruction/tool/test and bounded Mimo design backend diff | current entrypoints inventoried; no product runtime added | focused-prm 620 pass; latest role/strategy/checker suite 61 pass | phase-A independent review pending | none | none | PAI-01 brief/planning/review/design gate |
+| PAI-00 / PA-00, PA-01, PA-18 | local_verified | instruction/tool/test and bounded Mimo design backend diff | current entrypoints inventoried; no product runtime added | focused-prm 620 pass; latest bridge/role/guard/plan/strategy suite 92 pass | phase-A independent review pending | none | none | PAI-01 brief/planning/review/design gate |
 | PAI-01 / PA-01, PA-02, PA-09, PA-13, PA-16, PA-17 | in_progress | draft paired design + proposed ADR-013 | proposed topology only | pinned schema/mapping pass | two original product P1 independently resolved by scoped PASS; full review missing | none | none | brief/planning funded; complete independent reviews/exact design approval pending |
 | PAI-02 / PA-01, PA-17 | planned | existing PA contracts to reuse; no new PAI code | integration/restart/concurrency not demonstrated for PAI | new acceptance not run | none for new scope | none for new scope | none | PAI-01; PAI-01 design gate |
 | PAI-03 / PA-02, PA-16 | planned | existing PA contracts to reuse; no new PAI code | integration/restart/concurrency not demonstrated for PAI | new acceptance not run | none for new scope | none for new scope | none | PAI-02; PAI-01 design gate |
@@ -64,12 +65,13 @@ guards and safe error diagnostics precede the next complete request.
 Exact historic attempts and outcomes: PAI-01-durable-design.md.
 
 Verification: focused-prm 620 passed; latest deadline/role/strategy/checker suite
-61 passed in 9.90 s. Structural checks preserve 51 missing design approvals and
+92 passed in 16.40 s; strict guard self-check 13 cases, zero skips/failures. Structural checks preserve 51 missing design approvals and
 28 absent future acceptance suites. CI/provider/visual/usefulness/release are
 distinct evidence, not inferred from these tests.
 
 Existing owner decisions: exact project brief, Mimo reviewer, designed_slices,
 30 total calls and design/recheck output/deadline amendments. Do not re-request.
 Exact paired-feature human approval remains necessary after complete reviews.
-Next: collect all four program and product phase reviews on frozen source,
+Next: obtain independent critical-source tooling audit, then collect all four
+program and product phase reviews on frozen source,
 aggregate only complete coverage; resolve P0/P1, prepare exact approval package, then PAI-02.

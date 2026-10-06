@@ -57,6 +57,7 @@ def setup_run(tmp_path, monkeypatch, *, planning_block=False):
                           safe_repo_path=lambda root, ref: root / ref)
     approval = SimpleNamespace(write_design_review_record=lambda **kwargs: records.append(kwargs))
     monkeypatch.setattr(review, "pinned_modules", lambda root: (lib, workflow, approval))
+    monkeypatch.setattr(review, "require_tooling_audit", lambda root: "synthetic-independent-audit")
     monkeypatch.setattr(mimo_code_review, "_api_key", lambda path: calls.append("key") or "synthetic-key")
     def fake_provider(**kwargs):
         calls.append(kwargs)
@@ -491,4 +492,109 @@ def test_stream_terminal_diagnostic_cannot_leak_provider_content(tmp_path, monke
     assert 'synthetic-secret' not in raw
     assert json.loads(raw)['stream_state'] == {'wire_bytes': 1234, 'final_text_bytes': 0,
                                                'finish_reason': None, 'terminal_event': 'eof'}
+    assert records == []
+
+
+def test_missing_independent_tooling_audit_denies_before_provider(tmp_path, monkeypatch):
+    args, calls, records = setup_run(tmp_path, monkeypatch)
+    # Recover the actual function; the common fake-provider fixture represents
+    # an already-audited synthetic toolchain for its unrelated contract tests.
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("fresh_review_gate", review.__file__)
+    fresh = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(fresh)
+    monkeypatch.setattr(review, "require_tooling_audit", fresh.require_tooling_audit)
+    with pytest.raises(ValueError, match='independent current tooling audit'):
+        review.execute(args)
+    assert calls == [] and records == []
+
+
+def test_real_tooling_gate_rejects_changed_source_and_verdict_disagreement(tmp_path):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('fresh_review_gate', review.__file__)
+    fresh = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(fresh)
+    run = tmp_path / '.playbook-artifacts/opencode-runs/opencode-synthetic'
+    run.mkdir(parents=True)
+    manifest = []
+    for ref in fresh.TOOLING_REFS:
+        path = tmp_path / ref
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text('synthetic public toolchain fixture')
+        manifest.append({'path': ref, 'sha256': fresh.digest(path.read_bytes())})
+    report = run / 'report.md'
+    report.write_text('# Independent synthetic audit\n\nPROGRAM_DESIGN_REVIEW: ADVISORY\n\n' + response()['choices'][0]['message']['content'])
+    payload = {'review_scope': 'tooling', 'role': 'program_design_review', 'provider': 'opencode_go',
+               'read_only': True, 'requested_model': 'mimo-v2.6-pro', 'observed_model': 'mimo-v2.6-pro',
+               'verdict': 'ADVISORY', 'documents': manifest, 'report_sha256': fresh.digest(report.read_bytes())}
+    result = run / 'result.json'
+    def write():
+        result.write_text(json.dumps(payload))
+        result.with_suffix('.json.sha256').write_text(fresh.digest(result.read_bytes()))
+    write()
+    assert fresh.require_tooling_audit(tmp_path) == result.relative_to(tmp_path).as_posix()
+    target = tmp_path / fresh.TOOLING_REFS[0]
+    target.write_text('changed public source')
+    with pytest.raises(ValueError): fresh.require_tooling_audit(tmp_path)
+    target.write_text('synthetic public toolchain fixture')
+    payload['verdict'] = 'PASS'
+    write()
+    with pytest.raises(ValueError): fresh.require_tooling_audit(tmp_path)
+
+
+def test_all_phase_packets_keep_complete_canonical_registries():
+    for group in review.REVIEW_GROUPS:
+        packet, manifest, design = review.prepare_packet(review.ROOT, 'PAI-01', 'PAI', 'program_design_review', slice_group=group)
+        assert 'COMPLETE canonical 32-slice registry' in packet
+        assert len(design['slices']) == 32
+        assert len(packet.encode()) <= review.MAX_INPUT_BYTES
+        assert 'test_requirement_academic_01' in packet
+        assert 'test_requirement_search_04' in packet
+
+
+@pytest.mark.parametrize('change', ['scope', 'oversized', 'model', 'truncated', 'critical', 'valid'])
+def test_legacy_deep_review_stays_bounded_and_records_observed_identity(tmp_path, monkeypatch, change):
+    calls = []
+    def git(*args):
+        if args[0] == 'rev-parse': return 'a' * 40
+        if args[0] == 'diff': return 'x' * 200001 if change == 'oversized' else 'synthetic public diff'
+        return 'synthetic commit'
+    monkeypatch.setattr(mimo_code_review, '_git', git)
+    monkeypatch.setattr(mimo_code_review, '_api_key', lambda path: calls.append('key') or 'synthetic-key')
+    verdict = {'verdict': 'SHIP_OK', 'findings': [], 'summary': 'No P0/P1 in the synthetic diff.', 'not_verified': ['live I/O']}
+    if change == 'critical': verdict['findings'] = [{'severity': 'P1', 'title': 'Replay'}]
+    payload = {'model': 'other-model' if change == 'model' else 'mimo-v2.6-pro',
+        'choices': [{'finish_reason': 'length' if change == 'truncated' else 'stop', 'message': {'content': json.dumps(verdict)}}]}
+    monkeypatch.setattr(mimo_code_review, '_call_model', lambda **kwargs: calls.append(kwargs) or payload)
+    output = tmp_path / 'deep-review.json'
+    args = ['mimo_code_review.py', '--base', 'base', '--out', str(output), '--allow-provider-egress']
+    if change != 'scope': args += ['--call-cap', '1']
+    monkeypatch.setattr(sys, 'argv', args)
+    result = mimo_code_review.main()
+    assert result == (0 if change == 'valid' else 1)
+    if change in {'scope', 'oversized'}:
+        assert calls == []
+    else:
+        assert calls[1]['max_output_tokens'] == 8000 and calls[1]['stream'] is True
+    if change == 'valid':
+        report = json.loads(output.read_text())
+        assert report['observed_model'] == report['requested_model'] == 'mimo-v2.6-pro'
+        assert report['read_only'] is True and report['cost'] == 'unknown'
+    else:
+        assert not output.exists() or json.loads(output.read_text()).get('status') != 'reviewed'
+
+
+def test_phase_receipts_cannot_be_promoted_after_tooling_audit_changes(tmp_path, monkeypatch):
+    import finalize_opencode_design_reviews as complete
+    args, calls, records = setup_run(tmp_path, monkeypatch)
+    (tmp_path / 'docs/design').mkdir(parents=True)
+    (tmp_path / 'docs/design/F.design.json').write_text(json.dumps({'slices': [{'slice_id': f'PAI-{n:02}'} for n in range(32)]}))
+    for group in review.REVIEW_GROUPS:
+        args.slice_group = group
+        review.execute(args)
+    results = sorted((tmp_path / '.playbook-artifacts/opencode-runs').glob('*/result.json'))
+    monkeypatch.setattr(complete, 'pinned_modules', review.pinned_modules)
+    monkeypatch.setattr(review, 'require_tooling_audit', lambda root: 'new-independent-audit')
+    with pytest.raises(ValueError, match='phase receipts require'):
+        complete.finalize(tmp_path, 'F', args.role, results)
     assert records == []

@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import uuid
 import re
+import opencode_role_review as review
 from opencode_role_review import ROOT, ROLES, REVIEW_GROUPS, SPEC_GROUPS, ReviewBlocked, digest, pinned_modules
 
 
@@ -56,13 +57,17 @@ def finalize(root: Path, feature: str, role: str, results: list[Path]):
     sections = {sid for result, _, _ in by_group.values() for sid in result["reviewed_spec_sections"]}
     if slices != {s["slice_id"] for s in design["slices"]} or sections != set(range(16)):
         raise ReviewBlocked("whole programme/spec coverage incomplete")
+    tooling_audit_ref = review.require_tooling_audit(root)
+    if any(result.get("tooling_audit_ref") != tooling_audit_ref for result, _, _ in by_group.values()):
+        raise ReviewBlocked("phase receipts require current independently audited tooling")
     verdicts = {r["verdict"] for r, _, _ in by_group.values()}
     verdict = "STOP_SHIP" if "STOP_SHIP" in verdicts else "ADVISORY" if "ADVISORY" in verdicts else "PASS"
     run_dir = root / ".playbook-artifacts/opencode-complete" / uuid.uuid4().hex
     run_dir.mkdir(parents=True, exist_ok=False)
     manifest = {"schema_version":"assistant.opencode_complete_review.v1","role":role,
                 "feature_id":feature,"reviewed_head":head,"design_hashes":current_hashes,
-                "verdict":verdict,"coverage":{"slices":sorted(slices),"spec_sections":sorted(sections)},
+                "verdict":verdict,"tooling_audit_ref":tooling_audit_ref,
+                "coverage":{"slices":sorted(slices),"spec_sections":sorted(sections)},
                 "parts":[{"group":g,"result":p.relative_to(root).as_posix(),"sha256":digest(p.read_bytes()),
                           "verdict":r["verdict"]} for g,(r,p,_) in by_group.items()]}
     output = run_dir / "result.json"

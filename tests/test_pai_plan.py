@@ -80,3 +80,14 @@ def test_fine_spec_and_scope_gaps_cannot_pass_planning(monkeypatch, mutation):
         "scope_overlap": "scope overlap",
     }[mutation]):
         plan.check(ROOT)
+
+
+def test_requirement_matrix_bytes_are_bound_to_reviewed_design(monkeypatch):
+    matrix_path = ROOT / 'docs/design/PAI.requirements.json'
+    original = Path.read_bytes
+    def read_bytes(path):
+        raw = original(path)
+        return raw + b' ' if path.resolve() == matrix_path else raw
+    monkeypatch.setattr(Path, 'read_bytes', read_bytes)
+    with pytest.raises(ValueError, match='hash binding is stale'):
+        plan.check(ROOT)

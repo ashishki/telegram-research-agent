@@ -60,6 +60,10 @@ def check(root: Path = ROOT) -> int:
             raise ValueError("missing exact PAI design binding: " + task)
         if not tasks[task]["acceptance_criteria"] or not slices[task]["verification"]:
             raise ValueError("missing acceptance: " + task)
+        for entry in slices[task]["verification"]:
+            if (any(arg.startswith("tests/test_pai_") for arg in entry["argv"])
+                and entry["argv"][1] != "tools/run_pai_acceptance.py"):
+                raise ValueError("PAI acceptance must fail on skipped/missing cases: " + task)
         verification_section = re.search(r"\*\*Проверить:\*\*(.*?)(?=\n\*\*|\Z)", body, re.S).group(1)
         declared_tests = set(re.findall(r"tests/[\w/.*-]+\.py", verification_section))
         registered_tests = {
@@ -72,6 +76,10 @@ def check(root: Path = ROOT) -> int:
     if coverage != pa_ids:
         raise ValueError("original PA programme coverage incomplete")
     matrix = json.loads((root / "docs/design/PAI.requirements.json").read_text())
+    md = (root / "docs/design/PAI.md").read_text()
+    matrix_digest = hashlib.sha256((root / "docs/design/PAI.requirements.json").read_bytes()).hexdigest()
+    if "Requirements-matrix-SHA256: " + matrix_digest not in md:
+        raise ValueError("design/matrix hash binding is stale")
     spec = (root / "docs/PERSONAL_ASSISTANT_SPEC.md").read_text()
     spec_ids = set(re.findall(r"\*\*([A-Z]+-\d{2})\b", spec))
     rows = matrix["requirements"]

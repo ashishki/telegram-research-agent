@@ -15,7 +15,8 @@ or permission to send private data. The 2026-10-06 Sol prompt explicitly keeps
 paid model calls behind scoped authority. The owner approved the exact brief and two initial Mimo reviews; both attempts
 failed without verdict. A later owner request authorized one tiny diagnostic,
 which confirmed Mimo connectivity/schema. The owner resumed the goal and authorized the recommended total 30-call cap
-for local PAI-00..26. Eighteen requests are consumed at the complete SSE failure checkpoint. The owner
+for local PAI-00..26. Actual call consumption, including failures/diagnostics, is recorded in
+docs/verification/PAI-progress.md; read the current count before each request. The owner
 approved design/recheck output up to 16000 tokens and deadlines up to 900 s.
 Defaults remain 8000/300; no automatic retries or model substitution.
 Per-call bounds/private-source exclusions persist; no credential availability scans.
@@ -81,3 +82,15 @@ version, reviewed commit and diff/input hashes, command and exit, findings and
 recheck. Distinguish acceptance tests, regressions, fixtures, real provider I/O,
 actual rendered views and human usefulness. Full historical pytest is prohibited.
 No private corpus, account payload or credentials in reviewer packets or Git.
+
+## Enforced independent tooling gate
+
+Owner-authorized PAI-00 maintenance is reviewed separately with --tooling-review.
+The critical source list includes policy, bridge/runner/transport/checker,
+finalizer, strict acceptance runner and their tests. New design requests and
+record aggregation require a genuine independent tooling PASS/ADVISORY bound to
+unchanged hashes. Missing, altered, partial, STOP_SHIP or contradictory evidence
+blocks before credentials/provider calls. Historical bootstrap reports and
+synthetic diagnostics cannot unlock this gate. Any critical-source/policy change
+requires fresh independent re-audit before design receipts are consumed.
+This technical gate never grants human design, live or release authority.
