@@ -12,9 +12,10 @@ selects a non-Codex reviewer via OpenCode Go, default mimo-v2.6-pro, and batches
 review at phase boundaries. It supersedes the older Terra/high prescription in
 AGENTS/adoption/prompts. This is reviewer selection, not a new paid-call budget
 or permission to send private data. The 2026-10-06 Sol prompt explicitly keeps
-paid model calls behind scoped authority. The owner reconfirmed Mimo in the active session on 2026-10-06. No new paid
-reviewer call/budget is inferred from that selection; do not read keys merely
-to check availability. The pending brief/budget questions name the exact scope.
+paid model calls behind scoped authority. The owner approved the exact brief and two initial Mimo reviews; both attempts
+failed without verdict. A later owner request authorized one tiny diagnostic,
+which confirmed Mimo connectivity/schema. The follow-up overall call cap is
+unanswered. Do not scan keys or infer more calls from model selection/silence.
 
 ## Roles, runners and receipt compatibility
 
@@ -40,7 +41,8 @@ the genuine pinned write_design_review_record consumer with reviewer_binding
 opencode_go:<result-path>. Synthetic tests confirm that the pinned parser
 accepts that generic design record and rejects stale hashes. These are not
 codex_role_run traces; no Codex events or human approval fields are produced.
-The backend itself still requires independent risk review before real use.
+Independent backend risk review remains pending; authorized public/synthetic
+bootstrap calls do not accept the backend or the feature design.
 
 Current pinned feature_workflow review would manufacture a codex_exec binding
 when it sees a report at its default report path. Therefore the OpenCode backend

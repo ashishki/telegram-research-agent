@@ -196,3 +196,38 @@ The owner requested inspecting the working Navigator invocation. Source commit
 connectivity probe for that new request succeeded with observed mimo-v2.6-pro
 and usage 61+51=112 tokens. It is not a full design verdict or a renewal of the
 exhausted two-review-call cap. Full details: PAI-MIMO-CALL-PROTOCOL.md.
+
+## Automatic goal continuation audit — 2026-10-06
+
+Authoritative entry HEAD: 84da33a84e05e76f8451ea4a4aebd8a6d57ab5ec; clean tree.
+Previous goal turn classified progress: Navigator protocol fixed/published and
+actual bounded synthetic connectivity evidence obtained. No valid full-design
+review is proved: both actual design attempts have failure records, no generic
+PAI design records exist. The successful connectivity result is schema_ok with
+observed mimo-v2.6-pro, usage 61+51=112, valid_verdict=false.
+
+No new call-budget response arrived. The original cap of two design attempts is
+exhausted; diagnostic scope was one distinct owner-requested operation, already
+performed. New 30/8-call scope and subsequent exact feature approval are still
+required. No paid request, credential read or product implementation occurred
+during this continuation.
+
+Found stale contradictory current instructions (older checkpoint, no API/brief
+decision asserted alongside actual calls/approval). Replaced them with one
+current handoff/progress and aligned review policy. Full goal/32-card programme,
+formal states, historic failures and pending reviews are preserved.
+Changed files: docs/CODEX_PROMPT.md, docs/REVIEW_POLICY.md,
+docs/verification/PAI-progress.md plus this receipt and hash manifest.
+Next safe command is the actual --prepare-only role command in current handoff.
+
+Audit commands: git status --short / git rev-parse HEAD confirmed the entry
+state; safe inspection of the two failure artifacts and one connectivity result
+confirmed three attempts and zero PAI design records. All following commands
+exited 0: --prepare-only program role (199714-byte packet, planning_gate null,
+provider_call false), tools/playbook.py --check-pin,
+tools/check_personal_assistant_plan.py, tools/check_pai_plan.py,
+tools/playbook.py validate_feature_design --root . --design docs/design/PAI.design.json,
+git diff --check. Product tests were not rerun for this documentation-only
+correction. Required paid-review scope remains unanswered; no dependent product
+task can legally start. Goal is active; this is the second consecutive goal
+turn with that remaining cap gate, with concrete reconciliation progress here.

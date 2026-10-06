@@ -34,7 +34,7 @@
     },
     {
       "path": "docs/CODEX_PROMPT.md",
-      "sha256": "2c8a23c04f6024ce9f705f4ebfc4893b760a7ea167098a6b37abde67daf7e5cb"
+      "sha256": "430f12019ed520fd0dc0fa5f814b63a6bf508fec9fee6ea11d8892ff02b4d335"
     },
     {
       "path": "docs/IMPLEMENTATION_CONTRACT.md",
@@ -62,7 +62,7 @@
     },
     {
       "path": "docs/REVIEW_POLICY.md",
-      "sha256": "af2bde043800c7539ab95a3f1816ae6fed5358e0167a2f4240c43e03f04cefee"
+      "sha256": "21ac3a56ce2c7cf1d9f6a7060fa577276618d934d0f83f467a44d0b44ea6a4ed"
     },
     {
       "path": "docs/adr/ADR-012-pa-assignment-and-instruction-scope.md",
@@ -126,11 +126,11 @@
     },
     {
       "path": "docs/verification/PAI-00-reconciliation.md",
-      "sha256": "f700388ca14d5d313ec1bb5dcdd20da9bafdd6ef341fb56f19bb8e2d488f5e57"
+      "sha256": "4c5af2329d4f8ed6fc3b0823de08fb79dedb6dda9ca6dd5f56d9abf9d0e7d6c7"
     },
     {
       "path": "docs/verification/PAI-01-durable-design.md",
-      "sha256": "de5d1e00abc053fbc49f89659d040676280c194a8128175bde82557b3b336c30"
+      "sha256": "f8e3d25c79caa8eac9464271daf0614cc06d6dce821aee3b84d6bfec60459edc"
     },
     {
       "path": "docs/verification/PAI-access-release-pilot-packet.md",
@@ -138,7 +138,7 @@
     },
     {
       "path": "docs/verification/PAI-progress.md",
-      "sha256": "d71ac04419d39788c291b8b0d5204086ec64751b768d1524e0bab50ab1bed1cb"
+      "sha256": "63ba0c6776e7ca80affd91b31636634889f22876ddf7fdd28e2583f086694af2"
     },
     {
       "path": "tests/test_assistant_conversation.py",
@@ -205,9 +205,9 @@
     "call_cap": 2,
     "remaining_calls": 0
   },
-  "snapshot_commit": "ba170d4ba2fa339a5d2c90fd3f1aeae85b394de1",
+  "snapshot_commit": "84da33a84e05e76f8451ea4a4aebd8a6d57ab5ec",
   "latest_code_checkpoint": "985f8f2ecbbbe0ab28a62e8a4cd09295a0d2266e",
-  "snapshot_note": "Exact content hashes at snapshot_commit; this manifest excludes itself.",
+  "snapshot_note": "Content hashes for the handoff reconciliation diff based on snapshot_commit; manifest excludes itself.",
   "actual_mimo_requests": {
     "failed_initial_design_attempts": 2,
     "successful_owner_requested_connectivity_diagnostic": 1,
@@ -219,5 +219,11 @@
       "total_tokens": 112
     },
     "valid_independent_design_verdicts": 0
+  },
+  "goal_continuation_audit": {
+    "previous_turn": "progress",
+    "current_turn": "handoff authority reconciled against actual artifacts",
+    "remaining_gate": "initial paid-review cap exhausted; expanded cap unanswered",
+    "consecutive_gate_turns": 2
   }
 }

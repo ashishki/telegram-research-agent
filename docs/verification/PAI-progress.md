@@ -1,12 +1,15 @@
-# PAI progress — current local evidence
+# PAI progress — current evidence
 
-Updated: 2026-10-06. Source HEAD: 8faee4232cb30e6b6f39cfbd974c151846f79da6.
-Branch: docs/personal-assistant-blueprint-playbook-20260918.
-Scoped checkpoints 07f2475 and 985f8f2 are committed/published; no valid independent verdict exists.
-Original PA states/receipts and new formal PAI planned states are preserved.
-Engineering status below is separate from design/live/human acceptance.
-Current work: PAI-00 local baseline verified; PAI-01 reviews/human gate pending.
-No PAI-02..26 product implementation or actual provider evidence is claimed.
+Updated: 2026-10-06
+Branch: docs/personal-assistant-blueprint-playbook-20260918
+Published code/tool checkpoint: 84da33a84e05e76f8451ea4a4aebd8a6d57ab5ec.
+Initial source: 8faee4232cb30e6b6f39cfbd974c151846f79da6.
+Full goal remains active. Formal PA/PAI states are preserved; engineering
+status below does not grant independent, human or runtime acceptance.
+
+Current card: PAI-01. Draft/brief/planning are prepared and authorized.
+No completed product/program design verdict exists. Mimo connection works;
+the two approved initial review attempts are exhausted and new cap is pending.
 
 | ID / PA-Refs | Engineering status | Code | Wiring | Tests | Review | Live | Human acceptance | Blocker / next |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -43,31 +46,30 @@ No PAI-02..26 product implementation or actual provider evidence is claimed.
 | PAI-30 / PA-16, PA-17 | planned | existing PA contracts to reuse; no new PAI code | integration/restart/concurrency not demonstrated for PAI | new acceptance not run | none for new scope | none for new scope | none | PAI-23, PAI-24, PAI-26; measured condition + new ADR |
 | PAI-31 / PA-04, PA-17 | planned | existing PA contracts to reuse; no new PAI code | integration/restart/concurrency not demonstrated for PAI | new acceptance not run | none for new scope | none for new scope | none | PAI-11, PAI-25, PAI-26; measured condition + new ADR |
 
-The 2026-09-23 handoff documents historical PA-10..17 contracts/reviews.
-Those reports are neither current PAI wiring nor approval of PostgreSQL runtime.
-Source observations: application has model/web/GitHub injection seams; default
-conversation/policy/action receipts remain partly process-local; watch_jobs
-has explicit-path SQLite, with no general worker/scheduler composition.
-Current targeted baseline before correction: 1 failed, 50 passed (conversation
-fixture created on September 19, expired against current application clock).
-Historical PA-00 UX test passed. See PAI-00 receipt for exact commands/results.
+## Observed evidence and resume
 
-Next executable command: python3 tools/playbook.py feature_workflow --root . plan --task PAI-01.
-It now returns ready; the owner approved the exact brief and two bounded Mimo calls.
-Assigned designed_slices was selected via the pinned interactive workflow under
-explicit delegation. Actual feature-design approval remains separate.
+Application has model/web/GitHub injection seams, not complete default runtime
+composition. Current conversation/policy/action state remains partly local;
+watch_jobs has explicit-path SQLite. PAI-02..26 are still unimplemented.
 
-Mimo was explicitly retained by the owner during this session. A local role
-backend supports product/program design records with opencode_go binding via
-real pinned writer/parser, distinct from Codex run traces. Prepare-only works;
-actual API calls and human brief/design acceptance have not occurred.
+Model operations: program review HTTPError and product review TimeoutError on
+07f2475; no reports/design records. Navigator protocol correction at 84da33a
+passed 29 focused transport tests. Its tiny authorized diagnostic succeeded with
+mimo-v2.6-pro and 61+51=112 tokens. Three total model requests were made; a
+connectivity bool/JSON is not an independent design verdict.
 
-Published code/tool checkpoint 985f8f2; safe failure hardening is committed.
-The two actual Mimo attempts failed without verdict. They are not synthetic
-PASS or design acceptance. New bounded-call scope is pending; source/data
-permissions otherwise persist unchanged. Current goal remains active.
-\nPublication: git push origin HEAD succeeded, 8faee42..985f8f2 on the assigned\nbranch. No release/deployment claim. Latest handoff is the current CODEX_PROMPT.\n
-Navigator protocol found at 5f26418921246c3e24a967532225dfe3d274b1cb; shared client aligned. Actual
-synthetic smoke succeeded: observed mimo-v2.6-pro, strict JSON, 112 tokens.
-Current actual Mimo requests: 3 total (2 failed design + 1 tiny diagnostic).
-Full reviews and exact feature acceptance remain pending the new call cap.
+609 focused-prm tests passed at the earlier checkpoint; current relevant
+transport tests passed 29. Structure checks preserve 51 missing design approvals
+and 28 absent future acceptance suites. History and exact commands/failures are
+in PAI-00-reconciliation.md, PAI-01-durable-design.md and
+PAI-MIMO-CALL-PROTOCOL.md. Public checkpoints were pushed to the assigned branch.
+CI/provider/usefulness/release are distinct and not inferred.
+
+Human decisions already recorded: exact project brief, Mimo selection and
+assigned designed_slices. New total 30-call or 8-call budget is unanswered;
+no further paid call is permitted by an automatic continuation alone.
+After review, exact paired-feature approval remains necessary.
+
+Next executable safe command:
+python3 tools/run_codex_role.py run --provider opencode-go --task PAI-01 --feature-id PAI --role program_design_review --prepare-only
+It makes no API request. Do not rerun plan/select-plan unless their inputs drift.
