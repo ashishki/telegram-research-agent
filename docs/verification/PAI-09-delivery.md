@@ -55,7 +55,15 @@ dropping ACK were used. Other provider calls are faked; no live send occurred.
 `python3 tools/check_pai_plan.py`: 32 packets, 69 requirements, 10 scenarios;
 20 future test files absent. `git diff --check`: passed.
 
-Phase-C focused-prm floor and independent Mimo review are in progress. Prior
-phase-B Mimo call #21 had no valid completion. Engineering evidence does not
+Phase-C focused-prm floor: 652 passed in 135.52s on b267854, using
+`PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/test_tiers.py focused-prm`.
+Independent Mimo phase-C call #22 on aed2431..b267854 failed before any HTTP
+response (RemoteDisconnected). Safe evidence: PAI-phase-c-review-failure.json.
+The separate narrower delivery review #23 examined 5b4347d..b267854 and ended
+with finish_reason=length: requested/observed mimo-v2.6-pro, 12348 prompt and
+8000 completion tokens; no valid verdict. Safe provider telemetry:
+PAI-delivery-review-incomplete.json. Total 23/30 calls consumed; no automated
+retry or changed model/output settings. Prior phase-B #21 also had no valid
+completion. Independent phase-B/C review remains pending. Engineering evidence does not
 grant formal/human/live/release acceptance. Next after the review/findings:
 PAI-10 actual Chat composition, with all current external authority gates.

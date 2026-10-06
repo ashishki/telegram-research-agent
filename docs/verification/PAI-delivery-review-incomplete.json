@@ -1,0 +1,24 @@
+{
+  "requested_model": "mimo-v2.6-pro",
+  "observed_model": "mimo-v2.6-pro",
+  "finish_reason": "length",
+  "usage": {
+    "prompt_tokens": 12348,
+    "completion_tokens": 8000,
+    "total_tokens": 20348,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 8006
+    }
+  },
+  "output_token_cap": 8000,
+  "timeout_seconds": 300,
+  "call_number": 23,
+  "status": "incomplete_no_verdict",
+  "base_sha": "5b4347d1db31f7dc25c973eb7d8d38c6531aefa4",
+  "head_sha": "b267854a5cb35bb6378338bfe834a702c3acc04d",
+  "read_only": true,
+  "cost": "unknown"
+}

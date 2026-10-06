@@ -1,0 +1,16 @@
+{
+  "call_number": 22,
+  "status": "provider_failed_no_verdict",
+  "error_type": "RemoteDisconnected",
+  "base_sha": "aed24315876166f5d7d04b7308540bc41cc69e2e",
+  "head_sha": "b267854a5cb35bb6378338bfe834a702c3acc04d",
+  "diff_sha256": "2ed03301aad1d7077197dab635476b7818cc00f4f86e0e4f1e4c9e7458b43fe4",
+  "requested_model": "mimo-v2.6-pro",
+  "observed_model": null,
+  "finish_reason": null,
+  "output_token_cap": 8000,
+  "timeout_seconds": 300,
+  "usage": "unknown",
+  "cost": "unknown",
+  "read_only": true
+}

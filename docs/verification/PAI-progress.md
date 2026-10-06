@@ -132,3 +132,16 @@ cases passed in 91.89s; current delivery file 12 passed in 22.61s, zero skips.
 Receipt: docs/verification/PAI-09-delivery.md. Preserved/fixed connection-loss
 failure. Phase-C regression/review running; next PAI-10 after actual findings.
 No formal/human/live approval; Mimo count before phase-C call remains 21/30.
+# 2026-10-06 phase-C verification and review accounting
+
+Code HEAD b267854: focused-prm 652 passed in 135.52s. PAI-07/08/09 individual
+and dependency acceptance commands passed as recorded in their receipts.
+Mimo call #22 on aed2431..b267854 failed before HTTP response with
+RemoteDisconnected; no observed identity/usage/verdict. Evidence:
+docs/verification/PAI-phase-c-review-failure.json. Separate smaller scope call
+#23 on 5b4347d..b267854 returned requested/observed mimo-v2.6-pro with
+finish_reason=length, prompt=12348/completion=8000 and no valid verdict.
+Evidence: docs/verification/PAI-delivery-review-incomplete.json.
+Total 23/30 consumed including
+failures; no automatic retries or substitution. Independent B/C and human/live
+acceptance remain pending. Next implementation card PAI-10.

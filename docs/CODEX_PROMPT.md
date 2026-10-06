@@ -15,16 +15,19 @@ Phase-B Mimo call #21 returned no valid completion; keep it pending without
 restarting reviewer-framework work. PAI-07 durable inbox/polling/worker/CLI
 composition is locally verified (51 cases, zero skips); receipt PAI-07-ingress.md.
 PAI-08 durable scheduler/Watch is locally verified (119 cases, zero skips;
-receipt PAI-08-scheduler.md). Proceed under ADR-014 to PAI-09 common durable
-delivery/reconciliation; fix actual P0/P1 when received. PAI-09 code/tests are
+receipt PAI-08-scheduler.md). PAI-09 common durable delivery/reconciliation code/tests are
 locally verified (112 dependency cases plus current 12 delivery cases);
-phase-C focused-prm and independent review are running. Receipt PAI-09-delivery.md.
-Next PAI-10 after addressing actual review findings; no live/provider wiring.
+Phase-C focused-prm: 652 passed in 135.52s. Mimo #22 phase-C failed before
+response; #23 narrower delivery review reached output length 8000 with no
+verdict (telemetry PAI-delivery-review-incomplete.json). Receipt PAI-09-delivery.md.
+Next PAI-10 under ADR-014; fix actual P0/P1 if received. Do not restart review
+framework or repeatedly retry the same 8000-token packet. Formal phase B/C
+review stays pending; no live/provider wiring.
 Use .venv-pai/bin/python (psycopg 3.3.6 installed with verified wheel hash).
 Do not read .env/production DSNs or change services/timers/live accounts.
 
 Keep Mimo as independent reviewer at accumulated phase boundaries, not every
-patch. Twenty-one of 30 developer-review calls consumed; source/tooling attempt #20
+patch. Twenty-three of 30 developer-review calls consumed; source/tooling attempt #20
 on 2fb4e75 hit finish_reason length at 16000 output tokens (no valid verdict).
 Earlier foundation STOP_SHIP and local fixes are preserved. Formal PA/PAI
 states remain review_required/draft/planned; no acceptance fields were forged.
