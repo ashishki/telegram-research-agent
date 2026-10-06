@@ -51,9 +51,12 @@ mimo-v2.6-pro, JSON schema valid, 61 input + 51 output = 112 tokens.
 This is authenticated connectivity evidence, never a design verdict.
 
 Total actual Mimo requests: 3 (2 failed design attempts + 1 successful diagnostic).
-The follow-up total 30-call local-program / 8-call phase-A question is unanswered.
-Do not infer consent from silence, a UI default, or this automatic goal turn.
-There is no remaining permission for another full design-review request.
+The owner now explicitly answered “разрешаю, продолжи гол” and resumed work.
+The recommended total cap is 30 Mimo calls across local PAI-00..26, including
+the three previous calls: 27 remain before the next actual attempts.
+Each call stays <=200KB project/synthetic input, <=8000 output tokens,
+<=300s timeout, without automatic retries/private payload/model substitution.
+This expands review funding only; exact design/live/release gates persist.
 
 ## Design, verification and runner
 

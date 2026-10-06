@@ -210,3 +210,10 @@ git diff --check. Product tests were not rerun for this documentation-only
 correction. Required paid-review scope remains unanswered; no dependent product
 task can legally start. Goal is active; this is the second consecutive goal
 turn with that remaining cap gate, with concrete reconciliation progress here.
+
+## Owner resume and review funding
+
+Owner message: “разрешаю, продолжи гол”. The recommended total 30-call cap for
+the complete assigned local queue is now authorized, including all 3 prior
+requests. Per-call bounds and source classes remain unchanged. Continue without
+re-asking that scope; no feature/private/live/release approval is invented.

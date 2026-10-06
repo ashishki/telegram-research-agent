@@ -9,12 +9,12 @@ status below does not grant independent, human or runtime acceptance.
 
 Current card: PAI-01. Draft/brief/planning are prepared and authorized.
 No completed product/program design verdict exists. Mimo connection works;
-the two approved initial review attempts are exhausted and new cap is pending.
+the two approved initial review attempts are exhausted and total 30-call cap approved on resume; 3 used.
 
 | ID / PA-Refs | Engineering status | Code | Wiring | Tests | Review | Live | Human acceptance | Blocker / next |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | PAI-00 / PA-00, PA-01, PA-18 | local_verified | instruction/tool/test and bounded Mimo design backend diff | current entrypoints inventoried; no product runtime added | current focused-prm 609 pass; targeted 88 pass | phase-A independent review pending | none | none | PAI-01 brief/planning/review/design gate |
-| PAI-01 / PA-01, PA-02, PA-09, PA-13, PA-16, PA-17 | blocked_external | draft paired design + proposed ADR-013 | proposed topology only | pinned schema/mapping pass | Mimo actual attempts on 07f2475: HTTPError/TimeoutError; no verdict | none | none | brief/planning done; 2-call cap exhausted; new cap pending; independent reviews/exact approval pending |
+| PAI-01 / PA-01, PA-02, PA-09, PA-13, PA-16, PA-17 | blocked_external | draft paired design + proposed ADR-013 | proposed topology only | pinned schema/mapping pass | Mimo actual attempts on 07f2475: HTTPError/TimeoutError; no verdict | none | none | brief/planning done; 2-call cap exhausted; 30-call total cap approved; independent reviews/exact approval pending |
 | PAI-02 / PA-01, PA-17 | planned | existing PA contracts to reuse; no new PAI code | integration/restart/concurrency not demonstrated for PAI | new acceptance not run | none for new scope | none for new scope | none | PAI-01; PAI-01 design gate |
 | PAI-03 / PA-02, PA-16 | planned | existing PA contracts to reuse; no new PAI code | integration/restart/concurrency not demonstrated for PAI | new acceptance not run | none for new scope | none for new scope | none | PAI-02; PAI-01 design gate |
 | PAI-04 / PA-00, PA-13 | planned | existing PA contracts to reuse; no new PAI code | integration/restart/concurrency not demonstrated for PAI | new acceptance not run | none for new scope | none for new scope | none | PAI-03; PAI-01 design gate |
