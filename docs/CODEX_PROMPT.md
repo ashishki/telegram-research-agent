@@ -10,7 +10,9 @@ transactional CAS object versions, corruption guards and dump/restore tests.
 Receipt: docs/verification/PAI-02-storage.md. PAI-03 shared policy is locally verified (86 cases, zero skips); next PAI-04
 durable proposals/confirmations/attempts/receipts now locally verified (36
 cases). PAI-05 persistence locally verified (26 cases). Current next card:
-PAI-06 durable queue/worker/checkpoints, then accumulated phase-B review.
+PAI-06 queue/worker locally verified (45 cases). Phase-B floor: 652 passed.
+Next: independent accumulated phase-B Mimo diff review, fix/recheck P0/P1,
+then PAI-07 real ingress/durable inbox/runtime composition.
 Use .venv-pai/bin/python (psycopg 3.3.6 installed with verified wheel hash).
 Do not read .env/production DSNs or change services/timers/live accounts.
 
