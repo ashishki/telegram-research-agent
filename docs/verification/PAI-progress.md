@@ -116,3 +116,11 @@ worker/application composition, owner-bound status/result/cancel and voice
 intake. 51 cases passed, zero skips, in 39.76s. Receipt:
 docs/verification/PAI-07-ingress.md. Independent review/human/live acceptance
 remain pending. Next: PAI-08. No additional Mimo calls (21/30 consumed).
+# 2026-10-06 PAI-08 implementation checkpoint
+
+PAI-08 local_verified: confirmed PostgreSQL schedules/occurrences, fenced
+one-shot scheduler, current-policy collection worker, material-change/deadline
+handling and private ingress controls. 119 cases passed, zero skips, in 38.30s.
+Receipt: docs/verification/PAI-08-scheduler.md. Final delivery quota/attempts and
+reconciliation are PAI-09 next; independent phase-B/C reviews and human/live
+acceptance remain pending. Mimo remains 21/30 calls consumed.

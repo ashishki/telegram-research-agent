@@ -35,6 +35,36 @@ def request(grant,operation):
         'provider_openai',grant.purpose,expected_grant_revision=grant.revision,operation_ref=operation)
 
 
+def test_grant_expiring_during_final_lock_wait_cannot_dispatch(sandbox,monkeypatch):
+    from threading import Thread,Event
+    from prm.capabilities import CapabilityDenied
+    reg,grant=registry(sandbox,'expiry_wait')
+    grant=replace(grant,revision=2,expires_at=datetime.now(timezone.utc)+timedelta(seconds=.4))
+    reg.replace_grant(grant)
+    decision=reg.authorize_and_reserve(request(grant,'op_expiry_wait'),upper_bound=1)
+    assert decision.allowed
+    locked=Event();errors=[]
+    def hold_grant():
+        try:
+            with sandbox.app.connect() as conn:
+                with conn.transaction():
+                    conn.execute('SELECT grant_id FROM pa_policy.grants WHERE owner=%s FOR UPDATE',(grant.owner_ref,))
+                    locked.set();conn.execute('SELECT pg_sleep(.6)')
+        except Exception as exc:errors.append(exc);locked.set()
+    worker=Thread(target=hold_grant)
+    prepare=reg._commit_durable_transport
+    def prepare_then_contend(reservations):
+        result=prepare(reservations)
+        worker.start();assert locked.wait(timeout=5)
+        return result
+    monkeypatch.setattr(reg,'_commit_durable_transport',prepare_then_contend)
+    calls=[]
+    try:
+        with pytest.raises(CapabilityDenied):reg.execute_reserved((decision.reservation,),lambda:calls.append('dispatched'))
+    finally:worker.join(timeout=5)
+    assert not worker.is_alive() and not errors and not calls
+
+
 def _reserve_worker(config,refs,grant,barrier,result):
     from prm.storage.postgres import SyntheticTarget
     reg=DurableCapabilityRegistry(SyntheticTarget.from_mapping(config),budget_refs=refs)

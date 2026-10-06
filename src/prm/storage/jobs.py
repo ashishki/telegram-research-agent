@@ -86,7 +86,7 @@ class JobQueue:
         return item
     def enqueue_in(self,tx,*,owner,idempotency_key,payload,deadline,kind='compute.digest',mode='compute',priority=0,max_attempts=3):
         _check(tx.conn);_ref(owner);_ref(idempotency_key);payload=_payload(payload)
-        if (mode not in {'compute','effect'} or kind not in {'compute.digest','compute.assistant','effect.dispatch'} or (kind.startswith('compute.')!=(mode=='compute'))
+        if (mode not in {'compute','effect'} or kind not in {'compute.digest','compute.assistant','compute.watch','effect.dispatch'} or (kind.startswith('compute.')!=(mode=='compute'))
             or (mode=='effect')!=('effect_key'in payload) or type(priority)is not int or not -1000<=priority<=1000
             or type(max_attempts)is not int or not 1<=max_attempts<=5 or not isinstance(deadline,datetime) or deadline.tzinfo is None):
             raise StorageError('invalid bounded job intent')
@@ -111,7 +111,7 @@ class JobQueue:
         _ref(owner)
         if type(lease_seconds)is not int or not 1<=lease_seconds<=300 or not isinstance(modes,tuple) or not set(modes)<= {'compute','effect'}:
             raise StorageError('invalid bounded worker claim')
-        if kinds is not None and (not isinstance(kinds,tuple) or not kinds or not set(kinds)<= {'compute.digest','compute.assistant','effect.dispatch'}):
+        if kinds is not None and (not isinstance(kinds,tuple) or not kinds or not set(kinds)<= {'compute.digest','compute.assistant','compute.watch','effect.dispatch'}):
             raise StorageError('invalid worker kind filter')
         with self.store.transaction() as tx:
             conn=tx.conn;_check(conn)

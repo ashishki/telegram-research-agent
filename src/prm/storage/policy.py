@@ -103,10 +103,12 @@ class DurableCapabilityRegistry(CapabilityRegistry):
     def _now(self,conn):return conn.execute('SELECT clock_timestamp() AS now').fetchone()['now']
     def _grants(self,conn,owner,now,*,lock=False):
         rows=conn.execute('SELECT owner,grant_id,revision,document FROM pa_policy.grants WHERE owner=%s ORDER BY grant_id'+(' FOR UPDATE' if lock else ''),(owner,)).fetchall()
+        now=self._now(conn)
         return [_decode(row,now) for row in rows]
     def _decision(self,conn,request,*,lock=False):
         _check_schema(conn);now=self._now(conn)
         grants=self._grants(conn,request.owner_ref,now,lock=lock)
+        now=self._now(conn)
         return CapabilityRegistry(grants).authorize(request,now=now),grants,now
     def register_grant(self,grant:CapabilityGrant):
         if type(grant) is not CapabilityGrant:raise StorageError('typed grant required')
@@ -272,10 +274,11 @@ class DurableCapabilityRegistry(CapabilityRegistry):
         owner=reservations[0]._request.owner_ref;operation=reservations[0].operation_ref
         try:
             with self.store.transaction() as tx:
-                conn=tx.conn;_check_schema(conn);now=self._now(conn)
+                conn=tx.conn;_check_schema(conn)
                 ids=sorted({r.grant_ref for r in reservations})
                 rows=conn.execute('''SELECT owner,grant_id,revision,document FROM pa_policy.grants
                     WHERE owner=%s AND grant_id=ANY(%s) ORDER BY grant_id FOR UPDATE''',(owner,ids)).fetchall()
+                now=self._now(conn)
                 auth=CapabilityRegistry([_decode(row,now) for row in rows])
                 if any(not auth.authorize(r._request,now=now).allowed for r in reservations):
                     raise CapabilityDenied('grant changed before transport')

@@ -20,12 +20,13 @@ class IntakeReply:
 class TelegramJobIngress:
     """Explicit synthetic target and authenticated private owner, no env fallback."""
 
-    def __init__(self, queue: JobQueue, *, owner_ref: str, owner_chat_id: str):
+    def __init__(self, queue: JobQueue, *, owner_ref: str, owner_chat_id: str, watch_scheduler=None):
         if not owner_ref or len(owner_ref) > 128 or not re.fullmatch(r'[1-9][0-9]*', owner_chat_id):
             raise StorageError('explicit private owner required')
         self.queue = queue
         self.owner_ref = owner_ref
         self.owner_chat_id = owner_chat_id
+        self.watch_scheduler = watch_scheduler
 
     def receive(self, update: dict) -> IntakeReply | None:
         if not isinstance(update, dict) or type(update.get('update_id')) is not int or update['update_id'] < 0:
@@ -44,6 +45,8 @@ class TelegramJobIngress:
                 return IntakeReply('Это действие недоступно; подтверждение не использовано.')
             return self.control(parts[1], parts[2])
         parts = text.split(maxsplit=1)
+        if parts and parts[0].startswith('/watch') and self.watch_scheduler is not None:
+            return self.watch_control(parts[0], parts[1] if len(parts) == 2 else '')
         if parts and parts[0] in {'/status', '/cancel', '/result'}:
             if len(parts) != 2:
                 return IntakeReply('Укажи ID задачи после команды.')
@@ -89,6 +92,24 @@ class TelegramJobIngress:
             job = self.queue.enqueue_in(tx, owner=self.owner_ref, idempotency_key=key, payload=payload,
                                        deadline=now + timedelta(minutes=15), kind='compute.assistant')
         return IntakeReply(f'Запрос сохранён. Задача {job}. /status {job}', request_ref, job)
+
+    def watch_control(self, command, argument):
+        scheduler = self.watch_scheduler
+        actor = dict(chat_id=self.owner_chat_id, actor_id=self.owner_chat_id, owner_chat_id=self.owner_chat_id)
+        if command == '/watchconfirm':
+            scheduler.confirm(argument, **actor)
+            return IntakeReply('Подписка сохранена. Работа планировщика проверяется через /watchstatus.')
+        if command == '/watchstatus':
+            state = scheduler.status(owner=self.owner_ref, subscription_id=argument)
+            if state is None:
+                return IntakeReply('Подписка не найдена.')
+            observed = 'наблюдалась недавно' if state['scheduler_observed_recently'] else 'пока не подтверждена'
+            return IntakeReply(f"Подписка сохранена: {state['lifecycle']}. Работа планировщика {observed}. Последний результат: {state['last_reason']}.")
+        actions = {'/watchpause': 'pause', '/watchunsubscribe': 'unsubscribe', '/watchdone': 'done', '/watchresume': 'resume'}
+        if command not in actions:
+            return IntakeReply('Используй /watchstatus, /watchpause, /watchunsubscribe, /watchdone с ID подписки.')
+        scheduler.feedback(argument, actions[command], **actor)
+        return IntakeReply('Состояние подписки сохранено.')
 
     def control(self, command: str, job_id: str) -> IntakeReply:
         if not re.fullmatch(r'job_[a-f0-9]{32}', job_id):
