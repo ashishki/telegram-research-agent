@@ -34,7 +34,7 @@
     },
     {
       "path": "docs/CODEX_PROMPT.md",
-      "sha256": "8def44f1d65b57c4918634adb46b4a57c5e607bfe78af41163b71f295b0a00f8"
+      "sha256": "7726caddd809430dd0477a850ff770f76ec3b207438ebac2686dcfc765f26d71"
     },
     {
       "path": "docs/IMPLEMENTATION_CONTRACT.md",
@@ -126,11 +126,11 @@
     },
     {
       "path": "docs/verification/PAI-00-reconciliation.md",
-      "sha256": "132fc416f5ebd1319a2d5986d0469ecdfc2037fd7f36214c0d90c21472675fdb"
+      "sha256": "2f94d9d9962e6397907841b5730a4a70db490c3a5f46080ad9d3fe1b26fb1a9a"
     },
     {
       "path": "docs/verification/PAI-01-durable-design.md",
-      "sha256": "1a6b1321c6ba79308ee11718151e28f163ac42cf0731a073bb5eb43a7c34f4fc"
+      "sha256": "75dae5d2c4482e214144ee145c9e1e1365aac921858165d9401fa863ba666a13"
     },
     {
       "path": "docs/verification/PAI-access-release-pilot-packet.md",
@@ -138,7 +138,7 @@
     },
     {
       "path": "docs/verification/PAI-progress.md",
-      "sha256": "46faaa73df60a69046c00ef3222b6cd09e580a96ece3626082dc9384ad1cec2b"
+      "sha256": "00f10be0d4373b20fae6539ce4f8d7555278fc7a2b5997fb4c0f485bbbf5fe56"
     },
     {
       "path": "tests/test_assistant_conversation.py",
@@ -200,5 +200,8 @@
     "product_design_review": "TimeoutError, no verdict",
     "call_cap": 2,
     "remaining_calls": 0
-  }
+  },
+  "snapshot_commit": "ba170d4ba2fa339a5d2c90fd3f1aeae85b394de1",
+  "latest_code_checkpoint": "985f8f2ecbbbe0ab28a62e8a4cd09295a0d2266e",
+  "snapshot_note": "Exact content hashes at snapshot_commit; this manifest excludes itself."
 }
