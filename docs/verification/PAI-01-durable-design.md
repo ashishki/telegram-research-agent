@@ -339,3 +339,7 @@ Next actual review freezes this source and uses explicit approved bounds.
 Complete program call #15 on 1136863 returned HTTP 500; unknown provider outcome, no verdict.
 Bounded SSE transport added; targeted role/strategy/checker suite 59 passed in 8.78 s.
 Next: one new complete program request on frozen streaming source; it counts against 30.
+
+SSE complete request #16 failed safely (ValueError, exact cause unknown).
+Tiny SSE diagnostic #17 succeeded, 116 tokens; not a design verdict.
+Frame-envelope guard/diagnostics corrected, token/time caps unchanged.

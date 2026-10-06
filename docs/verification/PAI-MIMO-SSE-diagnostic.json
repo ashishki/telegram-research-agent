@@ -1,0 +1,24 @@
+{
+  "purpose": "one small synthetic SSE transport diagnostic",
+  "valid_verdict": false,
+  "call_cap": 1,
+  "requested_model": "mimo-v2.6-pro",
+  "output_token_cap": 1024,
+  "timeout_seconds": 120,
+  "budget_call_number": 17,
+  "status": "completed",
+  "observed_model": "mimo-v2.6-pro",
+  "usage": {
+    "prompt_tokens": 57,
+    "completion_tokens": 59,
+    "total_tokens": 116,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 51
+    }
+  },
+  "finish_reason": "stop",
+  "elapsed_seconds": 3.72
+}

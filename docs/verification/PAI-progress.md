@@ -2,7 +2,7 @@
 
 Updated: 2026-10-06
 Branch: docs/personal-assistant-blueprint-playbook-20260918
-Published code/tool checkpoint: 113686370939d3fa4404f8cef59b1b55464667c5.
+Published code/tool checkpoint: a5cd3d2a2ea1b5152035ed5ed6d39f4e8e15033c.
 Initial source: 8faee4232cb30e6b6f39cfbd974c151846f79da6.
 Full programme remains unfinished; owner resumed the existing goal. Formal PA/PAI states are preserved; engineering
 status below does not grant independent, human or runtime acceptance.
@@ -11,11 +11,11 @@ Current card: PAI-01. Draft/brief/planning are prepared and authorized.
 Original complete product review returned STOP_SHIP; its two P1 findings were
 independently resolved by a scoped PASS. Complete design rechecks remain pending.
 Owner authorized 30 total calls, 16000-token output and 900-second design deadlines.
-Fifteen calls are consumed including the current complete program request.
+Seventeen calls are consumed before the next complete program request.
 
 | ID / PA-Refs | Engineering status | Code | Wiring | Tests | Review | Live | Human acceptance | Blocker / next |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| PAI-00 / PA-00, PA-01, PA-18 | local_verified | instruction/tool/test and bounded Mimo design backend diff | current entrypoints inventoried; no product runtime added | focused-prm 620 pass; latest role/strategy/checker suite 51 pass | phase-A independent review pending | none | none | PAI-01 brief/planning/review/design gate |
+| PAI-00 / PA-00, PA-01, PA-18 | local_verified | instruction/tool/test and bounded Mimo design backend diff | current entrypoints inventoried; no product runtime added | focused-prm 620 pass; latest role/strategy/checker suite 61 pass | phase-A independent review pending | none | none | PAI-01 brief/planning/review/design gate |
 | PAI-01 / PA-01, PA-02, PA-09, PA-13, PA-16, PA-17 | in_progress | draft paired design + proposed ADR-013 | proposed topology only | pinned schema/mapping pass | two original product P1 independently resolved by scoped PASS; full review missing | none | none | brief/planning funded; complete independent reviews/exact design approval pending |
 | PAI-02 / PA-01, PA-17 | planned | existing PA contracts to reuse; no new PAI code | integration/restart/concurrency not demonstrated for PAI | new acceptance not run | none for new scope | none for new scope | none | PAI-01; PAI-01 design gate |
 | PAI-03 / PA-02, PA-16 | planned | existing PA contracts to reuse; no new PAI code | integration/restart/concurrency not demonstrated for PAI | new acceptance not run | none for new scope | none for new scope | none | PAI-02; PAI-01 design gate |
@@ -58,12 +58,13 @@ Original complete product review on 04c4efa: STOP_SHIP. Both P1s fixed and
 independently rechecked on e262f27: scoped PASS (not full acceptance).
 Full/phase calls at 300 s and 8000-token output encountered timeout/truncation;
 failed/unknown requests count toward the budget. Navigator smoke was successful
-with 112 tokens and cannot replace review. The current complete program request
-uses reviewed HEAD 1136863, 193708 input bytes, output cap 16000, deadline 900 s.
+with 112 tokens and cannot replace review. Complete requests on 1136863/a5cd3d2 failed with HTTP 500/ValueError;
+no verdict. Tiny SSE diagnostic passed with 116 tokens. Corrected SSE framing
+guards and safe error diagnostics precede the next complete request.
 Exact historic attempts and outcomes: PAI-01-durable-design.md.
 
 Verification: focused-prm 620 passed; latest deadline/role/strategy/checker suite
-51 passed in 10.00 s. Structural checks preserve 51 missing design approvals and
+61 passed in 9.90 s. Structural checks preserve 51 missing design approvals and
 28 absent future acceptance suites. CI/provider/visual/usefulness/release are
 distinct evidence, not inferred from these tests.
 

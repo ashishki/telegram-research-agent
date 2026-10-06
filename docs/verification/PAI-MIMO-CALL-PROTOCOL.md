@@ -72,3 +72,11 @@ and discards reasoning text. Missing terminal events, model changes, tool calls,
 errors and oversized bodies cannot become review evidence. The legacy helper
 default stays nonstreaming. No automatic retry or independent verdict is claimed
 by transport tests. Reference endpoint/client headers: https://opencode.ai/docs/go/.
+
+First complete SSE request (#16) was rejected with ValueError; no verdict.
+Tiny synthetic SSE diagnostic (#17): actual Mimo, 57 input + 59 output = 116
+tokens, finish stop, 3.72 s. This is connectivity evidence only. The first
+large failure lacks a fixed error code; its exact cause remains unknown.
+Added fixed-code safe diagnostics and separate 8 MiB SSE wire / 1 MiB final
+text / 64 KiB frame bounds (metadata repeats per chunk). Token/deadline caps
+remain unchanged. A framing-limit explanation is a hypothesis, not proof.

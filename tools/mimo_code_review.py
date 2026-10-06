@@ -124,7 +124,7 @@ def _call_model(*, api_key: str, base_url: str, model: str, prompt: str, timeout
 
 def _read_review_stream(response, model: str, deadline: float) -> dict[str, Any]:
     """Bound SSE wire bytes/time; retain final text/usage, discard reasoning."""
-    wire_bytes, content, finish, usage = 0, [], None, None
+    wire_bytes, text_bytes, content, finish, usage = 0, 0, [], None, None
     # urllib HTTPResponse's socket lets each read respect the remaining TOTAL
     # deadline rather than extending it on every arriving token.
     sock = response.fp.raw._sock
@@ -133,11 +133,13 @@ def _read_review_stream(response, model: str, deadline: float) -> dict[str, Any]
         if remaining <= 0:
             raise TimeoutError("review_stream_deadline")
         sock.settimeout(remaining)
-        line = response.readline(min(65_537, 1_048_577 - wire_bytes))
+        # SSE repeats JSON metadata for every chunk; its wire envelope is
+        # larger than the same bounded final answer in one JSON response.
+        line = response.readline(min(65_537, 8_388_609 - wire_bytes))
         wire_bytes += len(line)
         if time.monotonic() > deadline:
             raise TimeoutError("review_stream_deadline")
-        if wire_bytes > 1_048_576 or len(line) > 65_536:
+        if wire_bytes > 8_388_608 or len(line) > 65_536:
             raise ValueError("review_response_too_large")
         if not line:
             raise ValueError("review_stream_incomplete")
@@ -174,6 +176,9 @@ def _read_review_stream(response, model: str, deadline: float) -> dict[str, Any]
         if text is not None:
             if not isinstance(text, str):
                 raise ValueError("review_stream_invalid_content")
+            text_bytes += len(text.encode('utf-8'))
+            if text_bytes > 1_048_576:
+                raise ValueError("review_response_too_large")
             content.append(text)
         reason = choice.get("finish_reason")
         if reason is not None:

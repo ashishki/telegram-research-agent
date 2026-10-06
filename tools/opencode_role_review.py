@@ -302,6 +302,12 @@ def execute(args):
                    "error_type": type(exc).__name__,
                    "http_status": code if type(code) is int and 100 <= code <= 599 else None,
                    "provider_outcome": "unknown", "observed_model": None}
+        safe_transport_errors = {"review_response_too_large", "review_stream_deadline",
+            "review_stream_incomplete", "review_stream_invalid_event", "review_stream_provider_error",
+            "review_stream_model_mismatch", "review_stream_invalid_choices", "review_stream_invalid_choice",
+            "review_stream_invalid_delta", "review_stream_invalid_content", "review_stream_invalid_finish"}
+        if type(exc) in {ValueError, TimeoutError} and str(exc) in safe_transport_errors:
+            failure["error_code"] = str(exc)
         if "response" in locals() and isinstance(response, dict):
             if response.get("model") == args.model: failure["observed_model"] = args.model
             choices = response.get("choices")

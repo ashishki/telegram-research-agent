@@ -454,3 +454,24 @@ def test_stream_total_deadline_expires_even_with_arriving_tokens(monkeypatch):
     with pytest.raises(TimeoutError):
         mimo_code_review._read_review_stream(wire, 'mimo-v2.6-pro', 30)
     assert wire.timeouts == [30]
+
+
+def test_stream_bounds_final_text_separately_from_chunk_envelope():
+    import time
+    # Legitimate token chunks can exceed the old one-JSON wire envelope.
+    event = stream_event({'reasoning_content': 'discarded ' * 3000})
+    wire = stream_response([event] * 40 + [stream_event({'content': '{}'}), stream_event(finish='stop'), '[DONE]'])
+    assert mimo_code_review._read_review_stream(wire, 'mimo-v2.6-pro', time.monotonic() + 900)['choices'][0]['message']['content'] == '{}'
+    for delta, count in [({'content': 'x' * 60000}, 18), ({'reasoning_content': 'x' * 60000}, 140)]:
+        with pytest.raises(ValueError, match='review_response_too_large'):
+            mimo_code_review._read_review_stream(stream_response([stream_event(delta)] * count), 'mimo-v2.6-pro', time.monotonic() + 900)
+
+
+def test_stream_failure_preserves_fixed_diagnostic_without_provider_text(tmp_path, monkeypatch):
+    args, calls, records = setup_run(tmp_path, monkeypatch)
+    def failed_provider(**kwargs): raise ValueError('review_response_too_large')
+    monkeypatch.setattr(mimo_code_review, '_call_model', failed_provider)
+    with pytest.raises(ValueError): review.execute(args)
+    failure = json.loads(next((tmp_path / '.playbook-artifacts/opencode-runs').glob('*/failure.json')).read_text())
+    assert failure['error_code'] == 'review_response_too_large'
+    assert records == []

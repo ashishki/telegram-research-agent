@@ -1,0 +1,20 @@
+{
+  "schema_version": "assistant.opencode_review_attempt.v1",
+  "run_id": "opencode-c7b912091dd84a799f104a4650c2c456",
+  "role": "program_design_review",
+  "task": "PAI-01",
+  "reviewed_head": "a5cd3d2a2ea1b5152035ed5ed6d39f4e8e15033c",
+  "requested_model": "mimo-v2.6-pro",
+  "input_sha256": "be5496dd6b9daaf83a704a2d4b016931bd9b5f7d0c1b92b8a988d4a61a8270c1",
+  "input_bytes": 193879,
+  "call_cap": 1,
+  "output_token_cap": 16000,
+  "timeout_seconds": 900,
+  "transport": "sse",
+  "status": "no_valid_verdict",
+  "cost": "unknown",
+  "error_type": "ValueError",
+  "http_status": null,
+  "provider_outcome": "unknown",
+  "observed_model": null
+}
