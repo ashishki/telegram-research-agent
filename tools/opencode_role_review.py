@@ -173,7 +173,7 @@ def prepare_packet(root: Path, task: str, feature: str, role: str, tooling_revie
         if ref == "tools/mimo_code_review.py":
             # Review the changed shared transport and credential boundary in
             # full, without pretending to include the unrelated legacy CLI.
-            names = {"_api_key", "_call_model", "urlopen", "_NoReviewRedirects"}
+            names = {"_api_key", "_call_model", "_read_review_stream", "urlopen", "_NoReviewRedirects"}
             nodes = [node for node in ast.parse(content).body if getattr(node, "name", None) in names]
             if {node.name for node in nodes} != names:
                 raise ReviewBlocked("shared review transport shape changed")
@@ -285,6 +285,7 @@ def execute(args):
         "reviewed_head": head, "requested_model": args.model,
         "input_sha256": digest(packet.encode()), "input_bytes": len(packet.encode()),
         "call_cap": 1, "output_token_cap": output_cap, "timeout_seconds": args.timeout_seconds,
+        "transport": "sse",
         "status": "request_prepared", "cost": "unknown",
     }
     (run_dir / "attempt.json").write_text(json.dumps(request_evidence, indent=2) + "\n")
@@ -293,7 +294,7 @@ def execute(args):
         response = _call_model(api_key=key, base_url="https://opencode.ai/zen/go/v1",
                                model=args.model, prompt=packet, timeout=args.timeout_seconds,
                                max_output_tokens=output_cap, response_schema=VERDICT_SCHEMA,
-                               session_id=run_id.removeprefix("opencode-"))
+                               session_id=run_id.removeprefix("opencode-"), stream=True)
         verdict = parse_response(response, args.model)
     except Exception as exc:
         code = getattr(exc, "code", None)
@@ -343,6 +344,7 @@ def execute(args):
         "input_sha256": digest(packet.encode()), "documents": manifest,
         "design_hashes": before_hashes, "report_sha256": digest(report.read_bytes()),
         "verdict": verdict["verdict"], "call_cap": 1, "output_token_cap": output_cap,
+        "transport": "sse",
         "usage": usage, "cost": "unknown",
     }
     result = run_dir / "result.json"

@@ -16,6 +16,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import time
 import uuid
 from typing import Any, Mapping
 from urllib.error import HTTPError, URLError
@@ -79,7 +80,7 @@ def _api_key(explicit_file: str) -> str:
 
 def _call_model(*, api_key: str, base_url: str, model: str, prompt: str, timeout: int,
                 max_output_tokens: int = 12000, response_schema: dict | None = None,
-                session_id: str | None = None) -> dict[str, Any]:
+                session_id: str | None = None, stream: bool = False) -> dict[str, Any]:
     if type(max_output_tokens) is not int or not 1 <= max_output_tokens <= 16000:
         raise ValueError("invalid_review_output_bound")
     body = {
@@ -98,6 +99,8 @@ def _call_model(*, api_key: str, base_url: str, model: str, prompt: str, timeout
             }} if response_schema is not None else {"type": "json_object"}
         ),
     }
+    if stream:
+        body.update(stream=True, stream_options={"include_usage": True})
     request = Request(
         f"{base_url.rstrip('/')}/chat/completions",
         data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
@@ -109,11 +112,74 @@ def _call_model(*, api_key: str, base_url: str, model: str, prompt: str, timeout
         },
         method="POST",
     )
+    deadline = time.monotonic() + max(30, timeout)
     with urlopen(request, timeout=max(30, timeout)) as response:  # nosec B310
+        if stream:
+            return _read_review_stream(response, model, deadline)
         raw = response.read(1_048_577)
         if len(raw) > 1_048_576:
             raise ValueError("review_response_too_large")
         return json.loads(raw)
+
+
+def _read_review_stream(response, model: str, deadline: float) -> dict[str, Any]:
+    """Bound SSE wire bytes/time; retain final text/usage, discard reasoning."""
+    wire_bytes, content, finish, usage = 0, [], None, None
+    # urllib HTTPResponse's socket lets each read respect the remaining TOTAL
+    # deadline rather than extending it on every arriving token.
+    sock = response.fp.raw._sock
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError("review_stream_deadline")
+        sock.settimeout(remaining)
+        line = response.readline(min(65_537, 1_048_577 - wire_bytes))
+        wire_bytes += len(line)
+        if time.monotonic() > deadline:
+            raise TimeoutError("review_stream_deadline")
+        if wire_bytes > 1_048_576 or len(line) > 65_536:
+            raise ValueError("review_response_too_large")
+        if not line:
+            raise ValueError("review_stream_incomplete")
+        line = line.strip()
+        if not line or line.startswith(b":"):
+            continue
+        if not line.startswith(b"data:"):
+            raise ValueError("review_stream_invalid_event")
+        data = line[5:].strip()
+        if data == b"[DONE]":
+            if finish is None:
+                raise ValueError("review_stream_incomplete")
+            return {"model": model, "choices": [{"finish_reason": finish,
+                    "message": {"content": "".join(content)}}], "usage": usage}
+        event = json.loads(data)
+        if not isinstance(event, dict) or "error" in event:
+            raise ValueError("review_stream_provider_error")
+        if event.get("model") != model:
+            raise ValueError("review_stream_model_mismatch")
+        if isinstance(event.get("usage"), dict):
+            usage = event["usage"]
+        choices = event.get("choices")
+        if not isinstance(choices, list) or len(choices) > 1:
+            raise ValueError("review_stream_invalid_choices")
+        if not choices:
+            continue
+        choice = choices[0]
+        if not isinstance(choice, dict) or choice.get("index") != 0 or finish is not None:
+            raise ValueError("review_stream_invalid_choice")
+        delta = choice.get("delta")
+        if not isinstance(delta, dict) or delta.get("tool_calls"):
+            raise ValueError("review_stream_invalid_delta")
+        text = delta.get("content")
+        if text is not None:
+            if not isinstance(text, str):
+                raise ValueError("review_stream_invalid_content")
+            content.append(text)
+        reason = choice.get("finish_reason")
+        if reason is not None:
+            if reason not in {"stop", "length", "content_filter", "tool_calls"}:
+                raise ValueError("review_stream_invalid_finish")
+            finish = reason
 
 
 def _response_text(payload: Mapping[str, Any]) -> str | None:

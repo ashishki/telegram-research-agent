@@ -38,7 +38,7 @@ files remain absent. Planning validation is not runtime evidence.
 ## Review funding and transport
 
 Owner explicitly funded 30 total local-program Mimo calls, including failures
-and the tiny diagnostic. Fourteen have been consumed before the next request.
+and the tiny diagnostic. Fifteen have been consumed before the next request.
 Owner approved design/recheck output <=16000 tokens and now answered “да” to
 extending design/recheck deadlines to <=900 seconds. Other bounds unchanged:
 <=200000 input bytes; project/public/synthetic data only; no automatic retries,
@@ -48,7 +48,9 @@ use explicit approved bounds for actual design reviews.
 Navigator commit 5f26418921246c3e24a967532225dfe3d274b1cb supplied the working
 system/user + strict schema + fresh session protocol. Tiny authenticated smoke
 succeeded with 112 tokens; multiple prior whole/phase calls hit 300 s or output
-limits. None of those failures supplies a verdict. Preserve all attempts.
+limits. A complete 900-second nonstream request on 1136863 also returned HTTP 500.
+The design backend now uses bounded SSE. None of those failures supplies a
+verdict. Preserve all attempts.
 
 Run supported roles through tools/run_codex_role.py run --provider opencode-go.
 Whole design records use the actual pinned generic writer with honest OpenCode
@@ -59,8 +61,8 @@ never a whole-design record. Other role support must be extended before credit.
 
 ## Verification and continuation
 
-Latest focused-prm: 620 passed. Latest deadline/role/checker suite: 51 passed
-in 10.00 s. Full historical pytest is prohibited. Actual integrations, visual
+Latest focused-prm: 620 passed. Latest deadline/role/checker suite: 59 passed
+in 8.78 s. Full historical pytest is prohibited. Actual integrations, visual
 acceptance and operator usefulness remain distinct gates.
 
 Next: freeze committed source, run complete independent program/product design

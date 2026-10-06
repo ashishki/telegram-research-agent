@@ -57,3 +57,18 @@ There are now three actual Mimo requests: two failed design attempts on 07f2475
 and this successful tiny diagnostic. Count failed/unknown attempts conservatively.
 The follow-up overall 30/8-call budget question remains pending. Do not invent
 a successful full-review verdict from the smoke or infer that cap from silence.
+
+## Streaming continuation (2026-10-06)
+
+Owner subsequently approved 30 total calls, 16000 output and 900-second
+design/recheck deadlines. Complete program request on 1136863 failed with
+HTTP 500, not a valid verdict; request #15 is conservatively consumed.
+Public failure: PAI-01-review-failure-1136863.json.
+
+The native design runner now requests OpenAI-compatible SSE with usage, same
+endpoint/model/messages/schema/session. It bounds wire bytes and the total
+monotonic deadline, checks every observed model/choice and terminal completion,
+and discards reasoning text. Missing terminal events, model changes, tool calls,
+errors and oversized bodies cannot become review evidence. The legacy helper
+default stays nonstreaming. No automatic retry or independent verdict is claimed
+by transport tests. Reference endpoint/client headers: https://opencode.ai/docs/go/.

@@ -335,3 +335,7 @@ Total funding remains 30 calls (14 consumed); input <=200000 bytes, output
 <=16000, selected Mimo, public/synthetic scope and no automatic retry remain.
 Targeted role/strategy/checker suite: 51 passed in 10.00 s.
 Next actual review freezes this source and uses explicit approved bounds.
+
+Complete program call #15 on 1136863 returned HTTP 500; unknown provider outcome, no verdict.
+Bounded SSE transport added; targeted role/strategy/checker suite 59 passed in 8.78 s.
+Next: one new complete program request on frozen streaming source; it counts against 30.

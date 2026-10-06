@@ -2,19 +2,21 @@
 
 Updated: 2026-10-06
 Branch: docs/personal-assistant-blueprint-playbook-20260918
-Published code/tool checkpoint: 84da33a84e05e76f8451ea4a4aebd8a6d57ab5ec.
+Published code/tool checkpoint: 113686370939d3fa4404f8cef59b1b55464667c5.
 Initial source: 8faee4232cb30e6b6f39cfbd974c151846f79da6.
-Full goal remains active. Formal PA/PAI states are preserved; engineering
+Full programme remains unfinished; owner resumed the existing goal. Formal PA/PAI states are preserved; engineering
 status below does not grant independent, human or runtime acceptance.
 
 Current card: PAI-01. Draft/brief/planning are prepared and authorized.
-No completed product/program design verdict exists. Mimo connection works;
-the two approved initial review attempts are exhausted and total 30-call cap approved on resume; 3 used.
+Original complete product review returned STOP_SHIP; its two P1 findings were
+independently resolved by a scoped PASS. Complete design rechecks remain pending.
+Owner authorized 30 total calls, 16000-token output and 900-second design deadlines.
+Fifteen calls are consumed including the current complete program request.
 
 | ID / PA-Refs | Engineering status | Code | Wiring | Tests | Review | Live | Human acceptance | Blocker / next |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| PAI-00 / PA-00, PA-01, PA-18 | local_verified | instruction/tool/test and bounded Mimo design backend diff | current entrypoints inventoried; no product runtime added | current focused-prm 609 pass; targeted 88 pass | phase-A independent review pending | none | none | PAI-01 brief/planning/review/design gate |
-| PAI-01 / PA-01, PA-02, PA-09, PA-13, PA-16, PA-17 | in_progress | draft paired design + proposed ADR-013 | proposed topology only | pinned schema/mapping pass | two original product P1 independently resolved by scoped PASS; full review missing | none | none | brief/planning done; 2-call cap exhausted; 30-call total cap approved; independent reviews/exact approval pending |
+| PAI-00 / PA-00, PA-01, PA-18 | local_verified | instruction/tool/test and bounded Mimo design backend diff | current entrypoints inventoried; no product runtime added | focused-prm 620 pass; latest role/strategy/checker suite 51 pass | phase-A independent review pending | none | none | PAI-01 brief/planning/review/design gate |
+| PAI-01 / PA-01, PA-02, PA-09, PA-13, PA-16, PA-17 | in_progress | draft paired design + proposed ADR-013 | proposed topology only | pinned schema/mapping pass | two original product P1 independently resolved by scoped PASS; full review missing | none | none | brief/planning funded; complete independent reviews/exact design approval pending |
 | PAI-02 / PA-01, PA-17 | planned | existing PA contracts to reuse; no new PAI code | integration/restart/concurrency not demonstrated for PAI | new acceptance not run | none for new scope | none for new scope | none | PAI-01; PAI-01 design gate |
 | PAI-03 / PA-02, PA-16 | planned | existing PA contracts to reuse; no new PAI code | integration/restart/concurrency not demonstrated for PAI | new acceptance not run | none for new scope | none for new scope | none | PAI-02; PAI-01 design gate |
 | PAI-04 / PA-00, PA-13 | planned | existing PA contracts to reuse; no new PAI code | integration/restart/concurrency not demonstrated for PAI | new acceptance not run | none for new scope | none for new scope | none | PAI-03; PAI-01 design gate |
@@ -49,27 +51,24 @@ the two approved initial review attempts are exhausted and total 30-call cap app
 ## Observed evidence and resume
 
 Application has model/web/GitHub injection seams, not complete default runtime
-composition. Current conversation/policy/action state remains partly local;
-watch_jobs has explicit-path SQLite. PAI-02..26 are still unimplemented.
+composition. Conversation/policy/action state remains partly local; watch_jobs
+has explicit-path SQLite. PAI-02..26 remain unimplemented.
 
-Model operations: program review HTTPError and product review TimeoutError on
-07f2475; no reports/design records. Navigator protocol correction at 84da33a
-passed 29 focused transport tests. Its tiny authorized diagnostic succeeded with
-mimo-v2.6-pro and 61+51=112 tokens. Three total model requests were made; a
-connectivity bool/JSON is not an independent design verdict.
+Original complete product review on 04c4efa: STOP_SHIP. Both P1s fixed and
+independently rechecked on e262f27: scoped PASS (not full acceptance).
+Full/phase calls at 300 s and 8000-token output encountered timeout/truncation;
+failed/unknown requests count toward the budget. Navigator smoke was successful
+with 112 tokens and cannot replace review. The current complete program request
+uses reviewed HEAD 1136863, 193708 input bytes, output cap 16000, deadline 900 s.
+Exact historic attempts and outcomes: PAI-01-durable-design.md.
 
-609 focused-prm tests passed at the earlier checkpoint; current relevant
-transport tests passed 29. Structure checks preserve 51 missing design approvals
-and 28 absent future acceptance suites. History and exact commands/failures are
-in PAI-00-reconciliation.md, PAI-01-durable-design.md and
-PAI-MIMO-CALL-PROTOCOL.md. Public checkpoints were pushed to the assigned branch.
-CI/provider/usefulness/release are distinct and not inferred.
+Verification: focused-prm 620 passed; latest deadline/role/strategy/checker suite
+51 passed in 10.00 s. Structural checks preserve 51 missing design approvals and
+28 absent future acceptance suites. CI/provider/visual/usefulness/release are
+distinct evidence, not inferred from these tests.
 
-Human decisions already recorded: exact project brief, Mimo selection and
-assigned designed_slices. New total 30-call or 8-call budget is unanswered;
-no further paid call is permitted by an automatic continuation alone.
-After review, exact paired-feature approval remains necessary.
-
-Next executable safe command:
-python3 tools/run_codex_role.py run --provider opencode-go --task PAI-01 --feature-id PAI --role program_design_review --prepare-only
-It makes no API request. Do not rerun plan/select-plan unless their inputs drift.
+Existing owner decisions: exact project brief, Mimo reviewer, designed_slices,
+30 total calls and design/recheck output/deadline amendments. Do not re-request.
+Exact paired-feature human approval remains necessary after complete reviews.
+Next: collect actual program result, then complete product recheck on frozen
+source; resolve P0/P1, prepare exact approval package, then PAI-02.

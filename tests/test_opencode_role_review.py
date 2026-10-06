@@ -389,3 +389,68 @@ def test_complete_review_rejects_scope_or_head_drift(tmp_path, monkeypatch):
     with pytest.raises(ValueError,match="different HEAD"):
         complete.finalize(tmp_path,"F",args.role,[result])
     assert records==[]
+
+
+def stream_response(events):
+    import io
+    class StreamHTTP:
+        def __init__(self):
+            self.data = io.BytesIO(b''.join(
+                b'data: ' + (event.encode() if isinstance(event, str) else json.dumps(event).encode()) + b'\n\n'
+                for event in events))
+            self.timeouts = []
+            self.fp = SimpleNamespace(raw=SimpleNamespace(_sock=SimpleNamespace(settimeout=self.timeouts.append)))
+        def __enter__(self): return self
+        def __exit__(self, *args): return False
+        def readline(self, limit): return self.data.readline(limit)
+    return StreamHTTP()
+
+
+def stream_event(delta=None, finish=None, *, model='mimo-v2.6-pro'):
+    return {'model': model, 'choices': [{'index': 0, 'delta': delta or {}, 'finish_reason': finish}]}
+
+
+def test_stream_preserves_only_final_verdict_and_usage_and_real_wire_bounds(monkeypatch):
+    import time
+    verdict = response()['choices'][0]['message']['content']
+    events = [stream_event({'reasoning_content': 'synthetic hidden reasoning'}),
+              stream_event({'content': verdict[:40]}), stream_event({'content': verdict[40:]}),
+              stream_event(finish='stop'), {'model': 'mimo-v2.6-pro', 'choices': [],
+                                          'usage': {'prompt_tokens': 100, 'completion_tokens': 70}}, '[DONE]']
+    wire = stream_response(events)
+    captured = []
+    def open_fake(request, timeout):
+        captured.append(json.loads(request.data))
+        return wire
+    monkeypatch.setattr(mimo_code_review, 'urlopen', open_fake)
+    payload = mimo_code_review._call_model(api_key='synthetic-key', base_url='https://opencode.ai/zen/go/v1',
+        model='mimo-v2.6-pro', prompt='synthetic', timeout=900, max_output_tokens=16000, stream=True)
+    assert captured[0]['stream'] is True and captured[0]['stream_options'] == {'include_usage': True}
+    assert captured[0]['max_tokens'] == 16000
+    assert review.parse_response(payload, 'mimo-v2.6-pro')['verdict'] == 'ADVISORY'
+    assert payload['usage']['completion_tokens'] == 70
+    assert 'hidden reasoning' not in json.dumps(payload)
+    assert all(0 < timeout <= 900 for timeout in wire.timeouts)
+
+
+@pytest.mark.parametrize('events', [
+    [stream_event({'content': '{}'}), '[DONE]'],
+    [stream_event(finish='stop')],
+    [stream_event(model='other-model'), '[DONE]'],
+    [stream_event(finish='stop'), stream_event({'content': '{}'}), '[DONE]'],
+    [{'error': {'message': 'synthetic-secret'}}],
+    [stream_event({'content': 'x' * 70000})],
+])
+def test_incomplete_or_untrusted_stream_never_becomes_a_verdict(events):
+    import time
+    with pytest.raises(ValueError):
+        mimo_code_review._read_review_stream(stream_response(events), 'mimo-v2.6-pro', time.monotonic() + 900)
+
+
+def test_stream_total_deadline_expires_even_with_arriving_tokens(monkeypatch):
+    wire = stream_response([stream_event({'content': '{}'}), stream_event(finish='stop'), '[DONE]'])
+    ticks = iter([0, 5, 31])
+    monkeypatch.setattr(mimo_code_review.time, 'monotonic', lambda: next(ticks))
+    with pytest.raises(TimeoutError):
+        mimo_code_review._read_review_stream(wire, 'mimo-v2.6-pro', 30)
+    assert wire.timeouts == [30]
