@@ -73,6 +73,7 @@ class JobLease:
     payload: dict
     checkpoint: dict
     mode: str
+    kind: str = 'compute.digest'
 
 
 class JobQueue:
@@ -85,7 +86,7 @@ class JobQueue:
         return item
     def enqueue_in(self,tx,*,owner,idempotency_key,payload,deadline,kind='compute.digest',mode='compute',priority=0,max_attempts=3):
         _check(tx.conn);_ref(owner);_ref(idempotency_key);payload=_payload(payload)
-        if (mode not in {'compute','effect'} or kind not in {'compute.digest','effect.dispatch'} or (kind.startswith('compute.')!=(mode=='compute'))
+        if (mode not in {'compute','effect'} or kind not in {'compute.digest','compute.assistant','effect.dispatch'} or (kind.startswith('compute.')!=(mode=='compute'))
             or (mode=='effect')!=('effect_key'in payload) or type(priority)is not int or not -1000<=priority<=1000
             or type(max_attempts)is not int or not 1<=max_attempts<=5 or not isinstance(deadline,datetime) or deadline.tzinfo is None):
             raise StorageError('invalid bounded job intent')
@@ -106,16 +107,18 @@ class JobQueue:
         return job_id
     def enqueue(self,**kwargs):
         with self.store.transaction() as tx:return self.enqueue_in(tx,**kwargs)
-    def claim(self,*,owner,lease_seconds=30,modes=('compute',)):
+    def claim(self,*,owner,lease_seconds=30,modes=('compute',),kinds=None):
         _ref(owner)
         if type(lease_seconds)is not int or not 1<=lease_seconds<=300 or not isinstance(modes,tuple) or not set(modes)<= {'compute','effect'}:
             raise StorageError('invalid bounded worker claim')
+        if kinds is not None and (not isinstance(kinds,tuple) or not kinds or not set(kinds)<= {'compute.digest','compute.assistant','effect.dispatch'}):
+            raise StorageError('invalid worker kind filter')
         with self.store.transaction() as tx:
             conn=tx.conn;_check(conn)
             conn.execute("UPDATE pa_jobs.jobs SET status='failed',error_code='deadline' WHERE owner=%s AND status IN ('queued','retry_wait') AND deadline<=clock_timestamp()",(owner,))
-            row=conn.execute('''SELECT * FROM pa_jobs.jobs WHERE owner=%s AND mode=ANY(%s) AND status IN ('queued','retry_wait')
+            row=conn.execute('''SELECT * FROM pa_jobs.jobs WHERE owner=%s AND mode=ANY(%s) AND (%s::text[] IS NULL OR kind=ANY(%s)) AND status IN ('queued','retry_wait')
                 AND available_at<=clock_timestamp() AND deadline>clock_timestamp()
-                ORDER BY priority DESC,id FOR UPDATE SKIP LOCKED LIMIT 1''',(owner,list(modes))).fetchone()
+                ORDER BY priority DESC,id FOR UPDATE SKIP LOCKED LIMIT 1''',(owner,list(modes),list(kinds) if kinds else None,list(kinds) if kinds else None)).fetchone()
             if not row:return None
             try:payload=_payload(row['payload']);self._input(tx,owner,payload)
             except StorageError:
@@ -125,7 +128,7 @@ class JobQueue:
             lease=conn.execute('''UPDATE pa_jobs.jobs SET status='leased',generation=generation+1,token=%s,
                 lease_until=least(deadline,clock_timestamp()+(%s*interval '1 second')),attempts=attempts+1
                 WHERE owner=%s AND id=%s RETURNING generation,lease_until''',(token,lease_seconds,owner,row['id'])).fetchone()
-            return JobLease(owner,row['id'],lease['generation'],token,lease['lease_until'],payload,row['checkpoint'],row['mode'])
+            return JobLease(owner,row['id'],lease['generation'],token,lease['lease_until'],payload,row['checkpoint'],row['mode'],row['kind'])
     def _fenced(self,tx,lease):
         if type(lease)is not JobLease:raise StorageError('typed fenced lease required')
         _check(tx.conn)

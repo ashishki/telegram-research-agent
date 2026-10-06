@@ -12,8 +12,9 @@ durable proposals/confirmations/attempts/receipts now locally verified (36
 cases). PAI-05 persistence locally verified (26 cases). Current next card:
 PAI-06 queue/worker locally verified (45 cases). Phase-B floor: 652 passed.
 Phase-B Mimo call #21 returned no valid completion; keep it pending without
-restarting reviewer-framework work. Proceed under ADR-014 to PAI-07 real
-ingress/durable inbox/runtime composition; fix actual P0/P1 when received.
+restarting reviewer-framework work. PAI-07 durable inbox/polling/worker/CLI
+composition is locally verified (51 cases, zero skips); receipt PAI-07-ingress.md.
+Proceed under ADR-014 to PAI-08 durable scheduler/Watch; fix actual P0/P1 when received.
 Use .venv-pai/bin/python (psycopg 3.3.6 installed with verified wheel hash).
 Do not read .env/production DSNs or change services/timers/live accounts.
 

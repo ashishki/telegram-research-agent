@@ -232,6 +232,7 @@ def run_bot(
     runtime_mode: str = BOT_RUNTIME_PRM_ASSISTANT,
     model_access_provider: Callable[[str, str, str], ModelEgressAccess | None] | None = None,
     archive_synthesis_access_provider: Callable[[str, str, str], ArchiveSynthesisAccess | None] | None = None,
+    job_ingress=None,
 ) -> None:
     """Run the PA-safe polling surface; legacy polling is opt-in only.
 
@@ -266,6 +267,24 @@ def run_bot(
             continue
 
         for update in updates:
+            if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT and job_ingress is not None:
+                if job_ingress.owner_chat_id != owner_chat_id:
+                    raise ValueError('durable ingress owner differs from Telegram owner')
+                try:
+                    reply = job_ingress.receive(update)
+                except Exception:
+                    LOGGER.warning('Durable intake unavailable; update not acknowledged')
+                    break
+                # Advance only after commit (or rejection of a foreign update).
+                offset = int(update.get('update_id', 0)) + 1
+                if reply is not None:
+                    decisions = issue_private_reply_authorizations(token=token, chat_id=owner_chat_id,
+                        actor_id=owner_chat_id, owner_chat_id=owner_chat_id)
+                    from .prm_handlers import send_message as send_private_message
+                    send_private_message(token, owner_chat_id, reply.text,
+                        delivery_authorization=decisions[0] if decisions else None,
+                        actor_id=owner_chat_id, owner_chat_id=owner_chat_id)
+                continue
             offset = int(update.get("update_id", 0)) + 1
             callback = update.get("callback_query")
             if callback is not None:

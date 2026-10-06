@@ -15,7 +15,19 @@ from prm.contracts import OperatorRequest
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="prm", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("assistant", help="Run the private Telegram PRM assistant.")
+    assistant_command = sub.add_parser("assistant", help="Run the private Telegram PRM assistant.")
+    assistant_command.add_argument('--synthetic-target')
+    assistant_command.add_argument('--owner-ref')
+    assistant_command.add_argument('--owner-chat-id')
+    for name in ('job-status', 'job-cancel', 'job-result', 'job-worker'):
+        command = sub.add_parser(name, help='Inspect or cancel an explicitly selected local synthetic job.')
+        if name == 'job-worker':
+            command.add_argument('--db-path', required=True)
+        else:
+            command.add_argument('job_id')
+        command.add_argument('--synthetic-target', required=True)
+        command.add_argument('--owner-ref', required=True)
+        command.add_argument('--owner-chat-id', required=True)
     for name in ("research", "brief", "chat"):
         command = sub.add_parser(name, help=f"Run one {name} request.")
         command.add_argument("question")
@@ -98,11 +110,40 @@ def _run_editorial_brief(args: argparse.Namespace, settings) -> int:
     return 0
 
 
+def _explicit_job_ingress(args):
+    import json
+    from pathlib import Path
+    from prm.storage.postgres import SyntheticTarget, StorageError
+    from prm.storage.jobs import JobQueue
+    from prm.runtime.ingress import TelegramJobIngress
+    path = Path(args.synthetic_target)
+    if path.stat().st_size > 4096:
+        raise StorageError('explicit synthetic configuration exceeds its bound')
+    target = SyntheticTarget.from_mapping(json.loads(path.read_text(encoding='utf-8')))
+    ingress = TelegramJobIngress(JobQueue(target), owner_ref=args.owner_ref, owner_chat_id=args.owner_chat_id)
+    return ingress
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.command.startswith('job-'):
+        ingress = _explicit_job_ingress(args)
+        if args.command == 'job-worker':
+            from types import SimpleNamespace
+            from prm.runtime.ingress import AssistantJobWorker
+            result_ref = AssistantJobWorker(ingress, settings=SimpleNamespace(db_path=args.db_path)).run_once()
+            print(result_ref or 'Нет готовых задач.')
+        else:
+            print(ingress.control(args.command[4:], args.job_id).text)
+        return 0
     settings = load_settings()
     if args.command == "assistant":
-        run_bot(settings, runtime_mode=BOT_RUNTIME_PRM_ASSISTANT)
+        explicit = (args.synthetic_target, args.owner_ref, args.owner_chat_id)
+        if any(explicit) and not all(explicit):
+            raise ValueError('durable assistant requires target and complete owner tuple')
+        if all(explicit):
+            run_bot(settings, runtime_mode=BOT_RUNTIME_PRM_ASSISTANT, job_ingress=_explicit_job_ingress(args))
+        else:
+            run_bot(settings, runtime_mode=BOT_RUNTIME_PRM_ASSISTANT)
         return 0
     if args.command == "editorial-brief":
         return _run_editorial_brief(args, settings)
