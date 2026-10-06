@@ -80,7 +80,7 @@ def _api_key(explicit_file: str) -> str:
 def _call_model(*, api_key: str, base_url: str, model: str, prompt: str, timeout: int,
                 max_output_tokens: int = 12000, response_schema: dict | None = None,
                 session_id: str | None = None) -> dict[str, Any]:
-    if type(max_output_tokens) is not int or not 1 <= max_output_tokens <= 12000:
+    if type(max_output_tokens) is not int or not 1 <= max_output_tokens <= 16000:
         raise ValueError("invalid_review_output_bound")
     body = {
         "model": model,

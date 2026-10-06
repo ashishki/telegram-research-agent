@@ -130,7 +130,7 @@
     },
     {
       "path": "docs/verification/PAI-01-durable-design.md",
-      "sha256": "9086e227049cccac0dae9ced34631d9b0567b502f4fe8dbe2c2d5f60a7a9cfbe"
+      "sha256": "c670b4ab1d63fd0ed7593c9e5ec976c450be506c10dd9deca587e16dcf7d9826"
     },
     {
       "path": "docs/verification/PAI-access-release-pilot-packet.md",
@@ -150,7 +150,7 @@
     },
     {
       "path": "tests/test_opencode_role_review.py",
-      "sha256": "b3632fd5c57bfcb3e977b5489e82638ca26c13cf8c386da4eb4a4127af0121e6"
+      "sha256": "c6fe0cf35fc31ee3133cd30d994b0a9ef97d470a46d7d5d6f1af9f4a28e50000"
     },
     {
       "path": "tests/test_pai_plan.py",
@@ -166,11 +166,11 @@
     },
     {
       "path": "tools/mimo_code_review.py",
-      "sha256": "0afa54feff9c0206e584e9dbaccd6b3ac3121609aa418bbffc2f197f09bd00b2"
+      "sha256": "3b336a86516cfdb6ee499c4659a0fa4e5d3cc3cbebf1951a3bbd31a9d87d1d98"
     },
     {
       "path": "tools/opencode_role_review.py",
-      "sha256": "513193c4d94674d47d9c837fac6c597d7e2aff277cc5abb08e68cac67a7d46f2"
+      "sha256": "bc0da38bf7586b0767b8b31bd4bf52f68f9d336bb1c7ed0adcc6a90b5910f312"
     },
     {
       "path": "tools/playbook.py",
@@ -210,8 +210,9 @@
   "actual_review_attempts": {
     "product_design_review": "STOP_SHIP on 04c4efa, two P1 remediated pending recheck",
     "program_design_review": "incomplete response, no verdict",
-    "used_calls": 5,
-    "total_call_cap": 30
+    "used_calls": 8,
+    "total_call_cap": 30,
+    "design_recheck_output_cap": 16000
   },
   "snapshot_commit": "84da33a84e05e76f8451ea4a4aebd8a6d57ab5ec",
   "latest_code_checkpoint": "985f8f2ecbbbe0ab28a62e8a4cd09295a0d2266e",

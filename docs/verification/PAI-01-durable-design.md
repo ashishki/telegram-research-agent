@@ -253,3 +253,30 @@ Exit 0: 41 passed in 22.52 s. Schema/coverage checker passes: 69 IDs, 10 scenari
 32 tasks; 28 new future suite files still absent.
 Independent recheck of the changed paired design and tooling is next; no human
 feature acceptance is claimed. Budget: five calls used before these rechecks.
+
+## Scoped recheck results at bc2fb6a
+
+focused-prm exit 0: 620 passed in 107.22 s.
+Product recheck: observed mimo-v2.6-pro, finish_reason=length, 45928 input and
+8000 completion tokens; no full verdict. Tooling audit: observed same model,
+finish_reason=length, 27676 input and 8000 completion tokens; no full verdict.
+Program full-design recheck: TimeoutError; outcome/model/usage unknown.
+These are completed attempts, not live processes or acceptance records.
+Sanitized failure snapshots are PAI-01-recheck-failure-opencode-*.json.
+Eight total calls count against the authorized cap 30. No automatic repeats.
+
+The required schema bounds/parser remain fail-closed; no truncated verdict was
+promoted. A concrete question asks whether to increase only design-review output
+to 16000 while keeping the same model/thinking mode, input/time/total-call/data
+caps, or retain 8000 and explicitly split review scopes. Until that answer,
+do not exceed 8000 or infer a successful independent recheck. The full programme
+and actual P1 remediation remain intact; exact human design approval is pending.
+
+## Explicit output-ceiling amendment
+
+Owner answered “разрешаю, делай” to the concrete 16000-token design-review/
+recheck option. Total call cap 30, input 200KB, selected Mimo/default thinking,
+300 s timeout, no automatic retries and public/synthetic-only classes remain.
+CLI now requires explicit --output-token-cap 16000; default stays 8000.
+A provider/receipt test verifies the actual bound, not an invented measurement.
+No private/live/feature approval is inferred from this funding amendment.

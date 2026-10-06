@@ -232,6 +232,8 @@ def execute(args):
         raise ReviewBlocked(planning_error)
     if not args.allow_provider_egress or args.call_cap != 1:
         raise ReviewBlocked("explicit provider scope and exactly one budgeted call required")
+    output_cap = getattr(args, "output_token_cap", 8000)
+    if output_cap not in (8000, 16000): raise ReviewBlocked("unsupported review output cap")
     # No credential lookup before planning/scope/budget checks.
     from mimo_code_review import _api_key, _call_model
     key = _api_key(args.key_file)
@@ -248,7 +250,7 @@ def execute(args):
         "run_id": run_id, "role": args.role, "task": args.task,
         "reviewed_head": head, "requested_model": args.model,
         "input_sha256": digest(packet.encode()), "input_bytes": len(packet.encode()),
-        "call_cap": 1, "output_token_cap": 8000, "timeout_seconds": args.timeout_seconds,
+        "call_cap": 1, "output_token_cap": output_cap, "timeout_seconds": args.timeout_seconds,
         "status": "request_prepared", "cost": "unknown",
     }
     (run_dir / "attempt.json").write_text(json.dumps(request_evidence, indent=2) + "\n")
@@ -256,7 +258,7 @@ def execute(args):
     try:
         response = _call_model(api_key=key, base_url="https://opencode.ai/zen/go/v1",
                                model=args.model, prompt=packet, timeout=args.timeout_seconds,
-                               max_output_tokens=8000, response_schema=VERDICT_SCHEMA,
+                               max_output_tokens=output_cap, response_schema=VERDICT_SCHEMA,
                                session_id=run_id.removeprefix("opencode-"))
         verdict = parse_response(response, args.model)
     except Exception as exc:
@@ -303,7 +305,7 @@ def execute(args):
         "generated_at": datetime.now(timezone.utc).isoformat(), "read_only": True,
         "input_sha256": digest(packet.encode()), "documents": manifest,
         "design_hashes": before_hashes, "report_sha256": digest(report.read_bytes()),
-        "verdict": verdict["verdict"], "call_cap": 1, "output_token_cap": 8000,
+        "verdict": verdict["verdict"], "call_cap": 1, "output_token_cap": output_cap,
         "usage": usage, "cost": "unknown",
     }
     result = run_dir / "result.json"
@@ -334,6 +336,8 @@ def main(argv=None):
     parser.add_argument("--key-file", default=os.environ.get("OPENCODE_API_KEY_FILE", ""))
     parser.add_argument("--timeout-seconds", type=int, default=300)
     parser.add_argument("--call-cap", type=int, default=0)
+    parser.add_argument("--output-token-cap", type=int, choices=[8000, 16000], default=8000,
+                        help="16000 requires the owner's separately approved design/recheck scope")
     parser.add_argument("--allow-provider-egress", action="store_true")
     parser.add_argument("--prepare-only", action="store_true")
     parser.add_argument("--tooling-review", action="store_true",

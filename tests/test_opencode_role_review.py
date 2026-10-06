@@ -297,3 +297,13 @@ def test_truncated_response_preserves_known_telemetry_without_approval(tmp_path,
     assert failure["finish_reason"] == "length"
     assert failure["usage"] == payload["usage"]
     assert records == []
+
+
+def test_explicit_design_recheck_output_cap_reaches_provider_and_receipt(tmp_path, monkeypatch):
+    args, calls, records = setup_run(tmp_path, monkeypatch)
+    args.output_token_cap = 16000
+    assert review.execute(args) == 0
+    assert calls[1]["max_output_tokens"] == 16000
+    result = json.loads(next((tmp_path / ".playbook-artifacts/opencode-runs").glob("*/result.json")).read_text())
+    assert result["output_token_cap"] == 16000
+    assert records
