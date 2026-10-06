@@ -204,3 +204,26 @@ def test_runner_has_no_silent_codex_fallback(monkeypatch):
     assert calls == []
     assert run_codex_role.main(["verify", "--result", "historical.json"]) == 0
     assert calls == [["run_codex_role", "verify", "--result", "historical.json"]]
+
+
+@pytest.mark.parametrize("error_type", ["http", "timeout"])
+def test_failed_actual_attempt_keeps_safe_evidence_and_never_publishes_verdict(tmp_path, monkeypatch, error_type):
+    from urllib.error import HTTPError
+    args, calls, records = setup_run(tmp_path, monkeypatch)
+    error = HTTPError("https://opencode.ai/zen/go/v1/chat/completions", 503,
+                      "synthetic-secret-value", {}, None) if error_type == "http" else TimeoutError("synthetic-secret-value")
+    def failed_provider(**kwargs):
+        raise error
+    monkeypatch.setattr(mimo_code_review, "_call_model", failed_provider)
+    with pytest.raises(type(error)):
+        review.execute(args)
+    attempt_dirs = list((tmp_path / ".playbook-artifacts/opencode-runs").iterdir())
+    assert len(attempt_dirs) == 1
+    failure = json.loads((attempt_dirs[0] / "failure.json").read_text())
+    assert failure["status"] == "no_valid_verdict"
+    assert failure["provider_outcome"] == "unknown"
+    assert failure["http_status"] == (503 if error_type == "http" else None)
+    assert failure["call_cap"] == 1
+    assert "synthetic-secret-value" not in (attempt_dirs[0] / "failure.json").read_text()
+    assert records == []
+    assert not (attempt_dirs[0] / "result.json").exists()

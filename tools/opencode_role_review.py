@@ -72,6 +72,10 @@ def prepare_packet(root: Path, task: str, feature: str, role: str):
             # Whitespace reduction preserves every field and scope; the
             # manifest remains bound to the exact original registry bytes.
             content = json.dumps(json.loads(content), ensure_ascii=False, separators=(",", ":"))
+        if ref in {"tools/opencode_role_review.py", "tools/run_codex_role.py"}:
+            # AST normalization retains the complete executable source and
+            # docstrings; original bytes/hashes remain in the manifest.
+            content = ast.unparse(ast.parse(content))
         if role == "program_design_review" and ref == "docs/PROJECT_BRIEF.md":
             # Its full intent is already in the feature brief/spec. Keep the
             # exact authority hash and drift guard while avoiding repetition.
@@ -169,11 +173,29 @@ def execute(args):
     run_dir = root / ".playbook-artifacts" / "opencode-runs" / run_id
     run_dir.mkdir(parents=True, exist_ok=False)
     (run_dir / "input_manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    request_evidence = {
+        "schema_version": "assistant.opencode_review_attempt.v1",
+        "run_id": run_id, "role": args.role, "task": args.task,
+        "reviewed_head": head, "requested_model": args.model,
+        "input_sha256": digest(packet.encode()), "input_bytes": len(packet.encode()),
+        "call_cap": 1, "output_token_cap": 8000, "timeout_seconds": args.timeout_seconds,
+        "status": "request_prepared", "cost": "unknown",
+    }
+    (run_dir / "attempt.json").write_text(json.dumps(request_evidence, indent=2) + "\n")
     # Existing transport performs ONE request, with no automatic retries.
-    response = _call_model(api_key=key, base_url="https://opencode.ai/zen/go/v1",
-                           model=args.model, prompt=packet, timeout=args.timeout_seconds,
-                           max_output_tokens=8000)
-    verdict = parse_response(response, args.model)
+    try:
+        response = _call_model(api_key=key, base_url="https://opencode.ai/zen/go/v1",
+                               model=args.model, prompt=packet, timeout=args.timeout_seconds,
+                               max_output_tokens=8000)
+        verdict = parse_response(response, args.model)
+    except Exception as exc:
+        code = getattr(exc, "code", None)
+        failure = {**request_evidence, "status": "no_valid_verdict",
+                   "error_type": type(exc).__name__,
+                   "http_status": code if type(code) is int and 100 <= code <= 599 else None,
+                   "provider_outcome": "unknown", "observed_model": None}
+        (run_dir / "failure.json").write_text(json.dumps(failure, indent=2) + "\n")
+        raise
     if workflow.git_commit(root) != head:
         raise ReviewBlocked("reviewed HEAD changed during execution")
     for item in manifest:

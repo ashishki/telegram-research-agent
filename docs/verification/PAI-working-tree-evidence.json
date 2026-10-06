@@ -34,7 +34,7 @@
     },
     {
       "path": "docs/CODEX_PROMPT.md",
-      "sha256": "5f33d462241fd3b8e50db4741d65d370809e88734c75d08f9733ab1ffa190fe9"
+      "sha256": "8def44f1d65b57c4918634adb46b4a57c5e607bfe78af41163b71f295b0a00f8"
     },
     {
       "path": "docs/IMPLEMENTATION_CONTRACT.md",
@@ -126,11 +126,11 @@
     },
     {
       "path": "docs/verification/PAI-00-reconciliation.md",
-      "sha256": "1c31147cfff2c7d2d620433d4f156712a718690847584b01f4720a61bdb2c30e"
+      "sha256": "132fc416f5ebd1319a2d5986d0469ecdfc2037fd7f36214c0d90c21472675fdb"
     },
     {
       "path": "docs/verification/PAI-01-durable-design.md",
-      "sha256": "b80799e83d95f90263887defecfe11cb3174ca7bb4c588148b1216efcc34a1cd"
+      "sha256": "1a6b1321c6ba79308ee11718151e28f163ac42cf0731a073bb5eb43a7c34f4fc"
     },
     {
       "path": "docs/verification/PAI-access-release-pilot-packet.md",
@@ -138,7 +138,7 @@
     },
     {
       "path": "docs/verification/PAI-progress.md",
-      "sha256": "22ae2bcf78b2223a7e6f83b28f47ba0b4533f36dde064954549ab9d33c9c305d"
+      "sha256": "46faaa73df60a69046c00ef3222b6cd09e580a96ece3626082dc9384ad1cec2b"
     },
     {
       "path": "tests/test_assistant_conversation.py",
@@ -150,7 +150,7 @@
     },
     {
       "path": "tests/test_opencode_role_review.py",
-      "sha256": "b73002b2306ff2d3b04bc224659a47e68711cb3bb4e72b14867049a9b034698a"
+      "sha256": "b8097da8ef06fb972fb62d38118e8611c6a853d0540fc6cc89a0277d5fdbb08c"
     },
     {
       "path": "tests/test_pai_plan.py",
@@ -170,7 +170,7 @@
     },
     {
       "path": "tools/opencode_role_review.py",
-      "sha256": "9c51799fc1a056f2c01ef8e68099220ad78be0b0cb24c9cd053df2ebb1f62e7e"
+      "sha256": "d972b84b2e2a6fbecbb862943e189bc081104dda897099248757b0041d0b7fe9"
     },
     {
       "path": "tools/playbook.py",
@@ -193,5 +193,12 @@
     "UTD_intelligence_layer_research_report.md",
     "docs/prompts/astra6_strategy.md"
   ],
-  "scope": "PAI-00 reconciliation and PAI-01 draft preparation, not full product completion"
+  "scope": "PAI-00 reconciliation and PAI-01 draft preparation, not full product completion",
+  "checkpoint_head": "07f24757dccef9cd7e5118a7a1d19be85dd5b656",
+  "actual_review_attempts": {
+    "program_design_review": "HTTPError, no verdict",
+    "product_design_review": "TimeoutError, no verdict",
+    "call_cap": 2,
+    "remaining_calls": 0
+  }
 }

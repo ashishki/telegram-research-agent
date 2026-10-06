@@ -135,3 +135,51 @@ Phase-A checkpoint spans instruction reconciliation, baseline fixtures, scoped
 runner code/tests and paired design across 46 files (including the hash manifest).
 Draft PAI-00 file budget is 48; code-card budgets remain 24. This is a proposed
 scope recorded before review/approval, not a retroactive accepted budget.
+
+## Actual independent review attempts and bounded failure — 2026-10-06
+
+Checkpoint SHA: 07f2475. The owner approved the exact project brief and two
+bounded Mimo calls. Pinned draft succeeded on the clean scoped checkpoint;
+design_session and planning selection are real workflow-generated artifacts.
+
+Both independent processes ran the actual approved OpenCode Go request:
+python3 tools/run_codex_role.py run --provider opencode-go --task PAI-01
+--feature-id PAI --role program_design_review --allow-provider-egress --call-cap 1
+--key-file <documented owner OpenCode Go credential file>
+The matching product_design_review invocation used the second approved call.
+The file was read only for these real authorized requests; its contents were
+not printed, stored in reports or committed.
+
+Program invocation exited 2: HTTPError. Product invocation exited 2:
+TimeoutError (180 s request timeout). No valid model verdict, report or generic
+review approval record was produced. Requested model: mimo-v2.6-pro; observed
+model/effort/usage/cost: unknown, not invented. Both attempts count against the
+approved cap, including the unknown outcome; there were no automatic retries.
+Original runner retained only exception types, so HTTP status/body are unknown.
+Post-hoc failure-from-tool-output.json records preserve that limitation in each
+.playbook-artifacts/opencode-runs directory beside the exact input manifests.
+
+Failure instrumentation now records prepared attempt, safe HTTP status/type,
+request/hash/caps and unknown outcome, without provider body or credentials.
+Program source is AST-normalized with exact original-byte hashes; complete
+executable semantics/docstrings remain and no requirement field is dropped.
+Current full-spec program packet is <200000 bytes; dry-run returns planning_gate
+null and provider_call false. The targeted role/legacy-review tests pass:
+PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q
+tests/test_opencode_role_review.py tests/test_strategy_reviewer.py
+Result: 28 passed in 8.00 s. No product code/provider fallback was changed.
+
+Primary endpoint/model verification: https://opencode.ai/docs/go/ (checked
+2026-10-06), matching mimo-v2.6-pro and /zen/go/v1/chat/completions. This public
+reference does not prove key health, quota, API success or a reviewer verdict.
+
+The initial two-call cap is exhausted. A concrete follow-up scope question asks
+an overall cap of 30 local-program calls, or 8 for phase A only, still <=200KB
+input, <=8000 output tokens, <=300 s timeout and no automatic retries/private
+payload/model substitution. No answer is inferred from elapsed time.
+
+Next safe preparation command:
+python3 tools/run_codex_role.py run --provider opencode-go --task PAI-01
+--feature-id PAI --role program_design_review --prepare-only
+Actual repeats remain gated on the new explicit cap. Fix/review readiness and
+hash-bound feature approval remain separate; none of PAI-02..26 is implemented.
