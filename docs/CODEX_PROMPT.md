@@ -7,7 +7,8 @@ Do not restart historical tasks or run the historical full pytest suite.
 
 PAI-02 is locally verified with actual isolated PostgreSQL, migrations,
 transactional CAS object versions, corruption guards and dump/restore tests.
-Receipt: docs/verification/PAI-02-storage.md. Next: PAI-03 durable shared policy.
+Receipt: docs/verification/PAI-02-storage.md. PAI-03 shared policy is locally verified (86 cases, zero skips); next PAI-04
+durable proposals/confirmations/attempts/receipts.
 Use .venv-pai/bin/python (psycopg 3.3.6 installed with verified wheel hash).
 Do not read .env/production DSNs or change services/timers/live accounts.
 

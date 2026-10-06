@@ -595,6 +595,12 @@ def commit_transport_reservations(reservations: Sequence[BudgetReservation]) -> 
     unique_reservations = tuple(sorted({id(item): item for item in reservations}.values(), key=id))
     if not unique_reservations:
         return False
+    registries = {item.registry for item in unique_reservations}
+    if any(type(registry).__module__ == "prm.storage.policy" for registry in registries):
+        from .storage.policy import DurableCapabilityRegistry
+        if len(registries) != 1 or type(next(iter(registries))) is not DurableCapabilityRegistry:
+            return False
+        return next(iter(registries))._commit_durable_transport(unique_reservations)
     operation_registries: dict[str, CapabilityRegistry] = {}
     for reservation in unique_reservations:
         operation_ref = reservation.operation_ref
