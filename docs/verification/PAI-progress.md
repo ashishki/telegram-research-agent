@@ -2,7 +2,7 @@
 
 Updated: 2026-10-06. Source HEAD: 8faee4232cb30e6b6f39cfbd974c151846f79da6.
 Branch: docs/personal-assistant-blueprint-playbook-20260918.
-New work is an uncommitted local diff; no reviewed commit exists.
+Scoped checkpoints 07f2475 and 985f8f2 are committed/published; no valid independent verdict exists.
 Original PA states/receipts and new formal PAI planned states are preserved.
 Engineering status below is separate from design/live/human acceptance.
 Current work: PAI-00 local baseline verified; PAI-01 reviews/human gate pending.
@@ -62,7 +62,8 @@ backend supports product/program design records with opencode_go binding via
 real pinned writer/parser, distinct from Codex run traces. Prepare-only works;
 actual API calls and human brief/design acceptance have not occurred.
 
-Current checkpoint 07f2475; latest local diff hardens safe failure evidence.
+Published code/tool checkpoint 985f8f2; safe failure hardening is committed.
 The two actual Mimo attempts failed without verdict. They are not synthetic
 PASS or design acceptance. New bounded-call scope is pending; source/data
 permissions otherwise persist unchanged. Current goal remains active.
+\nPublication: git push origin HEAD succeeded, 8faee42..985f8f2 on the assigned\nbranch. No release/deployment claim. Latest handoff is the current CODEX_PROMPT.\n

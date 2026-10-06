@@ -2,90 +2,104 @@
 
 Updated: 2026-10-06
 Branch: docs/personal-assistant-blueprint-playbook-20260918
-Source HEAD: 8faee4232cb30e6b6f39cfbd974c151846f79da6
+Latest code/tool checkpoint: 985f8f2ecbbbe0ab28a62e8a4cd09295a0d2266e (published)
+Initial source: 8faee4232cb30e6b6f39cfbd974c151846f79da6
 Pin: d570163ab17ec3b4245187c778f1e8d89af9690f
 
-## Current assignment and stop point
+## Assignment and current stop point
 
 The owner assigned the latest Sol task pack end to end and requested a goal.
-Safe local PAI-00..26 implementation and synthetic tests are authorized,
-including isolated test PostgreSQL within PAI-02. Design approval, paid egress,
-live accounts, delivery/services/timers, production migrations/deploy and release
-remain distinct gates. Goal remains active; the full programme is not completed.
+Goal is active, full programme incomplete. Safe local PAI-00..26 implementation,
+synthetic tests and isolated test PostgreSQL in PAI-02 are authorized. Exact
+feature design, real accounts/private egress, services/timers, production
+migrations/deploy and release keep their explicit gates.
 
-Current work is PAI-00 baseline/reconciliation and PAI-01 exact draft design.
-Use docs/verification/PAI-progress.md and the two receipts for actual results,
-next work and limitations. All formal PAI states remain planned; original PA
-design remains review_required. Do not restart PA-00..17 based on planned alone.
+PAI-00 is local_verified, with independent phase-A review still pending.
+PAI-01 has a concrete draft but is blocked_external on actual reviewer evidence.
+Do not implement dependent PAI-02..26 before the required exact design gate.
+PAI-27..29 are prepared only as preliminary access/release/pilot decisions;
+actual runtime CLI/runbook and real acceptance remain future work. Redis/archive
+migration are conditional and neither measured condition is satisfied here.
 
-## Current files and registration
+## Recorded owner decisions — do not re-ask these
+
+The owner explicitly retained OpenCode Go/mimo-v2.6-pro as independent reviewer.
+The owner answered “да, всё разрешаю” to the exact project-brief hash and two
+bounded initial Mimo design-review calls. PROJECT_BRIEF.md records that real
+brief decision; it is not feature approval or account/deployment authority.
+
+Pinned plan PAI-01 returned ready. Pinned interactive select-plan recorded the
+assigned designed_slices under explicit delegation, with human:owner as alias.
+Pinned draft generated the real design_session on the clean committed tree.
+No approval fields were hand-edited and no independent verdict was invented.
+
+Both authorized API attempts were actually made against 07f2475:
+program_design_review -> HTTPError; product_design_review -> TimeoutError.
+No valid reviewer report/approval record exists. Requested model Mimo; observed
+model/effort/usage/cost unknown. Original failure status/body was unavailable.
+Exact input manifests and conservative failure-from-tool-output records stay in
+.playbook-artifacts/opencode-runs/. No raw error body/credential was logged.
+
+Two attempts consumed the initial cap, including failures/unknown outcomes.
+The follow-up question offers total 30 bounded calls for local PAI-00..26,
+or 8 for phase A, or retaining cap 2. It is still unanswered. Do not infer
+consent from elapsed time or the UI default, and do not repeat model calls yet.
+
+## Current design, runner and evidence
 
 Sol entrypoint: docs/prompts/pa_sol_implementation.md.
 Engineering queue: docs/PA_IMPLEMENTATION_TASKS.md.
-New formal tasks: PAI-00..31 in docs/tasks.md, feature PAI.
-Paired design: docs/design/PAI.md / PAI.design.json; draft, human_required.
-Proposed runtime decision: docs/adr/ADR-013-pa-durable-runtime.md.
-Original PA tasks/registry are preserved with their historical evidence.
+Formal tasks: PAI-00..31 in docs/tasks.md, paired draft feature PAI.
+Design: docs/design/PAI.md / PAI.design.json; draft, human_required.
+Proposed runtime: docs/adr/ADR-013-pa-durable-runtime.md.
+Progress and receipts: docs/verification/PAI-progress.md,
+PAI-00-reconciliation.md and PAI-01-durable-design.md.
 
-There are two conditional cards, Redis/archive transfer; neither condition is
-measured or satisfied here. Do not silently make them release dependencies.
-PAI-27..29 need actual access/release/pilot evidence for PA-18 completion.
+Original PA registry remains review_required and its 19 formal task states
+are preserved. New formal PAI states remain planned; coverage does not create
+completion. Task/reference validator has 51 missing-approval errors (19 old +
+32 draft PAI), no structural/reference errors. The PAI checker validates all
+32 mappings/dependencies; 28 future acceptance test files are absent. Strict
+implemented-tests mode exits 1. Do not treat structure as implementation proof.
 
-## Evidence and known gates
+Local Role Runner --provider opencode-go handles product/program design roles
+via the actual pinned generic design-record writer/parser and an honest
+opencode_go binding. Separate assistant.opencode_design_review evidence is not
+a Codex role-run trace. The native old review projection would rewrite binding
+as codex_exec: never copy OpenCode reports into its default Codex report path
+or refresh them through that projection. Approve reads the genuine generic
+records after actual successful reviews. Other non-Codex role support remains
+a future scoped extension. No-provider run fails closed, no Codex fallback.
 
-See current receipts for targeted tests and focused tier results. The final current-scope focused-prm tier passed 609 tests in 128.75 s.
-The historical PA-00 confirmation UX failure passes; a current conversation
-fixture mixed fixed September data with wall time. The correction controls
-time and tests missing-version denial, expired confirmation and expired state.
-This is a test repair, no runtime authorization change.
+Latest failure hardening records safe HTTP status/type, attempt/caps and unknown
+outcome, without error bodies/secrets. Input <=200000 bytes, actual output cap
+8000 tokens, one request per process, no redirects/automatic retries. Full
+specification/requirements are preserved; registry whitespace and program-source
+AST formatting are normalized with exact original-byte hashes retained.
 
-The owner’s September 23 non-Codex review amendment supersedes older Terra
-recipes. docs/REVIEW_POLICY.md records role/runner/receipt compatibility.
-The owner reconfirmed Mimo in this session. Native upstream harness is Codex-
-only; the local --provider opencode-go backend now prepares product/program
-packets and supports genuine generic pinned design records with honest non-Codex
-binding. Its separate evidence is not a Codex receipt. Code-range advisory
-reports still do not supply design-role records. Synthetic adapter checks pass;
-actual independent review awaits brief/planning and explicit call limits. The owner now explicitly authorized the exact brief and two initial bounded
-Mimo design-review calls (<=200KB input, <=8000 output tokens, no retries/private
-payload); credential access is only for those actual calls.
+Focused-prm passed 609 tests in 128.75 s at the first checkpoint. After failure
+instrumentation, role/legacy-review targeted tests passed 28 in 8.00 s.
+Two fixed baseline tests mixed historical fixture dates with current clocks;
+their denial/source assertions remain. Historical PA-00 UX regression passes.
+Actual Mimo integration failed; product provider/owner/runtime acceptance is
+not established by these synthetic tests.
 
-Pinned planning for PAI-01 now returns ready: the owner approved the exact
-project brief; selected depth is the assigned designed_slices, recorded through
-interactive select-plan under delegation.
-No human selection/approval fields were synthesized. Mandatory independent
-product/program reviews and exact hash-bound human design approval are pending
-before dependent PAI-02..26 work. Prepare authorized independent work meanwhile.
+## Preservation and resume
 
-## Preservation and continuation
+Two unrelated local documents are unchanged and excluded only via local
+Git info/exclude: UTD_intelligence_layer_research_report.md and
+docs/prompts/astra6_strategy.md. Owner-provided strategy/queue prerequisites
+were included in the scoped checkpoint. No master edit, reset or force push.
+The entering historical handoff is CODEX_PROMPT.before-pai-20261006.md.
+No production DB/service/timer/account was touched; keys were read only for
+the two expressly authorized review requests, never availability scanning.
 
-At entry, CODEX_PROMPT/tasks were modified and task pack/Sol/strategy/Astra/UTD
-documents were untracked. Relevant queue documents were updated in scope;
-unrelated Astra/UTD/strategy content is untouched. Original entering handoff is
-docs/CODEX_PROMPT.before-pai-20261006.md, retaining amendment provenance.
-The older September checkpoints are historical references, not competing tasks.
-No private data, production database, service, timer or key was read/changed.
-
-Next command:
-python3 tools/playbook.py feature_workflow --root . plan --task PAI-01
-
-The brief/planning decision is recorded; do not rerun it without drift.
-Then select-plan/draft/review and exact approve through the pinned workflow;
-do not fake interactive answers or import old PA approval. Fix P0/P1 with
-independent recheck and continue the first ready card without asking per file.
-
-Safe reviewer packet command, already exercised without API calls:
+Safe next command, no API call:
 python3 tools/run_codex_role.py run --provider opencode-go --task PAI-01 --feature-id PAI --role program_design_review --prepare-only
-It reports the real planning gate and exact packet hash; never a review verdict.
 
-## Latest continuation — actual Mimo failure
-
-Scoped checkpoint: 07f2475. Brief/planning are approved/selected; draft session
-was generated by pinned workflow. Both authorized design-review calls were
-actually attempted (program HTTPError; product TimeoutError), with no model
-verdict or review approval. Initial cap 2 is exhausted; a follow-up cap question
-is pending. Latest local diff stores safe failure status/counters without keys
-or raw error bodies; 28 targeted tests pass. No Codex fallback is allowed.
-Do not re-request brief consent or claim a review. Resume the actual Mimo roles
-only after additional bounded calls are authorized, then fix/recheck findings
-and obtain exact hash-bound feature approval before PAI-02.
+After new bounded calls are authorized: run the actual program/product roles
+with --allow-provider-egress --call-cap 1 and --timeout-seconds 300 using the
+documented key file for execution only. Each attempt counts against the total.
+Freeze HEAD/documents during a review, resolve P0/P1 with independent recheck,
+then get exact hash-bound feature approval through the pinned workflow. Continue
+the first ready assigned card without repeated per-file consent.

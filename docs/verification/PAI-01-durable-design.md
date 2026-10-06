@@ -161,3 +161,8 @@ python3 tools/run_codex_role.py run --provider opencode-go --task PAI-01
 --feature-id PAI --role program_design_review --prepare-only
 Actual repeats remain gated on the new explicit cap. Fix/review readiness and
 hash-bound feature approval remain separate; none of PAI-02..26 is implemented.
+
+Published continuation checkpoint: 985f8f2ecbbbe0ab28a62e8a4cd09295a0d2266e.
+Both scoped commits were pushed to the assigned branch (exit 0). Pinned draft
+was rerun on the clean hardening checkpoint. No actual reviewer verdict or
+feature acceptance is inferred. The live HTTPError/timeout evidence remains.
