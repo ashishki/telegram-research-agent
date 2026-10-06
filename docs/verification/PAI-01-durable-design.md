@@ -302,3 +302,27 @@ review judgment is added. Missing phases, stale HEAD/context, mismatched
 model/scope, or STOP_SHIP cannot become a full PASS. The generic pinned consumer
 receives only that completed reviewed set. Model/thinking defaults remain the
 owner's Mimo choice. No private/live authority or feature approval is invented.
+
+## Actual narrow P1 recheck and remaining complete-design gate
+
+Independent Mimo returned scoped PASS for both original P1 findings at e262f27.
+Report: PAI-01-product-P1-recheck.json. Scope is exactly runtime/checker edit
+permission and fine-grained requirement/scenario traceability. Its P2 notes that
+paths resolve through slice_bindings, and its explicit limitations exclude full
+programme/content/runtime/human approval. No complete-design record is minted.
+
+Full and first phase 300 s calls continued to time out. The current remaining
+blocker is complete programme review under the response deadline, not those
+two P1s. Four-phase aggregation covers all 32 slices/spec sections 0..15 and
+denies partial/stale results; targeted tests: 47 passed in 10.20 s. Actual full
+records still absent. Failed/unknown attempts all count: 14 calls used of 30.
+All model processes observed here are terminal; no live handle is inferred
+from old files. Current question proposes only a bounded deadline extension
+900 s for design calls, preserving data/model/thinking/input/output/total caps.
+Until answered, no request may silently exceed 300 s.
+
+Next safe command:
+python3 tools/run_codex_role.py run --provider opencode-go --task PAI-01 --feature-id PAI --role program_design_review --slice-group foundation --prepare-only
+After deadline choice: rerun actual phases sequentially, complete both required
+roles and tooling audit, resolve/recheck any remaining findings, then seek the
+actual hash-bound human feature approval. PAI-02..26 remain unimplemented.

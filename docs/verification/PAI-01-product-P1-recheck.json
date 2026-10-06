@@ -1,0 +1,41 @@
+{
+  "schema_version": "assistant.opencode_scoped_recheck.v1",
+  "scope": "two original product P1 findings only",
+  "reviewed_head": "e262f277614039120612511d045001f0d4200c49",
+  "input_sha256": "6304b89405a958b5578ea8e7f6c033744d75d71290567f540f2e8424ef6f5ade",
+  "input_bytes": 62408,
+  "call_cap": 1,
+  "output_token_cap": 4000,
+  "full_design_approval": false,
+  "status": "scoped_recheck_completed",
+  "observed_model": "mimo-v2.6-pro",
+  "verdict": {
+    "verdict": "PASS",
+    "findings": [
+      {
+        "severity": "P2",
+        "title": "Requirement rows resolve paths only indirectly via slice_bindings",
+        "issue": "PAI.requirements.json rows carry slices/verification_refs/review_roles/human_gate, but expected_paths are reached only through slice_bindings (requirement→slice→path). Traceability chain exists and is checker-enforced, but path binding is not per-row explicit.",
+        "fix": "Optional: add expected_paths to each requirement row or state the chain contract in the schema; not blocking since check_pai_plan validates slice membership and slice-level paths."
+      }
+    ],
+    "not_verified": [
+      "check_pai_plan.py was analyzed statically; its claimed exit 0 was not independently reproduced.",
+      "Registry internals of PAI-00 and PAI-02..PAI-31 (only extracts supplied) and whether all matrix verification_refs resolve in docs/design/PAI.design.json.",
+      "Content quality of the PAI design/ADR deliverables, future test implementations, runtime behaviour, live/SLO evidence and human acceptance — all out of scope and still 'planned'.",
+      "Whether the spec markdown SHA and §13.2 bullet extraction match the actual file contents."
+    ],
+    "summary": "Both original P1s are resolved in the packet. (1) PAI-01 is now doc/ADR-only (allowed_files contain no src/, tests/ or tools/ paths), so runtime code and tools/check_pai_plan.py are outside its edit scope and it cannot edit its own checker; the checker enforces this (rejects src/tests/tools in PAI-01 allowed_files) plus allow/forbidden overlap checks. Since scope is doc-only, the 'doc-only scope or behavioral tests' alternative is satisfied and structural planning verification is proportionate. (2) Fine-grained traceability now exists: 69 exact spec IDs each map to slices (therefore expected_paths), verification_refs, review_roles and a human_gate; SC13.2-01..10 map to slices, synthetic/recovery test nodes, review roles and human evidence; PAI-26 enumerates all 10 scenarios in expected_interfaces and registers the E2E/load test files, with the checker enforcing spec-ID set equality, verbatim §13.2 scenario text, valid refs and PAI-26 registration. No unresolved P0/P1; no STOP_SHIP. Verdict is limited to these two findings — it is not approval of the full programme, implementation, tests, runtime or human acceptance."
+  },
+  "usage": {
+    "prompt_tokens": 16744,
+    "completion_tokens": 3433,
+    "total_tokens": 20177,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 2877
+    }
+  }
+}

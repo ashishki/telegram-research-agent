@@ -103,3 +103,16 @@ After a new explicit call cap: freeze HEAD/documents, run actual program/product
 Mimo reviews, fix P0/P1 with independent recheck, then obtain exact hash-bound
 feature approval through the pinned workflow. Proceed to the first ready card
 without per-file consent. Do not restart completed historical PA slices.
+
+## Latest review checkpoint
+
+Owner funded total 30 Mimo calls and design/recheck output up to 16000. Fourteen
+attempts including failures/diagnostic count against it. Original product P1
+scope/traceability findings now have actual independent scoped PASS; this does
+not approve the whole design. Full and phase requests hit 300 s timeout.
+The complete four-phase review/finalizer preserves all 32 slices and spec 0..15
+and cannot promote partial evidence. Source and report details:
+docs/verification/PAI-01-durable-design.md and PAI-01-product-P1-recheck.json.
+Owner deadline-extension question (900 s, other bounds unchanged) is pending;
+do not infer consent or spend more calls blindly. Required full programme
+reviews/feature approval precede dependent PAI code work.
