@@ -7,7 +7,7 @@ Initial source: 8faee4232cb30e6b6f39cfbd974c151846f79da6.
 Full programme remains unfinished; owner resumed the existing goal. Formal PA/PAI states are preserved; engineering
 status below does not grant independent, human or runtime acceptance.
 
-Current card: PAI-04. PAI-02 locally verified under owner proceed instruction ADR-014.
+Current card: PAI-05. PAI-02 locally verified under owner proceed instruction ADR-014.
 Formal design states remain unchanged. Previous design-only stop no longer blocks local code.
 
 Historical design preparation checkpoint: PAI-01. Draft/brief/planning are prepared and authorized.
@@ -23,7 +23,7 @@ Nineteen calls are consumed before the separate tooling audit.
 | PAI-01 / PA-01, PA-02, PA-09, PA-13, PA-16, PA-17 | in_progress | draft paired design + proposed ADR-013 | proposed topology only | pinned schema/mapping pass | two original product P1 independently resolved by scoped PASS; full review missing | none | none | brief/planning funded; complete independent reviews/exact design approval pending |
 | PAI-02 / PA-01, PA-17 | local_verified | PostgreSQL target/UOW/versioned objects/migration | actual CLI, separate-process DB and dump/restore | 31 passed in 9.55 s; zero skips | phase-B pending | no production/account | none claimed | next PAI-03 |
 | PAI-03 / PA-02, PA-16 | local_verified | shared PostgreSQL grants/counters/windows/operation ledger | existing transport-group helper plus guarded adapter call | 86 passed in 11.43 s; zero skips | phase-B pending | synthetic only | none claimed | next PAI-04 |
-| PAI-04 / PA-00, PA-13 | planned | existing PA contracts to reuse; no new PAI code | integration/restart/concurrency not demonstrated for PAI | new acceptance not run | none for new scope | none for new scope | none | PAI-03; PAI-01 design gate |
+| PAI-04 / PA-00, PA-13 | local_verified | PostgreSQL proposals/confirmations/attempt receipts | execute_action dispatches explicit durable backend | 36 passed in 32.02 s; zero skips | phase-B pending | fake provider only | none claimed | next PAI-05 |
 | PAI-05 / PA-03, PA-07, PA-14 | planned | existing PA contracts to reuse; no new PAI code | integration/restart/concurrency not demonstrated for PAI | new acceptance not run | none for new scope | none for new scope | none | PAI-03, PAI-04; PAI-01 design gate |
 | PAI-06 / PA-06, PA-09, PA-17 | planned | existing PA contracts to reuse; no new PAI code | integration/restart/concurrency not demonstrated for PAI | new acceptance not run | none for new scope | none for new scope | none | PAI-03, PAI-04; PAI-01 design gate |
 | PAI-07 / PA-03, PA-06, PA-09 | planned | existing PA contracts to reuse; no new PAI code | integration/restart/concurrency not demonstrated for PAI | new acceptance not run | none for new scope | none for new scope | none | PAI-05, PAI-06; PAI-01 design gate |
@@ -93,3 +93,6 @@ Next card PAI-03: persist shared grants, budgets and reservation lifecycle.
 PAI-03 locally verified: 86 passed in 11.43 s. Exact command and limits in
 PAI-03-durable-policy.md. New default application wiring remains PAI-07 work.
 Next PAI-04; no new paid model calls (20/30 consumed).
+
+PAI-04 acceptance: 36 passed in 32.02 s, zero skips/failures. Receipt
+PAI-04-durable-actions.md; phase-B review pending; next PAI-05.

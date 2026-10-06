@@ -358,6 +358,12 @@ def execute_action(
 ) -> ActionReceipt:
     """Execute exactly once; unknown outcomes are recorded, never retried here."""
 
+    if type(store).__module__ == "prm.storage.actions":
+        from .storage.actions import DurableActionStore
+        if type(store) is not DurableActionStore:
+            raise CapabilityDenied("unsupported durable action store")
+        return store.execute(action, request=request, executor=executor, now=now)
+
     proposal = action.proposal
     if (
         action.confirmation.proposal_version != proposal.version
