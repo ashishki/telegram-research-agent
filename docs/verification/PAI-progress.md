@@ -124,3 +124,11 @@ handling and private ingress controls. 119 cases passed, zero skips, in 38.30s.
 Receipt: docs/verification/PAI-08-scheduler.md. Final delivery quota/attempts and
 reconciliation are PAI-09 next; independent phase-B/C reviews and human/live
 acceptance remain pending. Mimo remains 21/30 calls consumed.
+# 2026-10-06 PAI-09 implementation checkpoint
+
+PAI-09 local code/tests verified: common final policy, durable send attempts/
+receipts/quotas, scoped provider reconciliation and unknown UI. 112 dependency
+cases passed in 91.89s; current delivery file 12 passed in 22.61s, zero skips.
+Receipt: docs/verification/PAI-09-delivery.md. Preserved/fixed connection-loss
+failure. Phase-C regression/review running; next PAI-10 after actual findings.
+No formal/human/live approval; Mimo count before phase-C call remains 21/30.

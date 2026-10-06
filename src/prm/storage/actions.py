@@ -175,9 +175,13 @@ class DurableActionStore:
         def invoke():
             with self.store.transaction() as tx:
                 row=tx.conn.execute('SELECT * FROM pa_actions.proposals WHERE owner=%s AND ref=%s FOR UPDATE',(self.owner_ref,proposal.proposal_ref)).fetchone()
-                if row['status']=='cancelled' or row['version']!=proposal.version or row['digest']!=proposal.digest:
+                moment=tx.conn.execute('SELECT clock_timestamp() AS now').fetchone()['now']
+                if (row['status']=='cancelled' or row['version']!=proposal.version or row['digest']!=proposal.digest
+                    or proposal.expires_at<=moment or action.confirmation.expires_at<=moment):
                     raise CapabilityDenied('proposal cancelled or changed before dispatch')
-                return executor.execute(action)
+                outcome=executor.execute(action)
+                if tx.conn.closed:raise StorageError('final action scope connection lost')
+                return outcome
         try:
             outcome=auth.reservation.registry.execute_reserved((auth.reservation,),invoke)
             if type(outcome)is not ExecutionOutcome:outcome=ExecutionOutcome('unknown',error_code='invalid_provider_outcome')

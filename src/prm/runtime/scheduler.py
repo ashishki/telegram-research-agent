@@ -292,7 +292,10 @@ class WatchCollectionWorker:
                     if row['revision'] != sub.consent_revision or _subscription_effect(current, now=self.scheduler._now(tx.conn)) != 'active':
                         raise CapabilityDenied('subscription paused, revised or expired')
                     queue._fenced(tx, lease)
-                    return self.collector(source, current)
+                    result = self.collector(source, current)
+                    if tx.conn.closed:
+                        raise StorageError('collection scope connection lost')
+                    return result
             collected = self.registry.execute_reserved((decision.reservation,), transport)
             if not isinstance(collected, (tuple, list)) or len(collected) > 32:
                 raise StorageError('bounded notification batch required')

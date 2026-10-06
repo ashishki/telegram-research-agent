@@ -20,13 +20,14 @@ class IntakeReply:
 class TelegramJobIngress:
     """Explicit synthetic target and authenticated private owner, no env fallback."""
 
-    def __init__(self, queue: JobQueue, *, owner_ref: str, owner_chat_id: str, watch_scheduler=None):
+    def __init__(self, queue: JobQueue, *, owner_ref: str, owner_chat_id: str, watch_scheduler=None, delivery_executor=None):
         if not owner_ref or len(owner_ref) > 128 or not re.fullmatch(r'[1-9][0-9]*', owner_chat_id):
             raise StorageError('explicit private owner required')
         self.queue = queue
         self.owner_ref = owner_ref
         self.owner_chat_id = owner_chat_id
         self.watch_scheduler = watch_scheduler
+        self.delivery_executor = delivery_executor
 
     def receive(self, update: dict) -> IntakeReply | None:
         if not isinstance(update, dict) or type(update.get('update_id')) is not int or update['update_id'] < 0:
@@ -45,6 +46,8 @@ class TelegramJobIngress:
                 return IntakeReply('Это действие недоступно; подтверждение не использовано.')
             return self.control(parts[1], parts[2])
         parts = text.split(maxsplit=1)
+        if parts and parts[0] == '/deliverystatus' and self.delivery_executor is not None:
+            return IntakeReply(self.delivery_executor.describe(owner=self.owner_ref, delivery_id=parts[1] if len(parts) == 2 else ''))
         if parts and parts[0].startswith('/watch') and self.watch_scheduler is not None:
             return self.watch_control(parts[0], parts[1] if len(parts) == 2 else '')
         if parts and parts[0] in {'/status', '/cancel', '/result'}:

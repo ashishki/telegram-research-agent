@@ -69,6 +69,12 @@ LOCAL_PROVIDER_REF = "provider_local"
 MAX_EPHEMERAL_REPLY_SENDS = 8
 
 
+def deliver_completed_prm_job(executor, *, owner_ref, job_id, destination_ref, upper_bound, effect_lease=None):
+    """Explicit durable path; configured tokens never grant delivery authority."""
+    return executor.deliver_result(owner=owner_ref, job_id=job_id, destination_ref=destination_ref,
+                                   upper_bound=upper_bound, effect_lease=effect_lease)
+
+
 def _assistant_for_prm(settings: Settings) -> PersonalResearchAssistant:
     """Keep only the bounded visible BriefDocument projection across turns."""
 

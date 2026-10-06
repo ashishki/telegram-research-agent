@@ -16,7 +16,10 @@ restarting reviewer-framework work. PAI-07 durable inbox/polling/worker/CLI
 composition is locally verified (51 cases, zero skips); receipt PAI-07-ingress.md.
 PAI-08 durable scheduler/Watch is locally verified (119 cases, zero skips;
 receipt PAI-08-scheduler.md). Proceed under ADR-014 to PAI-09 common durable
-delivery/reconciliation; fix actual P0/P1 when received.
+delivery/reconciliation; fix actual P0/P1 when received. PAI-09 code/tests are
+locally verified (112 dependency cases plus current 12 delivery cases);
+phase-C focused-prm and independent review are running. Receipt PAI-09-delivery.md.
+Next PAI-10 after addressing actual review findings; no live/provider wiring.
 Use .venv-pai/bin/python (psycopg 3.3.6 installed with verified wheel hash).
 Do not read .env/production DSNs or change services/timers/live accounts.
 

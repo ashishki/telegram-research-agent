@@ -284,6 +284,7 @@ class DurableCapabilityRegistry(CapabilityRegistry):
                     raise CapabilityDenied('grant changed before transport')
                 started=time.monotonic()
                 result=transport()
+                if conn.closed:raise StorageError('final policy connection lost; retain unknown operation')
                 if time.monotonic()-started>10:raise StorageError('bounded transport deadline exceeded; outcome requires reconciliation')
             self.settle(owner,operation,outcome='accepted')
             return result
