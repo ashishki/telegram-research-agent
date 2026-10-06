@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import hashlib
+import fnmatch
 from pathlib import Path
 import re
 import sys
@@ -69,9 +71,51 @@ def check(root: Path = ROOT) -> int:
         future_tests.update(p for p in registered_tests if not (root / p).is_file())
     if coverage != pa_ids:
         raise ValueError("original PA programme coverage incomplete")
+    matrix = json.loads((root / "docs/design/PAI.requirements.json").read_text())
+    spec = (root / "docs/PERSONAL_ASSISTANT_SPEC.md").read_text()
+    spec_ids = set(re.findall(r"\*\*([A-Z]+-\d{2})\b", spec))
+    rows = matrix["requirements"]
+    if len(rows) != len(spec_ids) or {row["spec_id"] for row in rows} != spec_ids:
+        raise ValueError("fine-grained spec coverage incomplete or duplicated")
+    if matrix["spec_sha256"] != hashlib.sha256(spec.encode()).hexdigest():
+        raise ValueError("requirement matrix is stale against the full spec")
+    refs = {task + "/" + v["id"] for task, sl in slices.items() for v in sl["verification"]}
+    for row in rows:
+        if not row["slices"] or not set(row["slices"]) <= set(slices):
+            raise ValueError("unknown requirement slice: " + row["spec_id"])
+        if not row["verification_refs"] or not set(row["verification_refs"]) <= refs:
+            raise ValueError("unknown requirement verification: " + row["spec_id"])
+        if not row["review_roles"] or not row["human_gate"]:
+            raise ValueError("missing requirement review/human gate")
+    scenario_text = [line[2:].strip() for line in spec.split("### 13.2.")[1].split("**EVAL-03:")[0].splitlines() if line.startswith("- ")]
+    scenarios = matrix["scenarios"]
+    if len(scenarios) != len(scenario_text) or [s["source_text"] for s in scenarios] != scenario_text:
+        raise ValueError("mandatory scenario coverage differs from the full spec")
+    if [s["scenario_id"] for s in scenarios] != [f"SC13.2-{i:02}" for i in range(1, 11)]:
+        raise ValueError("mandatory scenario IDs incomplete or duplicated")
+    for scenario in scenarios:
+        if not set(scenario["slices"]) <= set(slices) or not scenario["review_roles"] or not scenario["human_evidence"]:
+            raise ValueError("mandatory scenario slice/review binding invalid")
+        if scenario["synthetic_test_node"].split("::")[0] not in {
+            arg for v in slices["PAI-26"]["verification"] for arg in v["argv"]
+        }:
+            raise ValueError("mandatory scenario is not registered in PAI-26")
+        if not any(interface.startswith(scenario["scenario_id"] + ":") for interface in slices["PAI-26"]["expected_interfaces"]):
+            raise ValueError("PAI-26 does not enumerate mandatory scenario")
+    if any(path.startswith(("src/", "tests/", "tools/")) for path in slices["PAI-01"]["allowed_files"]):
+        raise ValueError("design-only PAI-01 grants runtime/checker edit scope")
+    for task, sl in slices.items():
+        for allowed in sl["allowed_files"]:
+            if any(allowed == forbidden or fnmatch.fnmatchcase(allowed, forbidden) for forbidden in sl["forbidden_files"]):
+                raise ValueError("allowed/forbidden scope overlap: " + task)
+        for v in sl["verification"]:
+            for arg in v["argv"]:
+                if arg.startswith("tests/") and arg.endswith(".py") and not (root / arg).exists() and not arg.startswith("tests/test_pai_"):
+                    raise ValueError("missing existing regression test: " + arg)
     if len((root / "docs/design/PAI.md").read_text()) > 20000:
         raise ValueError("design exceeds pinned renderer context limit")
     print("PAI plan: 32 registered packets; dependency/acceptance/PA coverage and pinned schema checks passed.")
+    print(f"Spec coverage: {len(rows)} exact requirement IDs, {len(scenarios)} mandatory scenarios; planned evidence is not a PASS.")
     print(f"Design state: {registry['status']}; {len(future_tests)} planned test files absent; no product/review/human/live claim.")
     return len(future_tests)
 

@@ -14,8 +14,9 @@ AGENTS/adoption/prompts. This is reviewer selection, not a new paid-call budget
 or permission to send private data. The 2026-10-06 Sol prompt explicitly keeps
 paid model calls behind scoped authority. The owner approved the exact brief and two initial Mimo reviews; both attempts
 failed without verdict. A later owner request authorized one tiny diagnostic,
-which confirmed Mimo connectivity/schema. The follow-up overall call cap is
-unanswered. Do not scan keys or infer more calls from model selection/silence.
+which confirmed Mimo connectivity/schema. The owner resumed the goal and authorized the recommended total 30-call cap
+for local PAI-00..26. Five requests are consumed before scoped rechecks.
+Per-call bounds/private-source exclusions persist; no credential availability scans.
 
 ## Roles, runners and receipt compatibility
 

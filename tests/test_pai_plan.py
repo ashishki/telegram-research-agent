@@ -52,3 +52,31 @@ def test_registration_rejects_task_drift_from_design_and_card(monkeypatch, chang
         "missing_task": "must cover PAI-00..31",
     }[change]):
         plan.check(ROOT)
+
+
+@pytest.mark.parametrize("mutation", ["requirement", "scenario", "verification", "runtime_scope", "scope_overlap"])
+def test_fine_spec_and_scope_gaps_cannot_pass_planning(monkeypatch, mutation):
+    import json
+    matrix_path = ROOT / "docs/design/PAI.requirements.json"
+    registry_path = ROOT / "docs/design/PAI.design.json"
+    matrix = json.loads(matrix_path.read_text())
+    registry = json.loads(registry_path.read_text())
+    if mutation == "requirement": matrix["requirements"].pop()
+    elif mutation == "scenario": matrix["scenarios"].pop()
+    elif mutation == "verification": matrix["requirements"][0]["verification_refs"] = ["PAI-99/invented"]
+    elif mutation == "runtime_scope": registry["slices"][1]["allowed_files"].append("src/prm/capabilities.py")
+    else: registry["slices"][24]["forbidden_files"].append("systemd/**")
+    original = Path.read_text
+    def read_text(path, *args, **kwargs):
+        if path.resolve() == matrix_path: return json.dumps(matrix)
+        if path.resolve() == registry_path: return json.dumps(registry)
+        return original(path, *args, **kwargs)
+    monkeypatch.setattr(Path, "read_text", read_text)
+    with pytest.raises(ValueError, match={
+        "requirement": "spec coverage incomplete",
+        "scenario": "scenario coverage differs",
+        "verification": "unknown requirement verification",
+        "runtime_scope": "grants runtime/checker",
+        "scope_overlap": "scope overlap",
+    }[mutation]):
+        plan.check(ROOT)

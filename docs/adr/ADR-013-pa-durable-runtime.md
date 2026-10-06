@@ -87,3 +87,16 @@ Single-writer cutover requires PAI-25 copy rehearsal and PAI-28 scoped authority
 Before new PostgreSQL writes, verified snapshot rollback is possible; afterwards
 only tested delta transfer or forward fix preserves receipts/unknown fences.
 Redis and archive migration require measured triggers and separate ADRs.
+
+## Unknown settlement and cross-store deletion
+
+Permanent unknown spend remains conservatively consumed in its original window.
+Owner-confirmed write-off consumes the upper bound; new work requires a distinct
+funded operation and never refunds/retries the unknown effect. PAI-03/23/26 test
+visible exhaustion, rollover and one-use conservative settlement.
+
+PostgreSQL tombstones govern visibility before non-atomic physical cleanup.
+Idempotent per-store steps/watermarks mark unavailable cleanup pending/partial;
+serving checks deny stale data and unavailable authority. Restores replay
+authority tombstones before reads. Independent canonical archive records are
+preserved. PAI-21/25/26 test outage, restart/restore and partial deletion.

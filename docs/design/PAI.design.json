@@ -5,7 +5,8 @@
     "docs/PA_IMPLEMENTATION_TASKS.md",
     "docs/adr/ADR-013-pa-durable-runtime.md",
     "docs/IMPLEMENTATION_CONTRACT.md",
-    "docs/design/PA.design.json"
+    "docs/design/PA.design.json",
+    "docs/design/PAI.requirements.json"
   ],
   "brief_ref": "docs/PERSONAL_ASSISTANT_BRIEF.md",
   "feature_id": "PAI",
@@ -49,7 +50,8 @@
         "tools/opencode_role_review.py",
         "tools/mimo_code_review.py",
         "tests/test_opencode_role_review.py",
-        "tests/test_memory_research.py"
+        "tests/test_memory_research.py",
+        "docs/design/PAI.requirements.json"
       ],
       "forbidden_files": [
         ".env",
@@ -104,17 +106,14 @@
       "user_visible_outcome": "конкретный согласованный проект, по которому можно писать код.",
       "scope": "ADR для PostgreSQL state/jobs + SQLite archive; выбрать очередь с обоснованием и границами своей реализации/библиотеки; описать ownership таблиц, versioned job payload, transitions, budgets, lease/fencing, dispatch/pause/revoke и неизвестные исходы. Зафиксировать запрет слепого takeover внешней попытки. Выбрать narrow locking или доказанный sequencer, показать trade-off. Определить retention, план cutover, test DB, SLO/load profile и registry mapping; параметры с финансовыми/live последствиями оставить решениями владельца.",
       "allowed_files": [
-        "docs/verification/**",
-        "docs/CODEX_PROMPT.md",
-        "docs/tasks.md",
-        "docs/PA_IMPLEMENTATION_TASKS.md",
         "docs/design/PAI.md",
         "docs/design/PAI.design.json",
-        "docs/adr/ADR-01*.md",
-        "src/prm/capabilities.py",
-        "src/prm/watch_jobs.py",
-        "src/prm/confirmed_actions.py",
-        "tools/check_pai_plan.py"
+        "docs/design/PAI.requirements.json",
+        "docs/adr/ADR-013-pa-durable-runtime.md",
+        "docs/PA_IMPLEMENTATION_TASKS.md",
+        "docs/tasks.md",
+        "docs/CODEX_PROMPT.md",
+        "docs/verification/**"
       ],
       "forbidden_files": [
         ".env",
@@ -1659,7 +1658,7 @@
       "slice_id": "PAI-26",
       "status": "planned",
       "user_visible_outcome": "один release candidate с полной requirement-to-evidence матрицей и конкретным списком оставшихся live-gates.",
-      "scope": "fixture E2E из спецификации через настоящий composition root и HTTP/Telegram test doubles; lifecycle connections/actions/memory/media; load на зафиксированном expected и 2× peak; process kill/restart, stale lease, budget contention, lost ACK, DB outage, restore и injection из каждого источника. Зафиксировать p95/queue lag/ресурсы и regression floors. Независимый review изменённого полного диапазона и P0/P1 recheck — по согласованной политике и бюджету, без приватного содержимого.",
+      "scope": "fixture E2E из спецификации через настоящий composition root и HTTP/Telegram test doubles; lifecycle connections/actions/memory/media; load на зафиксированном expected и 2× peak; process kill/restart, stale lease, budget contention, lost ACK, DB outage, restore и injection из каждого источника. Зафиксировать p95/queue lag/ресурсы и regression floors. Независимый review изменённого полного диапазона и P0/P1 recheck — по согласованной политике и бюджету, без приватного содержимого. Mandatory final E2E enumerates SC13.2-01..10 and all 69 spec IDs in PAI.requirements.json; every mapped behavior needs actual wired evidence, not schema presence.",
       "allowed_files": [
         "tools/test_tiers.py",
         "tools/verify_project.py",
@@ -1685,7 +1684,17 @@
       ],
       "expected_interfaces": [
         "PA requirement coverage: PA-18",
-        "docs/PA_IMPLEMENTATION_TASKS.md#pai-26"
+        "docs/PA_IMPLEMENTATION_TASKS.md#pai-26",
+        "SC13.2-01: tests/test_pai_end_to_end.py::test_chat_multiturn_and_topic_return",
+        "SC13.2-02: tests/test_pai_end_to_end.py::test_object_followups_confirmation_cancel_restart",
+        "SC13.2-03: tests/test_pai_end_to_end.py::test_archive_web_conflicts_and_coverage",
+        "SC13.2-04: tests/test_pai_end_to_end.py::test_weekly_brief_dedup_deadline_and_outage",
+        "SC13.2-05: tests/test_pai_end_to_end.py::test_report_views_mobile_cyrillic_dark_theme",
+        "SC13.2-06: tests/test_pai_end_to_end.py::test_watch_pause_dst_revoke_and_unknown_send",
+        "SC13.2-07: tests/test_pai_end_to_end.py::test_academic_deadline_conflict_local_done_and_eligibility",
+        "SC13.2-08: tests/test_pai_end_to_end.py::test_action_edit_confirm_double_click_owner_expiry_version",
+        "SC13.2-09: tests/test_pai_end_to_end.py::test_source_injection_secret_query_and_fallback_denials",
+        "SC13.2-10: tests/test_pai_end_to_end.py::test_restore_migration_revoke_delete_and_cache"
       ],
       "verification": [
         {

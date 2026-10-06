@@ -1,0 +1,2075 @@
+{
+  "schema_version": "assistant.pai_requirement_coverage.v1",
+  "spec_ref": "docs/PERSONAL_ASSISTANT_SPEC.md",
+  "spec_sha256": "89a4fcf9010d79ca1d5a3f6b4e8799873356033525bd4268aba3867be39eecd8",
+  "source_binding": "exact IDs and verbatim scenarios; paths/test nodes are planned acceptance obligations",
+  "slice_bindings": {
+    "PAI-00": {
+      "expected_paths": [
+        "docs/verification/PAI-progress.md"
+      ],
+      "verification_refs": [
+        "PAI-00/planning_structure",
+        "PAI-00/reconciliation_regression"
+      ],
+      "test_files": [
+        "tests/test_playbook_bridge.py",
+        "tests/test_assistant_conversation.py",
+        "tests/test_prm_product_ux_eval.py",
+        "tests/test_pai_plan.py",
+        "tests/test_opencode_role_review.py",
+        "tests/test_memory_research.py"
+      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "evidence_status": "planned; no implementation or review acceptance implied"
+    },
+    "PAI-01": {
+      "expected_paths": [
+        "docs/design/PAI.md"
+      ],
+      "verification_refs": [
+        "PAI-01/planning_structure"
+      ],
+      "test_files": [],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "evidence_status": "planned; no implementation or review acceptance implied"
+    },
+    "PAI-02": {
+      "expected_paths": [
+        "src/prm/storage/**",
+        "src/db/**"
+      ],
+      "verification_refs": [
+        "PAI-02/acceptance"
+      ],
+      "test_files": [
+        "tests/test_pai_storage.py",
+        "tests/test_assistant_contracts.py",
+        "tests/test_archive_search.py"
+      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "evidence_status": "planned; no implementation or review acceptance implied"
+    },
+    "PAI-03": {
+      "expected_paths": [
+        "src/prm/storage/**",
+        "src/prm/capabilities.py",
+        "src/prm/model_cost.py"
+      ],
+      "verification_refs": [
+        "PAI-03/acceptance"
+      ],
+      "test_files": [
+        "tests/test_pai_durable_policy.py",
+        "tests/test_assistant_permissions.py",
+        "tests/test_assistant_egress.py",
+        "tests/test_assistant_grant_codec.py"
+      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "evidence_status": "planned; no implementation or review acceptance implied"
+    },
+    "PAI-04": {
+      "expected_paths": [
+        "src/prm/storage/**",
+        "src/prm/confirmed_actions.py",
+        "src/assistant/prm_post_answer_actions.py"
+      ],
+      "verification_refs": [
+        "PAI-04/acceptance"
+      ],
+      "test_files": [
+        "tests/test_pai_durable_actions.py",
+        "tests/test_assistant_actions.py",
+        "tests/test_prm_post_answer_actions.py"
+      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "evidence_status": "planned; no implementation or review acceptance implied"
+    },
+    "PAI-05": {
+      "expected_paths": [
+        "src/prm/storage/**",
+        "src/prm/conversation.py",
+        "src/prm/briefs.py",
+        "src/prm/application.py"
+      ],
+      "verification_refs": [
+        "PAI-05/acceptance"
+      ],
+      "test_files": [
+        "tests/test_pai_durable_conversation.py",
+        "tests/test_assistant_conversation.py",
+        "tests/test_assistant_report_dialogue.py"
+      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "evidence_status": "planned; no implementation or review acceptance implied"
+    },
+    "PAI-06": {
+      "expected_paths": [
+        "src/prm/storage/**",
+        "src/prm/runtime/worker.py",
+        "src/prm/deep_research.py",
+        "src/prm/research_worker.py",
+        "src/prm/watch_jobs.py"
+      ],
+      "verification_refs": [
+        "PAI-06/acceptance"
+      ],
+      "test_files": [
+        "tests/test_pai_workers.py",
+        "tests/test_assistant_jobs.py",
+        "tests/test_assistant_research.py"
+      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "evidence_status": "planned; no implementation or review acceptance implied"
+    },
+    "PAI-07": {
+      "expected_paths": [
+        "src/prm/runtime/composition.py",
+        "src/prm/runtime/ingress.py",
+        "src/prm/application.py",
+        "src/prm/cli.py",
+        "src/bot/bot.py",
+        "src/bot/prm_handlers.py"
+      ],
+      "verification_refs": [
+        "PAI-07/acceptance"
+      ],
+      "test_files": [
+        "tests/test_pai_ingress_jobs.py",
+        "tests/test_prm_bot_dispatch.py",
+        "tests/test_callbacks.py",
+        "tests/test_prm_cli.py"
+      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "evidence_status": "planned; no implementation or review acceptance implied"
+    },
+    "PAI-08": {
+      "expected_paths": [
+        "src/prm/runtime/scheduler.py",
+        "src/prm/watch_jobs.py",
+        "src/prm/runtime/composition.py"
+      ],
+      "verification_refs": [
+        "PAI-08/acceptance"
+      ],
+      "test_files": [
+        "tests/test_pai_scheduler.py",
+        "tests/test_assistant_jobs.py",
+        "tests/test_assistant_subscriptions.py"
+      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "evidence_status": "planned; no implementation or review acceptance implied"
+    },
+    "PAI-09": {
+      "expected_paths": [
+        "src/prm/runtime/effects.py",
+        "src/prm/watch_jobs.py",
+        "src/prm/confirmed_actions.py",
+        "src/bot/telegram_delivery.py",
+        "src/bot/prm_handlers.py"
+      ],
+      "verification_refs": [
+        "PAI-09/acceptance"
+      ],
+      "test_files": [
+        "tests/test_pai_delivery.py",
+        "tests/test_assistant_jobs.py",
+        "tests/test_assistant_actions.py",
+        "tests/test_assistant_egress.py"
+      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "evidence_status": "planned; no implementation or review acceptance implied"
+    },
+    "PAI-10": {
+      "expected_paths": [
+        "src/prm/runtime/composition.py",
+        "src/prm/application.py",
+        "src/prm/conversation.py",
+        "src/llm/**",
+        "src/bot/bot.py"
+      ],
+      "verification_refs": [
+        "PAI-10/acceptance"
+      ],
+      "test_files": [
+        "tests/test_pai_chat_runtime.py",
+        "tests/test_assistant_conversation.py",
+        "tests/test_prm_application.py",
+        "tests/test_openai_provider.py",
+        "tests/test_llm_client.py"
+      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "evidence_status": "planned; no implementation or review acceptance implied"
+    },
+    "PAI-11": {
+      "expected_paths": [
+        "src/db/archive_search.py",
+        "src/prm/archive_context.py",
+        "src/prm/archive_synthesis_transport.py",
+        "src/prm/synthesis.py",
+        "src/prm/application.py",
+        "src/prm/runtime/composition.py"
+      ],
+      "verification_refs": [
+        "PAI-11/acceptance"
+      ],
+      "test_files": [
+        "tests/test_pai_archive_search.py",
+        "tests/test_archive_search.py",
+        "tests/test_prm_synthesis.py",
+        "tests/test_prm_intent_archive_contract.py"
+      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "evidence_status": "planned; no implementation or review acceptance implied"
+    },
+    "PAI-12": {
+      "expected_paths": [
+        "src/prm/public_web.py",
+        "src/prm/public_fetch.py",
+        "src/prm/deep_research.py",
+        "src/prm/runtime/transports/**",
+        "src/prm/runtime/composition.py",
+        "src/prm/application.py",
+        "src/prm/research_facade.py"
+      ],
+      "verification_refs": [
+        "PAI-12/acceptance"
+      ],
+      "test_files": [
+        "tests/test_pai_web_github.py",
+        "tests/test_assistant_web_search.py",
+        "tests/test_assistant_research.py"
+      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "evidence_status": "planned; no implementation or review acceptance implied"
+    },
+    "PAI-13": {
+      "expected_paths": [
+        "src/prm/deep_research.py",
+        "src/prm/runtime/worker.py",
+        "src/prm/application.py",
+        "src/prm/runtime/composition.py",
+        "src/prm/research_worker.py"
+      ],
+      "verification_refs": [
+        "PAI-13/acceptance"
+      ],
+      "test_files": [
+        "tests/test_pai_deep_research.py",
+        "tests/test_assistant_research.py",
+        "tests/test_prm_research_planner.py"
+      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "evidence_status": "planned; no implementation or review acceptance implied"
+    },
+    "PAI-14": {
+      "expected_paths": [
+        "src/prm/briefs.py",
+        "src/prm/brief_editorial.py",
+        "src/prm/brief_document_store.py",
+        "src/prm/application.py",
+        "src/prm/runtime/composition.py",
+        "src/prm/editorial_transport.py"
+      ],
+      "verification_refs": [
+        "PAI-14/acceptance"
+      ],
+      "test_files": [
+        "tests/test_pai_brief_runtime.py",
+        "tests/test_assistant_briefs.py",
+        "tests/test_assistant_brief_editorial.py",
+        "tests/test_assistant_report_dialogue.py"
+      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "evidence_status": "planned; no implementation or review acceptance implied"
+    },
+    "PAI-15": {
+      "expected_paths": [
+        "src/prm/report_access.py",
+        "src/prm/report_exports.py",
+        "src/prm/runtime/reader.py",
+        "src/bot/prm_handlers.py",
+        "src/prm/briefs.py",
+        "src/prm/pdf_inspection.py"
+      ],
+      "verification_refs": [
+        "PAI-15/acceptance"
+      ],
+      "test_files": [
+        "tests/test_pai_report_runtime.py",
+        "tests/test_assistant_report_exports.py",
+        "tests/test_assistant_report_access.py",
+        "tests/test_pdf_inspection.py"
+      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "evidence_status": "planned; no implementation or review acceptance implied"
+    },
+    "PAI-16": {
+      "expected_paths": [
+        "src/prm/runtime/connections.py",
+        "src/prm/runtime/secret_store.py",
+        "src/prm/runtime/composition.py",
+        "src/prm/capabilities.py",
+        "src/prm/storage/**",
+        "src/bot/prm_handlers.py",
+        "src/prm/mail_connector.py",
+        "src/prm/schedule_connectors.py"
+      ],
+      "verification_refs": [
+        "PAI-16/acceptance"
+      ],
+      "test_files": [
+        "tests/test_pai_connections.py",
+        "tests/test_assistant_mail.py",
+        "tests/test_assistant_calendar.py",
+        "tests/test_assistant_egress.py"
+      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "evidence_status": "planned; no implementation or review acceptance implied"
+    },
+    "PAI-17": {
+      "expected_paths": [
+        "src/prm/mail_connector.py",
+        "src/prm/runtime/transports/**",
+        "src/prm/runtime/connections.py",
+        "src/prm/application.py",
+        "src/prm/runtime/composition.py"
+      ],
+      "verification_refs": [
+        "PAI-17/acceptance"
+      ],
+      "test_files": [
+        "tests/test_pai_graph_mail.py",
+        "tests/test_assistant_mail.py",
+        "tests/test_pai_brief_runtime.py"
+      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "evidence_status": "planned; no implementation or review acceptance implied"
+    },
+    "PAI-18": {
+      "expected_paths": [
+        "src/prm/schedule_connectors.py",
+        "src/prm/runtime/transports/**",
+        "src/prm/application.py",
+        "src/prm/runtime/composition.py"
+      ],
+      "verification_refs": [
+        "PAI-18/acceptance"
+      ],
+      "test_files": [
+        "tests/test_pai_schedule_runtime.py",
+        "tests/test_assistant_calendar.py",
+        "tests/test_assistant_contacts.py"
+      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "evidence_status": "planned; no implementation or review acceptance implied"
+    },
+    "PAI-19": {
+      "expected_paths": [
+        "src/prm/academic_inbox.py",
+        "src/prm/runtime/transports/**",
+        "src/prm/application.py",
+        "src/prm/runtime/composition.py",
+        "src/prm/runtime/scheduler.py",
+        "src/prm/watch_jobs.py"
+      ],
+      "verification_refs": [
+        "PAI-19/acceptance"
+      ],
+      "test_files": [
+        "tests/test_pai_academic_runtime.py",
+        "tests/test_assistant_academic.py",
+        "tests/test_assistant_subscriptions.py"
+      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "evidence_status": "planned; no implementation or review acceptance implied"
+    },
+    "PAI-20": {
+      "expected_paths": [
+        "src/prm/confirmed_actions.py",
+        "src/prm/runtime/transports/**",
+        "src/prm/runtime/effects.py",
+        "src/prm/application.py",
+        "src/bot/callbacks.py",
+        "src/prm/runtime/composition.py"
+      ],
+      "verification_refs": [
+        "PAI-20/acceptance"
+      ],
+      "test_files": [
+        "tests/test_pai_action_runtime.py",
+        "tests/test_assistant_actions.py",
+        "tests/test_pai_delivery.py",
+        "tests/test_prm_post_answer_actions.py"
+      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "evidence_status": "planned; no implementation or review acceptance implied"
+    },
+    "PAI-21": {
+      "expected_paths": [
+        "src/prm/memory_library.py",
+        "src/prm/storage/**",
+        "src/prm/runtime/deletion.py",
+        "src/prm/application.py",
+        "src/prm/runtime/composition.py"
+      ],
+      "verification_refs": [
+        "PAI-21/acceptance"
+      ],
+      "test_files": [
+        "tests/test_pai_memory_runtime.py",
+        "tests/test_assistant_memory.py",
+        "tests/test_assistant_report_dialogue.py"
+      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "evidence_status": "planned; no implementation or review acceptance implied"
+    },
+    "PAI-22": {
+      "expected_paths": [
+        "src/prm/media_connectors.py",
+        "src/prm/runtime/transports/**",
+        "src/bot/voice.py",
+        "src/bot/bot.py",
+        "src/prm/application.py",
+        "src/prm/runtime/composition.py",
+        "src/prm/pdf_inspection.py"
+      ],
+      "verification_refs": [
+        "PAI-22/acceptance"
+      ],
+      "test_files": [
+        "tests/test_pai_media_runtime.py",
+        "tests/test_assistant_media.py",
+        "tests/test_voice_transcription.py",
+        "tests/test_pdf_inspection.py"
+      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "evidence_status": "planned; no implementation or review acceptance implied"
+    },
+    "PAI-23": {
+      "expected_paths": [
+        "src/prm/model_cost.py",
+        "src/prm/runtime/cache.py",
+        "src/llm/**",
+        "src/prm/runtime/composition.py"
+      ],
+      "verification_refs": [
+        "PAI-23/acceptance"
+      ],
+      "test_files": [
+        "tests/test_pai_cost_cache.py",
+        "tests/test_assistant_cost.py",
+        "tests/test_pai_durable_policy.py"
+      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "evidence_status": "planned; no implementation or review acceptance implied"
+    },
+    "PAI-24": {
+      "expected_paths": [
+        "src/prm/operations.py",
+        "src/prm/runtime/operations.py",
+        "src/prm/runtime/composition.py"
+      ],
+      "verification_refs": [
+        "PAI-24/acceptance"
+      ],
+      "test_files": [
+        "tests/test_pai_operations_runtime.py",
+        "tests/test_assistant_ops.py",
+        "tests/test_delivery_health.py"
+      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "evidence_status": "planned; no implementation or review acceptance implied"
+    },
+    "PAI-25": {
+      "expected_paths": [
+        "src/prm/storage/**",
+        "src/prm/runtime/migration.py",
+        "src/prm/operations.py",
+        "src/prm/watch_jobs.py"
+      ],
+      "verification_refs": [
+        "PAI-25/acceptance"
+      ],
+      "test_files": [
+        "tests/test_pai_migration.py",
+        "tests/test_pai_storage.py",
+        "tests/test_pai_durable_actions.py",
+        "tests/test_prm_post_answer_actions.py"
+      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "evidence_status": "planned; no implementation or review acceptance implied"
+    },
+    "PAI-26": {
+      "expected_paths": [
+        "docs/verification/PAI-progress.md"
+      ],
+      "verification_refs": [
+        "PAI-26/acceptance",
+        "PAI-26/focused-prm",
+        "PAI-26/retrofit-boundaries",
+        "PAI-26/project_verifier"
+      ],
+      "test_files": [
+        "tests/test_pai_end_to_end.py",
+        "tests/test_pai_load_recovery.py"
+      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "evidence_status": "planned; no implementation or review acceptance implied"
+    },
+    "PAI-27": {
+      "expected_paths": [
+        "docs/verification/PAI-progress.md"
+      ],
+      "verification_refs": [
+        "PAI-27/planning_structure"
+      ],
+      "test_files": [],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "evidence_status": "planned; no implementation or review acceptance implied"
+    },
+    "PAI-28": {
+      "expected_paths": [
+        "docs/verification/PAI-progress.md"
+      ],
+      "verification_refs": [
+        "PAI-28/planning_structure"
+      ],
+      "test_files": [],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "evidence_status": "planned; no implementation or review acceptance implied"
+    },
+    "PAI-29": {
+      "expected_paths": [
+        "docs/verification/PAI-progress.md"
+      ],
+      "verification_refs": [
+        "PAI-29/planning_structure"
+      ],
+      "test_files": [],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "evidence_status": "planned; no implementation or review acceptance implied"
+    },
+    "PAI-30": {
+      "expected_paths": [
+        "src/prm/runtime/cache.py",
+        "src/prm/storage/**"
+      ],
+      "verification_refs": [
+        "PAI-30/acceptance"
+      ],
+      "test_files": [
+        "tests/test_pai_redis.py",
+        "tests/test_pai_cost_cache.py",
+        "tests/test_pai_delivery.py"
+      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "evidence_status": "planned; no implementation or review acceptance implied"
+    },
+    "PAI-31": {
+      "expected_paths": [
+        "src/db/**",
+        "src/prm/storage/**",
+        "src/prm/runtime/migration.py"
+      ],
+      "verification_refs": [
+        "PAI-31/acceptance"
+      ],
+      "test_files": [
+        "tests/test_pai_archive_migration.py",
+        "tests/test_archive_search.py",
+        "tests/test_archive_documents.py",
+        "tests/test_pai_migration.py"
+      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "evidence_status": "planned; no implementation or review acceptance implied"
+    }
+  },
+  "requirements": [
+    {
+      "spec_id": "ACADEMIC-01",
+      "slices": [
+        "PAI-19"
+      ],
+      "case_name": "test_requirement_academic_01",
+      "verification_refs": [
+        "PAI-19/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "ACADEMIC-02",
+      "slices": [
+        "PAI-19"
+      ],
+      "case_name": "test_requirement_academic_02",
+      "verification_refs": [
+        "PAI-19/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "ACADEMIC-03",
+      "slices": [
+        "PAI-19"
+      ],
+      "case_name": "test_requirement_academic_03",
+      "verification_refs": [
+        "PAI-19/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "ACADEMIC-04",
+      "slices": [
+        "PAI-19"
+      ],
+      "case_name": "test_requirement_academic_04",
+      "verification_refs": [
+        "PAI-19/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "ACADEMIC-05",
+      "slices": [
+        "PAI-19"
+      ],
+      "case_name": "test_requirement_academic_05",
+      "verification_refs": [
+        "PAI-19/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "ACT-01",
+      "slices": [
+        "PAI-04",
+        "PAI-20"
+      ],
+      "case_name": "test_requirement_act_01",
+      "verification_refs": [
+        "PAI-04/acceptance",
+        "PAI-20/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic",
+        "privacy_review"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "ACT-02",
+      "slices": [
+        "PAI-04",
+        "PAI-20"
+      ],
+      "case_name": "test_requirement_act_02",
+      "verification_refs": [
+        "PAI-04/acceptance",
+        "PAI-20/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic",
+        "privacy_review"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "ACT-03",
+      "slices": [
+        "PAI-04",
+        "PAI-09",
+        "PAI-20"
+      ],
+      "case_name": "test_requirement_act_03",
+      "verification_refs": [
+        "PAI-04/acceptance",
+        "PAI-09/acceptance",
+        "PAI-20/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic",
+        "privacy_review"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "ARCH-01",
+      "slices": [
+        "PAI-01",
+        "PAI-07"
+      ],
+      "case_name": "test_requirement_arch_01",
+      "verification_refs": [
+        "PAI-01/planning_structure",
+        "PAI-07/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "ARCH-02",
+      "slices": [
+        "PAI-02",
+        "PAI-21"
+      ],
+      "case_name": "test_requirement_arch_02",
+      "verification_refs": [
+        "PAI-02/acceptance",
+        "PAI-21/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "BRIEF-01",
+      "slices": [
+        "PAI-14"
+      ],
+      "case_name": "test_requirement_brief_01",
+      "verification_refs": [
+        "PAI-14/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "BRIEF-02",
+      "slices": [
+        "PAI-14"
+      ],
+      "case_name": "test_requirement_brief_02",
+      "verification_refs": [
+        "PAI-14/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "BRIEF-03",
+      "slices": [
+        "PAI-05",
+        "PAI-14",
+        "PAI-15"
+      ],
+      "case_name": "test_requirement_brief_03",
+      "verification_refs": [
+        "PAI-05/acceptance",
+        "PAI-14/acceptance",
+        "PAI-15/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "BRIEF-04",
+      "slices": [
+        "PAI-14"
+      ],
+      "case_name": "test_requirement_brief_04",
+      "verification_refs": [
+        "PAI-14/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "BRIEF-05",
+      "slices": [
+        "PAI-14"
+      ],
+      "case_name": "test_requirement_brief_05",
+      "verification_refs": [
+        "PAI-14/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "BRIEF-06",
+      "slices": [
+        "PAI-14",
+        "PAI-17",
+        "PAI-19"
+      ],
+      "case_name": "test_requirement_brief_06",
+      "verification_refs": [
+        "PAI-14/acceptance",
+        "PAI-17/acceptance",
+        "PAI-19/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "BRIEF-07",
+      "slices": [
+        "PAI-14"
+      ],
+      "case_name": "test_requirement_brief_07",
+      "verification_refs": [
+        "PAI-14/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "CHAT-01",
+      "slices": [
+        "PAI-10"
+      ],
+      "case_name": "test_requirement_chat_01",
+      "verification_refs": [
+        "PAI-10/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "CHAT-02",
+      "slices": [
+        "PAI-05",
+        "PAI-07",
+        "PAI-10"
+      ],
+      "case_name": "test_requirement_chat_02",
+      "verification_refs": [
+        "PAI-05/acceptance",
+        "PAI-07/acceptance",
+        "PAI-10/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "CONNECT-01",
+      "slices": [
+        "PAI-17",
+        "PAI-18",
+        "PAI-19"
+      ],
+      "case_name": "test_requirement_connect_01",
+      "verification_refs": [
+        "PAI-17/acceptance",
+        "PAI-18/acceptance",
+        "PAI-19/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic",
+        "privacy_review"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "CONNECT-02",
+      "slices": [
+        "PAI-16",
+        "PAI-17",
+        "PAI-18"
+      ],
+      "case_name": "test_requirement_connect_02",
+      "verification_refs": [
+        "PAI-16/acceptance",
+        "PAI-17/acceptance",
+        "PAI-18/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic",
+        "privacy_review"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "CONNECT-03",
+      "slices": [
+        "PAI-16",
+        "PAI-20"
+      ],
+      "case_name": "test_requirement_connect_03",
+      "verification_refs": [
+        "PAI-16/acceptance",
+        "PAI-20/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic",
+        "privacy_review"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "COST-01",
+      "slices": [
+        "PAI-03",
+        "PAI-23"
+      ],
+      "case_name": "test_requirement_cost_01",
+      "verification_refs": [
+        "PAI-03/acceptance",
+        "PAI-23/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "COST-02",
+      "slices": [
+        "PAI-23"
+      ],
+      "case_name": "test_requirement_cost_02",
+      "verification_refs": [
+        "PAI-23/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "DONE-01",
+      "slices": [
+        "PAI-26",
+        "PAI-27",
+        "PAI-28",
+        "PAI-29"
+      ],
+      "case_name": "test_requirement_done_01",
+      "verification_refs": [
+        "PAI-26/acceptance",
+        "PAI-26/focused-prm",
+        "PAI-26/retrofit-boundaries",
+        "PAI-26/project_verifier",
+        "PAI-27/planning_structure",
+        "PAI-28/planning_structure",
+        "PAI-29/planning_structure"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "EVAL-01",
+      "slices": [
+        "PAI-23",
+        "PAI-26",
+        "PAI-27",
+        "PAI-29"
+      ],
+      "case_name": "test_requirement_eval_01",
+      "verification_refs": [
+        "PAI-23/acceptance",
+        "PAI-26/acceptance",
+        "PAI-26/focused-prm",
+        "PAI-26/retrofit-boundaries",
+        "PAI-26/project_verifier",
+        "PAI-27/planning_structure",
+        "PAI-29/planning_structure"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "EVAL-02",
+      "slices": [
+        "PAI-23",
+        "PAI-26"
+      ],
+      "case_name": "test_requirement_eval_02",
+      "verification_refs": [
+        "PAI-23/acceptance",
+        "PAI-26/acceptance",
+        "PAI-26/focused-prm",
+        "PAI-26/retrofit-boundaries",
+        "PAI-26/project_verifier"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "EVAL-03",
+      "slices": [
+        "PAI-15",
+        "PAI-27",
+        "PAI-29"
+      ],
+      "case_name": "test_requirement_eval_03",
+      "verification_refs": [
+        "PAI-15/acceptance",
+        "PAI-27/planning_structure",
+        "PAI-29/planning_structure"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "EVIDENCE-01",
+      "slices": [
+        "PAI-11",
+        "PAI-12",
+        "PAI-17",
+        "PAI-19"
+      ],
+      "case_name": "test_requirement_evidence_01",
+      "verification_refs": [
+        "PAI-11/acceptance",
+        "PAI-12/acceptance",
+        "PAI-17/acceptance",
+        "PAI-19/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "EVIDENCE-02",
+      "slices": [
+        "PAI-11",
+        "PAI-12",
+        "PAI-19"
+      ],
+      "case_name": "test_requirement_evidence_02",
+      "verification_refs": [
+        "PAI-11/acceptance",
+        "PAI-12/acceptance",
+        "PAI-19/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "EVIDENCE-03",
+      "slices": [
+        "PAI-12"
+      ],
+      "case_name": "test_requirement_evidence_03",
+      "verification_refs": [
+        "PAI-12/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "MEDIA-01",
+      "slices": [
+        "PAI-22"
+      ],
+      "case_name": "test_requirement_media_01",
+      "verification_refs": [
+        "PAI-22/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "MEDIA-02",
+      "slices": [
+        "PAI-22"
+      ],
+      "case_name": "test_requirement_media_02",
+      "verification_refs": [
+        "PAI-22/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "MEDIA-03",
+      "slices": [
+        "PAI-05",
+        "PAI-15",
+        "PAI-22"
+      ],
+      "case_name": "test_requirement_media_03",
+      "verification_refs": [
+        "PAI-05/acceptance",
+        "PAI-15/acceptance",
+        "PAI-22/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "MEM-01",
+      "slices": [
+        "PAI-05"
+      ],
+      "case_name": "test_requirement_mem_01",
+      "verification_refs": [
+        "PAI-05/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic",
+        "privacy_review"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "MEM-02",
+      "slices": [
+        "PAI-21"
+      ],
+      "case_name": "test_requirement_mem_02",
+      "verification_refs": [
+        "PAI-21/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic",
+        "privacy_review"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "MEM-03",
+      "slices": [
+        "PAI-21"
+      ],
+      "case_name": "test_requirement_mem_03",
+      "verification_refs": [
+        "PAI-21/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic",
+        "privacy_review"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "MIGRATION-01",
+      "slices": [
+        "PAI-02",
+        "PAI-25"
+      ],
+      "case_name": "test_requirement_migration_01",
+      "verification_refs": [
+        "PAI-02/acceptance",
+        "PAI-25/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "MODEL-01",
+      "slices": [
+        "PAI-10",
+        "PAI-23"
+      ],
+      "case_name": "test_requirement_model_01",
+      "verification_refs": [
+        "PAI-10/acceptance",
+        "PAI-23/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "MODEL-02",
+      "slices": [
+        "PAI-23"
+      ],
+      "case_name": "test_requirement_model_02",
+      "verification_refs": [
+        "PAI-23/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "OPS-01",
+      "slices": [
+        "PAI-06",
+        "PAI-07",
+        "PAI-08",
+        "PAI-09"
+      ],
+      "case_name": "test_requirement_ops_01",
+      "verification_refs": [
+        "PAI-06/acceptance",
+        "PAI-07/acceptance",
+        "PAI-08/acceptance",
+        "PAI-09/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "OPS-02",
+      "slices": [
+        "PAI-24",
+        "PAI-25"
+      ],
+      "case_name": "test_requirement_ops_02",
+      "verification_refs": [
+        "PAI-24/acceptance",
+        "PAI-25/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "PERM-01",
+      "slices": [
+        "PAI-03",
+        "PAI-04",
+        "PAI-09",
+        "PAI-16",
+        "PAI-20"
+      ],
+      "case_name": "test_requirement_perm_01",
+      "verification_refs": [
+        "PAI-03/acceptance",
+        "PAI-04/acceptance",
+        "PAI-09/acceptance",
+        "PAI-16/acceptance",
+        "PAI-20/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic",
+        "privacy_review"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "PLAN-01",
+      "slices": [
+        "PAI-00",
+        "PAI-01",
+        "PAI-26"
+      ],
+      "case_name": "test_requirement_plan_01",
+      "verification_refs": [
+        "PAI-00/planning_structure",
+        "PAI-00/reconciliation_regression",
+        "PAI-01/planning_structure",
+        "PAI-26/acceptance",
+        "PAI-26/focused-prm",
+        "PAI-26/retrofit-boundaries",
+        "PAI-26/project_verifier"
+      ],
+      "review_roles": [
+        "program_design_review",
+        "product_design_review"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "PLAN-02",
+      "slices": [
+        "PAI-00",
+        "PAI-01"
+      ],
+      "case_name": "test_requirement_plan_02",
+      "verification_refs": [
+        "PAI-00/planning_structure",
+        "PAI-00/reconciliation_regression",
+        "PAI-01/planning_structure"
+      ],
+      "review_roles": [
+        "program_design_review",
+        "product_design_review"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "PLAN-03",
+      "slices": [
+        "PAI-00",
+        "PAI-23"
+      ],
+      "case_name": "test_requirement_plan_03",
+      "verification_refs": [
+        "PAI-00/planning_structure",
+        "PAI-00/reconciliation_regression",
+        "PAI-23/acceptance"
+      ],
+      "review_roles": [
+        "program_design_review",
+        "product_design_review"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "QUALITY-01",
+      "slices": [
+        "PAI-23",
+        "PAI-26",
+        "PAI-29"
+      ],
+      "case_name": "test_requirement_quality_01",
+      "verification_refs": [
+        "PAI-23/acceptance",
+        "PAI-26/acceptance",
+        "PAI-26/focused-prm",
+        "PAI-26/retrofit-boundaries",
+        "PAI-26/project_verifier",
+        "PAI-29/planning_structure"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "RAG-01",
+      "slices": [
+        "PAI-11"
+      ],
+      "case_name": "test_requirement_rag_01",
+      "verification_refs": [
+        "PAI-11/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "SEARCH-01",
+      "slices": [
+        "PAI-11",
+        "PAI-12",
+        "PAI-13"
+      ],
+      "case_name": "test_requirement_search_01",
+      "verification_refs": [
+        "PAI-11/acceptance",
+        "PAI-12/acceptance",
+        "PAI-13/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "SEARCH-02",
+      "slices": [
+        "PAI-10",
+        "PAI-11",
+        "PAI-12"
+      ],
+      "case_name": "test_requirement_search_02",
+      "verification_refs": [
+        "PAI-10/acceptance",
+        "PAI-11/acceptance",
+        "PAI-12/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "SEARCH-03",
+      "slices": [
+        "PAI-13"
+      ],
+      "case_name": "test_requirement_search_03",
+      "verification_refs": [
+        "PAI-13/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "SEARCH-04",
+      "slices": [
+        "PAI-11",
+        "PAI-12",
+        "PAI-13"
+      ],
+      "case_name": "test_requirement_search_04",
+      "verification_refs": [
+        "PAI-11/acceptance",
+        "PAI-12/acceptance",
+        "PAI-13/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "SEC-01",
+      "slices": [
+        "PAI-12",
+        "PAI-17",
+        "PAI-19",
+        "PAI-21",
+        "PAI-22",
+        "PAI-26"
+      ],
+      "case_name": "test_requirement_sec_01",
+      "verification_refs": [
+        "PAI-12/acceptance",
+        "PAI-17/acceptance",
+        "PAI-19/acceptance",
+        "PAI-21/acceptance",
+        "PAI-22/acceptance",
+        "PAI-26/acceptance",
+        "PAI-26/focused-prm",
+        "PAI-26/retrofit-boundaries",
+        "PAI-26/project_verifier"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic",
+        "privacy_review"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "SEC-02",
+      "slices": [
+        "PAI-03",
+        "PAI-16",
+        "PAI-22"
+      ],
+      "case_name": "test_requirement_sec_02",
+      "verification_refs": [
+        "PAI-03/acceptance",
+        "PAI-16/acceptance",
+        "PAI-22/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic",
+        "privacy_review"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "SEC-03",
+      "slices": [
+        "PAI-16",
+        "PAI-24"
+      ],
+      "case_name": "test_requirement_sec_03",
+      "verification_refs": [
+        "PAI-16/acceptance",
+        "PAI-24/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic",
+        "privacy_review"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "SEC-04",
+      "slices": [
+        "PAI-21",
+        "PAI-25"
+      ],
+      "case_name": "test_requirement_sec_04",
+      "verification_refs": [
+        "PAI-21/acceptance",
+        "PAI-25/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic",
+        "privacy_review"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "UX-01",
+      "slices": [
+        "PAI-07",
+        "PAI-16"
+      ],
+      "case_name": "test_requirement_ux_01",
+      "verification_refs": [
+        "PAI-07/acceptance",
+        "PAI-16/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "UX-02",
+      "slices": [
+        "PAI-10",
+        "PAI-11",
+        "PAI-14"
+      ],
+      "case_name": "test_requirement_ux_02",
+      "verification_refs": [
+        "PAI-10/acceptance",
+        "PAI-11/acceptance",
+        "PAI-14/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "UX-03",
+      "slices": [
+        "PAI-05",
+        "PAI-10",
+        "PAI-14",
+        "PAI-20"
+      ],
+      "case_name": "test_requirement_ux_03",
+      "verification_refs": [
+        "PAI-05/acceptance",
+        "PAI-10/acceptance",
+        "PAI-14/acceptance",
+        "PAI-20/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "UX-04",
+      "slices": [
+        "PAI-06",
+        "PAI-07",
+        "PAI-13"
+      ],
+      "case_name": "test_requirement_ux_04",
+      "verification_refs": [
+        "PAI-06/acceptance",
+        "PAI-07/acceptance",
+        "PAI-13/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "UX-05",
+      "slices": [
+        "PAI-07",
+        "PAI-09",
+        "PAI-20"
+      ],
+      "case_name": "test_requirement_ux_05",
+      "verification_refs": [
+        "PAI-07/acceptance",
+        "PAI-09/acceptance",
+        "PAI-20/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "VISUAL-01",
+      "slices": [
+        "PAI-15"
+      ],
+      "case_name": "test_requirement_visual_01",
+      "verification_refs": [
+        "PAI-15/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "VISUAL-02",
+      "slices": [
+        "PAI-15"
+      ],
+      "case_name": "test_requirement_visual_02",
+      "verification_refs": [
+        "PAI-15/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "VISUAL-03",
+      "slices": [
+        "PAI-15"
+      ],
+      "case_name": "test_requirement_visual_03",
+      "verification_refs": [
+        "PAI-15/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "VISUAL-04",
+      "slices": [
+        "PAI-15"
+      ],
+      "case_name": "test_requirement_visual_04",
+      "verification_refs": [
+        "PAI-15/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "WATCH-01",
+      "slices": [
+        "PAI-08"
+      ],
+      "case_name": "test_requirement_watch_01",
+      "verification_refs": [
+        "PAI-08/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "WATCH-02",
+      "slices": [
+        "PAI-08"
+      ],
+      "case_name": "test_requirement_watch_02",
+      "verification_refs": [
+        "PAI-08/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "WATCH-03",
+      "slices": [
+        "PAI-08",
+        "PAI-09"
+      ],
+      "case_name": "test_requirement_watch_03",
+      "verification_refs": [
+        "PAI-08/acceptance",
+        "PAI-09/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    },
+    {
+      "spec_id": "WATCH-04",
+      "slices": [
+        "PAI-08",
+        "PAI-09"
+      ],
+      "case_name": "test_requirement_watch_04",
+      "verification_refs": [
+        "PAI-08/acceptance",
+        "PAI-09/acceptance"
+      ],
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "status": "planned"
+    }
+  ],
+  "scenarios": [
+    {
+      "scenario_id": "SC13.2-01",
+      "source_text": "приветствие, переписывание письма, вопрос без поиска, 10–20 последовательных уточнений, новая тема, возврат к предыдущему результату;",
+      "slices": [
+        "PAI-10",
+        "PAI-26",
+        "PAI-29"
+      ],
+      "synthetic_test_node": "tests/test_pai_end_to_end.py::test_chat_multiturn_and_topic_return",
+      "recovery_test_node": null,
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_evidence": "PAI-27/29 actual authorized provider/render/operator observations",
+      "status": "planned"
+    },
+    {
+      "scenario_id": "SC13.2-02",
+      "source_text": "«коротко», «второй пункт», неверное название проекта, неоднозначное «да», отмена во время работы, перезапуск;",
+      "slices": [
+        "PAI-05",
+        "PAI-07",
+        "PAI-14",
+        "PAI-20",
+        "PAI-26",
+        "PAI-29"
+      ],
+      "synthetic_test_node": "tests/test_pai_end_to_end.py::test_object_followups_confirmation_cancel_restart",
+      "recovery_test_node": "tests/test_pai_load_recovery.py::test_object_followups_confirmation_cancel_restart",
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_evidence": "PAI-27/29 actual authorized provider/render/operator observations",
+      "status": "planned"
+    },
+    {
+      "scenario_id": "SC13.2-03",
+      "source_text": "архив + интернет, свежий факт, конфликт источников, только первоисточники, пустая/частичная выдача, источник недоступен;",
+      "slices": [
+        "PAI-11",
+        "PAI-12",
+        "PAI-13",
+        "PAI-26",
+        "PAI-29"
+      ],
+      "synthetic_test_node": "tests/test_pai_end_to_end.py::test_archive_web_conflicts_and_coverage",
+      "recovery_test_node": null,
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_evidence": "PAI-27/29 actual authorized provider/render/operator observations",
+      "status": "planned"
+    },
+    {
+      "scenario_id": "SC13.2-04",
+      "source_text": "недельный отчёт с разными источниками, повторными событиями, старой новостью, изменённым сроком, отсутствием новостей, ошибкой одного подключения;",
+      "slices": [
+        "PAI-14",
+        "PAI-17",
+        "PAI-19",
+        "PAI-26",
+        "PAI-29"
+      ],
+      "synthetic_test_node": "tests/test_pai_end_to_end.py::test_weekly_brief_dedup_deadline_and_outage",
+      "recovery_test_node": null,
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_evidence": "PAI-27/29 actual authorized provider/render/operator observations",
+      "status": "planned"
+    },
+    {
+      "scenario_id": "SC13.2-05",
+      "source_text": "Telegram/HTML/PDF одного отчёта: равенство фактов, мобильный просмотр, длинные URL, кириллица, тёмная тема, без обрезаний;",
+      "slices": [
+        "PAI-15",
+        "PAI-26",
+        "PAI-29"
+      ],
+      "synthetic_test_node": "tests/test_pai_end_to_end.py::test_report_views_mobile_cyrillic_dark_theme",
+      "recovery_test_node": null,
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_evidence": "PAI-27/29 actual authorized provider/render/operator observations",
+      "status": "planned"
+    },
+    {
+      "scenario_id": "SC13.2-06",
+      "source_text": "подтверждённая подписка, пауза, отписка, тихие часы, DST, отзыв доступа перед отправкой, сбой исполнителя, unknown-send;",
+      "slices": [
+        "PAI-08",
+        "PAI-09",
+        "PAI-26",
+        "PAI-29"
+      ],
+      "synthetic_test_node": "tests/test_pai_end_to_end.py::test_watch_pause_dst_revoke_and_unknown_send",
+      "recovery_test_node": "tests/test_pai_load_recovery.py::test_watch_pause_dst_revoke_and_unknown_send",
+      "review_roles": [
+        "slice_review",
+        "test_critic",
+        "privacy_review"
+      ],
+      "human_evidence": "PAI-27/29 actual authorized provider/render/operator observations",
+      "status": "planned"
+    },
+    {
+      "scenario_id": "SC13.2-07",
+      "source_text": "письмо/Canvas с разными дедлайнами, неоднозначная дата, уже сданное задание, локальное «готово», непроверенная применимость возможности;",
+      "slices": [
+        "PAI-19",
+        "PAI-26",
+        "PAI-29"
+      ],
+      "synthetic_test_node": "tests/test_pai_end_to_end.py::test_academic_deadline_conflict_local_done_and_eligibility",
+      "recovery_test_node": null,
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_evidence": "PAI-27/29 actual authorized provider/render/operator observations",
+      "status": "planned"
+    },
+    {
+      "scenario_id": "SC13.2-08",
+      "source_text": "черновик → исправление → новое подтверждение → действие; двойное нажатие, другой владелец, истечение срока и конфликт версии;",
+      "slices": [
+        "PAI-04",
+        "PAI-20",
+        "PAI-26",
+        "PAI-29"
+      ],
+      "synthetic_test_node": "tests/test_pai_end_to_end.py::test_action_edit_confirm_double_click_owner_expiry_version",
+      "recovery_test_node": "tests/test_pai_load_recovery.py::test_action_edit_confirm_double_click_owner_expiry_version",
+      "review_roles": [
+        "slice_review",
+        "test_critic",
+        "privacy_review"
+      ],
+      "human_evidence": "PAI-27/29 actual authorized provider/render/operator observations",
+      "status": "planned"
+    },
+    {
+      "scenario_id": "SC13.2-09",
+      "source_text": "prompt injection из каждого типа источников, секреты в ошибках, приватный текст в веб-запросе, недопустимый резервный провайдер;",
+      "slices": [
+        "PAI-12",
+        "PAI-16",
+        "PAI-17",
+        "PAI-19",
+        "PAI-21",
+        "PAI-22",
+        "PAI-26",
+        "PAI-29"
+      ],
+      "synthetic_test_node": "tests/test_pai_end_to_end.py::test_source_injection_secret_query_and_fallback_denials",
+      "recovery_test_node": "tests/test_pai_load_recovery.py::test_source_injection_secret_query_and_fallback_denials",
+      "review_roles": [
+        "slice_review",
+        "test_critic",
+        "privacy_review"
+      ],
+      "human_evidence": "PAI-27/29 actual authorized provider/render/operator observations",
+      "status": "planned"
+    },
+    {
+      "scenario_id": "SC13.2-10",
+      "source_text": "восстановление из резервной копии, миграция вперёд/назад на копии, удаление/отзыв источника и кэшей.",
+      "slices": [
+        "PAI-21",
+        "PAI-24",
+        "PAI-25",
+        "PAI-26",
+        "PAI-29"
+      ],
+      "synthetic_test_node": "tests/test_pai_end_to_end.py::test_restore_migration_revoke_delete_and_cache",
+      "recovery_test_node": "tests/test_pai_load_recovery.py::test_restore_migration_revoke_delete_and_cache",
+      "review_roles": [
+        "slice_review",
+        "test_critic",
+        "privacy_review"
+      ],
+      "human_evidence": "PAI-27/29 actual authorized provider/render/operator observations",
+      "status": "planned"
+    }
+  ]
+}

@@ -217,3 +217,39 @@ Owner message: “разрешаю, продолжи гол”. The recommended 
 the complete assigned local queue is now authorized, including all 3 prior
 requests. Per-call bounds and source classes remain unchanged. Continue without
 re-asking that scope; no feature/private/live/release approval is invented.
+
+## Actual resumed design review and scoped remediation
+
+Reviewed SHA: 04c4efa17c4fc10ad1db1a7e1acb4c1cbbd32d66.
+Actual product reviewer requested/observed mimo-v2.6-pro; verdict STOP_SHIP,
+two P1 and three P2. Usage 38730 input / 6304 output tokens. Immutable result:
+.playbook-artifacts/opencode-runs/opencode-ccae625bd14a40b88cd808af1c475fc0/result.json.
+Public report: PAI-01-product-review-04c4efa.md. Initial program response failed
+the complete-response guard; no program verdict/approval is inferred.
+
+Remediated P1: PAI-01 cannot edit src/tests/tools, including its checker; those
+belong to independently reviewed code scopes. Added PAI.requirements.json with
+all 69 exact spec IDs and all ten verbatim §13.2 scenarios, slice/path/test/review/
+human bindings. PAI-26 explicitly enumerates them. Planned tests are obligations,
+not passes. Checker additions are PAI-00 tooling and have negative drift tests.
+
+P2 clarifications: permanent unknown spend is conservatively consumed, owner
+visible and never refunded/retried silently; new work needs a new funded ID.
+PostgreSQL tombstones block serving immediately while idempotent per-store
+cleanup/watermarks truthfully remain partial during outage/restore. Scope
+overlap checking confirms PAI-24 has no actual allow/deny overlap. Missing
+future tests remain pending; missing existing regression files fail checking.
+
+Lossless string/column factoring retains every registry/matrix field and is
+roundtrip checked. Full-spec design packets remain below 200000 bytes.
+Separate narrow --tooling-review audits the actual checker/transport but cannot
+write full-design review evidence. JSON report limits prioritize concise P0/P1;
+more independent blockers require STOP_SHIP and explicit remaining coverage,
+not a false PASS. Provider thinking defaults/model are unchanged.
+
+Exact targeted command:
+PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_plan.py tests/test_opencode_role_review.py tests/test_strategy_reviewer.py
+Exit 0: 41 passed in 22.52 s. Schema/coverage checker passes: 69 IDs, 10 scenarios,
+32 tasks; 28 new future suite files still absent.
+Independent recheck of the changed paired design and tooling is next; no human
+feature acceptance is claimed. Budget: five calls used before these rechecks.

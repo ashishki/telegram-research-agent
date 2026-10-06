@@ -12,6 +12,7 @@ from pathlib import Path
 import re
 import sys
 import uuid
+from collections import Counter
 
 from playbook import ROOT, verified_upstream
 
@@ -25,16 +26,18 @@ VERDICT_SCHEMA = {
     "required": ["verdict", "findings", "not_verified", "summary"],
     "properties": {
         "verdict": {"type": "string", "enum": ["PASS", "ADVISORY", "STOP_SHIP"]},
-        "findings": {"type": "array", "maxItems": 50, "items": {
+        "findings": {"type": "array", "maxItems": 12, "items": {
             "type": "object", "additionalProperties": False,
             "required": ["severity", "title", "issue", "fix"],
             "properties": {
                 "severity": {"type": "string", "enum": ["P0", "P1", "P2"]},
-                **{key: {"type": "string"} for key in ("title", "issue", "fix")},
+                "title": {"type": "string", "maxLength": 140},
+                "issue": {"type": "string", "maxLength": 800},
+                "fix": {"type": "string", "maxLength": 600},
             },
         }},
-        "not_verified": {"type": "array", "items": {"type": "string"}},
-        "summary": {"type": "string"},
+        "not_verified": {"type": "array", "maxItems": 8, "items": {"type": "string", "maxLength": 240}},
+        "summary": {"type": "string", "maxLength": 1600},
     },
 }
 PACKET_REFS = (
@@ -42,6 +45,7 @@ PACKET_REFS = (
     "docs/PROJECT_BRIEF.md", "docs/ASSISTANT_BOUNDARIES.md",
     "docs/IMPLEMENTATION_CONTRACT.md", "docs/REVIEW_POLICY.md",
     "docs/adr/ADR-013-pa-durable-runtime.md",
+    "docs/design/PAI.requirements.json",
 )
 
 
@@ -54,6 +58,46 @@ def digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def factor_json(document):
+    """Losslessly share strings/record columns; preserve all reviewable fields."""
+    strings = []
+    def scan(node):
+        if isinstance(node, str): strings.append(node)
+        elif isinstance(node, list):
+            for item in node: scan(item)
+        elif isinstance(node, dict):
+            for item in node.values(): scan(item)
+    scan(document)
+    values = sorted(value for value, count in Counter(strings).items()
+                    if (count > 1 and len(value) >= 18) or re.fullmatch(r"[$][0-9]+", value))
+    ids = {value: str(index) for index, value in enumerate(values)}
+    symbols = {index: value for value, index in ids.items()}
+    def encode(node):
+        if isinstance(node, str) and node in ids: return "$" + ids[node]
+        if isinstance(node, list):
+            if len(node) > 1 and all(isinstance(item, dict) for item in node):
+                columns = list(node[0])
+                if all(list(item) == columns for item in node):
+                    return {"$table": {"columns": columns,
+                            "rows": [[encode(item[key]) for key in columns] for item in node]}}
+            return [encode(item) for item in node]
+        if isinstance(node, dict): return {key: encode(value) for key, value in node.items()}
+        return node
+    def decode(node):
+        if isinstance(node, str) and re.fullmatch(r"[$][0-9]+", node): return symbols[node[1:]]
+        if isinstance(node, dict) and set(node) == {"$table"}:
+            table = node["$table"]
+            return [{key: decode(value) for key, value in zip(table["columns"], row)}
+                    for row in table["rows"]]
+        if isinstance(node, dict): return {key: decode(value) for key, value in node.items()}
+        if isinstance(node, list): return [decode(item) for item in node]
+        return node
+    packed = encode(document)
+    if decode(packed) != document: raise ReviewBlocked("lossless JSON factoring failed")
+    return {"encoding": "lossless-tables.v1: $N strings resolve via symbols; $table rows map to columns",
+            "symbols": symbols, "document": packed}
+
+
 def pinned_modules(root: Path):
     upstream = verified_upstream(root)
     sys.path.insert(0, str(upstream / "tools"))
@@ -63,7 +107,7 @@ def pinned_modules(root: Path):
     return feature_design_lib, feature_workflow, approve_feature_design
 
 
-def prepare_packet(root: Path, task: str, feature: str, role: str):
+def prepare_packet(root: Path, task: str, feature: str, role: str, tooling_review: bool = False):
     if role not in ROLES or not re.fullmatch(r"[A-Za-z][A-Za-z0-9._-]*", feature):
         raise ReviewBlocked("unsupported role or feature")
     lib, workflow, _ = pinned_modules(root)
@@ -75,8 +119,10 @@ def prepare_packet(root: Path, task: str, feature: str, role: str):
     if any(f.severity == "error" for f in findings):
         raise ReviewBlocked("invalid feature design")
     refs = (f"docs/design/{feature}.md", registry_ref, *PACKET_REFS)
-    if role == "program_design_review":
-        refs += ("tools/opencode_role_review.py", "tools/run_codex_role.py", "tools/mimo_code_review.py")
+    if tooling_review:
+        if role != "program_design_review": raise ReviewBlocked("tooling audit requires program role")
+        refs = tuple(ref for ref in refs if ref not in {registry_ref, f"docs/design/{feature}.md", "docs/design/PAI.requirements.json"})
+        refs += ("tools/opencode_role_review.py", "tools/run_codex_role.py", "tools/mimo_code_review.py", "tools/check_pai_plan.py", "tests/test_pai_plan.py")
     manifest, sections = [], []
     for ref in refs:
         path = lib.safe_repo_path(root, ref)
@@ -85,11 +131,11 @@ def prepare_packet(root: Path, task: str, feature: str, role: str):
         data = path.read_bytes()
         manifest.append({"path": ref, "sha256": digest(data), "bytes": len(data)})
         content = data.decode("utf-8")
-        if ref == registry_ref:
+        if ref in {registry_ref, "docs/design/PAI.requirements.json"}:
             # Whitespace reduction preserves every field and scope; the
             # manifest remains bound to the exact original registry bytes.
-            content = json.dumps(json.loads(content), ensure_ascii=False, separators=(",", ":"))
-        if ref in {"tools/opencode_role_review.py", "tools/run_codex_role.py"}:
+            content = json.dumps(factor_json(json.loads(content)), ensure_ascii=False, separators=(",", ":"))
+        if ref in {"tools/opencode_role_review.py", "tools/run_codex_role.py", "tools/check_pai_plan.py", "tests/test_pai_plan.py"}:
             # AST normalization retains the complete executable source and
             # docstrings; original bytes/hashes remain in the manifest.
             content = ast.unparse(ast.parse(content))
@@ -118,7 +164,13 @@ def prepare_packet(root: Path, task: str, feature: str, role: str):
         "(PASS, ADVISORY, STOP_SHIP), findings (list of severity P0/P1/P2, "
         "title, issue, fix), not_verified (list of strings), summary (string). "
         "Any P0/P1 requires STOP_SHIP. Cosmetic nits are not blockers.\n"
+        "Keep findings concise, merge related issues, and prioritize all P0/P1. "
+        "If more than twelve independent blockers remain, return STOP_SHIP and "
+        "state the remaining unreviewed risk in not_verified; never call it PASS. "
+        "Table JSON is lossless: resolve $N strings with symbols and map table rows to columns.\n"
     )
+    if tooling_review:
+        instruction += "Scope is the actual review transport/checker code only, not full feature design approval. Challenge budget/credentials, schema, provenance, source coverage, tamper guards and negative tests.\n"
     packet = instruction + json.dumps({"task": task, "role": role}) + "".join(sections)
     if len(packet.encode("utf-8")) > MAX_INPUT_BYTES:
         raise ReviewBlocked("packet exceeds authorized input bound; never truncate silently")
@@ -161,7 +213,8 @@ def parse_response(payload: dict, requested_model: str) -> dict:
 
 def execute(args):
     root = args.root.resolve()
-    packet, manifest, design = prepare_packet(root, args.task, args.feature_id, args.role)
+    tooling_review = getattr(args, "tooling_review", False)
+    packet, manifest, design = prepare_packet(root, args.task, args.feature_id, args.role, tooling_review)
     lib, workflow, approval = pinned_modules(root)
     try:
         workflow.validate_task_feature_slice_binding(
@@ -212,6 +265,15 @@ def execute(args):
                    "error_type": type(exc).__name__,
                    "http_status": code if type(code) is int and 100 <= code <= 599 else None,
                    "provider_outcome": "unknown", "observed_model": None}
+        if "response" in locals() and isinstance(response, dict):
+            if response.get("model") == args.model: failure["observed_model"] = args.model
+            choices = response.get("choices")
+            if isinstance(choices, list) and choices and isinstance(choices[0], dict):
+                reason = choices[0].get("finish_reason")
+                if reason in {"stop", "length", "content_filter", "tool_calls"}: failure["finish_reason"] = reason
+            usage = response.get("usage")
+            if isinstance(usage, dict):
+                failure["usage"] = {key: usage[key] for key in ("prompt_tokens", "completion_tokens", "total_tokens") if type(usage.get(key)) is int and usage[key] >= 0}
         (run_dir / "failure.json").write_text(json.dumps(failure, indent=2) + "\n")
         raise
     if workflow.git_commit(root) != head:
@@ -235,6 +297,7 @@ def execute(args):
         "schema_version": "assistant.opencode_design_review.v1",
         "provider": "opencode_go", "run_id": run_id, "task": args.task,
         "role": args.role, "feature_id": args.feature_id, "reviewed_head": head,
+        "review_scope": "tooling" if tooling_review else "complete_design",
         "requested_model": args.model, "observed_model": response["model"],
         "requested_effort": "not_requested", "observed_effort": "unknown",
         "generated_at": datetime.now(timezone.utc).isoformat(), "read_only": True,
@@ -248,13 +311,14 @@ def execute(args):
     (run_dir / "result.json.sha256").write_text(digest(result.read_bytes()) + "\n")
     # Use the real pinned consumer and an honest non-Codex binding. Never create
     # codex_role_run events/results or human approval fields.
-    approval.write_design_review_record(
-        root=root, feature_id=args.feature_id, role=args.role,
-        report_path=report.relative_to(root).as_posix(), reviewed_design=design,
-        reviewer_binding="opencode_go:" + result.relative_to(root).as_posix(),
-        read_only=True,
-    )
-    print(json.dumps({"status": "review_record_written", "provider": "opencode_go",
+    if not tooling_review:
+        approval.write_design_review_record(
+            root=root, feature_id=args.feature_id, role=args.role,
+            report_path=report.relative_to(root).as_posix(), reviewed_design=design,
+            reviewer_binding="opencode_go:" + result.relative_to(root).as_posix(),
+            read_only=True,
+        )
+    print(json.dumps({"status": "tooling_review_completed" if tooling_review else "review_record_written", "provider": "opencode_go",
                       "verdict": verdict["verdict"], "result": str(result)}))
     return 0 if verdict["verdict"] != "STOP_SHIP" else 1
 
@@ -272,6 +336,8 @@ def main(argv=None):
     parser.add_argument("--call-cap", type=int, default=0)
     parser.add_argument("--allow-provider-egress", action="store_true")
     parser.add_argument("--prepare-only", action="store_true")
+    parser.add_argument("--tooling-review", action="store_true",
+                        help="separate narrow code audit; never publishes full-design approval evidence")
     args = parser.parse_args(argv)
     try:
         if not 30 <= args.timeout_seconds <= 300:

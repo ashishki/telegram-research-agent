@@ -991,6 +991,8 @@ lease, budget contention, lost ACK, DB outage, restore и injection из каж�
 `tests/test_pai_end_to_end.py`, `tests/test_pai_load_recovery.py`,
 `docs/verification/PAI-release-candidate.md`.
 
+**Обязательный набор:** SC13.2-01..10 из docs/design/PAI.requirements.json: чат/multiturn; object followups/yes/cancel/restart; архив+web/конфликты/coverage; Brief/dedup/deadlines/outage; Telegram/HTML/PDF mobile/кириллица/dark theme; Watch pause/DST/revoke/unknown; Academic conflicts/done/eligibility; Act edit/confirm/double-click/owner/expiry/version; injection/secrets/query/fallback; restore/migration/delete/cache. Все 69 spec-ID имеют отдельные test/review/human obligations; planned mapping не считается PASS.
+
 **Готово, когда:** каждая обязательная PA-возможность имеет wired positive
 и failure evidence, нет открытых P0/P1; отсутствие provider/human proof
 указано отдельно. Generic tier и judge не заменяют эту матрицу.

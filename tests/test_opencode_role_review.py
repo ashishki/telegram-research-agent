@@ -255,3 +255,45 @@ def test_transport_matches_navigator_two_messages_strict_schema_and_fresh_sessio
     assert "temperature" not in body
     sessions = [next(value for key, value in record[1].items() if key.lower() == "x-opencode-session") for record in captures]
     assert len(set(sessions)) == 2 and all(len(value) == 32 for value in sessions)
+
+
+def test_json_factoring_preserves_complete_registry_and_literal_references():
+    import re
+    document = {"rows": [
+        {"id": 1, "scope": "a long repeated scope with every requirement", "path": "src/prm/runtime/worker.py"},
+        {"id": 2, "scope": "a long repeated scope with every requirement", "path": "src/prm/runtime/worker.py"},
+    ], "literal": "$0", "flags": [False, None, 600]}
+    packed = review.factor_json(document)
+    def decode(node):
+        if isinstance(node, str) and re.fullmatch(r"[$][0-9]+", node): return packed["symbols"][node[1:]]
+        if isinstance(node, list): return [decode(item) for item in node]
+        if isinstance(node, dict) and set(node) == {"$table"}:
+            table = node["$table"]
+            return [dict(zip(table["columns"], [decode(v) for v in row])) for row in table["rows"]]
+        if isinstance(node, dict): return {k: decode(v) for k, v in node.items()}
+        return node
+    assert decode(packed["document"]) == document
+
+
+def test_tooling_audit_cannot_create_a_full_design_record(tmp_path, monkeypatch):
+    args, calls, records = setup_run(tmp_path, monkeypatch)
+    args.tooling_review = True
+    assert review.execute(args) == 0
+    assert calls[1]["response_schema"] == review.VERDICT_SCHEMA
+    assert records == []
+    result = json.loads(next((tmp_path / ".playbook-artifacts/opencode-runs").glob("*/result.json")).read_text())
+    assert result["review_scope"] == "tooling"
+
+
+def test_truncated_response_preserves_known_telemetry_without_approval(tmp_path, monkeypatch):
+    args, calls, records = setup_run(tmp_path, monkeypatch)
+    payload = response()
+    payload["choices"][0]["finish_reason"] = "length"
+    monkeypatch.setattr(mimo_code_review, "_call_model", lambda **kw: payload)
+    with pytest.raises(ValueError, match="incomplete"):
+        review.execute(args)
+    failure = json.loads(next((tmp_path / ".playbook-artifacts/opencode-runs").glob("*/failure.json")).read_text())
+    assert failure["observed_model"] == "mimo-v2.6-pro"
+    assert failure["finish_reason"] == "length"
+    assert failure["usage"] == payload["usage"]
+    assert records == []

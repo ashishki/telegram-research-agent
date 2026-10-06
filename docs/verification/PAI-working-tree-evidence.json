@@ -34,7 +34,7 @@
     },
     {
       "path": "docs/CODEX_PROMPT.md",
-      "sha256": "430f12019ed520fd0dc0fa5f814b63a6bf508fec9fee6ea11d8892ff02b4d335"
+      "sha256": "9f7b42ab761cd8861239dba203936ec7e6ff5814dc9b1a9bf71f29f6ab561979"
     },
     {
       "path": "docs/IMPLEMENTATION_CONTRACT.md",
@@ -42,7 +42,7 @@
     },
     {
       "path": "docs/PA_IMPLEMENTATION_TASKS.md",
-      "sha256": "c5ae655a2243004eb00802f11561fa2bc2c72dad8ed2c54e043e57ca978570c3"
+      "sha256": "1685422be6d23b25cda15262720a3af4ffc7843c87e181f30d53b9c544e018d3"
     },
     {
       "path": "docs/PA_SCALING_STRATEGY_2026-10-06.md",
@@ -62,7 +62,7 @@
     },
     {
       "path": "docs/REVIEW_POLICY.md",
-      "sha256": "21ac3a56ce2c7cf1d9f6a7060fa577276618d934d0f83f467a44d0b44ea6a4ed"
+      "sha256": "01290fb7367f148ba801d5247b3fbc12da95cd1e42847603179456717de246a1"
     },
     {
       "path": "docs/adr/ADR-012-pa-assignment-and-instruction-scope.md",
@@ -70,15 +70,15 @@
     },
     {
       "path": "docs/adr/ADR-013-pa-durable-runtime.md",
-      "sha256": "134736397f8e64b369235cc077765fa7bab3ded48e6ce91b0a418470561e91a0"
+      "sha256": "ff6b4984b1dce72d04b6f765be579620d106684d183098c805331502bd07a6bf"
     },
     {
       "path": "docs/design/PAI.design.json",
-      "sha256": "6ba5906456f6832322902bb4d37f47d4f8c09ab6c55a7552c205aba32f58b2ac"
+      "sha256": "5760c06210f445ed1252810dff95c6e07b199fe28054c9b8c85b63a040811208"
     },
     {
       "path": "docs/design/PAI.md",
-      "sha256": "dc63c36ff0a51bb620d680ed1e8b13bad5f15b5e248a48722b93fa2d263dfa91"
+      "sha256": "6d9119c389f60fc80b869aadc031fa308919e7958817abef5b394a59b082c119"
     },
     {
       "path": "docs/prompts/ORCHESTRATOR.md",
@@ -122,7 +122,7 @@
     },
     {
       "path": "docs/tasks.md",
-      "sha256": "c4383b3b0c366560f2df543cac6e3cad08a426ca3650cf8144fb6506f9aef7e3"
+      "sha256": "d6b010a9492300a4f4e7f2d4e479f111a4d99aeba425cfd95658f2d5b645947a"
     },
     {
       "path": "docs/verification/PAI-00-reconciliation.md",
@@ -130,7 +130,7 @@
     },
     {
       "path": "docs/verification/PAI-01-durable-design.md",
-      "sha256": "f8e3d25c79caa8eac9464271daf0614cc06d6dce821aee3b84d6bfec60459edc"
+      "sha256": "9086e227049cccac0dae9ced34631d9b0567b502f4fe8dbe2c2d5f60a7a9cfbe"
     },
     {
       "path": "docs/verification/PAI-access-release-pilot-packet.md",
@@ -138,7 +138,7 @@
     },
     {
       "path": "docs/verification/PAI-progress.md",
-      "sha256": "63ba0c6776e7ca80affd91b31636634889f22876ddf7fdd28e2583f086694af2"
+      "sha256": "cb71a7918921bba3dc7353c9478359bf56c2d28c76b336f876cfe23a9d842e1d"
     },
     {
       "path": "tests/test_assistant_conversation.py",
@@ -150,11 +150,11 @@
     },
     {
       "path": "tests/test_opencode_role_review.py",
-      "sha256": "88901932ece79edb7c80d5f23c75c0f9bb3766ddad14e92700808ec31388de56"
+      "sha256": "b3632fd5c57bfcb3e977b5489e82638ca26c13cf8c386da4eb4a4127af0121e6"
     },
     {
       "path": "tests/test_pai_plan.py",
-      "sha256": "0331ea951d3b63d06e35052f3cf24ce920928758cd067b380d1e90902f88032c"
+      "sha256": "8989ee11b081d07e48b20a04e58a7a0ff1c8f53b11a28b2a95b51aba6ab0481e"
     },
     {
       "path": "tests/test_playbook_bridge.py",
@@ -162,7 +162,7 @@
     },
     {
       "path": "tools/check_pai_plan.py",
-      "sha256": "8d129ee45b884b409cca13d16a15546307079d3610abafe22b54944ecb1dc3cc"
+      "sha256": "4e3a62d60c6ff963f6e5bed02a614ca7989ef68e70b0bbc8f5e46efeb20a812a"
     },
     {
       "path": "tools/mimo_code_review.py",
@@ -170,7 +170,7 @@
     },
     {
       "path": "tools/opencode_role_review.py",
-      "sha256": "888e6276c2110d0ea76777ebbb1ded6f65b94a6654afa59668c007664068fed7"
+      "sha256": "513193c4d94674d47d9c837fac6c597d7e2aff277cc5abb08e68cac67a7d46f2"
     },
     {
       "path": "tools/playbook.py",
@@ -187,6 +187,14 @@
     {
       "path": "docs/verification/PAI-MIMO-CALL-PROTOCOL.md",
       "sha256": "380d3eed401d491482682529b1e6c2b334c2d798cf9edb1d63ea9d20d24dc689"
+    },
+    {
+      "path": "docs/design/PAI.requirements.json",
+      "sha256": "d785a60ea94d68f7c45d167c1738321233cd8b3d41b1ad06ec55828ef92a5139"
+    },
+    {
+      "path": "docs/verification/PAI-01-product-review-04c4efa.md",
+      "sha256": "7746ae3c555f93eec24ca2fb4a9ce1034892abc6443899d567500f468193726b"
     }
   ],
   "preserved_unrelated_paths": [
@@ -200,10 +208,10 @@
   "scope": "PAI-00 reconciliation and PAI-01 draft preparation, not full product completion",
   "checkpoint_head": "07f24757dccef9cd7e5118a7a1d19be85dd5b656",
   "actual_review_attempts": {
-    "program_design_review": "HTTPError, no verdict",
-    "product_design_review": "TimeoutError, no verdict",
-    "call_cap": 2,
-    "remaining_calls": 0
+    "product_design_review": "STOP_SHIP on 04c4efa, two P1 remediated pending recheck",
+    "program_design_review": "incomplete response, no verdict",
+    "used_calls": 5,
+    "total_call_cap": 30
   },
   "snapshot_commit": "84da33a84e05e76f8451ea4a4aebd8a6d57ab5ec",
   "latest_code_checkpoint": "985f8f2ecbbbe0ab28a62e8a4cd09295a0d2266e",

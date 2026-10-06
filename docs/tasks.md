@@ -1237,6 +1237,7 @@ Planning-Depth: designed_slices
 Slice-ID: PAI-26
 Objective: один release candidate с полной requirement-to-evidence матрицей и конкретным списком оставшихся live-gates.
 Acceptance-Criteria:
+  - Every SC13.2-01..10 scenario and all 69 spec IDs in docs/design/PAI.requirements.json have actual wired test/review evidence; absent/planned nodes cannot pass.
   - каждая обязательная PA-возможность имеет wired positive и failure evidence, нет открытых P0/P1; отсутствие provider/human proof указано отдельно. Generic tier и judge не заменяют эту матрицу.
   - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
 Verification:

@@ -32,7 +32,9 @@ The application has injection seams but does not wire all these contracts into
 the default ingress. Do not infer deployed state from templates or fixtures.
 Read the full PERSONAL_ASSISTANT_SPEC.md for product/program design reviews.
 The companion registry binds each PAI packet to an executable formal task;
-PA-Refs in the task pack preserve original requirement coverage.
+PA-Refs preserve stage coverage; PAI.requirements.json maps all 69 binding spec
+IDs and ten verbatim §13.2 scenarios to slices, expected paths, acceptance
+commands/test nodes, independent roles and actual human evidence gates.
 
 ## 3. System Impact
 
@@ -165,6 +167,32 @@ final export/check, switch one writer and retain source read-only.
 After new writes rollback requires verified delta transfer or forward fix;
 restoring an old snapshot alone could duplicate effects and is forbidden.
 
+### Unknown settlement and cross-store deletion
+
+Unknown spend stays owner-visible and charged conservatively to its original
+request/job/day/month window; rollover cannot refund or restart that job.
+Provider evidence settles actual usage by CAS, or explicit owner-confirmed
+write-off consumes the entire upper reservation once. The operator can inspect
+unknown totals, cancel remaining work, or fund a NEW bounded operation ID.
+None of these choices retries an unknown external effect or silently increases
+a cap. Declining additional budget visibly blocks that work. PAI-03/23/26 test
+permanent unknown, window rollover, visible refusal, conservative one-use
+settlement and explicitly funded new-operation continuation.
+
+PostgreSQL is the visibility authority across both stores. First commit an
+owner/resource/revision deletion tombstone and invalidate jobs/caches/reader
+links; every serving path checks current authority and denies unavailable
+authority. Then idempotent per-store steps remove selected derived PostgreSQL
+rows/artifacts and SQLite derived/index rows under the same deletion ID.
+Independent canonical Telegram records are preserved. Each store tracks a
+watermark; unreachable cleanup remains pending with bounded retries and an
+owner-visible partial_deletion status, never complete. Offline SQLite cleanup
+does not permit stale serving. Restore applies authority tombstones before
+opening reads, then resumes cleanup. PAI-21/25/26 cover offline-store revoke,
+stale cache/job denial, resumed cleanup and both restore directions. Backup/
+provider expiry exceptions are shown before acceptance, not called immediate
+physical deletion.
+
 ## 5. Maintainability Risks
 
 Keep queue implementation narrow and repository transactions explicit.
@@ -202,9 +230,9 @@ or lifecycle behavior. No skeleton-only closure.
 
 ## 8. Open Decisions
 
-Independent review and governed non-Codex runner compatibility are pending.
-The current project-level brief provenance does not cover this PA/PAI design;
-planning reports needs_input. Live retention/cost/provider/account parameters
+The owner approved the current project brief and assigned planning depth;
+pinned planning is selected. Mimo generic-record compatibility is tested, but
+independent design recheck and hash-bound feature approval remain pending. Live retention/cost/provider/account parameters
 remain owner decisions. Conditional Redis/archive migration needs measurements.
 No listed open decision is inferred from elapsed time or a configured key.
 
