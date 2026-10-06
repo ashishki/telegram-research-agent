@@ -9,7 +9,8 @@ PAI-02 is locally verified with actual isolated PostgreSQL, migrations,
 transactional CAS object versions, corruption guards and dump/restore tests.
 Receipt: docs/verification/PAI-02-storage.md. PAI-03 shared policy is locally verified (86 cases, zero skips); next PAI-04
 durable proposals/confirmations/attempts/receipts now locally verified (36
-cases). Current next card: PAI-05 conversation/result persistence.
+cases). PAI-05 persistence locally verified (26 cases). Current next card:
+PAI-06 durable queue/worker/checkpoints, then accumulated phase-B review.
 Use .venv-pai/bin/python (psycopg 3.3.6 installed with verified wheel hash).
 Do not read .env/production DSNs or change services/timers/live accounts.
 
