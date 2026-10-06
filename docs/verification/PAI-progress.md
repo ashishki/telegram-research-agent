@@ -11,7 +11,7 @@ Current card: PAI-01. Draft/brief/planning are prepared and authorized.
 Original complete product review returned STOP_SHIP; its two P1 findings were
 independently resolved by a scoped PASS. Complete design rechecks remain pending.
 Owner authorized 30 total calls, 16000-token output and 900-second design deadlines.
-Seventeen calls are consumed before the next complete program request.
+Eighteen calls are consumed before the phase-review continuation.
 
 | ID / PA-Refs | Engineering status | Code | Wiring | Tests | Review | Live | Human acceptance | Blocker / next |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -58,7 +58,7 @@ Original complete product review on 04c4efa: STOP_SHIP. Both P1s fixed and
 independently rechecked on e262f27: scoped PASS (not full acceptance).
 Full/phase calls at 300 s and 8000-token output encountered timeout/truncation;
 failed/unknown requests count toward the budget. Navigator smoke was successful
-with 112 tokens and cannot replace review. Complete requests on 1136863/a5cd3d2 failed with HTTP 500/ValueError;
+with 112 tokens and cannot replace review. Complete requests on 1136863/a5cd3d2/4901d56 failed with HTTP 500/ValueError/incomplete SSE;
 no verdict. Tiny SSE diagnostic passed with 116 tokens. Corrected SSE framing
 guards and safe error diagnostics precede the next complete request.
 Exact historic attempts and outcomes: PAI-01-durable-design.md.
@@ -71,5 +71,5 @@ distinct evidence, not inferred from these tests.
 Existing owner decisions: exact project brief, Mimo reviewer, designed_slices,
 30 total calls and design/recheck output/deadline amendments. Do not re-request.
 Exact paired-feature human approval remains necessary after complete reviews.
-Next: collect actual program result, then complete product recheck on frozen
-source; resolve P0/P1, prepare exact approval package, then PAI-02.
+Next: collect all four program and product phase reviews on frozen source,
+aggregate only complete coverage; resolve P0/P1, prepare exact approval package, then PAI-02.

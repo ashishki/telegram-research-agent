@@ -71,7 +71,11 @@ versioned state schema; src/prm/runtime/ for composition, worker, scheduler,
 effect executor and connector transports. Existing domain modules remain the
 source of business semantics; src/bot/ stays transport. The companion registry
 specifies per-card allowed/forbidden files, verification, budgets and rollback.
-No application code or DB migration is implemented by this packet.
+No application code or DB migration is implemented by this packet. PAI-00
+owns the bounded reviewer/checker/phase-finalizer tooling and owner strategy
+document. Its file budget is 64, covering 57 accumulated instruction/tooling/
+verification paths plus bounded publication receipts; this draft rescope is
+subject to the same independent reviews and human approval.
 
 ### Interfaces and invariants
 

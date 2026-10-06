@@ -343,3 +343,14 @@ Next: one new complete program request on frozen streaming source; it counts aga
 SSE complete request #16 failed safely (ValueError, exact cause unknown).
 Tiny SSE diagnostic #17 succeeded, 116 tokens; not a design verdict.
 Frame-envelope guard/diagnostics corrected, token/time caps unchanged.
+
+Complete streaming request #18 on 4901d56 ended without terminal completion
+(error_code review_stream_incomplete); no verdict. Added bounded terminal
+metadata diagnostics without model text. PAI-00 scope now explicitly includes
+the phase finalizer and owner strategy document, budget 64 for 57 accumulated
+paths plus publication receipts. Draft remains unapproved. Next review uses
+the existing complete four-phase strategy, all slices/spec sections preserved.
+
+Phase-scope amendment validates structurally (32 slices, 69 requirements, ten
+scenarios). Terminal diagnostic test preserves safe metadata and excludes
+provider/secret text. Latest targeted suite: 62 passed; phase reviews next.

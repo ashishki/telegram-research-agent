@@ -142,7 +142,11 @@ def _read_review_stream(response, model: str, deadline: float) -> dict[str, Any]
         if wire_bytes > 8_388_608 or len(line) > 65_536:
             raise ValueError("review_response_too_large")
         if not line:
-            raise ValueError("review_stream_incomplete")
+            error = ValueError("review_stream_incomplete")
+            error.review_stream_state = {"wire_bytes": wire_bytes, "final_text_bytes": text_bytes,
+                                         "finish_reason": finish,
+                                         "terminal_event": "eof"}
+            raise error
         line = line.strip()
         if not line or line.startswith(b":"):
             continue
@@ -151,7 +155,11 @@ def _read_review_stream(response, model: str, deadline: float) -> dict[str, Any]
         data = line[5:].strip()
         if data == b"[DONE]":
             if finish is None:
-                raise ValueError("review_stream_incomplete")
+                error = ValueError("review_stream_incomplete")
+                error.review_stream_state = {"wire_bytes": wire_bytes, "final_text_bytes": text_bytes,
+                                             "finish_reason": None,
+                                             "terminal_event": "done_without_finish"}
+                raise error
             return {"model": model, "choices": [{"finish_reason": finish,
                     "message": {"content": "".join(content)}}], "usage": usage}
         event = json.loads(data)

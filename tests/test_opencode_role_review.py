@@ -475,3 +475,20 @@ def test_stream_failure_preserves_fixed_diagnostic_without_provider_text(tmp_pat
     failure = json.loads(next((tmp_path / '.playbook-artifacts/opencode-runs').glob('*/failure.json')).read_text())
     assert failure['error_code'] == 'review_response_too_large'
     assert records == []
+
+
+def test_stream_terminal_diagnostic_cannot_leak_provider_content(tmp_path, monkeypatch):
+    args, calls, records = setup_run(tmp_path, monkeypatch)
+    def failed_provider(**kwargs):
+        error = ValueError('review_stream_incomplete')
+        error.review_stream_state = {'wire_bytes': 1234, 'final_text_bytes': 0,
+            'finish_reason': None, 'terminal_event': 'eof',
+            'observed_model': 'synthetic-secret', 'reasoning': 'synthetic-secret'}
+        raise error
+    monkeypatch.setattr(mimo_code_review, '_call_model', failed_provider)
+    with pytest.raises(ValueError): review.execute(args)
+    raw = next((tmp_path / '.playbook-artifacts/opencode-runs').glob('*/failure.json')).read_text()
+    assert 'synthetic-secret' not in raw
+    assert json.loads(raw)['stream_state'] == {'wire_bytes': 1234, 'final_text_bytes': 0,
+                                               'finish_reason': None, 'terminal_event': 'eof'}
+    assert records == []

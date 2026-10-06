@@ -38,7 +38,7 @@ files remain absent. Planning validation is not runtime evidence.
 ## Review funding and transport
 
 Owner explicitly funded 30 total local-program Mimo calls, including failures
-and the tiny diagnostic. Seventeen have been consumed before the next request.
+and the tiny diagnostic. Eighteen have been consumed before the next request.
 Owner approved design/recheck output <=16000 tokens and now answered “да” to
 extending design/recheck deadlines to <=900 seconds. Other bounds unchanged:
 <=200000 input bytes; project/public/synthetic data only; no automatic retries,
@@ -64,12 +64,12 @@ never a whole-design record. Other role support must be extended before credit.
 
 ## Verification and continuation
 
-Latest focused-prm: 620 passed. Latest deadline/role/checker suite: 61 passed
-in 9.90 s. Full historical pytest is prohibited. Actual integrations, visual
+Latest focused-prm: 620 passed. Latest deadline/role/checker suite: 62 passed in 9.40 s at the terminal-diagnostic checkpoint. Full historical pytest is prohibited. Actual integrations, visual
 acceptance and operator usefulness remain distinct gates.
 
-Next: freeze committed source, run complete independent program/product design
-reviews with --output-token-cap 16000 --timeout-seconds 900; fix P0/P1 and
+Next: freeze committed source, run all four independent program/product design
+phases with --output-token-cap 16000 --timeout-seconds 900; aggregate only
+complete same-HEAD coverage with tools/finalize_opencode_design_reviews.py; fix P0/P1 and
 independently recheck. Then present the exact hash-bound feature package for
 owner approval through pinned workflow before implementing PAI-02.
 

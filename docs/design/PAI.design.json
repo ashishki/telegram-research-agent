@@ -15,10 +15,6 @@
   "schema_version": "playbook.feature_design.v1",
   "slices": [
     {
-      "slice_id": "PAI-00",
-      "status": "planned",
-      "user_visible_outcome": "следующий исполнитель однозначно понимает, что уже написано, что подключено и что ему разрешено.",
-      "scope": "сверить HEAD/branch/status и актуальные пути; оформить `docs/verification/PAI-progress.md` с колонками code/wiring/tests/review/live/ human acceptance. Привести AGENTS, handoff, README, architecture, старые prompts и skill policy к конкретным исправлениям из стратегии, сохранив safety contract. Свести reviewer-policy с provenance owner amendments и возможностями pinned runner; не выдавать Mimo-отчёт за Codex Role Runner receipt. Неизвестное решение владельца вынести одним конкретным вопросом после подготовки вариантов.",
       "allowed_files": [
         "AGENTS.md",
         "README.md",
@@ -51,7 +47,15 @@
         "tools/mimo_code_review.py",
         "tests/test_opencode_role_review.py",
         "tests/test_memory_research.py",
-        "docs/design/PAI.requirements.json"
+        "docs/design/PAI.requirements.json",
+        "tools/finalize_opencode_design_reviews.py",
+        "docs/PA_SCALING_STRATEGY_2026-10-06.md"
+      ],
+      "change_budget": "files<=64",
+      "dependencies": [],
+      "expected_interfaces": [
+        "PA requirement coverage: PA-00, PA-01, PA-18",
+        "docs/PA_IMPLEMENTATION_TASKS.md#pai-00"
       ],
       "forbidden_files": [
         ".env",
@@ -61,23 +65,24 @@
         ".playbook/upstream/**",
         "systemd/**"
       ],
-      "expected_interfaces": [
-        "PA requirement coverage: PA-00, PA-01, PA-18",
-        "docs/PA_IMPLEMENTATION_TASKS.md#pai-00"
-      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "rollback": "revert только новых инструкций/ссылок, не истории approvals.",
+      "scope": "сверить HEAD/branch/status и актуальные пути; оформить `docs/verification/PAI-progress.md` с колонками code/wiring/tests/review/live/ human acceptance. Привести AGENTS, handoff, README, architecture, старые prompts и skill policy к конкретным исправлениям из стратегии, сохранив safety contract. Свести reviewer-policy с provenance owner amendments и возможностями pinned runner; не выдавать Mimo-отчёт за Codex Role Runner receipt. Неизвестное решение владельца вынести одним конкретным вопросом после подготовки вариантов.",
+      "slice_id": "PAI-00",
+      "status": "planned",
+      "user_visible_outcome": "следующий исполнитель однозначно понимает, что уже написано, что подключено и что ему разрешено.",
       "verification": [
         {
-          "id": "planning_structure",
           "argv": [
             "{python}",
             "tools/check_pai_plan.py"
           ],
-          "required": true,
           "expected_exit_code": 0,
+          "id": "planning_structure",
+          "required": true,
           "timeout_seconds": 60
         },
         {
-          "id": "reconciliation_regression",
           "argv": [
             "{python}",
             "-m",
@@ -90,21 +95,14 @@
             "tests/test_opencode_role_review.py",
             "tests/test_memory_research.py"
           ],
-          "required": true,
           "expected_exit_code": 0,
+          "id": "reconciliation_regression",
+          "required": true,
           "timeout_seconds": 120
         }
-      ],
-      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
-      "dependencies": [],
-      "change_budget": "files<=48",
-      "rollback": "revert только новых инструкций/ссылок, не истории approvals."
+      ]
     },
     {
-      "slice_id": "PAI-01",
-      "status": "planned",
-      "user_visible_outcome": "конкретный согласованный проект, по которому можно писать код.",
-      "scope": "ADR для PostgreSQL state/jobs + SQLite archive; выбрать очередь с обоснованием и границами своей реализации/библиотеки; описать ownership таблиц, versioned job payload, transitions, budgets, lease/fencing, dispatch/pause/revoke и неизвестные исходы. Зафиксировать запрет слепого takeover внешней попытки. Выбрать narrow locking или доказанный sequencer, показать trade-off. Определить retention, план cutover, test DB, SLO/load profile и registry mapping; параметры с финансовыми/live последствиями оставить решениями владельца.",
       "allowed_files": [
         "docs/design/PAI.md",
         "docs/design/PAI.design.json",
@@ -115,6 +113,14 @@
         "docs/CODEX_PROMPT.md",
         "docs/verification/**"
       ],
+      "change_budget": "files<=32",
+      "dependencies": [
+        "PAI-00"
+      ],
+      "expected_interfaces": [
+        "PA requirement coverage: PA-01, PA-02, PA-09, PA-13, PA-16, PA-17",
+        "docs/PA_IMPLEMENTATION_TASKS.md#pai-01"
+      ],
       "forbidden_files": [
         ".env",
         ".env.*",
@@ -123,34 +129,26 @@
         ".playbook/upstream/**",
         "systemd/**"
       ],
-      "expected_interfaces": [
-        "PA requirement coverage: PA-01, PA-02, PA-09, PA-13, PA-16, PA-17",
-        "docs/PA_IMPLEMENTATION_TASKS.md#pai-01"
-      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "rollback": "отозвать предложенный design через workflow; production не меняется.",
+      "scope": "ADR для PostgreSQL state/jobs + SQLite archive; выбрать очередь с обоснованием и границами своей реализации/библиотеки; описать ownership таблиц, versioned job payload, transitions, budgets, lease/fencing, dispatch/pause/revoke и неизвестные исходы. Зафиксировать запрет слепого takeover внешней попытки. Выбрать narrow locking или доказанный sequencer, показать trade-off. Определить retention, план cutover, test DB, SLO/load profile и registry mapping; параметры с финансовыми/live последствиями оставить решениями владельца.",
+      "slice_id": "PAI-01",
+      "status": "planned",
+      "user_visible_outcome": "конкретный согласованный проект, по которому можно писать код.",
       "verification": [
         {
-          "id": "planning_structure",
           "argv": [
             "{python}",
             "tools/check_pai_plan.py"
           ],
-          "required": true,
           "expected_exit_code": 0,
+          "id": "planning_structure",
+          "required": true,
           "timeout_seconds": 60
         }
-      ],
-      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
-      "dependencies": [
-        "PAI-00"
-      ],
-      "change_budget": "files<=32",
-      "rollback": "отозвать предложенный design через workflow; production не меняется."
+      ]
     },
     {
-      "slice_id": "PAI-02",
-      "status": "planned",
-      "user_visible_outcome": "тестовый runtime с явным выбором backend и воспроизводимой схемой.",
-      "scope": "добавить pinned DB driver и настройку изолированной test DB; узкие repositories/unit-of-work для нового PA-state; versioned migrations, schema compatibility и роли. Соединения создаются в своём процессе. Сохранить архивный SQLite adapter и fixtures; не переписывать весь SQL/ORM. У migration команды явный target и отказ от production/default пути без нужного scope.",
       "allowed_files": [
         "src/prm/storage/**",
         "src/db/**",
@@ -168,6 +166,14 @@
         "tests/fixtures/assistant/**",
         "tools/test_tiers.py"
       ],
+      "change_budget": "files<=24",
+      "dependencies": [
+        "PAI-01"
+      ],
+      "expected_interfaces": [
+        "PA requirement coverage: PA-01, PA-17",
+        "docs/PA_IMPLEMENTATION_TASKS.md#pai-02"
+      ],
       "forbidden_files": [
         ".env",
         ".env.*",
@@ -176,13 +182,14 @@
         ".playbook/upstream/**",
         "systemd/**"
       ],
-      "expected_interfaces": [
-        "PA requirement coverage: PA-01, PA-17",
-        "docs/PA_IMPLEMENTATION_TASKS.md#pai-02"
-      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "rollback": "выключить новый backend; удалять можно только явно созданную test DB.",
+      "scope": "добавить pinned DB driver и настройку изолированной test DB; узкие repositories/unit-of-work для нового PA-state; versioned migrations, schema compatibility и роли. Соединения создаются в своём процессе. Сохранить архивный SQLite adapter и fixtures; не переписывать весь SQL/ORM. У migration команды явный target и отказ от production/default пути без нужного scope.",
+      "slice_id": "PAI-02",
+      "status": "planned",
+      "user_visible_outcome": "тестовый runtime с явным выбором backend и воспроизводимой схемой.",
       "verification": [
         {
-          "id": "acceptance",
           "argv": [
             "{python}",
             "-m",
@@ -192,23 +199,14 @@
             "tests/test_assistant_contracts.py",
             "tests/test_archive_search.py"
           ],
-          "required": true,
           "expected_exit_code": 0,
+          "id": "acceptance",
+          "required": true,
           "timeout_seconds": 600
         }
-      ],
-      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
-      "dependencies": [
-        "PAI-01"
-      ],
-      "change_budget": "files<=24",
-      "rollback": "выключить новый backend; удалять можно только явно созданную test DB."
+      ]
     },
     {
-      "slice_id": "PAI-03",
-      "status": "planned",
-      "user_visible_outcome": "два workers видят один отзыв разрешения и не тратят один бюджет дважды.",
-      "scope": "durable grants/revisions/revocations, reservations/operation groups и spend ledger. Сохранить purpose separation и существующий transport contract; перед вызовом проверять текущий grant. Atomically reserve верхнюю оценку и общий request/job/day/month limit, затем settle usage; unknown не возвращает резерв без оснований. Очередь содержит refs, не готовое право или credential. Не добавлять permissive fallback при недоступности БД.",
       "allowed_files": [
         "src/prm/storage/**",
         "src/prm/capabilities.py",
@@ -227,6 +225,14 @@
         "tests/fixtures/assistant/**",
         "tools/test_tiers.py"
       ],
+      "change_budget": "files<=24",
+      "dependencies": [
+        "PAI-02"
+      ],
+      "expected_interfaces": [
+        "PA requirement coverage: PA-02, PA-16",
+        "docs/PA_IMPLEMENTATION_TASKS.md#pai-03"
+      ],
       "forbidden_files": [
         ".env",
         ".env.*",
@@ -235,13 +241,14 @@
         ".playbook/upstream/**",
         "systemd/**"
       ],
-      "expected_interfaces": [
-        "PA requirement coverage: PA-02, PA-16",
-        "docs/PA_IMPLEMENTATION_TASKS.md#pai-03"
-      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "rollback": "остановить новые egress; не возвращаться к in-memory budget при включённом multi-worker runtime.",
+      "scope": "durable grants/revisions/revocations, reservations/operation groups и spend ledger. Сохранить purpose separation и существующий transport contract; перед вызовом проверять текущий grant. Atomically reserve верхнюю оценку и общий request/job/day/month limit, затем settle usage; unknown не возвращает резерв без оснований. Очередь содержит refs, не готовое право или credential. Не добавлять permissive fallback при недоступности БД.",
+      "slice_id": "PAI-03",
+      "status": "planned",
+      "user_visible_outcome": "два workers видят один отзыв разрешения и не тратят один бюджет дважды.",
       "verification": [
         {
-          "id": "acceptance",
           "argv": [
             "{python}",
             "-m",
@@ -252,23 +259,14 @@
             "tests/test_assistant_egress.py",
             "tests/test_assistant_grant_codec.py"
           ],
-          "required": true,
           "expected_exit_code": 0,
+          "id": "acceptance",
+          "required": true,
           "timeout_seconds": 600
         }
-      ],
-      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
-      "dependencies": [
-        "PAI-02"
-      ],
-      "change_budget": "files<=24",
-      "rollback": "остановить новые egress; не возвращаться к in-memory budget при включённом multi-worker runtime."
+      ]
     },
     {
-      "slice_id": "PAI-04",
-      "status": "planned",
-      "user_visible_outcome": "повторное нажатие или рестарт не повторяет внешнее действие.",
-      "scope": "durable proposal/confirmation/attempt/receipt repositories вместо `ActionReceiptStore` в памяти; atomic one-use claim и idempotency по scope, версии и digest. Попытка фиксируется до fake provider effect. Исключение, crash или потеря ACK оставляет unknown до reconciliation. Сохранить PA-00 callback bindings, owner tuple и правила drain старых handlers.",
       "allowed_files": [
         "src/prm/storage/**",
         "src/prm/confirmed_actions.py",
@@ -286,6 +284,14 @@
         "tools/test_tiers.py",
         "src/assistant/prm_post_answer_actions.py"
       ],
+      "change_budget": "files<=24",
+      "dependencies": [
+        "PAI-03"
+      ],
+      "expected_interfaces": [
+        "PA requirement coverage: PA-00, PA-13",
+        "docs/PA_IMPLEMENTATION_TASKS.md#pai-04"
+      ],
       "forbidden_files": [
         ".env",
         ".env.*",
@@ -294,13 +300,14 @@
         ".playbook/upstream/**",
         "systemd/**"
       ],
-      "expected_interfaces": [
-        "PA requirement coverage: PA-00, PA-13",
-        "docs/PA_IMPLEMENTATION_TASKS.md#pai-04"
-      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "rollback": "выключить execution, сохранить ledger; старый writer только после drain.",
+      "scope": "durable proposal/confirmation/attempt/receipt repositories вместо `ActionReceiptStore` в памяти; atomic one-use claim и idempotency по scope, версии и digest. Попытка фиксируется до fake provider effect. Исключение, crash или потеря ACK оставляет unknown до reconciliation. Сохранить PA-00 callback bindings, owner tuple и правила drain старых handlers.",
+      "slice_id": "PAI-04",
+      "status": "planned",
+      "user_visible_outcome": "повторное нажатие или рестарт не повторяет внешнее действие.",
       "verification": [
         {
-          "id": "acceptance",
           "argv": [
             "{python}",
             "-m",
@@ -310,23 +317,14 @@
             "tests/test_assistant_actions.py",
             "tests/test_prm_post_answer_actions.py"
           ],
-          "required": true,
           "expected_exit_code": 0,
+          "id": "acceptance",
+          "required": true,
           "timeout_seconds": 600
         }
-      ],
-      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
-      "dependencies": [
-        "PAI-03"
-      ],
-      "change_budget": "files<=24",
-      "rollback": "выключить execution, сохранить ledger; старый writer только после drain."
+      ]
     },
     {
-      "slice_id": "PAI-05",
-      "status": "planned",
-      "user_visible_outcome": "после перезапуска «объясни второй пункт» относится к правильному отчёту, а «да» — только к одному текущему предложению.",
-      "scope": "durable conversation state, result/object/version refs, request status, history policy, pending confirmation binding и expiry. Сохранить BriefDocument identity; immutable result отдельно от navigation. История, явно сохранённая память и source data — отдельные слои. Не отправлять сохранённую историю модели без соответствующего scope.",
       "allowed_files": [
         "src/prm/storage/**",
         "src/prm/conversation.py",
@@ -345,6 +343,15 @@
         "tools/test_tiers.py",
         "src/prm/application.py"
       ],
+      "change_budget": "files<=24",
+      "dependencies": [
+        "PAI-03",
+        "PAI-04"
+      ],
+      "expected_interfaces": [
+        "PA requirement coverage: PA-03, PA-07, PA-14",
+        "docs/PA_IMPLEMENTATION_TASKS.md#pai-05"
+      ],
       "forbidden_files": [
         ".env",
         ".env.*",
@@ -353,13 +360,14 @@
         ".playbook/upstream/**",
         "systemd/**"
       ],
-      "expected_interfaces": [
-        "PA requirement coverage: PA-03, PA-07, PA-14",
-        "docs/PA_IMPLEMENTATION_TASKS.md#pai-05"
-      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "rollback": "читать сохранённые объекты; отключить неподдерживаемые переходы, не превращать старые ссылки в новое подтверждение.",
+      "scope": "durable conversation state, result/object/version refs, request status, history policy, pending confirmation binding и expiry. Сохранить BriefDocument identity; immutable result отдельно от navigation. История, явно сохранённая память и source data — отдельные слои. Не отправлять сохранённую историю модели без соответствующего scope.",
+      "slice_id": "PAI-05",
+      "status": "planned",
+      "user_visible_outcome": "после перезапуска «объясни второй пункт» относится к правильному отчёту, а «да» — только к одному текущему предложению.",
       "verification": [
         {
-          "id": "acceptance",
           "argv": [
             "{python}",
             "-m",
@@ -369,24 +377,14 @@
             "tests/test_assistant_conversation.py",
             "tests/test_assistant_report_dialogue.py"
           ],
-          "required": true,
           "expected_exit_code": 0,
+          "id": "acceptance",
+          "required": true,
           "timeout_seconds": 600
         }
-      ],
-      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
-      "dependencies": [
-        "PAI-03",
-        "PAI-04"
-      ],
-      "change_budget": "files<=24",
-      "rollback": "читать сохранённые объекты; отключить неподдерживаемые переходы, не превращать старые ссылки в новое подтверждение."
+      ]
     },
     {
-      "slice_id": "PAI-06",
-      "status": "planned",
-      "user_visible_outcome": "задача выполняется отдельным процессом и возобновляется с безопасного checkpoint.",
-      "scope": "PostgreSQL jobs, atomic enqueue с доменным изменением, bounded claim, lease/heartbeat/fencing, checkpoints, deadline/cancel, retry/backoff, quarantine и priorities. Versioned payload содержит refs/digests, не pickle, callbacks или secrets. Pure/read/compute retry отделить от unknown external effect. Начать с небольшой реализации выбранного в PAI-01 решения.",
       "allowed_files": [
         "src/prm/storage/**",
         "src/prm/runtime/worker.py",
@@ -406,6 +404,15 @@
         "src/prm/research_worker.py",
         "src/prm/watch_jobs.py"
       ],
+      "change_budget": "files<=24",
+      "dependencies": [
+        "PAI-03",
+        "PAI-04"
+      ],
+      "expected_interfaces": [
+        "PA requirement coverage: PA-06, PA-09, PA-17",
+        "docs/PA_IMPLEMENTATION_TASKS.md#pai-06"
+      ],
       "forbidden_files": [
         ".env",
         ".env.*",
@@ -414,13 +421,14 @@
         ".playbook/upstream/**",
         "systemd/**"
       ],
-      "expected_interfaces": [
-        "PA requirement coverage: PA-06, PA-09, PA-17",
-        "docs/PA_IMPLEMENTATION_TASKS.md#pai-06"
-      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "rollback": "прекратить claims, drain/record in-flight; jobs не удалять.",
+      "scope": "PostgreSQL jobs, atomic enqueue с доменным изменением, bounded claim, lease/heartbeat/fencing, checkpoints, deadline/cancel, retry/backoff, quarantine и priorities. Versioned payload содержит refs/digests, не pickle, callbacks или secrets. Pure/read/compute retry отделить от unknown external effect. Начать с небольшой реализации выбранного в PAI-01 решения.",
+      "slice_id": "PAI-06",
+      "status": "planned",
+      "user_visible_outcome": "задача выполняется отдельным процессом и возобновляется с безопасного checkpoint.",
       "verification": [
         {
-          "id": "acceptance",
           "argv": [
             "{python}",
             "-m",
@@ -430,24 +438,14 @@
             "tests/test_assistant_jobs.py",
             "tests/test_assistant_research.py"
           ],
-          "required": true,
           "expected_exit_code": 0,
+          "id": "acceptance",
+          "required": true,
           "timeout_seconds": 600
         }
-      ],
-      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
-      "dependencies": [
-        "PAI-03",
-        "PAI-04"
-      ],
-      "change_budget": "files<=24",
-      "rollback": "прекратить claims, drain/record in-flight; jobs не удалять."
+      ]
     },
     {
-      "slice_id": "PAI-07",
-      "status": "planned",
-      "user_visible_outcome": "бот принимает новый запрос и отмену, пока готовится предыдущий.",
-      "scope": "durable inbox/update dedup и transaction enqueue; быстрый acknowledgement только после сохранения. Подключить job status/progress/cancel к обычной беседе и CLI. Результат возвращается по своему request/result ID, не текущему `last_topic`. Проверить private tuple для текста, voice и callbacks.",
       "allowed_files": [
         "src/prm/runtime/composition.py",
         "src/prm/runtime/ingress.py",
@@ -469,6 +467,15 @@
         "tests/fixtures/assistant/**",
         "tools/test_tiers.py"
       ],
+      "change_budget": "files<=24",
+      "dependencies": [
+        "PAI-05",
+        "PAI-06"
+      ],
+      "expected_interfaces": [
+        "PA requirement coverage: PA-03, PA-06, PA-09",
+        "docs/PA_IMPLEMENTATION_TASKS.md#pai-07"
+      ],
       "forbidden_files": [
         ".env",
         ".env.*",
@@ -477,13 +484,14 @@
         ".playbook/upstream/**",
         "systemd/**"
       ],
-      "expected_interfaces": [
-        "PA requirement coverage: PA-03, PA-06, PA-09",
-        "docs/PA_IMPLEMENTATION_TASKS.md#pai-07"
-      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "rollback": "прекратить новый job intake, сохранить доступ к status/cancel/results.",
+      "scope": "durable inbox/update dedup и transaction enqueue; быстрый acknowledgement только после сохранения. Подключить job status/progress/cancel к обычной беседе и CLI. Результат возвращается по своему request/result ID, не текущему `last_topic`. Проверить private tuple для текста, voice и callbacks.",
+      "slice_id": "PAI-07",
+      "status": "planned",
+      "user_visible_outcome": "бот принимает новый запрос и отмену, пока готовится предыдущий.",
       "verification": [
         {
-          "id": "acceptance",
           "argv": [
             "{python}",
             "-m",
@@ -494,24 +502,14 @@
             "tests/test_callbacks.py",
             "tests/test_prm_cli.py"
           ],
-          "required": true,
           "expected_exit_code": 0,
+          "id": "acceptance",
+          "required": true,
           "timeout_seconds": 600
         }
-      ],
-      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
-      "dependencies": [
-        "PAI-05",
-        "PAI-06"
-      ],
-      "change_budget": "files<=24",
-      "rollback": "прекратить новый job intake, сохранить доступ к status/cancel/results."
+      ]
     },
     {
-      "slice_id": "PAI-08",
-      "status": "planned",
-      "user_visible_outcome": "подтверждённая подписка действительно создаёт задания по времени и восстанавливается без лавины старых уведомлений.",
-      "scope": "durable schedules, occurrences, next_due_at и scheduler lease; одна транзакция enqueue + продвижение расписания. Встроить PA-09 material-change detection, quiet hours/DST, deadline recalculation, pause/unsubscribe/snooze/done и caps. Background collection/delivery grants проверяются отдельно. Старый UTD watch не становится согласием на новые источники.",
       "allowed_files": [
         "src/prm/runtime/scheduler.py",
         "src/prm/watch_jobs.py",
@@ -529,6 +527,15 @@
         "tests/fixtures/assistant/**",
         "tools/test_tiers.py"
       ],
+      "change_budget": "files<=24",
+      "dependencies": [
+        "PAI-06",
+        "PAI-07"
+      ],
+      "expected_interfaces": [
+        "PA requirement coverage: PA-09, PA-12",
+        "docs/PA_IMPLEMENTATION_TASKS.md#pai-08"
+      ],
       "forbidden_files": [
         ".env",
         ".env.*",
@@ -537,13 +544,14 @@
         ".playbook/upstream/**",
         "systemd/**"
       ],
-      "expected_interfaces": [
-        "PA requirement coverage: PA-09, PA-12",
-        "docs/PA_IMPLEMENTATION_TASKS.md#pai-08"
-      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "rollback": "остановить scheduler, сохранить subscriptions/occurrences/receipts.",
+      "scope": "durable schedules, occurrences, next_due_at и scheduler lease; одна транзакция enqueue + продвижение расписания. Встроить PA-09 material-change detection, quiet hours/DST, deadline recalculation, pause/unsubscribe/snooze/done и caps. Background collection/delivery grants проверяются отдельно. Старый UTD watch не становится согласием на новые источники.",
+      "slice_id": "PAI-08",
+      "status": "planned",
+      "user_visible_outcome": "подтверждённая подписка действительно создаёт задания по времени и восстанавливается без лавины старых уведомлений.",
       "verification": [
         {
-          "id": "acceptance",
           "argv": [
             "{python}",
             "-m",
@@ -553,24 +561,14 @@
             "tests/test_assistant_jobs.py",
             "tests/test_assistant_subscriptions.py"
           ],
-          "required": true,
           "expected_exit_code": 0,
+          "id": "acceptance",
+          "required": true,
           "timeout_seconds": 600
         }
-      ],
-      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
-      "dependencies": [
-        "PAI-06",
-        "PAI-07"
-      ],
-      "change_budget": "files<=24",
-      "rollback": "остановить scheduler, сохранить subscriptions/occurrences/receipts."
+      ]
     },
     {
-      "slice_id": "PAI-09",
-      "status": "planned",
-      "user_visible_outcome": "ответ, Watch и действие проходят один контракт последнего разрешения и правдиво показывают исход.",
-      "scope": "подключить durable attempts/receipts к foreground/background delivery; отдельные purposes сохранить. Выполнить согласованное в PAI-01 упорядочивание pause/revoke/send. Не выносить `sender` из SQLite transaction без эквивалентного доказанного поведения. Ввести provider reconciliation adapter и UI для unknown; receipts выдаются после реального transport результата.",
       "allowed_files": [
         "src/prm/runtime/effects.py",
         "src/prm/watch_jobs.py",
@@ -591,6 +589,16 @@
         "tests/fixtures/assistant/**",
         "tools/test_tiers.py"
       ],
+      "change_budget": "files<=24",
+      "dependencies": [
+        "PAI-04",
+        "PAI-07",
+        "PAI-08"
+      ],
+      "expected_interfaces": [
+        "PA requirement coverage: PA-02, PA-09, PA-13",
+        "docs/PA_IMPLEMENTATION_TASKS.md#pai-09"
+      ],
       "forbidden_files": [
         ".env",
         ".env.*",
@@ -599,13 +607,14 @@
         ".playbook/upstream/**",
         "systemd/**"
       ],
-      "expected_interfaces": [
-        "PA requirement coverage: PA-02, PA-09, PA-13",
-        "docs/PA_IMPLEMENTATION_TASKS.md#pai-09"
-      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "rollback": "stop новых effects, reconciliation/read-only оставить доступными.",
+      "scope": "подключить durable attempts/receipts к foreground/background delivery; отдельные purposes сохранить. Выполнить согласованное в PAI-01 упорядочивание pause/revoke/send. Не выносить `sender` из SQLite transaction без эквивалентного доказанного поведения. Ввести provider reconciliation adapter и UI для unknown; receipts выдаются после реального transport результата.",
+      "slice_id": "PAI-09",
+      "status": "planned",
+      "user_visible_outcome": "ответ, Watch и действие проходят один контракт последнего разрешения и правдиво показывают исход.",
       "verification": [
         {
-          "id": "acceptance",
           "argv": [
             "{python}",
             "-m",
@@ -616,25 +625,14 @@
             "tests/test_assistant_actions.py",
             "tests/test_assistant_egress.py"
           ],
-          "required": true,
           "expected_exit_code": 0,
+          "id": "acceptance",
+          "required": true,
           "timeout_seconds": 600
         }
-      ],
-      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
-      "dependencies": [
-        "PAI-04",
-        "PAI-07",
-        "PAI-08"
-      ],
-      "change_budget": "files<=24",
-      "rollback": "stop новых effects, reconciliation/read-only оставить доступными."
+      ]
     },
     {
-      "slice_id": "PAI-10",
-      "status": "planned",
-      "user_visible_outcome": "приветствие, объяснение и редактирование текста проходят реальный model route и возвращаются в ту же беседу.",
-      "scope": "единый runtime composition root внедряет model access/provider в Telegram/CLI/application. Provider/model config явные, без hardcoded «лучшая модель»; реальный HTTP adapter тестируется fake server. Бounded history и object followups собираются только в разрешённом data scope. Privacy-safe fallback, timeouts, отмена и usage settlement обязательны.",
       "allowed_files": [
         "src/prm/runtime/composition.py",
         "src/prm/application.py",
@@ -656,6 +654,17 @@
         "tests/fixtures/assistant/**",
         "tools/test_tiers.py"
       ],
+      "change_budget": "files<=24",
+      "dependencies": [
+        "PAI-03",
+        "PAI-05",
+        "PAI-07",
+        "PAI-09"
+      ],
+      "expected_interfaces": [
+        "PA requirement coverage: PA-03, PA-16",
+        "docs/PA_IMPLEMENTATION_TASKS.md#pai-10"
+      ],
       "forbidden_files": [
         ".env",
         ".env.*",
@@ -664,13 +673,14 @@
         ".playbook/upstream/**",
         "systemd/**"
       ],
-      "expected_interfaces": [
-        "PA requirement coverage: PA-03, PA-16",
-        "docs/PA_IMPLEMENTATION_TASKS.md#pai-10"
-      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "rollback": "отключить модельный маршрут; доступный локальный поиск сохранить.",
+      "scope": "единый runtime composition root внедряет model access/provider в Telegram/CLI/application. Provider/model config явные, без hardcoded «лучшая модель»; реальный HTTP adapter тестируется fake server. Бounded history и object followups собираются только в разрешённом data scope. Privacy-safe fallback, timeouts, отмена и usage settlement обязательны.",
+      "slice_id": "PAI-10",
+      "status": "planned",
+      "user_visible_outcome": "приветствие, объяснение и редактирование текста проходят реальный model route и возвращаются в ту же беседу.",
       "verification": [
         {
-          "id": "acceptance",
           "argv": [
             "{python}",
             "-m",
@@ -682,26 +692,14 @@
             "tests/test_openai_provider.py",
             "tests/test_llm_client.py"
           ],
-          "required": true,
           "expected_exit_code": 0,
+          "id": "acceptance",
+          "required": true,
           "timeout_seconds": 600
         }
-      ],
-      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
-      "dependencies": [
-        "PAI-03",
-        "PAI-05",
-        "PAI-07",
-        "PAI-09"
-      ],
-      "change_budget": "files<=24",
-      "rollback": "отключить модельный маршрут; доступный локальный поиск сохранить."
+      ]
     },
     {
-      "slice_id": "PAI-11",
-      "status": "planned",
-      "user_visible_outcome": "запрос на русском/английском находит нужные материалы и даёт синтез с проверяемыми основаниями.",
-      "scope": "соединить FTS retrieval, bounded evidence, paired request/context authorization и archive synthesis с ingress. Зафиксировать RU/EN holdout до настройки; отдельно измерять recall, unsupported claims, false refusals, пропущенные важные материалы. Сохранить source IDs, negation/conflict и insufficient evidence. Не добавлять vector DB без отдельного measured ADR.",
       "allowed_files": [
         "src/db/archive_search.py",
         "src/prm/archive_context.py",
@@ -723,6 +721,14 @@
         "tests/fixtures/assistant/**",
         "tools/test_tiers.py"
       ],
+      "change_budget": "files<=24",
+      "dependencies": [
+        "PAI-10"
+      ],
+      "expected_interfaces": [
+        "PA requirement coverage: PA-04",
+        "docs/PA_IMPLEMENTATION_TASKS.md#pai-11"
+      ],
       "forbidden_files": [
         ".env",
         ".env.*",
@@ -731,13 +737,14 @@
         ".playbook/upstream/**",
         "systemd/**"
       ],
-      "expected_interfaces": [
-        "PA requirement coverage: PA-04",
-        "docs/PA_IMPLEMENTATION_TASKS.md#pai-11"
-      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "rollback": "прежний FTS/evidence fallback; канонический архив не переписывается.",
+      "scope": "соединить FTS retrieval, bounded evidence, paired request/context authorization и archive synthesis с ingress. Зафиксировать RU/EN holdout до настройки; отдельно измерять recall, unsupported claims, false refusals, пропущенные важные материалы. Сохранить source IDs, negation/conflict и insufficient evidence. Не добавлять vector DB без отдельного measured ADR.",
+      "slice_id": "PAI-11",
+      "status": "planned",
+      "user_visible_outcome": "запрос на русском/английском находит нужные материалы и даёт синтез с проверяемыми основаниями.",
       "verification": [
         {
-          "id": "acceptance",
           "argv": [
             "{python}",
             "-m",
@@ -748,23 +755,14 @@
             "tests/test_prm_synthesis.py",
             "tests/test_prm_intent_archive_contract.py"
           ],
-          "required": true,
           "expected_exit_code": 0,
+          "id": "acceptance",
+          "required": true,
           "timeout_seconds": 600
         }
-      ],
-      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
-      "dependencies": [
-        "PAI-10"
-      ],
-      "change_budget": "files<=24",
-      "rollback": "прежний FTS/evidence fallback; канонический архив не переписывается."
+      ]
     },
     {
-      "slice_id": "PAI-12",
-      "status": "planned",
-      "user_visible_outcome": "приложение умеет проверить свежий факт и сравнить его с материалами владельца/выбранным ref репозитория.",
-      "scope": "реализовать конкретный search adapter, безопасный fetch/extract и GitHub read adapter; внедрить в composition root. Выбор провайдера и API подтвердить официальной документацией при реализации. Public query отдельно минимизируется и не наследует private text. Ограничить DNS/redirect/actual connection, size/time/content type; untrusted text не выдаёт инструментам прав.",
       "allowed_files": [
         "src/prm/public_web.py",
         "src/prm/public_fetch.py",
@@ -786,6 +784,15 @@
         "tools/test_tiers.py",
         "src/prm/research_facade.py"
       ],
+      "change_budget": "files<=24",
+      "dependencies": [
+        "PAI-10",
+        "PAI-11"
+      ],
+      "expected_interfaces": [
+        "PA requirement coverage: PA-05, PA-06",
+        "docs/PA_IMPLEMENTATION_TASKS.md#pai-12"
+      ],
       "forbidden_files": [
         ".env",
         ".env.*",
@@ -794,13 +801,14 @@
         ".playbook/upstream/**",
         "systemd/**"
       ],
-      "expected_interfaces": [
-        "PA requirement coverage: PA-05, PA-06",
-        "docs/PA_IMPLEMENTATION_TASKS.md#pai-12"
-      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "rollback": "отключить конкретный adapter, честно сохранить локальный ответ/пробел.",
+      "scope": "реализовать конкретный search adapter, безопасный fetch/extract и GitHub read adapter; внедрить в composition root. Выбор провайдера и API подтвердить официальной документацией при реализации. Public query отдельно минимизируется и не наследует private text. Ограничить DNS/redirect/actual connection, size/time/content type; untrusted text не выдаёт инструментам прав.",
+      "slice_id": "PAI-12",
+      "status": "planned",
+      "user_visible_outcome": "приложение умеет проверить свежий факт и сравнить его с материалами владельца/выбранным ref репозитория.",
       "verification": [
         {
-          "id": "acceptance",
           "argv": [
             "{python}",
             "-m",
@@ -810,24 +818,14 @@
             "tests/test_assistant_web_search.py",
             "tests/test_assistant_research.py"
           ],
-          "required": true,
           "expected_exit_code": 0,
+          "id": "acceptance",
+          "required": true,
           "timeout_seconds": 600
         }
-      ],
-      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
-      "dependencies": [
-        "PAI-10",
-        "PAI-11"
-      ],
-      "change_budget": "files<=24",
-      "rollback": "отключить конкретный adapter, честно сохранить локальный ответ/пробел."
+      ]
     },
     {
-      "slice_id": "PAI-13",
-      "status": "planned",
-      "user_visible_outcome": "большой вопрос переживает рестарт, показывает прогресс и заканчивается синтезом, а не списком ссылок.",
-      "scope": "перенести ограниченный research plan/gather/gap-check/synthesis/ verify в checkpoints worker. Параллелить только независимые reads в пределах общего бюджета; отсутствие источника даёт объяснимый partial outcome. Сохранять evidence versions и расход, не повторять оплаченный завершённый step без основания. Внешние side effects в research не разрешать.",
       "allowed_files": [
         "src/prm/deep_research.py",
         "src/prm/runtime/worker.py",
@@ -847,6 +845,16 @@
         "tools/test_tiers.py",
         "src/prm/research_worker.py"
       ],
+      "change_budget": "files<=24",
+      "dependencies": [
+        "PAI-06",
+        "PAI-11",
+        "PAI-12"
+      ],
+      "expected_interfaces": [
+        "PA requirement coverage: PA-06",
+        "docs/PA_IMPLEMENTATION_TASKS.md#pai-13"
+      ],
       "forbidden_files": [
         ".env",
         ".env.*",
@@ -855,13 +863,14 @@
         ".playbook/upstream/**",
         "systemd/**"
       ],
-      "expected_interfaces": [
-        "PA requirement coverage: PA-06",
-        "docs/PA_IMPLEMENTATION_TASKS.md#pai-13"
-      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "rollback": "запрет новых deep jobs; уже готовые checkpoints/results доступны.",
+      "scope": "перенести ограниченный research plan/gather/gap-check/synthesis/ verify в checkpoints worker. Параллелить только независимые reads в пределах общего бюджета; отсутствие источника даёт объяснимый partial outcome. Сохранять evidence versions и расход, не повторять оплаченный завершённый step без основания. Внешние side effects в research не разрешать.",
+      "slice_id": "PAI-13",
+      "status": "planned",
+      "user_visible_outcome": "большой вопрос переживает рестарт, показывает прогресс и заканчивается синтезом, а не списком ссылок.",
       "verification": [
         {
-          "id": "acceptance",
           "argv": [
             "{python}",
             "-m",
@@ -871,25 +880,14 @@
             "tests/test_assistant_research.py",
             "tests/test_prm_research_planner.py"
           ],
-          "required": true,
           "expected_exit_code": 0,
+          "id": "acceptance",
+          "required": true,
           "timeout_seconds": 600
         }
-      ],
-      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
-      "dependencies": [
-        "PAI-06",
-        "PAI-11",
-        "PAI-12"
-      ],
-      "change_budget": "files<=24",
-      "rollback": "запрет новых deep jobs; уже готовые checkpoints/results доступны."
+      ]
     },
     {
-      "slice_id": "PAI-14",
-      "status": "planned",
-      "user_visible_outcome": "«что важного за неделю» даёт редакционный обзор событий, который можно обсудить и обновить.",
-      "scope": "полный путь window/timezone → разрешённые источники → event dedup → selection/editorial → один immutable BriefDocument → delivery. Отличать публикацию, событие и обнаружение; хранить coverage/omissions/conflicts. Сильный отбор и объяснение важности проверять отдельно от цитат и схемы. «Пункт 2», «для проекта», «сравни недели», «обнови» связывать с версией. Добавить source hooks для личных источников следующих карточек.",
       "allowed_files": [
         "src/prm/briefs.py",
         "src/prm/brief_editorial.py",
@@ -911,6 +909,18 @@
         "tools/test_tiers.py",
         "src/prm/editorial_transport.py"
       ],
+      "change_budget": "files<=24",
+      "dependencies": [
+        "PAI-05",
+        "PAI-08",
+        "PAI-09",
+        "PAI-11",
+        "PAI-13"
+      ],
+      "expected_interfaces": [
+        "PA requirement coverage: PA-07, PA-09",
+        "docs/PA_IMPLEMENTATION_TASKS.md#pai-14"
+      ],
       "forbidden_files": [
         ".env",
         ".env.*",
@@ -919,13 +929,14 @@
         ".playbook/upstream/**",
         "systemd/**"
       ],
-      "expected_interfaces": [
-        "PA requirement coverage: PA-07, PA-09",
-        "docs/PA_IMPLEMENTATION_TASKS.md#pai-14"
-      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "rollback": "отключить schedule/editorial route; сохранить принятые версии отчётов.",
+      "scope": "полный путь window/timezone → разрешённые источники → event dedup → selection/editorial → один immutable BriefDocument → delivery. Отличать публикацию, событие и обнаружение; хранить coverage/omissions/conflicts. Сильный отбор и объяснение важности проверять отдельно от цитат и схемы. «Пункт 2», «для проекта», «сравни недели», «обнови» связывать с версией. Добавить source hooks для личных источников следующих карточек.",
+      "slice_id": "PAI-14",
+      "status": "planned",
+      "user_visible_outcome": "«что важного за неделю» даёт редакционный обзор событий, который можно обсудить и обновить.",
       "verification": [
         {
-          "id": "acceptance",
           "argv": [
             "{python}",
             "-m",
@@ -936,27 +947,14 @@
             "tests/test_assistant_brief_editorial.py",
             "tests/test_assistant_report_dialogue.py"
           ],
-          "required": true,
           "expected_exit_code": 0,
+          "id": "acceptance",
+          "required": true,
           "timeout_seconds": 600
         }
-      ],
-      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
-      "dependencies": [
-        "PAI-05",
-        "PAI-08",
-        "PAI-09",
-        "PAI-11",
-        "PAI-13"
-      ],
-      "change_budget": "files<=24",
-      "rollback": "отключить schedule/editorial route; сохранить принятые версии отчётов."
+      ]
     },
     {
-      "slice_id": "PAI-15",
-      "status": "planned",
-      "user_visible_outcome": "один отчёт читается с телефона в Telegram и приватном reader, экспортируется в HTML/PDF/Markdown с одинаковыми фактами.",
-      "scope": "подключить существующий rendering и access contract к реальному локально тестируемому reader endpoint/доставке. Owner authentication, expiry, no indexing, share preview и отсутствие внешних ресурсов обязательны. Renderer изолировать от сети, ограничить ресурсы, хранить artifacts/version. Светлая/тёмная тема, keyboard, кириллица, длинные URLs и page overflow проверять на настоящих synthetic renders, а не строковых шаблонах.",
       "allowed_files": [
         "src/prm/report_access.py",
         "src/prm/report_exports.py",
@@ -978,6 +976,15 @@
         "tools/test_tiers.py",
         "src/prm/pdf_inspection.py"
       ],
+      "change_budget": "files<=24",
+      "dependencies": [
+        "PAI-07",
+        "PAI-14"
+      ],
+      "expected_interfaces": [
+        "PA requirement coverage: PA-08",
+        "docs/PA_IMPLEMENTATION_TASKS.md#pai-15"
+      ],
       "forbidden_files": [
         ".env",
         ".env.*",
@@ -986,13 +993,14 @@
         ".playbook/upstream/**",
         "systemd/**"
       ],
-      "expected_interfaces": [
-        "PA requirement coverage: PA-08",
-        "docs/PA_IMPLEMENTATION_TASKS.md#pai-15"
-      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "rollback": "отключить reader/экспорт, сохранить исходный BriefDocument.",
+      "scope": "подключить существующий rendering и access contract к реальному локально тестируемому reader endpoint/доставке. Owner authentication, expiry, no indexing, share preview и отсутствие внешних ресурсов обязательны. Renderer изолировать от сети, ограничить ресурсы, хранить artifacts/version. Светлая/тёмная тема, keyboard, кириллица, длинные URLs и page overflow проверять на настоящих synthetic renders, а не строковых шаблонах.",
+      "slice_id": "PAI-15",
+      "status": "planned",
+      "user_visible_outcome": "один отчёт читается с телефона в Telegram и приватном reader, экспортируется в HTML/PDF/Markdown с одинаковыми фактами.",
       "verification": [
         {
-          "id": "acceptance",
           "argv": [
             "{python}",
             "-m",
@@ -1003,24 +1011,14 @@
             "tests/test_assistant_report_access.py",
             "tests/test_pdf_inspection.py"
           ],
-          "required": true,
           "expected_exit_code": 0,
+          "id": "acceptance",
+          "required": true,
           "timeout_seconds": 600
         }
-      ],
-      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
-      "dependencies": [
-        "PAI-07",
-        "PAI-14"
-      ],
-      "change_budget": "files<=24",
-      "rollback": "отключить reader/экспорт, сохранить исходный BriefDocument."
+      ]
     },
     {
-      "slice_id": "PAI-16",
-      "status": "planned",
-      "user_visible_outcome": "пользователь видит scope подключения, может подтвердить его, проверить состояние, отозвать и удалить производные данные.",
-      "scope": "конкретный OAuth flow для первого выбранного Graph provider; state/PKCE/redirect validation, owner/connection binding, минимальные scopes, защищённое token storage, refresh/revoke/rotation. Concurrent refresh сериализуется. Secrets никогда не являются payload/log/fixture value. UI различает ширину provider token и фильтр приложения. Fake OAuth server проверяет реальный callback/client; новые providers не нужны без выбора.",
       "allowed_files": [
         "src/prm/runtime/connections.py",
         "src/prm/runtime/secret_store.py",
@@ -1044,6 +1042,15 @@
         "src/prm/mail_connector.py",
         "src/prm/schedule_connectors.py"
       ],
+      "change_budget": "files<=24",
+      "dependencies": [
+        "PAI-03",
+        "PAI-07"
+      ],
+      "expected_interfaces": [
+        "PA requirement coverage: PA-02, PA-10, PA-11, PA-17",
+        "docs/PA_IMPLEMENTATION_TASKS.md#pai-16"
+      ],
       "forbidden_files": [
         ".env",
         ".env.*",
@@ -1052,13 +1059,14 @@
         ".playbook/upstream/**",
         "systemd/**"
       ],
-      "expected_interfaces": [
-        "PA requirement coverage: PA-02, PA-10, PA-11, PA-17",
-        "docs/PA_IMPLEMENTATION_TASKS.md#pai-16"
-      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "rollback": "disconnect и запрет refresh/egress; сохранность/удаление токенов согласно выбранной политике, не через вывод в отчёт.",
+      "scope": "конкретный OAuth flow для первого выбранного Graph provider; state/PKCE/redirect validation, owner/connection binding, минимальные scopes, защищённое token storage, refresh/revoke/rotation. Concurrent refresh сериализуется. Secrets никогда не являются payload/log/fixture value. UI различает ширину provider token и фильтр приложения. Fake OAuth server проверяет реальный callback/client; новые providers не нужны без выбора.",
+      "slice_id": "PAI-16",
+      "status": "planned",
+      "user_visible_outcome": "пользователь видит scope подключения, может подтвердить его, проверить состояние, отозвать и удалить производные данные.",
       "verification": [
         {
-          "id": "acceptance",
           "argv": [
             "{python}",
             "-m",
@@ -1069,24 +1077,14 @@
             "tests/test_assistant_calendar.py",
             "tests/test_assistant_egress.py"
           ],
-          "required": true,
           "expected_exit_code": 0,
+          "id": "acceptance",
+          "required": true,
           "timeout_seconds": 600
         }
-      ],
-      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
-      "dependencies": [
-        "PAI-03",
-        "PAI-07"
-      ],
-      "change_budget": "files<=24",
-      "rollback": "disconnect и запрет refresh/egress; сохранность/удаление токенов согласно выбранной политике, не через вывод в отчёт."
+      ]
     },
     {
-      "slice_id": "PAI-17",
-      "status": "planned",
-      "user_visible_outcome": "«что требует ответа в почте» и раздел Brief используют выбранную почту с понятными ссылками, сроками и ограничениями покрытия.",
-      "scope": "production-shaped Graph read/search adapter, pagination/delta checkpoints, minimal fields, thread normalization и derived store. Внутри adapter всегда вызывается guard до HTTP. Обработка смены/удаления писем, delta reset, 429 и partial pages обязательна. По умолчанию не загружать bodies/attachments; если metadata недостаточно для нужной сводки, подготовить точный новый минимальный scope для владельца, не расширять его молча.",
       "allowed_files": [
         "src/prm/mail_connector.py",
         "src/prm/runtime/transports/**",
@@ -1106,6 +1104,16 @@
         "tests/fixtures/assistant/**",
         "tools/test_tiers.py"
       ],
+      "change_budget": "files<=24",
+      "dependencies": [
+        "PAI-10",
+        "PAI-14",
+        "PAI-16"
+      ],
+      "expected_interfaces": [
+        "PA requirement coverage: PA-10",
+        "docs/PA_IMPLEMENTATION_TASKS.md#pai-17"
+      ],
       "forbidden_files": [
         ".env",
         ".env.*",
@@ -1114,13 +1122,14 @@
         ".playbook/upstream/**",
         "systemd/**"
       ],
-      "expected_interfaces": [
-        "PA requirement coverage: PA-10",
-        "docs/PA_IMPLEMENTATION_TASKS.md#pai-17"
-      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "rollback": "отключить sync/source; сохранить независимый Telegram-архив.",
+      "scope": "production-shaped Graph read/search adapter, pagination/delta checkpoints, minimal fields, thread normalization и derived store. Внутри adapter всегда вызывается guard до HTTP. Обработка смены/удаления писем, delta reset, 429 и partial pages обязательна. По умолчанию не загружать bodies/attachments; если metadata недостаточно для нужной сводки, подготовить точный новый минимальный scope для владельца, не расширять его молча.",
+      "slice_id": "PAI-17",
+      "status": "planned",
+      "user_visible_outcome": "«что требует ответа в почте» и раздел Brief используют выбранную почту с понятными ссылками, сроками и ограничениями покрытия.",
       "verification": [
         {
-          "id": "acceptance",
           "argv": [
             "{python}",
             "-m",
@@ -1130,25 +1139,14 @@
             "tests/test_assistant_mail.py",
             "tests/test_pai_brief_runtime.py"
           ],
-          "required": true,
           "expected_exit_code": 0,
+          "id": "acceptance",
+          "required": true,
           "timeout_seconds": 600
         }
-      ],
-      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
-      "dependencies": [
-        "PAI-10",
-        "PAI-14",
-        "PAI-16"
-      ],
-      "change_budget": "files<=24",
-      "rollback": "отключить sync/source; сохранить независимый Telegram-архив."
+      ]
     },
     {
-      "slice_id": "PAI-18",
-      "status": "planned",
-      "user_visible_outcome": "ассистент показывает конфликты расписания и находит адресата, не путая аккаунты, зоны времени и совпадающие имена.",
-      "scope": "read adapters для выбранного календарного provider, paging/sync, free/busy, recurrence/exceptions, source/local timezone и deleted/cancelled events. Contacts — отдельный scope/adapter. Сначала выбранный Graph, если владелец не выбрал другой; не реализовывать все экосистемы ради симметрии. Подключить ответы, Brief и watch evidence.",
       "allowed_files": [
         "src/prm/schedule_connectors.py",
         "src/prm/runtime/transports/**",
@@ -1167,6 +1165,15 @@
         "tests/fixtures/assistant/**",
         "tools/test_tiers.py"
       ],
+      "change_budget": "files<=24",
+      "dependencies": [
+        "PAI-10",
+        "PAI-16"
+      ],
+      "expected_interfaces": [
+        "PA requirement coverage: PA-11",
+        "docs/PA_IMPLEMENTATION_TASKS.md#pai-18"
+      ],
       "forbidden_files": [
         ".env",
         ".env.*",
@@ -1175,13 +1182,14 @@
         ".playbook/upstream/**",
         "systemd/**"
       ],
-      "expected_interfaces": [
-        "PA requirement coverage: PA-11",
-        "docs/PA_IMPLEMENTATION_TASKS.md#pai-18"
-      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "rollback": "отключить connector; pending actions по нему становятся unavailable.",
+      "scope": "read adapters для выбранного календарного provider, paging/sync, free/busy, recurrence/exceptions, source/local timezone и deleted/cancelled events. Contacts — отдельный scope/adapter. Сначала выбранный Graph, если владелец не выбрал другой; не реализовывать все экосистемы ради симметрии. Подключить ответы, Brief и watch evidence.",
+      "slice_id": "PAI-18",
+      "status": "planned",
+      "user_visible_outcome": "ассистент показывает конфликты расписания и находит адресата, не путая аккаунты, зоны времени и совпадающие имена.",
       "verification": [
         {
-          "id": "acceptance",
           "argv": [
             "{python}",
             "-m",
@@ -1191,24 +1199,14 @@
             "tests/test_assistant_calendar.py",
             "tests/test_assistant_contacts.py"
           ],
-          "required": true,
           "expected_exit_code": 0,
+          "id": "acceptance",
+          "required": true,
           "timeout_seconds": 600
         }
-      ],
-      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
-      "dependencies": [
-        "PAI-10",
-        "PAI-16"
-      ],
-      "change_budget": "files<=24",
-      "rollback": "отключить connector; pending actions по нему становятся unavailable."
+      ]
     },
     {
-      "slice_id": "PAI-19",
-      "status": "planned",
-      "user_visible_outcome": "академическая сводка различает обязательства, возможности и чтение; напоминания опираются на актуальный подтверждённый срок.",
-      "scope": "использовать existing Academic handoff; Canvas adapter для разрешаемого минимального assignments/calendar/announcements scope; объединить mail/calendar candidates, provenance, categories, stage profile, eligibility uncertainty, conflicting dates и completion states. Не читать grades/roster/submission bodies по умолчанию. Определить institutional permission до live подключения; offline adapter продолжить.",
       "allowed_files": [
         "src/prm/academic_inbox.py",
         "src/prm/runtime/transports/**",
@@ -1229,6 +1227,17 @@
         "tools/test_tiers.py",
         "src/prm/watch_jobs.py"
       ],
+      "change_budget": "files<=24",
+      "dependencies": [
+        "PAI-08",
+        "PAI-14",
+        "PAI-17",
+        "PAI-18"
+      ],
+      "expected_interfaces": [
+        "PA requirement coverage: PA-12",
+        "docs/PA_IMPLEMENTATION_TASKS.md#pai-19"
+      ],
       "forbidden_files": [
         ".env",
         ".env.*",
@@ -1237,13 +1246,14 @@
         ".playbook/upstream/**",
         "systemd/**"
       ],
-      "expected_interfaces": [
-        "PA requirement coverage: PA-12",
-        "docs/PA_IMPLEMENTATION_TASKS.md#pai-19"
-      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "rollback": "выключить Canvas scope; не скрывать отсутствие источника за «задач нет».",
+      "scope": "использовать existing Academic handoff; Canvas adapter для разрешаемого минимального assignments/calendar/announcements scope; объединить mail/calendar candidates, provenance, categories, stage profile, eligibility uncertainty, conflicting dates и completion states. Не читать grades/roster/submission bodies по умолчанию. Определить institutional permission до live подключения; offline adapter продолжить.",
+      "slice_id": "PAI-19",
+      "status": "planned",
+      "user_visible_outcome": "академическая сводка различает обязательства, возможности и чтение; напоминания опираются на актуальный подтверждённый срок.",
       "verification": [
         {
-          "id": "acceptance",
           "argv": [
             "{python}",
             "-m",
@@ -1253,26 +1263,14 @@
             "tests/test_assistant_academic.py",
             "tests/test_assistant_subscriptions.py"
           ],
-          "required": true,
           "expected_exit_code": 0,
+          "id": "acceptance",
+          "required": true,
           "timeout_seconds": 600
         }
-      ],
-      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
-      "dependencies": [
-        "PAI-08",
-        "PAI-14",
-        "PAI-17",
-        "PAI-18"
-      ],
-      "change_budget": "files<=24",
-      "rollback": "выключить Canvas scope; не скрывать отсутствие источника за «задач нет»."
+      ]
     },
     {
-      "slice_id": "PAI-20",
-      "status": "planned",
-      "user_visible_outcome": "находка превращается в редактируемое предложение, точное подтверждение и проверяемую квитанцию выполнения.",
-      "scope": "конкретные executor/reconcile adapters для выбранных mail и calendar операций. Перед отправкой проверить account, recipient, thread, content digest, version/ETag и free/busy где нужно. Provider draft тоже write. Показать последствия, expiry и изменённый preview; старое подтверждение не переиспользовать. Семантику idempotency/reconciliation проверить по официальному API, не переносить её с другого провайдера.",
       "allowed_files": [
         "src/prm/confirmed_actions.py",
         "src/prm/runtime/transports/**",
@@ -1294,6 +1292,17 @@
         "tests/fixtures/assistant/**",
         "tools/test_tiers.py"
       ],
+      "change_budget": "files<=24",
+      "dependencies": [
+        "PAI-04",
+        "PAI-09",
+        "PAI-17",
+        "PAI-18"
+      ],
+      "expected_interfaces": [
+        "PA requirement coverage: PA-13",
+        "docs/PA_IMPLEMENTATION_TASKS.md#pai-20"
+      ],
       "forbidden_files": [
         ".env",
         ".env.*",
@@ -1302,13 +1311,14 @@
         ".playbook/upstream/**",
         "systemd/**"
       ],
-      "expected_interfaces": [
-        "PA requirement coverage: PA-13",
-        "docs/PA_IMPLEMENTATION_TASKS.md#pai-20"
-      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "rollback": "отключить executor, оставить preview и reconciliation существующих attempts; не удалять receipts.",
+      "scope": "конкретные executor/reconcile adapters для выбранных mail и calendar операций. Перед отправкой проверить account, recipient, thread, content digest, version/ETag и free/busy где нужно. Provider draft тоже write. Показать последствия, expiry и изменённый preview; старое подтверждение не переиспользовать. Семантику idempotency/reconciliation проверить по официальному API, не переносить её с другого провайдера.",
+      "slice_id": "PAI-20",
+      "status": "planned",
+      "user_visible_outcome": "находка превращается в редактируемое предложение, точное подтверждение и проверяемую квитанцию выполнения.",
       "verification": [
         {
-          "id": "acceptance",
           "argv": [
             "{python}",
             "-m",
@@ -1319,26 +1329,14 @@
             "tests/test_pai_delivery.py",
             "tests/test_prm_post_answer_actions.py"
           ],
-          "required": true,
           "expected_exit_code": 0,
+          "id": "acceptance",
+          "required": true,
           "timeout_seconds": 600
         }
-      ],
-      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
-      "dependencies": [
-        "PAI-04",
-        "PAI-09",
-        "PAI-17",
-        "PAI-18"
-      ],
-      "change_budget": "files<=24",
-      "rollback": "отключить executor, оставить preview и reconciliation существующих attempts; не удалять receipts."
+      ]
     },
     {
-      "slice_id": "PAI-21",
-      "status": "planned",
-      "user_visible_outcome": "владелец видит, что сохранено, может исправить/забыть/экспортировать; удалённое не возвращается из кэша или отложенной job.",
-      "scope": "wire memory library в разговор и Brief; provenance/confirmation/ versions, lifecycle distinctions, source retention. Durable delete/revoke workflow инвалидирует derived rows, indexes, caches, jobs и artifacts; определяет backup retention/tombstones и поведение restore. Пользовательский экспорт доступен только owner. Не превращать реакцию в постоянный preference.",
       "allowed_files": [
         "src/prm/memory_library.py",
         "src/prm/storage/**",
@@ -1358,6 +1356,16 @@
         "tests/fixtures/assistant/**",
         "tools/test_tiers.py"
       ],
+      "change_budget": "files<=24",
+      "dependencies": [
+        "PAI-05",
+        "PAI-14",
+        "PAI-17"
+      ],
+      "expected_interfaces": [
+        "PA requirement coverage: PA-14",
+        "docs/PA_IMPLEMENTATION_TASKS.md#pai-21"
+      ],
       "forbidden_files": [
         ".env",
         ".env.*",
@@ -1366,13 +1374,14 @@
         ".playbook/upstream/**",
         "systemd/**"
       ],
-      "expected_interfaces": [
-        "PA requirement coverage: PA-14",
-        "docs/PA_IMPLEMENTATION_TASKS.md#pai-21"
-      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "rollback": "остановить новые mutations; deletion tombstones не откатывать молча.",
+      "scope": "wire memory library в разговор и Brief; provenance/confirmation/ versions, lifecycle distinctions, source retention. Durable delete/revoke workflow инвалидирует derived rows, indexes, caches, jobs и artifacts; определяет backup retention/tombstones и поведение restore. Пользовательский экспорт доступен только owner. Не превращать реакцию в постоянный preference.",
+      "slice_id": "PAI-21",
+      "status": "planned",
+      "user_visible_outcome": "владелец видит, что сохранено, может исправить/забыть/экспортировать; удалённое не возвращается из кэша или отложенной job.",
       "verification": [
         {
-          "id": "acceptance",
           "argv": [
             "{python}",
             "-m",
@@ -1382,25 +1391,14 @@
             "tests/test_assistant_memory.py",
             "tests/test_assistant_report_dialogue.py"
           ],
-          "required": true,
           "expected_exit_code": 0,
+          "id": "acceptance",
+          "required": true,
           "timeout_seconds": 600
         }
-      ],
-      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
-      "dependencies": [
-        "PAI-05",
-        "PAI-14",
-        "PAI-17"
-      ],
-      "change_budget": "files<=24",
-      "rollback": "остановить новые mutations; deletion tombstones не откатывать молча."
+      ]
     },
     {
-      "slice_id": "PAI-22",
-      "status": "planned",
-      "user_visible_outcome": "voice/image/PDF input продолжает правильный разговор, показывает редактируемую расшифровку и source/page references.",
-      "scope": "media adapters и реальная wiring цепочка download/inspect/text layer/optional OCR/question/response/cleanup. Сначала локальный текст, bounded OCR по необходимости, speech response опционален. Проверить content type/size/active content/archive bombs и resource limits. Каждая modality получает отдельный purpose; temporary files удаляются реальным cleanup, включая exception/cancel/restart, не только CleanupPlan.",
       "allowed_files": [
         "src/prm/media_connectors.py",
         "src/prm/runtime/transports/**",
@@ -1423,6 +1421,16 @@
         "tools/test_tiers.py",
         "src/prm/pdf_inspection.py"
       ],
+      "change_budget": "files<=24",
+      "dependencies": [
+        "PAI-10",
+        "PAI-15",
+        "PAI-21"
+      ],
+      "expected_interfaces": [
+        "PA requirement coverage: PA-15",
+        "docs/PA_IMPLEMENTATION_TASKS.md#pai-22"
+      ],
       "forbidden_files": [
         ".env",
         ".env.*",
@@ -1431,13 +1439,14 @@
         ".playbook/upstream/**",
         "systemd/**"
       ],
-      "expected_interfaces": [
-        "PA requirement coverage: PA-15",
-        "docs/PA_IMPLEMENTATION_TASKS.md#pai-22"
-      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "rollback": "отключить новые media types, сохранить plain text и гарантировать cleanup.",
+      "scope": "media adapters и реальная wiring цепочка download/inspect/text layer/optional OCR/question/response/cleanup. Сначала локальный текст, bounded OCR по необходимости, speech response опционален. Проверить content type/size/active content/archive bombs и resource limits. Каждая modality получает отдельный purpose; temporary files удаляются реальным cleanup, включая exception/cancel/restart, не только CleanupPlan.",
+      "slice_id": "PAI-22",
+      "status": "planned",
+      "user_visible_outcome": "voice/image/PDF input продолжает правильный разговор, показывает редактируемую расшифровку и source/page references.",
       "verification": [
         {
-          "id": "acceptance",
           "argv": [
             "{python}",
             "-m",
@@ -1448,25 +1457,14 @@
             "tests/test_voice_transcription.py",
             "tests/test_pdf_inspection.py"
           ],
-          "required": true,
           "expected_exit_code": 0,
+          "id": "acceptance",
+          "required": true,
           "timeout_seconds": 600
         }
-      ],
-      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
-      "dependencies": [
-        "PAI-10",
-        "PAI-15",
-        "PAI-21"
-      ],
-      "change_budget": "files<=24",
-      "rollback": "отключить новые media types, сохранить plain text и гарантировать cleanup."
+      ]
     },
     {
-      "slice_id": "PAI-23",
-      "status": "planned",
-      "user_visible_outcome": "видны стоимость целой задачи, задержка, маршрут модели и ограничения; оптимизация не ухудшает согласованное качество.",
-      "scope": "подключить versioned model/tariff catalog к реальному runtime; usage adapter различает input/cache-read/cache-write/output/reasoning по семантике провайдера. Агрегировать unique user task и все attempts/tools/judges, а не число успешных реплик. Реализовать caches для extraction/retrieval/ render и допустимый model prefix caching; keys включают scope/version. Revoke/delete/freshness проверяются на hit. Подготовить paired holdout strong baseline vs candidate; платное сравнение только в разрешённом scope.",
       "allowed_files": [
         "src/prm/model_cost.py",
         "src/prm/runtime/cache.py",
@@ -1485,6 +1483,18 @@
         "tests/fixtures/assistant/**",
         "tools/test_tiers.py"
       ],
+      "change_budget": "files<=24",
+      "dependencies": [
+        "PAI-03",
+        "PAI-13",
+        "PAI-15",
+        "PAI-20",
+        "PAI-22"
+      ],
+      "expected_interfaces": [
+        "PA requirement coverage: PA-16",
+        "docs/PA_IMPLEMENTATION_TASKS.md#pai-23"
+      ],
       "forbidden_files": [
         ".env",
         ".env.*",
@@ -1493,13 +1503,14 @@
         ".playbook/upstream/**",
         "systemd/**"
       ],
-      "expected_interfaces": [
-        "PA requirement coverage: PA-16",
-        "docs/PA_IMPLEMENTATION_TASKS.md#pai-23"
-      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "rollback": "фиксированный разрешённый baseline, cache bypass с сохранением caps.",
+      "scope": "подключить versioned model/tariff catalog к реальному runtime; usage adapter различает input/cache-read/cache-write/output/reasoning по семантике провайдера. Агрегировать unique user task и все attempts/tools/judges, а не число успешных реплик. Реализовать caches для extraction/retrieval/ render и допустимый model prefix caching; keys включают scope/version. Revoke/delete/freshness проверяются на hit. Подготовить paired holdout strong baseline vs candidate; платное сравнение только в разрешённом scope.",
+      "slice_id": "PAI-23",
+      "status": "planned",
+      "user_visible_outcome": "видны стоимость целой задачи, задержка, маршрут модели и ограничения; оптимизация не ухудшает согласованное качество.",
       "verification": [
         {
-          "id": "acceptance",
           "argv": [
             "{python}",
             "-m",
@@ -1509,27 +1520,14 @@
             "tests/test_assistant_cost.py",
             "tests/test_pai_durable_policy.py"
           ],
-          "required": true,
           "expected_exit_code": 0,
+          "id": "acceptance",
+          "required": true,
           "timeout_seconds": 600
         }
-      ],
-      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
-      "dependencies": [
-        "PAI-03",
-        "PAI-13",
-        "PAI-15",
-        "PAI-20",
-        "PAI-22"
-      ],
-      "change_budget": "files<=24",
-      "rollback": "фиксированный разрешённый baseline, cache bypass с сохранением caps."
+      ]
     },
     {
-      "slice_id": "PAI-24",
-      "status": "planned",
-      "user_visible_outcome": "оператор понимает состояние системы и может восстановить её по проверенному runbook.",
-      "scope": "wired status/readiness/health, metrics/traces с безопасными IDs, queue age, unknown age, sync freshness, spend, lock/pool wait, disk/backup. Реализовать backup/restore, а не только план: synthetic PG/state/artifacts, проверка WAL/backup выбранного способа, restoration isolation. После restore новая execution epoch, egress off и сверка потерянного интервала. Подготовить reproducible dependencies, service/container templates, graceful drain, secret rotation и kill switch; templates не активировать.",
       "allowed_files": [
         "src/prm/operations.py",
         "src/prm/runtime/operations.py",
@@ -1549,6 +1547,18 @@
         "tests/fixtures/assistant/**",
         "tools/test_tiers.py"
       ],
+      "change_budget": "files<=24",
+      "dependencies": [
+        "PAI-09",
+        "PAI-16",
+        "PAI-21",
+        "PAI-22",
+        "PAI-23"
+      ],
+      "expected_interfaces": [
+        "PA requirement coverage: PA-17",
+        "docs/PA_IMPLEMENTATION_TASKS.md#pai-24"
+      ],
       "forbidden_files": [
         ".env",
         ".env.*",
@@ -1556,13 +1566,14 @@
         "secrets/**",
         ".playbook/upstream/**"
       ],
-      "expected_interfaces": [
-        "PA requirement coverage: PA-17",
-        "docs/PA_IMPLEMENTATION_TASKS.md#pai-24"
-      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "rollback": "выключить новые процессы/egress, удержать безопасный read-only status; restore никогда не является автоматическим разрешением отправки.",
+      "scope": "wired status/readiness/health, metrics/traces с безопасными IDs, queue age, unknown age, sync freshness, spend, lock/pool wait, disk/backup. Реализовать backup/restore, а не только план: synthetic PG/state/artifacts, проверка WAL/backup выбранного способа, restoration isolation. После restore новая execution epoch, egress off и сверка потерянного интервала. Подготовить reproducible dependencies, service/container templates, graceful drain, secret rotation и kill switch; templates не активировать.",
+      "slice_id": "PAI-24",
+      "status": "planned",
+      "user_visible_outcome": "оператор понимает состояние системы и может восстановить её по проверенному runbook.",
       "verification": [
         {
-          "id": "acceptance",
           "argv": [
             "{python}",
             "-m",
@@ -1572,27 +1583,14 @@
             "tests/test_assistant_ops.py",
             "tests/test_delivery_health.py"
           ],
-          "required": true,
           "expected_exit_code": 0,
+          "id": "acceptance",
+          "required": true,
           "timeout_seconds": 600
         }
-      ],
-      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
-      "dependencies": [
-        "PAI-09",
-        "PAI-16",
-        "PAI-21",
-        "PAI-22",
-        "PAI-23"
-      ],
-      "change_budget": "files<=24",
-      "rollback": "выключить новые процессы/egress, удержать безопасный read-only status; restore никогда не является автоматическим разрешением отправки."
+      ]
     },
     {
-      "slice_id": "PAI-25",
-      "status": "planned",
-      "user_visible_outcome": "готов конкретный cutover plan для выбранных PA-таблиц, который воспроизведён на копиях synthetic data.",
-      "scope": "versioned export/import, counts/checksums/refs, ownership и digest preservation; финальный freeze/drain, один writer, старый store read-only. Не переносить весь Telegram-архив. Проверить N/N−1 compatibility, old confirmation drain и unknown transfer. Rollback после новых записей переносит ledger delta либо использует forward fix; не возвращает старый snapshot с повторно действующими подтверждениями. Реальную приватную копию использовать только по отдельному разрешению.",
       "allowed_files": [
         "src/prm/storage/**",
         "src/prm/runtime/migration.py",
@@ -1612,6 +1610,19 @@
         "tools/test_tiers.py",
         "src/prm/watch_jobs.py"
       ],
+      "change_budget": "files<=24",
+      "dependencies": [
+        "PAI-02",
+        "PAI-04",
+        "PAI-05",
+        "PAI-08",
+        "PAI-21",
+        "PAI-24"
+      ],
+      "expected_interfaces": [
+        "PA requirement coverage: PA-00, PA-17",
+        "docs/PA_IMPLEMENTATION_TASKS.md#pai-25"
+      ],
       "forbidden_files": [
         ".env",
         ".env.*",
@@ -1620,13 +1631,14 @@
         ".playbook/upstream/**",
         "systemd/**"
       ],
-      "expected_interfaces": [
-        "PA requirement coverage: PA-00, PA-17",
-        "docs/PA_IMPLEMENTATION_TASKS.md#pai-25"
-      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "rollback": "описанный и испытанный reverse-delta/forward-fix путь. Production cutover не выполнять в этой карточке.",
+      "scope": "versioned export/import, counts/checksums/refs, ownership и digest preservation; финальный freeze/drain, один writer, старый store read-only. Не переносить весь Telegram-архив. Проверить N/N−1 compatibility, old confirmation drain и unknown transfer. Rollback после новых записей переносит ledger delta либо использует forward fix; не возвращает старый snapshot с повторно действующими подтверждениями. Реальную приватную копию использовать только по отдельному разрешению.",
+      "slice_id": "PAI-25",
+      "status": "planned",
+      "user_visible_outcome": "готов конкретный cutover plan для выбранных PA-таблиц, который воспроизведён на копиях synthetic data.",
       "verification": [
         {
-          "id": "acceptance",
           "argv": [
             "{python}",
             "-m",
@@ -1637,28 +1649,14 @@
             "tests/test_pai_durable_actions.py",
             "tests/test_prm_post_answer_actions.py"
           ],
-          "required": true,
           "expected_exit_code": 0,
+          "id": "acceptance",
+          "required": true,
           "timeout_seconds": 600
         }
-      ],
-      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
-      "dependencies": [
-        "PAI-02",
-        "PAI-04",
-        "PAI-05",
-        "PAI-08",
-        "PAI-21",
-        "PAI-24"
-      ],
-      "change_budget": "files<=24",
-      "rollback": "описанный и испытанный reverse-delta/forward-fix путь. Production cutover не выполнять в этой карточке."
+      ]
     },
     {
-      "slice_id": "PAI-26",
-      "status": "planned",
-      "user_visible_outcome": "один release candidate с полной requirement-to-evidence матрицей и конкретным списком оставшихся live-gates.",
-      "scope": "fixture E2E из спецификации через настоящий composition root и HTTP/Telegram test doubles; lifecycle connections/actions/memory/media; load на зафиксированном expected и 2× peak; process kill/restart, stale lease, budget contention, lost ACK, DB outage, restore и injection из каждого источника. Зафиксировать p95/queue lag/ресурсы и regression floors. Независимый review изменённого полного диапазона и P0/P1 recheck — по согласованной политике и бюджету, без приватного содержимого. Mandatory final E2E enumerates SC13.2-01..10 and all 69 spec IDs in PAI.requirements.json; every mapped behavior needs actual wired evidence, not schema presence.",
       "allowed_files": [
         "tools/test_tiers.py",
         "tools/verify_project.py",
@@ -1674,13 +1672,15 @@
         "tests/test_pai_load_recovery.py",
         "tests/fixtures/assistant/**"
       ],
-      "forbidden_files": [
-        ".env",
-        ".env.*",
-        "data/**",
-        "secrets/**",
-        ".playbook/upstream/**",
-        "systemd/**"
+      "change_budget": "files<=24",
+      "dependencies": [
+        "PAI-15",
+        "PAI-19",
+        "PAI-20",
+        "PAI-22",
+        "PAI-23",
+        "PAI-24",
+        "PAI-25"
       ],
       "expected_interfaces": [
         "PA requirement coverage: PA-18",
@@ -1696,9 +1696,22 @@
         "SC13.2-09: tests/test_pai_end_to_end.py::test_source_injection_secret_query_and_fallback_denials",
         "SC13.2-10: tests/test_pai_end_to_end.py::test_restore_migration_revoke_delete_and_cache"
       ],
+      "forbidden_files": [
+        ".env",
+        ".env.*",
+        "data/**",
+        "secrets/**",
+        ".playbook/upstream/**",
+        "systemd/**"
+      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "rollback": "не продвигать release candidate; исправлять конкретные findings.",
+      "scope": "fixture E2E из спецификации через настоящий composition root и HTTP/Telegram test doubles; lifecycle connections/actions/memory/media; load на зафиксированном expected и 2× peak; process kill/restart, stale lease, budget contention, lost ACK, DB outage, restore и injection из каждого источника. Зафиксировать p95/queue lag/ресурсы и regression floors. Независимый review изменённого полного диапазона и P0/P1 recheck — по согласованной политике и бюджету, без приватного содержимого. Mandatory final E2E enumerates SC13.2-01..10 and all 69 spec IDs in PAI.requirements.json; every mapped behavior needs actual wired evidence, not schema presence.",
+      "slice_id": "PAI-26",
+      "status": "planned",
+      "user_visible_outcome": "один release candidate с полной requirement-to-evidence матрицей и конкретным списком оставшихся live-gates.",
       "verification": [
         {
-          "id": "acceptance",
           "argv": [
             "{python}",
             "-m",
@@ -1707,34 +1720,34 @@
             "tests/test_pai_end_to_end.py",
             "tests/test_pai_load_recovery.py"
           ],
-          "required": true,
           "expected_exit_code": 0,
+          "id": "acceptance",
+          "required": true,
           "timeout_seconds": 600
         },
         {
-          "id": "focused-prm",
           "argv": [
             "{python}",
             "tools/test_tiers.py",
             "focused-prm"
           ],
-          "required": true,
           "expected_exit_code": 0,
+          "id": "focused-prm",
+          "required": true,
           "timeout_seconds": 600
         },
         {
-          "id": "retrofit-boundaries",
           "argv": [
             "{python}",
             "tools/test_tiers.py",
             "retrofit-boundaries"
           ],
-          "required": true,
           "expected_exit_code": 0,
+          "id": "retrofit-boundaries",
+          "required": true,
           "timeout_seconds": 600
         },
         {
-          "id": "project_verifier",
           "argv": [
             "{python}",
             "tools/playbook.py",
@@ -1742,29 +1755,14 @@
             "--root",
             "."
           ],
-          "required": true,
           "expected_exit_code": 0,
+          "id": "project_verifier",
+          "required": true,
           "timeout_seconds": 1200
         }
-      ],
-      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
-      "dependencies": [
-        "PAI-15",
-        "PAI-19",
-        "PAI-20",
-        "PAI-22",
-        "PAI-23",
-        "PAI-24",
-        "PAI-25"
-      ],
-      "change_budget": "files<=24",
-      "rollback": "не продвигать release candidate; исправлять конкретные findings."
+      ]
     },
     {
-      "slice_id": "PAI-27",
-      "status": "planned",
-      "user_visible_outcome": "реальные integrations подтверждены наблюдениями, а не mocks.",
-      "scope": " External gate: no live effect, paid call, service or production change without its separate scoped authority. Structure checks alone cannot complete this card; refine exact canary/runbook commands at PAI-26.",
       "allowed_files": [
         "docs/security/**",
         "docs/verification/**",
@@ -1775,6 +1773,14 @@
         "docs/design/PAI.design.json",
         "docs/adr/ADR-01*.md"
       ],
+      "change_budget": "files<=24",
+      "dependencies": [
+        "PAI-26"
+      ],
+      "expected_interfaces": [
+        "PA requirement coverage: PA-02, PA-05, PA-09, PA-10, PA-11, PA-12, PA-13, PA-15, PA-16, PA-18",
+        "docs/PA_IMPLEMENTATION_TASKS.md#pai-27"
+      ],
       "forbidden_files": [
         ".env",
         ".env.*",
@@ -1783,34 +1789,26 @@
         ".playbook/upstream/**",
         "systemd/**"
       ],
-      "expected_interfaces": [
-        "PA requirement coverage: PA-02, PA-05, PA-09, PA-10, PA-11, PA-12, PA-13, PA-15, PA-16, PA-18",
-        "docs/PA_IMPLEMENTATION_TASKS.md#pai-27"
-      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "rollback": "stop canary, revoke выданного test scope, согласованный cleanup; уже отправленный эффект не объявлять отменённым без проверки.",
+      "scope": " External gate: no live effect, paid call, service or production change without its separate scoped authority. Structure checks alone cannot complete this card; refine exact canary/runbook commands at PAI-26.",
+      "slice_id": "PAI-27",
+      "status": "planned",
+      "user_visible_outcome": "реальные integrations подтверждены наблюдениями, а не mocks.",
       "verification": [
         {
-          "id": "planning_structure",
           "argv": [
             "{python}",
             "tools/check_pai_plan.py"
           ],
-          "required": true,
           "expected_exit_code": 0,
+          "id": "planning_structure",
+          "required": true,
           "timeout_seconds": 60
         }
-      ],
-      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
-      "dependencies": [
-        "PAI-26"
-      ],
-      "change_budget": "files<=24",
-      "rollback": "stop canary, revoke выданного test scope, согласованный cleanup; уже отправленный эффект не объявлять отменённым без проверки."
+      ]
     },
     {
-      "slice_id": "PAI-28",
-      "status": "planned",
-      "user_visible_outcome": "нужный SHA работает в назначенной среде с проверенной БД, worker, scheduler и управляемыми capabilities.",
-      "scope": " External gate: no live effect, paid call, service or production change without its separate scoped authority. Structure checks alone cannot complete this card; refine exact canary/runbook commands at PAI-26.",
       "allowed_files": [
         "docs/operator_quickstart.md",
         "docs/verification/**",
@@ -1821,6 +1819,15 @@
         "docs/design/PAI.design.json",
         "docs/adr/ADR-01*.md"
       ],
+      "change_budget": "files<=24",
+      "dependencies": [
+        "PAI-25",
+        "PAI-27"
+      ],
+      "expected_interfaces": [
+        "PA requirement coverage: PA-17, PA-18",
+        "docs/PA_IMPLEMENTATION_TASKS.md#pai-28"
+      ],
       "forbidden_files": [
         ".env",
         ".env.*",
@@ -1829,35 +1836,26 @@
         ".playbook/upstream/**",
         "systemd/**"
       ],
-      "expected_interfaces": [
-        "PA requirement coverage: PA-17, PA-18",
-        "docs/PA_IMPLEMENTATION_TASKS.md#pai-28"
-      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "rollback": "утверждённый runbook с сохранением новых receipts/unknown/tombstones; старый snapshot автоматически не восстанавливать.",
+      "scope": " External gate: no live effect, paid call, service or production change without its separate scoped authority. Structure checks alone cannot complete this card; refine exact canary/runbook commands at PAI-26.",
+      "slice_id": "PAI-28",
+      "status": "planned",
+      "user_visible_outcome": "нужный SHA работает в назначенной среде с проверенной БД, worker, scheduler и управляемыми capabilities.",
       "verification": [
         {
-          "id": "planning_structure",
           "argv": [
             "{python}",
             "tools/check_pai_plan.py"
           ],
-          "required": true,
           "expected_exit_code": 0,
+          "id": "planning_structure",
+          "required": true,
           "timeout_seconds": 60
         }
-      ],
-      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
-      "dependencies": [
-        "PAI-25",
-        "PAI-27"
-      ],
-      "change_budget": "files<=24",
-      "rollback": "утверждённый runbook с сохранением новых receipts/unknown/tombstones; старый snapshot автоматически не восстанавливать."
+      ]
     },
     {
-      "slice_id": "PAI-29",
-      "status": "planned",
-      "user_visible_outcome": "владелец принимает полный персональный ассистент по своим задачам, качеству ответов и эксплуатации.",
-      "scope": "до старта зафиксировать 20 начальных задач и длительность дальнейшего пилота; пройти Chat/Search/Brief/Watch/Act, выбранные личные источники, memory/media, restore/cancel/revoke. Проверить полезность, coverage/citations, пропущенные обязательства, шум, latency/cost и visual quality на телефоне/PDF. Исправления проходят scoped tests и независимые P0/P1 rechecks, затем повторяются затронутые live cases на новом SHA. External gate: no live effect, paid call, service or production change without its separate scoped authority. Structure checks alone cannot complete this card; refine exact canary/runbook commands at PAI-26.",
       "allowed_files": [
         "docs/EVIDENCE_INDEX.md",
         "docs/verification/**",
@@ -1868,6 +1866,14 @@
         "docs/design/PAI.design.json",
         "docs/adr/ADR-01*.md"
       ],
+      "change_budget": "files<=24",
+      "dependencies": [
+        "PAI-28"
+      ],
+      "expected_interfaces": [
+        "PA requirement coverage: PA-18",
+        "docs/PA_IMPLEMENTATION_TASKS.md#pai-29"
+      ],
       "forbidden_files": [
         ".env",
         ".env.*",
@@ -1876,34 +1882,26 @@
         ".playbook/upstream/**",
         "systemd/**"
       ],
-      "expected_interfaces": [
-        "PA requirement coverage: PA-18",
-        "docs/PA_IMPLEMENTATION_TASKS.md#pai-29"
-      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "rollback": "stop нового rollout/автоматических writes, сохранить рабочие разрешённые read paths и точную точку продолжения.",
+      "scope": "до старта зафиксировать 20 начальных задач и длительность дальнейшего пилота; пройти Chat/Search/Brief/Watch/Act, выбранные личные источники, memory/media, restore/cancel/revoke. Проверить полезность, coverage/citations, пропущенные обязательства, шум, latency/cost и visual quality на телефоне/PDF. Исправления проходят scoped tests и независимые P0/P1 rechecks, затем повторяются затронутые live cases на новом SHA. External gate: no live effect, paid call, service or production change without its separate scoped authority. Structure checks alone cannot complete this card; refine exact canary/runbook commands at PAI-26.",
+      "slice_id": "PAI-29",
+      "status": "planned",
+      "user_visible_outcome": "владелец принимает полный персональный ассистент по своим задачам, качеству ответов и эксплуатации.",
       "verification": [
         {
-          "id": "planning_structure",
           "argv": [
             "{python}",
             "tools/check_pai_plan.py"
           ],
-          "required": true,
           "expected_exit_code": 0,
+          "id": "planning_structure",
+          "required": true,
           "timeout_seconds": 60
         }
-      ],
-      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
-      "dependencies": [
-        "PAI-28"
-      ],
-      "change_budget": "files<=24",
-      "rollback": "stop нового rollout/автоматических writes, сохранить рабочие разрешённые read paths и точную точку продолжения."
+      ]
     },
     {
-      "slice_id": "PAI-30",
-      "status": "planned",
-      "user_visible_outcome": "Measured conditional outcome: Добавить Redis, только если он устраняет измеренный предел",
-      "scope": "сначала выбрать конкретную роль Redis. Для cache — scope/version keys, TTL, revoke invalidation, limits и безопасный miss/failure. Для Streams — отдельный ADR, transactional outbox в PostgreSQL, dedup, pending recovery, ACK, persistence, trimming и DLQ. Не использовать Pub/Sub как durable queue; grants/budget/receipts остаются в authority DB. Requires measured trigger and a separately approved ADR/scope before implementation.",
       "allowed_files": [
         "src/prm/runtime/cache.py",
         "src/prm/storage/**",
@@ -1921,6 +1919,16 @@
         "tests/fixtures/assistant/**",
         "tools/test_tiers.py"
       ],
+      "change_budget": "files<=24",
+      "dependencies": [
+        "PAI-23",
+        "PAI-24",
+        "PAI-26"
+      ],
+      "expected_interfaces": [
+        "PA requirement coverage: PA-16, PA-17",
+        "docs/PA_IMPLEMENTATION_TASKS.md#pai-30"
+      ],
       "forbidden_files": [
         ".env",
         ".env.*",
@@ -1929,13 +1937,14 @@
         ".playbook/upstream/**",
         "systemd/**"
       ],
-      "expected_interfaces": [
-        "PA requirement coverage: PA-16, PA-17",
-        "docs/PA_IMPLEMENTATION_TASKS.md#pai-30"
-      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "rollback": "cache bypass или восстановленный PostgreSQL dispatch без потери domain jobs; никаких повторных effects из потерянного Redis state.",
+      "scope": "сначала выбрать конкретную роль Redis. Для cache — scope/version keys, TTL, revoke invalidation, limits и безопасный miss/failure. Для Streams — отдельный ADR, transactional outbox в PostgreSQL, dedup, pending recovery, ACK, persistence, trimming и DLQ. Не использовать Pub/Sub как durable queue; grants/budget/receipts остаются в authority DB. Requires measured trigger and a separately approved ADR/scope before implementation.",
+      "slice_id": "PAI-30",
+      "status": "planned",
+      "user_visible_outcome": "Measured conditional outcome: Добавить Redis, только если он устраняет измеренный предел",
       "verification": [
         {
-          "id": "acceptance",
           "argv": [
             "{python}",
             "-m",
@@ -1945,25 +1954,14 @@
             "tests/test_pai_cost_cache.py",
             "tests/test_pai_delivery.py"
           ],
-          "required": true,
           "expected_exit_code": 0,
+          "id": "acceptance",
+          "required": true,
           "timeout_seconds": 600
         }
-      ],
-      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
-      "dependencies": [
-        "PAI-23",
-        "PAI-24",
-        "PAI-26"
-      ],
-      "change_budget": "files<=24",
-      "rollback": "cache bypass или восстановленный PostgreSQL dispatch без потери domain jobs; никаких повторных effects из потерянного Redis state."
+      ]
     },
     {
-      "slice_id": "PAI-31",
-      "status": "planned",
-      "user_visible_outcome": "Measured conditional outcome: Перенести архив/FTS в PostgreSQL, если SQLite стал ограничением",
-      "scope": "ADR и отдельный export/import `raw_posts`/`posts`, сохранение canonical IDs/refs/reactions, rebuild производного поиска. Сравнить SQLite FTS и PostgreSQL retrieval на одном RU/EN holdout: recall, exact matches, ranking, source/citation integrity. Cutover одним writer, тест backward compatibility и reverse-delta/forward-fix; сеть не монтирует живой SQLite-файл. Vector/microservice не добавлять в этот scope. Requires measured trigger and a separately approved ADR/scope before implementation.",
       "allowed_files": [
         "src/db/**",
         "src/prm/storage/**",
@@ -1982,6 +1980,16 @@
         "tests/fixtures/assistant/**",
         "tools/test_tiers.py"
       ],
+      "change_budget": "files<=24",
+      "dependencies": [
+        "PAI-11",
+        "PAI-25",
+        "PAI-26"
+      ],
+      "expected_interfaces": [
+        "PA requirement coverage: PA-04, PA-17",
+        "docs/PA_IMPLEMENTATION_TASKS.md#pai-31"
+      ],
       "forbidden_files": [
         ".env",
         ".env.*",
@@ -1990,13 +1998,14 @@
         ".playbook/upstream/**",
         "systemd/**"
       ],
-      "expected_interfaces": [
-        "PA requirement coverage: PA-04, PA-17",
-        "docs/PA_IMPLEMENTATION_TASKS.md#pai-31"
-      ],
+      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
+      "rollback": "испытанный reader/writer switch, сохранение новых данных; старый архив не удалять до завершения agreed rollback window.",
+      "scope": "ADR и отдельный export/import `raw_posts`/`posts`, сохранение canonical IDs/refs/reactions, rebuild производного поиска. Сравнить SQLite FTS и PostgreSQL retrieval на одном RU/EN holdout: recall, exact matches, ranking, source/citation integrity. Cutover одним writer, тест backward compatibility и reverse-delta/forward-fix; сеть не монтирует живой SQLite-файл. Vector/microservice не добавлять в этот scope. Requires measured trigger and a separately approved ADR/scope before implementation.",
+      "slice_id": "PAI-31",
+      "status": "planned",
+      "user_visible_outcome": "Measured conditional outcome: Перенести архив/FTS в PostgreSQL, если SQLite стал ограничением",
       "verification": [
         {
-          "id": "acceptance",
           "argv": [
             "{python}",
             "-m",
@@ -2007,19 +2016,12 @@
             "tests/test_archive_documents.py",
             "tests/test_pai_migration.py"
           ],
-          "required": true,
           "expected_exit_code": 0,
+          "id": "acceptance",
+          "required": true,
           "timeout_seconds": 600
         }
-      ],
-      "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
-      "dependencies": [
-        "PAI-11",
-        "PAI-25",
-        "PAI-26"
-      ],
-      "change_budget": "files<=24",
-      "rollback": "испытанный reader/writer switch, сохранение новых данных; старый архив не удалять до завершения agreed rollback window."
+      ]
     }
   ],
   "status": "draft"

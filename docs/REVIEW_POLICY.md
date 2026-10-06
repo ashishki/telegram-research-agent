@@ -15,7 +15,7 @@ or permission to send private data. The 2026-10-06 Sol prompt explicitly keeps
 paid model calls behind scoped authority. The owner approved the exact brief and two initial Mimo reviews; both attempts
 failed without verdict. A later owner request authorized one tiny diagnostic,
 which confirmed Mimo connectivity/schema. The owner resumed the goal and authorized the recommended total 30-call cap
-for local PAI-00..26. Seventeen requests are consumed at the SSE diagnostic checkpoint. The owner
+for local PAI-00..26. Eighteen requests are consumed at the complete SSE failure checkpoint. The owner
 approved design/recheck output up to 16000 tokens and deadlines up to 900 s.
 Defaults remain 8000/300; no automatic retries or model substitution.
 Per-call bounds/private-source exclusions persist; no credential availability scans.

@@ -308,6 +308,15 @@ def execute(args):
             "review_stream_invalid_delta", "review_stream_invalid_content", "review_stream_invalid_finish"}
         if type(exc) in {ValueError, TimeoutError} and str(exc) in safe_transport_errors:
             failure["error_code"] = str(exc)
+        stream_state = getattr(exc, "review_stream_state", None)
+        if isinstance(stream_state, dict):
+            failure["stream_state"] = {
+                k: stream_state[k] for k in ("wire_bytes", "final_text_bytes")
+                if type(stream_state.get(k)) is int and 0 <= stream_state[k] <= 8_388_608}
+            if stream_state.get("finish_reason") in {"stop", "length", "content_filter", "tool_calls", None}:
+                failure["stream_state"]["finish_reason"] = stream_state.get("finish_reason")
+            if stream_state.get("terminal_event") in {"eof", "done_without_finish"}:
+                failure["stream_state"]["terminal_event"] = stream_state["terminal_event"]
         if "response" in locals() and isinstance(response, dict):
             if response.get("model") == args.model: failure["observed_model"] = args.model
             choices = response.get("choices")
