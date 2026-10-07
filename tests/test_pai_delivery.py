@@ -150,7 +150,7 @@ def test_revoke_winning_before_final_send_and_foreground_scope_separation(case, 
     scheduler, registry, sub, clock, actor = case
     grants(case); job = completed(case); calls = []
     commit = registry._commit_durable_transport
-    def revoke_first(reservations):
+    def revoke_first(reservations,**kwargs):
         registry.revoke_grant('grant_answer', owner_ref=sub.owner_ref)
         return commit(reservations,**kwargs)
     monkeypatch.setattr(registry, '_commit_durable_transport', revoke_first)
