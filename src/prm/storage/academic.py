@@ -9,7 +9,7 @@ DDL=(
        PRIMARY KEY(owner,object_ref,schedule_id,subject_ref))''',
     'GRANT USAGE ON SCHEMA pa_academic TO pa_test_app',
     'GRANT SELECT ON pa_academic.meta TO pa_test_app',
-    'GRANT SELECT,INSERT,DELETE ON pa_academic.watches TO pa_test_app',
+    'GRANT SELECT,INSERT,UPDATE,DELETE ON pa_academic.watches TO pa_test_app',
 )
 CHECKSUM=hashlib.sha256('\n'.join(DDL).encode()).hexdigest()
 

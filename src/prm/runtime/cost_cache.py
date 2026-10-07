@@ -72,7 +72,7 @@ class CostCacheRuntime:
                                    (self.root.owner_ref,task_ref)).fetchone()
     def key(self,*,kind,parameters,dependencies,provider=None,model=None,version=None):
         value={'owner':self.root.owner_ref,'kind':kind,'parameters':parameters,'dependencies':dependencies,'provider':provider,'model':model,'version':version}
-        return hashlib.sha256(_canonical(value)[0]).hexdigest()
+        return hashlib.sha256(_canonical(value)[0].encode()).hexdigest()
     def put(self,*,key,kind,payload,dependencies,ttl_seconds):
         if kind not in {'extraction','retrieval','render'} or not 1<=ttl_seconds<=86400 or len(dependencies)>32:raise StorageError('bounded non-effect cache required')
         _canonical(payload)

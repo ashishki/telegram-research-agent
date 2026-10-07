@@ -686,6 +686,9 @@ def classify_brief_followup(text: str, *, active_item_number: int | None = None)
 
     clean = " ".join(str(text or "").split())
     lowered = clean.casefold()
+    selected = re.fullmatch(r"(?:пункт|item)\s*(\d{1,2})[?.!]?", lowered)
+    if selected is not None:
+        return BriefFollowup("explain_item", item_number=int(selected.group(1)))
     item = re.fullmatch(r"(?:объясни|поясни|расскажи про|подробнее про|explain)\s+(?:пункт\s*|item\s*)?(\d{1,2})[?.!]?", lowered)
     if item is not None:
         return BriefFollowup("explain_item", item_number=int(item.group(1)))
@@ -718,7 +721,7 @@ def classify_brief_followup(text: str, *, active_item_number: int | None = None)
             "что неизвестно?", "что неизвестно", "what is uncertain?", "what are the limits?",
         }:
             return BriefFollowup("caveat_item", item_number=active_item_number)
-    if lowered in {"сделай короче", "сократи", "shorten it", "make it shorter"}:
+    if lowered in {"сделай короче", "короче", "коротко", "кратко", "сократи", "shorten it", "make it shorter"}:
         return BriefFollowup("shorten")
     if lowered in {
         "покажи полный бриф", "показать полный бриф", "полный бриф", "подробный бриф", "show full brief",

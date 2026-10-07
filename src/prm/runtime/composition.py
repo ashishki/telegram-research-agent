@@ -187,17 +187,19 @@ class AssistantRuntime:
                     parent=next((item.response_ref for item in state.object_refs if referenced==item.response_ref or referenced in item.item_refs),referenced) if state else referenced
                     classes=self.conversations.response_origin(parent)
                     result=replace(result,payload={**result.payload,'source_scopes':list(self.conversations.response_source_scopes(parent))})
+                    if refs and refs[0]!=parent:self.conversations.record_origin(refs[0],classes,source_scopes=result.payload['source_scopes'],parent_response_ref=parent)
                 elif result.payload.get('source_data_class'):classes=(result.payload['source_data_class'],)
                 elif result.mode=='brief':
                     from prm.conversation import conversation_id_for
                     binding=self.briefs.store.get(self.owner_ref,'conversation',self.briefs._binding_ref(conversation_id_for(request.chat_id)))
                     manifest=self.briefs.store.get(self.owner_ref,'result',self.briefs._document_ref(binding.payload['brief_id']),version=binding.payload['version']) if binding and not binding.payload.get('forgotten') else None
                     classes=tuple(manifest.payload.get('source_data_classes',('private_archive','private_connector_content'))) if manifest else ('private_archive','private_connector_content')
+                    result=replace(result,payload={**result.payload,'source_scopes':manifest.payload.get('source_scopes',[]) if manifest else []})
                 elif result.mode=='chat':classes=('user_provided',)
                 elif request.public_web_query:classes=('public','private_archive')
                 else:classes=('private_archive',)
                 result=replace(result,payload={**result.payload,'source_data_classes':list(classes),'source_data_class':classes[0]})
-                if refs and not referenced:self.conversations.record_origin(refs[0],classes,source_scopes=result.payload.get('source_scopes',()))
+                if refs and not referenced and not result.route.get('conversation_control'):self.conversations.record_origin(refs[0],classes,source_scopes=result.payload.get('source_scopes',()))
             return result
         finally:
             if public_access is not None:

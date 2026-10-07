@@ -36,9 +36,9 @@ def pai(tmp_path):
                 for message in body['messages']:
                     value=message.get('content')
                     if isinstance(value,str) and value.startswith('Untrusted cited archive evidence: '):
-                        evidence=json.loads(value.split(': ',1)[1]);text=evidence[0]['text']+' ('+evidence[0]['source_ref']+').' if evidence else text
+                        evidence=json.loads(value.split(': ',1)[1]);text=evidence[0]['text'].rstrip('. ')+' ('+evidence[0]['source_ref']+').' if evidence else text
                     if isinstance(value,str) and value.startswith('Untrusted verified reads: '):
-                        evidence=json.loads(value.split(': ',1)[1]);text=evidence[0]['support_span']+' ('+evidence[0]['source_url']+').' if evidence else text
+                        evidence=json.loads(value.split(': ',1)[1]);text=evidence[0]['support_span'].rstrip('. ')+' ('+evidence[0]['source_url']+').' if evidence else text
                 self.reply({'model':'fixture_model','choices':[{'finish_reason':'stop','message':{'content':text}}],
                     'usage':{'prompt_tokens':40,'completion_tokens':12,'prompt_tokens_details':{'cached_tokens':10},'completion_tokens_details':{'reasoning_tokens':4}}});return
             if self.path.startswith('/v1.0/me/'):

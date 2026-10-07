@@ -154,7 +154,7 @@ class DurableConversationStore(ConversationStore):
         item=self.store.get(self.owner_ref,'conversation',ref)
         return tuple(item.payload.get('source_scopes',())) if item else ()
 
-    def record_origin(self,response_ref,data_classes,*,source_scopes=()):
+    def record_origin(self,response_ref,data_classes,*,source_scopes=(),parent_response_ref=None):
         classes=tuple(sorted(set(data_classes)))
         if not classes or not set(classes)<= {'model_generated','private_archive','private_connector_metadata','private_connector_content','user_provided','public'}:
             raise StorageError('explicit response origin classes required')
@@ -163,6 +163,7 @@ class DurableConversationStore(ConversationStore):
         with self.store.transaction() as tx:
             lineage_lock(tx.conn,self.owner_ref)
             if tx.get(self.owner_ref,'result',response_ref) is None:raise StorageError('response unavailable')
+            if parent_response_ref and tx.get(self.owner_ref,'result',parent_response_ref) is None:raise StorageError('source response deleted')
             old=tx.get(self.owner_ref,'conversation',ref)
             payload={'response_ref':response_ref,'data_classes':list(classes),'source_scopes':list(source_scopes)}
             if old and old.payload!=payload:raise StateConflict('response origin cannot be relabelled')
@@ -170,6 +171,9 @@ class DurableConversationStore(ConversationStore):
             if tx.conn.execute("SELECT to_regclass('pa_memory.dependencies') AS meta").fetchone()['meta'] is not None:
                 tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',
                     (self.owner_ref,'result',response_ref,'conversation',ref))
+                if parent_response_ref and parent_response_ref!=response_ref:
+                    tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',
+                        (self.owner_ref,'result',parent_response_ref,'result',response_ref))
         if classes==('model_generated',):self.tag_response_source(response_ref,'model_generated')
 
     def purge_history(self):
