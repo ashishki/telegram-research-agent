@@ -63,6 +63,9 @@ fresh actual-finding recheck against the committed #33 response/fixes/tests.
 Prepared packet: PAI-next-review-packets.json / review_33_resolution.
 Do not call #34 before that extension, retry or substitute models automatically.
 Source excerpts/call receipts remain recorded at their exact hashes/SHAs.
+After that explicit extension, record authorization_34/current cap and run:
+OPENCODE_API_KEY_FILE=/srv/openclaw-you/workspace/Georgia-Community-Navigator/secrets/openrouter_api_key .venv-pai/bin/python .playbook-artifacts/pai-review-resolution-34.py --call-number 34 --purpose review_33_resolution
+The compiled one-call runner rejects a missing extension before key/provider I/O.
 Public code and synthetic evidence
 only; no private corpus, tokens or account payloads to reviewers.
 
