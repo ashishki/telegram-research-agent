@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "status": "authorized_review_in_progress",
+  "status": "authorized_preparing_final_actual_finding_recheck",
   "current_approved_call_cap": 33,
-  "calls_consumed_including_failures": 31,
+  "calls_consumed_including_failures": 32,
   "proposed_total_cap": 33,
   "new_calls_maximum": 3,
   "third_call": "only if an actual new finding needs independent recheck",
@@ -141,6 +141,145 @@
         }
       ],
       "source_bytes": 154500
+    },
+    {
+      "purpose": "actual_finding_recheck",
+      "reviewed_head": null,
+      "instructions": "Independently recheck the actual P1 and P2 from review #31 against current full sources and executable failure cases. The original #30 allegations were independently contradicted in #31; do not reintroduce them without a concrete counterexample. Check that speech/vision unknown post-attempt outcomes, accepted response followed by accounting failure, late authorization/storage errors and failed accounting after definitive rejection/malformed reply always surface a typed retry_allowed=False error with the durable logical fence retained. Definitive provider rejections and malformed responses may retain their distinct typed non-retryable classes: do not mislabel a known rejection as a successfully delivered answer or require it to be converted to a generic retryable error. Confirm bounded actual file size, integrity and encoded body validation before preparation. These are local synthetic observations, no provider billing, live-account, human design or governed role acceptance. Report only concrete defects with an executable path. Independently resolve EVERY candidate in PAI-review-32-candidate.json against current code and executable tests. That candidate had FIX_P1_FIRST with P0 findings and is NOT a valid prior approval/verdict. Re-evaluate severities: any actual P0 => STOP_SHIP; P1 without P0 => FIX_P1_FIRST; no P0/P1 => SHIP_OK. Check the related committed refresh fence, retirement queue and missing-token recovery. The implementer response to #32 is published separately and is not supplied as review evidence; assess the actual code/tests. Source excerpts are declared; do not claim to have reviewed omitted code. Review #31 findings: {\"verdict\": \"FIX_P1_FIRST\", \"findings\": [{\"severity\": \"P1\", \"title\": \"Speech and vision transport exceptions are recorded as an outcome that is not a provider rejection and then re-raised as-is, allowing retry without the durable non-replay fence being surfaced\", \"file\": \"src/prm/runtime/speech.py:55\", \"issue\": \"`execute_reserved` re-raises the original transport exception after settling the operation as 'unknown'; speech/vision only classify `ModelProviderRejected` as 'rejected' and otherwise keep `outcome='unknown'` in the cost cache, but the caller sees the raw exception type (e.g. `StorageError('...do not retry')` for the wrapped path, yet `LLMOutcomeUnknown`-style fencing is not guaranteed because `ModelProviderRejected` may be raised by an inner re-raise while `finally` still records outcome and then `registry.settle` for vision runs with `outcome=outcome` where `outcome` may be 'rejected').\", \"fix\": \"Normalize every post-attempt exception into `LLMOutcomeUnknown` with `retry_allowed=False` (or the existing `ModelAttemptAlreadyRecorded` class), including `ModelProviderRejected`, and make the cost/settle path use a single terminal outcome per attempt; never re-raise an exception type that a caller could interpret as retryable.\", \"confidence\": \"medium\"}, {\"severity\": \"P2\", \"title\": \"Vision payload and model output bounds are not consistently enforced before the durable attempt fence\", \"file\": \"src/prm/runtime/vision.py:24\", \"issue\": \"The image bytes are read and base64-encoded before `prepare_model_attempt`, but there is no explicit bound on the encoded body size (unlike model.py's 48KB cap), so oversized payloads can be hashed into a one-use fence and then rejected by the provider, leaving a non-replayable attempt for a request that was never billable.\", \"fix\": \"Validate `len(body)` (and decoded image size) before calling `prepare_model_attempt`, and keep the attempt fence strictly after all local validation, matching the speech/model path.\", \"confidence\": \"medium\"}], \"not_verified\": [\"Actual network traffic, provider billing reconciliation, and real Postgres concurrency beyond the synthetic sandbox.\", \"Whether `execute_reserved_groups` correctly settles all group members when multiple operations share one HTTP call under failure.\", \"Whether `CostCacheRuntime.record` leaks private prompt/image text into reports or logs.\"], \"summary\": \"The two allegations in review #30 are not supported by the current code: local payload/history validation in `ScopedModelClient` occurs before `prepare_model_attempt`, so it leaves no model fence and the reservation remains usable; `DurableCapabilityRegistry.settle` treats `actual=None` as the terminal no-op branch, so a later known `actual` can still adjust an unknown operation's windows without resetting the replay fence. Speech and vision boundaries are mostly correct in scope binding and media bounds, but their exception paths surface raw errors after an unknown outcome instead of a uniform non-retryable unknown class, which is a P1 retry-safety risk, and vision lacks a body-size bound before fencing (P2). No P0 found in the reviewed scope; the fail-closed reservation and unknown-cost handling otherwise look sound.\"}",
+      "sources": [
+        {
+          "path": "src/prm/runtime/model_errors.py",
+          "sha256": "5e0d0d96363bff9f008ebb2d0c23b53e5972114615437ebb9e9ff41ec4c7bcb7",
+          "bytes": 1106
+        },
+        {
+          "path": "src/prm/runtime/media_attempts.py",
+          "sha256": "bc430642b8cf5032206b7cd2fc5b71f4a4669d5ad034dcb3effe414d5fae16f5",
+          "bytes": 2427
+        },
+        {
+          "path": "src/prm/runtime/speech.py",
+          "sha256": "a9244bc94b07eb0e585c87ee30f274a25c3305e582c4e6a5a42045d30793c5fe",
+          "bytes": 4617
+        },
+        {
+          "path": "src/prm/runtime/vision.py",
+          "sha256": "b873cf98e91c577756d8c3aff394399bdb6bf76afb96e53b369317906cdadda3",
+          "bytes": 6183
+        },
+        {
+          "path": "src/prm/runtime/model_attempts.py",
+          "sha256": "5498d7273a349037dac1fcce150df5fb7328937910419240ce6e2b86a6882d87",
+          "bytes": 1588
+        },
+        {
+          "path": "src/prm/storage/policy.py",
+          "sha256": "476ef57dce41b2eab38d9978421805cadeb7ee80cbeff2f7823863ef91a93859",
+          "bytes": 29630
+        },
+        {
+          "path": "src/prm/runtime/connections.py",
+          "sha256": "942996b79d409674b79f46d75925e3d2e150fc5a2afc714d5e73ab13c235835f",
+          "bytes": 20203
+        },
+        {
+          "path": "src/prm/runtime/graph.py",
+          "sha256": "881ff4a92756ab8a6592bf1e5c3df422e5dd8a272cabf65f6740a495401df6f9",
+          "bytes": 28398,
+          "line_ranges": [
+            [
+              1,
+              18
+            ],
+            [
+              46,
+              128
+            ],
+            [
+              131,
+              132
+            ],
+            [
+              133,
+              133
+            ],
+            [
+              135,
+              183
+            ],
+            [
+              230,
+              265
+            ]
+          ]
+        },
+        {
+          "path": "src/prm/runtime/schedule.py",
+          "sha256": "9028c8c672fec19c57497b5e15e98c26d52f6455a1ca6e9b435172037bd2ea4b",
+          "bytes": 8739
+        },
+        {
+          "path": "src/prm/runtime/academic.py",
+          "sha256": "f97eec3f4e4fd9f5ed8e007bac1a02a7ca494b4530635023d672a04e39b8b0a1",
+          "bytes": 17843,
+          "line_ranges": [
+            [
+              1,
+              103
+            ]
+          ]
+        },
+        {
+          "path": "src/prm/runtime/actions.py",
+          "sha256": "d346ed47015c33ee0174ccf8e424f3048f42a068a9cd11071d4e3c7516500aa3",
+          "bytes": 16086
+        },
+        {
+          "path": "src/prm/storage/actions.py",
+          "sha256": "6f1738970ab681dcc264c8739122085e0ae8a66ed8423b2a1553fe535650f74f",
+          "bytes": 13893
+        },
+        {
+          "path": "src/prm/confirmed_actions.py",
+          "sha256": "aa933b7af329bca26c7c81a50ef324608a3cf0d8d0ada322ac25d34574dc8d3a",
+          "bytes": 16470,
+          "line_ranges": [
+            [
+              273,
+              289
+            ]
+          ]
+        },
+        {
+          "path": "tests/test_pai_media_runtime.py",
+          "sha256": "d8994866f97392615c479ad1edc9a5d0c1aadbcb39be13a3da9d46f91fd2b272",
+          "bytes": 11018
+        },
+        {
+          "path": "tests/test_pai_review_recovery.py",
+          "sha256": "4904f5ab9958d4e6ddb4b51b3372bb6cbb319d4cbf80c67ca3a375542572b91e",
+          "bytes": 14739
+        },
+        {
+          "path": "tests/pai_runtime_fixtures.py",
+          "sha256": "9fea5d1aa9e60f0b338638072ed5cd73c9b19ed825fc2e72b4c01cf032e6ed1d",
+          "bytes": 10375
+        },
+        {
+          "path": "docs/verification/PAI-review-32-candidate.json",
+          "sha256": "9cb1ad710ad0bf77ff3fc2ce9a445280b600ee92058b8a33940a423235b290fc",
+          "bytes": 10267
+        },
+        {
+          "path": "docs/verification/PAI-review-31-response.md",
+          "sha256": "e8963c8f95fd7b86b7918c7a616da53bf5a7e8190286bb555b713e490ee3de91",
+          "bytes": 3763
+        }
+      ],
+      "source_bytes": 217345,
+      "numbered_source_bytes": 190186,
+      "scope": "actual-finding recheck, full sources plus explicit original-line excerpts; not accumulated full-program/role review",
+      "head_binding": "Exact committed HEAD resolved and recorded by the one-call runner at invocation."
     }
   ],
   "authority_exclusions": [

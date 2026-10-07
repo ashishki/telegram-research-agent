@@ -235,7 +235,6 @@ class DurableCapabilityRegistry(CapabilityRegistry):
                     (request.owner_ref,request.operation_ref,reservation.member_id)).fetchone()
                 return bool(decision.allowed and row and row['state']=='reserved' and row['request']==asdict(request))
         except (StorageError,ValueError,KeyError,TypeError):
-            if strict:raise ScopePreparationUnknown((ref,)) from None
             return False
     def _commit_durable_transport(self,reservations,*,strict=False):
         if not reservations or any(type(r) is not DurableReservation or r.registry is not self for r in reservations):return False

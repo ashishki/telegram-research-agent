@@ -1,4 +1,4 @@
-# Current handoff — independent review continuation and media fix
+# Current handoff — final actual-finding recheck prepared
 
 2026-10-07. Assigned branch: docs/personal-assistant-blueprint-playbook-20260918.
 Owner authorized finishing implementation, then testing/review, and confirmed
@@ -24,13 +24,23 @@ Independent Mimo #31 on e492ca6 resolves the two #30 allegations against the
 counterexamples, but returns FIX_P1_FIRST for a new media error-boundary P1
 and vision input-bound P2. Local fixes: docs/verification/PAI-review-31-response.md;
 12 media cases and 7 model/cost/settlement regressions passed, zero skips.
-New media findings remain open pending independent recheck #33. Scoped advisory reviews are not
+Review #32 on 832f9f3 returned complete JSON with P0 findings but FIX_P1_FIRST;
+the enforced consistency check rejects it as a valid verdict. Its unedited
+candidate/receipt are preserved in PAI-review-32-candidate.json and
+PAI-review-continuation-32.json. Concrete fixes/counterexamples (including a
+newly reproduced body-reader AttributeError) are in PAI-review-32-response.md:
+19 source/recovery cases, 5 refresh/cleanup cases, 38 policy/action/media
+regressions, and 6 final Graph-guard cases passed at their documented snapshots.
+Current code commits awaiting final recheck include non-retryable media errors,
+selected-message body reads, boolean policy denial, exact scope changes,
+durable token retirement/refresh fences, bounded calendar actions and typed
+coverage. All #31/#32 findings remain independently open until #33. Scoped advisory reviews are not
 Deep Review/Role Runner/human approval receipts; accumulated phase/role coverage
 remains pending. Requested/observed model and effort, hashes and scopes are in
 PAI-critical-boundaries-recheck-28/29/30.json. Thinking disabled and strict JSON
 schema produced usable reports; earlier incomplete attempts stay preserved.
 
-Paid review count: 31/33 consumed INCLUDING failures. On 2026-10-07 the owner
+Paid review count: 32/33 consumed INCLUDING failures. On 2026-10-07 the owner
 answered “разрешаю, делай дотконца” to the explicit 30-to-33 extension proposal.
 Do not ask for the same budget authorization again or swap models automatically.
 Prepared, authorized next packets: docs/verification/PAI-next-review-packets.json.
@@ -38,8 +48,11 @@ The initial no-credential command stopped before provider I/O, preserving
 30/33. Owner then explicitly directed lookup to Georgia-Community-Navigator;
 its secrets/openrouter_api_key was used ONLY at the authorized OpenCode Go
 endpoint, which confirmed mimo-v2.6-pro. Do not print/copy the credential.
-Next: independent connection/source review #32, then #33 for an actual-finding
-recheck of #31 and any actionable #32 findings. Public code and synthetic evidence
+Next: exactly one fresh #33 actual-finding recheck against the committed fixes,
+current tests and unedited #32 candidate. Use the prepared packet and
+.playbook-artifacts/pai-review-final-recheck.py, whose manifest records explicit
+source excerpts. Do not call #34, retry or substitute models automatically.
+Public code and synthetic evidence
 only; no private corpus, tokens or account payloads to reviewers.
 
 Formal PA/PAI design states stay review_required/draft/planned. Playbook readiness

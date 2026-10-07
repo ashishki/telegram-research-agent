@@ -185,7 +185,9 @@ class DurableActionStore:
         try:
             outcome=auth.reservation.registry.execute_reserved((auth.reservation,),invoke)
             if type(outcome)is not ExecutionOutcome:outcome=ExecutionOutcome('unknown',error_code='invalid_provider_outcome')
-        except Exception as error:outcome=ExecutionOutcome('unknown',error_code=type(error).__name__)
+        except Exception as error:
+            code='action_scope_denied' if isinstance(error,CapabilityDenied) else 'action_storage_unavailable' if isinstance(error,StorageError) else 'executor_outcome_unknown'
+            outcome=ExecutionOutcome('unknown',error_code=code)
         receipt=replace(pending,status=outcome.status,provider_operation_ref=outcome.provider_operation_ref,error_code=outcome.error_code)
         self.put(receipt)
         return receipt

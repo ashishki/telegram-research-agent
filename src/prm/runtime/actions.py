@@ -17,6 +17,16 @@ def _calendar_time(value,timezone_name):
     return parsed.astimezone(ZoneInfo(timezone_name)).replace(tzinfo=None).isoformat()
 
 
+def _validate_calendar_interval(content):
+    from zoneinfo import ZoneInfo
+    ZoneInfo(content['timezone'])
+    start=datetime.fromisoformat(content['start_at'].replace('Z','+00:00'))
+    end=datetime.fromisoformat(content['end_at'].replace('Z','+00:00'))
+    # Reuse the selected-calendar read window limit for bounded free/busy.
+    if start.tzinfo is None or end.tzinfo is None or not timedelta(0)<end-start<=timedelta(days=370):
+        raise CapabilityDenied('aware calendar interval within 370 days required')
+
+
 class GraphActionAdapter:
     def __init__(self,transport):self.transport=transport
     def execute(self,action):
@@ -90,8 +100,7 @@ class ActionRuntime:
         if content.get('account_ref',self.transport.account_ref)!=self.transport.account_ref:raise CapabilityDenied('preview account substitution denied')
         content={**content,'account_ref':self.transport.account_ref}
         if action_code.startswith('calendar.'):
-            from zoneinfo import ZoneInfo
-            if action_code!='calendar.cancel':ZoneInfo(content['timezone'])
+            if action_code!='calendar.cancel':_validate_calendar_interval(content)
             if action_code in {'calendar.update','calendar.cancel'} and not content.get('etag'):raise CapabilityDenied('exact event ETag required in preview')
         proposal=ActionProposal('proposal_'+uuid.uuid4().hex,self.root.owner_ref,self.transport.connection_ref,'provider_microsoft_graph',
             action_code,resource_ref,1,content,tuple(rationale_refs),now,now+timedelta(minutes=10))
@@ -101,8 +110,7 @@ class ActionRuntime:
         if content.get('account_ref',self.transport.account_ref)!=self.transport.account_ref:raise CapabilityDenied('edited account differs')
         content={**content,'account_ref':self.transport.account_ref}
         if proposal.action_code.startswith('calendar.') and proposal.action_code!='calendar.cancel':
-            from zoneinfo import ZoneInfo
-            ZoneInfo(content['timezone'])
+            _validate_calendar_interval(content)
         changed=replace(proposal,version=proposal.version+1,content=content,created_at=datetime.now(timezone.utc),expires_at=datetime.now(timezone.utc)+timedelta(minutes=10))
         self.store.register(changed,expected_version=proposal.version);self._show(changed);return changed
 
@@ -142,6 +150,7 @@ class ActionRuntime:
             observed=value.get('@odata.etag') or receipt.get('etag')
             if observed!=content.get('etag'):raise CapabilityDenied('event version changed; a new preview is required')
         if proposal.action_code=='calendar.cancel':return
+        _validate_calendar_interval(content)
         start=datetime.fromisoformat(content['start_at'].replace('Z','+00:00'));end=datetime.fromisoformat(content['end_at'].replace('Z','+00:00'))
         if start.tzinfo is None or end<=start:raise CapabilityDenied('valid aware calendar interval required')
         path='/v1.0/me/calendars/'+quote(content['calendar_ref'],safe='')+'/calendarView?'+urlencode({'startDateTime':start.isoformat(),'endDateTime':end.isoformat(),'$top':'100','$select':'id,start,end,showAs,isCancelled'})

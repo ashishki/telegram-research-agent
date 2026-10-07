@@ -1,0 +1,131 @@
+{
+  "schema_version": 1,
+  "status": "failed_or_incomplete",
+  "call_number": 32,
+  "call_limit": 33,
+  "purpose": "remaining_connection_source_review",
+  "read_only": true,
+  "provider": "opencode_go",
+  "requested_model": "mimo-v2.6-pro",
+  "observed_model": "mimo-v2.6-pro",
+  "requested_effort": "thinking_disabled",
+  "observed_effort": "thinking_disabled",
+  "head_sha": "832f9f39fb5eae34d9df8f7db2a104c47ce77127",
+  "base_sha": "761ffd21bf10aab39325d3d47d8fd3117d037858",
+  "diff_sha256": "cea5a749d0f82b399d2557f7095f8ae3ae8cc19f2d296064965a050956f65f93",
+  "sources": [
+    {
+      "path": "src/prm/runtime/connections.py",
+      "sha256": "78b66510284acddcb1e46815de0e740f378c97e75e7c8d71e24c101d467fb028",
+      "bytes": 16585
+    },
+    {
+      "path": "src/prm/runtime/graph.py",
+      "sha256": "9d696f5e6330467d389df84132fc7fae659e6b97fc2a94e297581fcb9395554c",
+      "bytes": 27558
+    },
+    {
+      "path": "src/prm/runtime/schedule.py",
+      "sha256": "3f0e2daa043924ecd32759752fb39e51293da778e7802330bee8c8fad9add947",
+      "bytes": 8672
+    },
+    {
+      "path": "src/prm/runtime/academic.py",
+      "sha256": "d23d0f4980b45b00d6a91ad921e73a38bb0c670c374731f23e30799af6d41e92",
+      "bytes": 17741
+    },
+    {
+      "path": "src/prm/runtime/actions.py",
+      "sha256": "39249d29ac1e86778c88d6ab4b4d6095d943a5e1857cd275af7aced5fad85d05",
+      "bytes": 15591
+    },
+    {
+      "path": "tests/test_pai_connections.py",
+      "sha256": "84e44c520069593985551627577e57f288e694af9282d3c269515eb808494a1c",
+      "bytes": 1244
+    },
+    {
+      "path": "tests/test_pai_graph_mail.py",
+      "sha256": "7254ebd795f6868e207602a5f15438f8b7f56c59184e4dd6bd91d17753488106",
+      "bytes": 1224
+    },
+    {
+      "path": "tests/test_pai_schedule_runtime.py",
+      "sha256": "487460e373017f0d340ecd9cc19c68b20cf64e40c4a9eaa1e503a51a964c3fb3",
+      "bytes": 2158
+    },
+    {
+      "path": "tests/test_pai_academic_runtime.py",
+      "sha256": "838104e23a1469812671a731332342f882f8c4ab56d5cbd26dd27c69f4ca559f",
+      "bytes": 2419
+    },
+    {
+      "path": "tests/test_pai_action_runtime.py",
+      "sha256": "55c5878c8c3617a2475b7d51b215ff190d4d8915a2ccab7fcf7adbac0e37d02d",
+      "bytes": 2696
+    },
+    {
+      "path": "src/prm/storage/actions.py",
+      "sha256": "2fef4f4955e1a052eecb06c606cacbceffe6e87145f5d7ccfe4f6ea5718b89f6",
+      "bytes": 13719
+    },
+    {
+      "path": "src/prm/runtime/deletion.py",
+      "sha256": "12ce6cf1397e7b67bc4f5b1f515bab9d870c3a4f26bf4e2a3709f94782315c04",
+      "bytes": 5678
+    },
+    {
+      "path": "tests/pai_runtime_fixtures.py",
+      "sha256": "bcb816e6140803276d8f07da31afc4b0e863640cc02f548a7b9214119cef4378",
+      "bytes": 9515
+    },
+    {
+      "path": "src/prm/storage/policy.py",
+      "sha256": "f7456178adba4a911f74987f9832937a99473a4e772141a7c90adcc4b95f8680",
+      "bytes": 29700
+    }
+  ],
+  "scope": "selected full source",
+  "input_sha256": "fa42d546f66088e0bbf167ad15192820d56386b56b2b60f1663b0184963136b9",
+  "input_bytes": 166541,
+  "output_token_cap": 16000,
+  "timeout_seconds": 900,
+  "workflow_receipt": false,
+  "human_authority": false,
+  "runner_path": ".playbook-artifacts/pai-review-continuation.py",
+  "runner_sha256": "a659cef7117af98086b374c430eee326985df0c56d53359cefe09ace33fc4945",
+  "transport_path": "tools/mimo_code_review.py",
+  "transport_sha256": "2ba3cbf032166616aa2eeba61f654308379b32d228e98f389f2099a02679262f",
+  "command": ".venv-pai/bin/python .playbook-artifacts/pai-review-continuation.py --call-number 32 --purpose remaining_connection_source_review",
+  "source_exclusions": [
+    "actual private corpus",
+    "live account payload",
+    "credentials",
+    "production configuration"
+  ],
+  "authority_exclusions": [
+    "human/workflow completion",
+    "live-account consent",
+    "production migration/deployment",
+    "product-provider spending"
+  ],
+  "request_body_sha256": "ce3a5908ed5cfb6397ccb2135004ca581fc96564969b3ed89f5a9ee5583dc56a",
+  "provider_call_attempted": true,
+  "usage": {
+    "prompt_tokens": 41296,
+    "completion_tokens": 2128,
+    "total_tokens": 43424,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    }
+  },
+  "finish_reason": "stop",
+  "response_sha256": "f65089bb0fef183b635939144b832a68624292d7e93e94043b59a5562155dcec",
+  "error_type": "AssertionError",
+  "duration_seconds": 127.736,
+  "candidate_report_path": "docs/verification/PAI-review-32-candidate.json",
+  "rejection_reason": "Verdict FIX_P1_FIRST contradicts P0 findings; not a valid independent verdict."
+}

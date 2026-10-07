@@ -261,3 +261,20 @@ zero skips/failures). Independent closure of the new findings remains open.
 Consumption: 31/33 including failures. Next #32 connection/source review;
 #33 only for actual-finding recheck. No other provider, live account, service,
 production or human acceptance was used/inferred.
+
+Review #32 reserved/attempted, 32/33 consumed including failures.
+Purpose: remaining_connection_source_review; source HEAD 832f9f39fb5eae34d9df8f7db2a104c47ce77127. No automatic retry.
+
+# 2026-10-07 review 32 candidate and final bounded fix pass
+
+Call #32 (832f9f3) observed mimo-v2.6-pro, thinking disabled, complete JSON;
+verdict contradicted P0 severities and was rejected by the existing consistency
+check. Exact candidate preserved, no independent PASS synthesized. Consumption
+32/33 including invalid responses. PAI-review-32-response.md records concrete
+fixes, the initial 1 failed/6 passed (body selection AttributeError), corrected
+19 passed, 5 refresh/cleanup passed, 38 policy/action/media regressions passed,
+and 6 final Graph guard cases passed, all zero skips on successful runs.
+The actual-finding packet includes explicit hash-bound source excerpts under
+the 200000-byte input bound. Next: one fresh call #33 for #31/#32 findings;
+no #34, automatic retry or model substitution. No live/private/product-provider
+call, service, timer or production migration was executed.

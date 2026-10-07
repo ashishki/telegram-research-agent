@@ -52,8 +52,8 @@ class GraphScheduleRuntime:
             if pages>=max_pages and calendar_ref!=selection.calendar_refs[-1]:complete=False;break
         if complete:
             with self.transport.connections.store.transaction() as tx:
-                tx.conn.execute("UPDATE pa_sources.items SET deleted=true WHERE owner=%s AND connection_ref=%s AND kind='calendar' AND payload->>'scope_digest'=%s AND NOT(id=ANY(%s))",
-                    (owner,connection,digest,[event.event_ref for event in events]))
+                tx.conn.execute("UPDATE pa_sources.items SET deleted=true WHERE owner=%s AND connection_ref=%s AND kind='calendar' AND payload->>'scope_digest'=%s AND payload->>'calendar_ref'=ANY(%s) AND NOT(id=ANY(%s))",
+                    (owner,connection,digest,list(selection.calendar_refs),[event.event_ref for event in events]))
                 tx.conn.execute("UPDATE pa_sources.sync SET completed=true,cursor=NULL WHERE owner=%s AND connection_ref=%s AND kind='calendar' AND scope_digest=%s",(owner,connection,digest))
         visible=tuple(event for event in events if event.status!='cancelled')
         conflicts=detect_conflicts(visible)

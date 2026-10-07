@@ -46,6 +46,12 @@ def _check(conn):
     if conn.execute('SELECT version,checksum FROM pa_connections.meta').fetchall()!=[{'version':1,'checksum':CHECKSUM}]:raise StorageError('connection schema differs')
 
 
+class CredentialRefreshUnknown(StorageError):
+    def __init__(self):
+        super().__init__('credential refresh outcome unknown; interactive reconnect required')
+        self.retry_allowed=False
+
+
 class TokenVault:
     def __init__(self,*,directory,encryption_key):
         from cryptography.fernet import Fernet
@@ -58,16 +64,23 @@ class TokenVault:
         ref='sealed_'+secrets.token_hex(16);path=self.path/ref
         fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
         with os.fdopen(fd,'wb') as output:output.write(self._cipher.encrypt(data));output.flush();os.fsync(output.fileno())
+        self._sync_directory()
         return ref
+    def _sync_directory(self):
+        fd=os.open(self.path,os.O_RDONLY|os.O_DIRECTORY)
+        try:os.fsync(fd)
+        finally:os.close(fd)
     def get(self,ref):
         if not re.fullmatch(r'sealed_[a-f0-9]{32}',ref):raise StorageError('invalid credential reference')
         path=self.path/ref
-        if path.is_symlink() or path.stat().st_mode&0o077 or path.stat().st_size>100000:raise StorageError('credential permissions or size differ')
-        try:return json.loads(self._cipher.decrypt(path.read_bytes()))
+        try:
+            if path.is_symlink() or path.stat().st_mode&0o077 or path.stat().st_size>100000:raise StorageError('credential permissions or size differ')
+            return json.loads(self._cipher.decrypt(path.read_bytes()))
         except Exception:raise StorageError('credential unavailable') from None
     def delete(self,ref):
         if not re.fullmatch(r'sealed_[a-f0-9]{32}',ref):raise StorageError('invalid credential reference')
         (self.path/ref).unlink(missing_ok=True)
+        self._sync_directory()
 
 
 class GraphOAuth:
@@ -120,8 +133,9 @@ class GraphOAuth:
                 _check(tx.conn);now=tx.conn.execute('SELECT clock_timestamp() AS now').fetchone()['now']
                 tx.conn.execute('INSERT INTO pa_connections.accounts(owner,id,account_ref,scopes,revision,status) VALUES(%s,%s,%s,%s,1,%s) ON CONFLICT DO NOTHING',
                                 (owner,connection_ref,account_ref,Jsonb(list(scopes)),'awaiting_handshake'))
-                prior=tx.conn.execute('SELECT revision,account_ref FROM pa_connections.accounts WHERE owner=%s AND id=%s FOR UPDATE',(owner,connection_ref)).fetchone()
+                prior=tx.conn.execute('SELECT revision,account_ref,scopes FROM pa_connections.accounts WHERE owner=%s AND id=%s FOR UPDATE',(owner,connection_ref)).fetchone()
                 if prior['account_ref']!=account_ref:raise CapabilityDenied('a new account requires a new connection identity')
+                if set(prior['scopes'])!=set(scopes):raise CapabilityDenied('changed OAuth scopes require a new connection identity')
                 tx.conn.execute('INSERT INTO pa_connections.flows(owner,state_digest,connection_ref,account_ref,scopes,verifier_ref,redirect,expires,expected_revision) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)',
                     (owner,digest,connection_ref,account_ref,Jsonb(list(scopes)),ref,self.redirect,now+timedelta(minutes=10),prior['revision']))
         except Exception:self.vault.delete(ref);raise
@@ -160,39 +174,77 @@ class GraphOAuth:
                 with self.store.transaction() as tx:
                     prior=tx.conn.execute('SELECT revision,secret_ref FROM pa_connections.accounts WHERE owner=%s AND id=%s FOR UPDATE',(owner,row['connection_ref'])).fetchone()
                     if prior is None or prior['revision']!=row['expected_revision']:raise CapabilityDenied('connection revoked or replaced during handshake')
+                    if prior['secret_ref']:self._queue_retirement(tx,owner,prior['secret_ref'])
                     tx.conn.execute('''INSERT INTO pa_connections.accounts VALUES(%s,%s,%s,%s,%s,'connected',%s,%s)
                         ON CONFLICT(owner,id) DO UPDATE SET account_ref=excluded.account_ref,scopes=excluded.scopes,revision=excluded.revision,
                         status='connected',secret_ref=excluded.secret_ref,expires=excluded.expires''',
                         (owner,row['connection_ref'],row['account_ref'],Jsonb(row['scopes']),prior['revision']+1 if prior else 1,secret,
                          datetime.now(timezone.utc)+timedelta(seconds=bundle['expires_in'])))
             except Exception:self.vault.delete(secret);raise
-            if prior and prior['secret_ref']:self.vault.delete(prior['secret_ref'])
+            if prior and prior['secret_ref']:self.cleanup_retired(owner=owner)
             return self.status(owner=owner,connection_ref=row['connection_ref'])
         finally:self.vault.delete(row['verifier_ref'])
 
     def credential(self,*,owner,connection_ref,account_ref):
-        obsolete=None;new_secret=None
         try:
             with self.store.transaction() as tx:
                 _check(tx.conn)
                 row=tx.conn.execute('SELECT * FROM pa_connections.accounts WHERE owner=%s AND id=%s FOR UPDATE',(owner,connection_ref)).fetchone()
                 now=tx.conn.execute('SELECT clock_timestamp() AS now').fetchone()['now']
-                if not row or row['status']!='connected' or row['account_ref']!=account_ref:raise CapabilityDenied('current connection unavailable')
-                bundle=self.vault.get(row['secret_ref'])
-                if row['expires']<=now+timedelta(seconds=30):
-                    if not bundle.get('refresh_token'):raise CapabilityDenied('interactive reconnect required')
-                    refreshed=self._validate_bundle(self._http(self.authority+'/'+self.tenant+'/oauth2/v2.0/token',form={'client_id':self.client_id,
-                        'grant_type':'refresh_token','refresh_token':bundle['refresh_token'],'scope':' '.join(row['scopes'])}),row['scopes'])
-                    if 'refresh_token' not in refreshed:refreshed['refresh_token']=bundle['refresh_token']
-                    new_secret=self.vault.put(refreshed);obsolete=row['secret_ref']
-                    tx.conn.execute('UPDATE pa_connections.accounts SET secret_ref=%s,expires=%s WHERE owner=%s AND id=%s',
-                        (new_secret,now+timedelta(seconds=refreshed['expires_in']),owner,connection_ref))
-                    bundle=refreshed
-        except Exception:
-            if new_secret:self.vault.delete(new_secret)
-            raise
-        if obsolete:self.vault.delete(obsolete)
-        return bundle['access_token']
+                if not row or row['status']!='connected' or row['account_ref']!=account_ref:raise CapabilityDenied('current connection unavailable; reconnect if refresh is pending')
+                try:bundle=self.vault.get(row['secret_ref'])
+                except StorageError:raise CapabilityDenied('interactive reconnect required') from None
+                if row['expires']>now+timedelta(seconds=30):return bundle['access_token']
+                if not bundle.get('refresh_token'):raise CapabilityDenied('interactive reconnect required')
+                revision=row['revision']+1
+                tx.conn.execute("UPDATE pa_connections.accounts SET status='awaiting_refresh',revision=%s WHERE owner=%s AND id=%s",(revision,owner,connection_ref))
+        except CapabilityDenied:raise
+        except Exception:raise CredentialRefreshUnknown() from None
+        # Commit the fence before the token endpoint can rotate a credential.
+        # Restart/ACK loss never reuses the old refresh token automatically.
+        try:
+            with self.store.transaction() as tx:
+                current=tx.conn.execute('SELECT * FROM pa_connections.accounts WHERE owner=%s AND id=%s FOR UPDATE',(owner,connection_ref)).fetchone()
+                if (not current or current['status']!='awaiting_refresh' or current['revision']!=revision
+                    or current['account_ref']!=account_ref or current['secret_ref']!=row['secret_ref']):
+                    raise CapabilityDenied('connection changed before credential refresh')
+                refreshed=self._validate_bundle(self._http(self.authority+'/'+self.tenant+'/oauth2/v2.0/token',form={'client_id':self.client_id,
+                    'grant_type':'refresh_token','refresh_token':bundle['refresh_token'],'scope':' '.join(current['scopes'])}),current['scopes'])
+                if 'refresh_token' not in refreshed:refreshed['refresh_token']=bundle['refresh_token']
+                new_secret=self.vault.put(refreshed)
+                self._queue_retirement(tx,owner,row['secret_ref'])
+                # The new reference is queued too: cleanup skips active refs,
+                # so an ambiguous DB commit cannot justify deleting it.
+                self._queue_retirement(tx,owner,new_secret)
+                tx.conn.execute("UPDATE pa_connections.accounts SET status='connected',secret_ref=%s,expires=clock_timestamp()+(%s*interval '1 second') WHERE owner=%s AND id=%s",
+                    (new_secret,refreshed['expires_in'],owner,connection_ref))
+        except CapabilityDenied:raise
+        except Exception:raise CredentialRefreshUnknown() from None
+        self.cleanup_retired(owner=owner)
+        return refreshed['access_token']
+
+    def _queue_retirement(self,tx,owner,secret_ref):
+        reference='credential_cleanup_'+hashlib.sha256(secret_ref.encode()).hexdigest()[:32]
+        if tx.get(owner,'conversation',reference) is None:
+            tx.put(owner,'conversation',reference,{'secret_ref':secret_ref,'done':False},expected_version=0)
+
+    def cleanup_retired(self,*,owner,maximum=32):
+        """Retry committed retirement metadata only; never erase an active token."""
+        if type(maximum)is not int or not 1<=maximum<=32:raise StorageError('bounded credential cleanup required')
+        completed=0;pending=0
+        with self.store.transaction() as tx:
+            rows=tx.conn.execute('''SELECT v.object_id,v.version,v.payload FROM pa_runtime.object_versions v
+                JOIN pa_runtime.object_heads h USING(owner,namespace,object_id,version)
+                WHERE v.owner=%s AND v.namespace='conversation' AND v.object_id LIKE 'credential_cleanup_%%'
+                  AND v.payload->>'done'='false' ORDER BY v.object_id LIMIT %s FOR UPDATE OF h''',(owner,maximum)).fetchall()
+            for row in rows:
+                ref=row['payload']['secret_ref']
+                if tx.conn.execute('SELECT 1 FROM pa_connections.accounts WHERE secret_ref=%s',(ref,)).fetchone():
+                    pending+=1;continue
+                try:self.vault.delete(ref)
+                except (StorageError,OSError):pending+=1;continue
+                tx.put(owner,'conversation',row['object_id'],{**row['payload'],'done':True},expected_version=row['version']);completed+=1
+        return {'completed':completed,'pending_in_batch':pending}
 
     def revoke(self,*,connection_ref,chat_id,actor_id,owner_chat_id):
         owner=self._owner(chat_id,actor_id,owner_chat_id)

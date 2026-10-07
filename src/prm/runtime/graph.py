@@ -9,7 +9,7 @@ from urllib.request import Request,ProxyHandler,build_opener
 from urllib.error import HTTPError
 from psycopg.types.json import Jsonb
 from prm.storage.postgres import PostgresStore,StorageError,StateConflict
-from prm.capabilities import AuthorizationRequest,CapabilityDenied,require_authorized_operation
+from prm.capabilities import AuthorizationRequest,AuthorizationDecision,CapabilityDenied,require_authorized_operation
 from prm.mail_connector import MailMessage,MailFetchPage,require_mail_read_access
 from prm.schedule_connectors import CalendarEvent,Contact,require_calendar_read_access,require_contacts_read_access
 from .model import NoRedirect
@@ -50,6 +50,9 @@ class GraphTransport:
         self.upper_bound=upper_bound
 
     def request(self,decision,*,path,method='GET',body=None,headers=None):
+        if (type(decision)is not AuthorizationDecision or not decision.allowed or decision.reservation is None
+            or decision.reservation.registry is not self.registry):
+            raise CapabilityDenied('Graph request requires an exact shared-policy reservation')
         if (decision.owner_ref,decision.connection_ref,decision.provider_ref)!=(self.owner_ref,self.connection_ref,'provider_microsoft_graph'):
             raise CapabilityDenied('Graph transport connection or provider differs')
         if not path.startswith('/v1.0/me/') and path!='/v1.0/me':raise CapabilityDenied('Graph account path substituted')
@@ -225,8 +228,12 @@ class GraphMailAdapter:
         return {'text':'\n'.join(str(item.get('subject','Без темы'))+' — '+str(item.get('webLink','')) for item in items[:10]) or 'В выбранном покрытии писем нет.',
                 'items':items,'limitation':'Metadata does not prove reply obligation, deadline or body content. Exact wider scope is required when insufficient.'}
     def read_message(self,selection,message_ref):
-        if selection.account_ref!=self.transport.account_ref or not isinstance(message_ref,str) or not 0<len(message_ref)<=256:
+        if selection.provider_id!='provider_microsoft_graph' or len(selection.folders)!=1 or not isinstance(message_ref,str) or not 0<len(message_ref)<=256:
             raise CapabilityDenied('exact selected message/account required')
+        with self.store.transaction() as tx:
+            selected=tx.conn.execute("SELECT payload FROM pa_sources.items WHERE owner=%s AND connection_ref=%s AND kind='mail' AND id=%s AND NOT deleted AND payload->>'scope_digest'=%s",
+                (self.transport.owner_ref,self.transport.connection_ref,message_ref,selection.scope_digest)).fetchone()
+        if selected is None:raise CapabilityDenied('sync selected message metadata before reading its body')
         import uuid
         from html.parser import HTMLParser
         from dataclasses import asdict
@@ -235,7 +242,7 @@ class GraphMailAdapter:
             operation_ref='mailbody_'+uuid.uuid4().hex)
         decision=self.transport.registry.authorize_and_reserve(scope,upper_bound=self.transport.upper_bound)
         if not decision.allowed:raise CapabilityDenied(decision.reason)
-        value,_=self.transport.request(decision,path='/v1.0/me/messages/'+quote(message_ref,safe='')+'?'+urlencode({'$select':'id,subject,body,from,receivedDateTime,parentFolderId,conversationId,webLink'}))
+        value,_=self.transport.request(decision,path='/v1.0/me/mailFolders/'+quote(selection.folders[0],safe='')+'/messages/'+quote(message_ref,safe='')+'?'+urlencode({'$select':'id,subject,body,from,receivedDateTime,parentFolderId,conversationId,webLink'}))
         received=datetime.fromisoformat(value['receivedDateTime'].replace('Z','+00:00'))
         sender=value.get('from',{}).get('emailAddress',{}).get('address','')
         if (value.get('id')!=message_ref or value.get('parentFolderId') not in selection.folders or

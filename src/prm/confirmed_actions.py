@@ -282,6 +282,12 @@ class ActionReceipt:
     reconciled: bool = False
     created_at: datetime | None = None
 
+    @property
+    def retry_allowed(self) -> bool:
+        # This confirmation identifies one invocation. Reconciliation reads
+        # provider evidence; another effect requires a new exact confirmation.
+        return False
+
 
 class ActionExecutor(Protocol):
     def execute(self, action: ConfirmedAction) -> ExecutionOutcome: ...

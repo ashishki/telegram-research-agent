@@ -29,6 +29,7 @@ def pai(tmp_path):
             raw=self.rfile.read(int(self.headers.get('Content-Length',0)))
             if self.path.endswith('/token'):
                 form=parse_qs(raw.decode());requests.append(('oauth',self.path,form))
+                if form.get('refresh_token')==['synthetic_ack_loss_refresh']:self.close_connection=True;return
                 scopes=form.get('scope',['User.Read'])[0].replace('offline_access','').strip()
                 self.reply({'access_token':'synthetic_access_fixture','refresh_token':'synthetic_refresh_fixture','token_type':'Bearer','expires_in':3600,'scope':scopes});return
             if self.path=='/chat/completions':
@@ -44,6 +45,7 @@ def pai(tmp_path):
                     'usage':{'prompt_tokens':40,'completion_tokens':12,'prompt_tokens_details':{'cached_tokens':10},'completion_tokens_details':{'reasoning_tokens':4}}});return
             if self.path.startswith('/v1.0/me/'):
                 body=json.loads(raw) if raw else {};requests.append(('write',self.path,body))
+                if body.get('message',{}).get('subject')=='Synthetic ACK-loss mail':self.close_connection=True;return
                 self.reply({'id':'synthetic_event_created','changeKey':'version_1'},201 if self.path.endswith('/events') else 202);return
             if self.path=='/speech/malformed':
                 requests.append(('malformed',self.path,{}));self.reply({},200);return
@@ -60,6 +62,10 @@ def pai(tmp_path):
         def do_GET(self):
             requests.append(('read',self.path,{}));parsed=urlsplit(self.path);query=parse_qs(parsed.query)
             if parsed.path=='/v1.0/me':self.reply({'id':'account_synthetic'});return
+            if '/mailFolders/inbox/messages/message_' in parsed.path:
+                self.reply({'id':parsed.path.rsplit('/',1)[-1],'subject':'Selected body','body':{'contentType':'text','content':'Synthetic selected body.'},
+                    'from':{'emailAddress':{'address':'sender@example.test'}},'receivedDateTime':moment.isoformat(),'parentFolderId':'inbox',
+                    'conversationId':'conversation_synthetic','webLink':'https://outlook.example.test/selected'});return
             if '/messages/delta' in parsed.path or parsed.path.endswith('/messages'):
                 page=query.get('$skiptoken',['1'])[0]
                 message={'id':'message_'+page,'subject':'Selected message '+page,'from':{'emailAddress':{'address':'sender@example.test'}},
@@ -69,7 +75,8 @@ def pai(tmp_path):
             if parsed.path.endswith('/calendarView'):
                 def event(key,start,end):return {'id':key,'subject':key,'start':{'dateTime':start.isoformat(),'timeZone':'UTC'},
                     'end':{'dateTime':end.isoformat(),'timeZone':'UTC'},'changeKey':'etag_1','webLink':'https://outlook.example.test/calendar/'+key,'type':'singleInstance'}
-                self.reply({'value':[event('event_a',moment+timedelta(hours=1),moment+timedelta(hours=2)),event('event_b',moment+timedelta(minutes=90),moment+timedelta(hours=3))]});return
+                calendar=parsed.path.split('/')[-2];prefix=calendar+'_' if calendar in {'calendar_one','calendar_two'} else ''
+                self.reply({'value':[event(prefix+'event_a',moment+timedelta(hours=1),moment+timedelta(hours=2)),event(prefix+'event_b',moment+timedelta(minutes=90),moment+timedelta(hours=3))]});return
             if parsed.path.endswith('/contacts'):
                 self.reply({'value':[{'id':'contact_a','displayName':'Alex','emailAddresses':[{'address':'alex.a@example.test'}]},
                                      {'id':'contact_b','displayName':'Alex','emailAddresses':[{'address':'alex.b@example.test'}]}]});return

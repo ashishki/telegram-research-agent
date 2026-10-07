@@ -97,6 +97,7 @@ class CanvasReadAdapter:
                         request=AcademicFetchRequest(decision,owner_ref,connection_ref,replace(selection,course_refs=(course,)),cursor=cursor)
                         candidates.extend(self.fetch_page(request,surface=surface));cursor=self.next_cursor
                         if cursor is None:done=True;coverage.append(course+':'+surface+':checked');break
+                    except CapabilityDenied:coverage.append(course+':'+surface+':scope_denied');break
                     except Exception:coverage.append(course+':'+surface+':unavailable');break
                 if not done:complete=False;coverage.append(course+':'+surface+':partial')
         return {'candidates':tuple(candidates),'coverage':coverage,'complete':complete,'tool_calls':calls}
