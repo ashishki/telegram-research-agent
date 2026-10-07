@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "status": "reviewed",
+  "call_number": 28,
+  "call_limit": 30,
+  "phase": "F",
+  "read_only": true,
+  "provider": "opencode_go",
+  "requested_model": "mimo-v2.6-pro",
+  "observed_model": "mimo-v2.6-pro",
+  "requested_effort": "thinking_disabled",
+  "observed_effort": "thinking_disabled",
+  "head_sha": "70311759c0024d741921c67317c6c82af15997bd",
+  "base_sha": "5d0f1208884411d8564bfa467fa0026363117d5b",
+  "paths": [
+    "src/prm/runtime/deletion.py",
+    "src/prm/runtime/migration.py",
+    "src/prm/runtime/reader.py",
+    "src/prm/runtime/network_guard.py",
+    "src/prm/runtime/model.py",
+    "src/prm/runtime/actions.py",
+    "src/prm/storage/policy.py",
+    "src/prm/storage/jobs.py"
+  ],
+  "diff_sha256": "050934b03e5c5851af194cb00f0a53945ffc54ade05ed7b953acbe5d1d60a758",
+  "input_sha256": "63244a8915e49f829dbbfc992c2057e8cfc3a4237fe21f8baf7b3e011f8d059e",
+  "input_bytes": 100954,
+  "output_token_cap": 16000,
+  "timeout_seconds": 900,
+  "role": "independent_code_review_with_privacy_and_test_adequacy",
+  "workflow_receipt": false,
+  "human_authority": false,
+  "recheck": true,
+  "scope": "selected full source",
+  "thinking_reference": "https://mimo.mi.com/docs/en-US/quick-start/usage-guide/other/deep-thinking",
+  "final_text_bytes": 4125,
+  "usage": {
+    "prompt_tokens": 22002,
+    "completion_tokens": 805,
+    "total_tokens": 22807,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    }
+  },
+  "finish_reason": "stop",
+  "candidate_shape": {
+    "type": "dict",
+    "keys": [
+      "verdict",
+      "findings",
+      "not_verified",
+      "summary"
+    ],
+    "verdict": "FIX_P1_FIRST",
+    "findings_type": "list"
+  },
+  "findings": {
+    "verdict": "FIX_P1_FIRST",
+    "findings": [
+      {
+        "severity": "P1",
+        "title": "Policy errors are downgraded to durable grants in compound transport",
+        "file": "src/prm/storage/policy.py:1133",
+        "issue": "execute_reserved_groups catches Exception around grant re-validation and transport, then settles each prepared operation as 'unknown' and re-raises; but the initial loop calling _commit_durable_transport falls inside the same try and any StorageError/KeyError from those calls is also funneled through that path, while _commit_durable_transport itself returns False on all storage faults and the caller converts that to CapabilityDenied. A DB outage during pre-transport authorization therefore yields a retryable-looking CapabilityDenied for operations that were actually already prepared in prior (",
+        "fix": "Return a fail-closed outcome distinguishing 'denied before any prepared operation' from 'authorization state unavailable after preparation', and never mark partially prepared groups as retryable. Treat storage faults after the first successful _commit_durable_transport as unknown outcomes requiring reconciliation, not CapabilityDenied.",
+        "confidence": "medium"
+      },
+      {
+        "severity": "P1",
+        "title": "Unknown model outcomes can be silently retried by callers",
+        "file": "src/prm/runtime/model.py:141",
+        "issue": "complete_with_receipt converts every transport exception (including a response that exceeded the 1MB bound or had a malformed body) into LLMOutcomeUnknown with external_call_attempted=True and raises it, but the caller-visible exception does not itself carry a fence that prevents a subsequent retry from issuing a second real network call for the same reservation. The durable operation is settled 'unknown' (not replayable) via execute_reserved_groups' except path, yet ScopedModelClient gives no guarantee the higher-level retry loop won't construct a fresh request/reservation pair and call again",
+        "fix": "Make the unknown receipt reference a durable idempotency/operation fence that any retry path must check before re-issuing I/O, and document/enforce that LLMOutcomeUnknown never re-invokes transport. Add a test asserting a second attempt after unknown is blocked.",
+        "confidence": "medium"
+      },
+      {
+        "severity": "P1",
+        "title": "apply_domain_delta can erase target-only tombstones' side effects inconsistently",
+        "file": "src/prm/runtime/migration.py:199",
+        "issue": "After replacing all domain tables with source rows, apply_domain_delta re-runs delete_derived_in for each tombstone row. delete_derived_in rebuilds/updates dependent records (conversation history, delivery attempts, cache entries, jobs) based only on current content; for tombstones that existed on the target but whose derived artifacts were already cleaned up locally, re-running deletion on a freshly imported state can re-write '[deleted by owner]' payloads or re-cancel jobs that the target had already finalized, producing non-monotone side effects despite the stated monotone guarantee.",
+        "fix": "Make delete_derived_in's secondary updates strictly monotone/idempotent (e.g., only touch rows whose current payload still contains the original private text, or record an explicit deletion-applied marker), and add a regression test applying the same tombstone twice across import boundaries.",
+        "confidence": "low"
+      }
+    ],
+    "not_verified": [
+      "Whether call sites of LLMOutcomeUnknown enforce retry blocking",
+      "Whether schema/foreign-key order assumptions in apply_domain_delta hold for all listed tables",
+      "Actual test coverage for the compound-group failure paths in execute_reserved_groups"
+    ],
+    "summary": "Reviewed the phase F diff for fail-closed policy, migration monotonicity, and unknown-outcome handling. The code is generally careful about fencing, bounded payloads, and egress gating, but compound scope-group transport conflates pre-authorization storage failures with CapabilityDenied (retryable), model unknown outcomes lack an enforced no-retry fence at the client boundary, and tombstone re-application across domain import may produce non-monotone side effects. No P0 issues were identified in the supplied diff; address the listed P1 items before treating this as release-ready."
+  },
+  "duration_seconds": 152.625
+}

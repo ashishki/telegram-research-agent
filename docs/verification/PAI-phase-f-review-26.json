@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "status": "incomplete_or_failed",
+  "call_number": 26,
+  "call_limit": 30,
+  "phase": "F",
+  "read_only": true,
+  "provider": "opencode_go",
+  "requested_model": "mimo-v2.6-pro",
+  "observed_model": "mimo-v2.6-pro",
+  "requested_effort": "thinking_disabled",
+  "observed_effort": "thinking_disabled",
+  "head_sha": "6ac7ecaa59498e1c489645344dad990163e0744c",
+  "base_sha": "5d0f1208884411d8564bfa467fa0026363117d5b",
+  "paths": [
+    "src/prm/runtime/deletion.py",
+    "src/prm/runtime/memory.py",
+    "src/prm/runtime/migration.py",
+    "src/prm/runtime/operations.py",
+    "src/prm/runtime/cost_cache.py",
+    "src/prm/runtime/media.py",
+    "src/prm/runtime/speech.py",
+    "src/prm/runtime/vision.py",
+    "src/prm/runtime/delivery.py",
+    "src/prm/storage/artifacts.py",
+    "src/prm/storage/jobs.py",
+    "src/prm/storage/conversations.py",
+    "tests/test_pai_memory_runtime.py",
+    "tests/test_pai_migration.py",
+    "tests/test_pai_cost_cache.py",
+    "tests/test_pai_load_recovery.py"
+  ],
+  "diff_sha256": "278cc107853743b6952a8c4a305e2515c83b6cb26f6be58fc7bfd3ea27fc7ed9",
+  "input_sha256": "75a4013974117b14d69d224575715c59cbf18482f7a13487e7f021d27cc3c4f2",
+  "input_bytes": 109541,
+  "output_token_cap": 8000,
+  "timeout_seconds": 300,
+  "role": "independent_code_review_with_privacy_and_test_adequacy",
+  "workflow_receipt": false,
+  "human_authority": false,
+  "thinking_reference": "https://mimo.mi.com/docs/en-US/quick-start/usage-guide/other/deep-thinking",
+  "usage": {
+    "prompt_tokens": 25858,
+    "completion_tokens": 8000,
+    "total_tokens": 33858,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    }
+  },
+  "finish_reason": "length",
+  "error_code": "invalid_identity_or_completion",
+  "duration_seconds": 161.89
+}

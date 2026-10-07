@@ -1,0 +1,132 @@
+{
+  "schema_version": 1,
+  "status": "prepared_not_invoked",
+  "current_approved_call_cap": 30,
+  "calls_consumed_including_failures": 30,
+  "proposed_total_cap": 33,
+  "new_calls_maximum": 3,
+  "third_call": "only if an actual new finding needs independent recheck",
+  "provider": "opencode_go",
+  "model": "mimo-v2.6-pro",
+  "mode": "fresh read-only; thinking disabled; strict JSON schema; advisory only",
+  "per_call_output_tokens_maximum": 16000,
+  "per_call_timeout_seconds_maximum": 900,
+  "source_exclusions": [
+    "actual private corpus",
+    "live account payload",
+    "credentials",
+    "production configuration"
+  ],
+  "packets": [
+    {
+      "purpose": "remaining_P1_recheck",
+      "reviewed_head": "5c5e7db8c424dcf966413ec2104754232d52d15b",
+      "sources": [
+        {
+          "path": "src/prm/runtime/model.py",
+          "sha256": "76ecda296ecad2d6658b9479a09b3a42045349027f63f93c984e785e2da90df4",
+          "bytes": 8531
+        },
+        {
+          "path": "src/prm/runtime/model_attempts.py",
+          "sha256": "5498d7273a349037dac1fcce150df5fb7328937910419240ce6e2b86a6882d87",
+          "bytes": 1588
+        },
+        {
+          "path": "src/prm/storage/policy.py",
+          "sha256": "f7456178adba4a911f74987f9832937a99473a4e772141a7c90adcc4b95f8680",
+          "bytes": 29700
+        },
+        {
+          "path": "src/prm/runtime/speech.py",
+          "sha256": "a878e1746842049cf52ebbecf286d78b7d3990d989a37d4b9da80649f394915c",
+          "bytes": 4390
+        },
+        {
+          "path": "src/prm/runtime/vision.py",
+          "sha256": "f2c4c11508b049649de23f729aa7ae9015de5bd732ca9e74b4006339f96b9e33",
+          "bytes": 5407
+        },
+        {
+          "path": "tests/test_pai_chat_runtime.py",
+          "sha256": "161789fde64868948daf32d129772b33cac90ac62be2ecb0944c7f78ed22dbad",
+          "bytes": 9523
+        },
+        {
+          "path": "tests/test_pai_durable_policy.py",
+          "sha256": "14739e62c8804f324c90a45d50167d1ccc51970d6e6cd30e2a1af6ffe4dfb5ae",
+          "bytes": 14493
+        },
+        {
+          "path": "docs/verification/PAI-review-30-response.md",
+          "sha256": "0d963304f3b6048aa3b2fe0eb2fc06d9a921b2190c6472e1233f119445b42a1c",
+          "bytes": 2567
+        }
+      ],
+      "source_bytes": 76199
+    },
+    {
+      "purpose": "remaining_connection_source_review",
+      "reviewed_head": "5c5e7db8c424dcf966413ec2104754232d52d15b",
+      "sources": [
+        {
+          "path": "src/prm/runtime/connections.py",
+          "sha256": "78b66510284acddcb1e46815de0e740f378c97e75e7c8d71e24c101d467fb028",
+          "bytes": 16585
+        },
+        {
+          "path": "src/prm/runtime/graph.py",
+          "sha256": "9d696f5e6330467d389df84132fc7fae659e6b97fc2a94e297581fcb9395554c",
+          "bytes": 27558
+        },
+        {
+          "path": "src/prm/runtime/schedule.py",
+          "sha256": "3f0e2daa043924ecd32759752fb39e51293da778e7802330bee8c8fad9add947",
+          "bytes": 8672
+        },
+        {
+          "path": "src/prm/runtime/academic.py",
+          "sha256": "d23d0f4980b45b00d6a91ad921e73a38bb0c670c374731f23e30799af6d41e92",
+          "bytes": 17741
+        },
+        {
+          "path": "src/prm/runtime/actions.py",
+          "sha256": "39249d29ac1e86778c88d6ab4b4d6095d943a5e1857cd275af7aced5fad85d05",
+          "bytes": 15591
+        },
+        {
+          "path": "tests/test_pai_connections.py",
+          "sha256": "84e44c520069593985551627577e57f288e694af9282d3c269515eb808494a1c",
+          "bytes": 1244
+        },
+        {
+          "path": "tests/test_pai_graph_mail.py",
+          "sha256": "7254ebd795f6868e207602a5f15438f8b7f56c59184e4dd6bd91d17753488106",
+          "bytes": 1224
+        },
+        {
+          "path": "tests/test_pai_schedule_runtime.py",
+          "sha256": "487460e373017f0d340ecd9cc19c68b20cf64e40c4a9eaa1e503a51a964c3fb3",
+          "bytes": 2158
+        },
+        {
+          "path": "tests/test_pai_academic_runtime.py",
+          "sha256": "838104e23a1469812671a731332342f882f8c4ab56d5cbd26dd27c69f4ca559f",
+          "bytes": 2419
+        },
+        {
+          "path": "tests/test_pai_action_runtime.py",
+          "sha256": "55c5878c8c3617a2475b7d51b215ff190d4d8915a2ccab7fcf7adbac0e37d02d",
+          "bytes": 2696
+        }
+      ],
+      "source_bytes": 95888
+    }
+  ],
+  "authority_exclusions": [
+    "human/workflow completion",
+    "live-account consent",
+    "production migration/deployment",
+    "product-provider spending"
+  ]
+}

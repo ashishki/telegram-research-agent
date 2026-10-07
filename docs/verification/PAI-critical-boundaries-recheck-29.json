@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "status": "reviewed",
+  "call_number": 29,
+  "call_limit": 30,
+  "phase": "F",
+  "read_only": true,
+  "provider": "opencode_go",
+  "requested_model": "mimo-v2.6-pro",
+  "observed_model": "mimo-v2.6-pro",
+  "requested_effort": "thinking_disabled",
+  "observed_effort": "thinking_disabled",
+  "head_sha": "3d837bca1acb77bad50f08f134791930b1e2761d",
+  "base_sha": "5d0f1208884411d8564bfa467fa0026363117d5b",
+  "paths": [
+    "src/prm/storage/policy.py",
+    "src/prm/runtime/model.py",
+    "src/prm/runtime/model_attempts.py",
+    "src/prm/runtime/composition.py",
+    "src/prm/runtime/migration.py",
+    "src/prm/runtime/deletion.py",
+    "src/prm/runtime/reader.py",
+    "src/prm/runtime/archive.py",
+    "src/prm/runtime/speech.py",
+    "src/prm/runtime/vision.py",
+    "src/prm/runtime/render.py",
+    "src/prm/runtime/network_guard.py"
+  ],
+  "diff_sha256": "ea40041a86e323810aa92160d26f19fd9b0d785512a63227f260e09b089150eb",
+  "input_sha256": "e2061356a4af7cb37a8e9762db17d61ed1b574ff3d5f0fd2790a441412219386",
+  "input_bytes": 139959,
+  "output_token_cap": 16000,
+  "timeout_seconds": 900,
+  "role": "independent_code_review_with_privacy_and_test_adequacy",
+  "workflow_receipt": false,
+  "human_authority": false,
+  "recheck": true,
+  "scope": "selected full source",
+  "thinking_reference": "https://mimo.mi.com/docs/en-US/quick-start/usage-guide/other/deep-thinking",
+  "final_text_bytes": 3229,
+  "usage": {
+    "prompt_tokens": 29161,
+    "completion_tokens": 662,
+    "total_tokens": 29823,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    }
+  },
+  "finish_reason": "stop",
+  "candidate_shape": {
+    "type": "dict",
+    "keys": [
+      "verdict",
+      "findings",
+      "not_verified",
+      "summary"
+    ],
+    "verdict": "FIX_P1_FIRST",
+    "findings_type": "list"
+  },
+  "findings": {
+    "verdict": "FIX_P1_FIRST",
+    "findings": [
+      {
+        "severity": "P1",
+        "title": "Post-handshake response errors are swallowed into a non-retryable unknown via bare except",
+        "file": "src/prm/runtime/speech.py:60",
+        "issue": "The transport wraps the entire request/response handling (including response reading, size/type checks, and json parsing after a successful connection close) in `except Exception: raise StorageError('speech outcome unknown; automatic retry denied')`. A definitively rejected/invalid provider response (e.g., HTTP error before any audio was processed, or a malformed reply after a completed request) is indistinguishable from a true unknown outcome and forces the operation permanently unretryable, wasting budget and blocking legitimate retries on clear failures.",
+        "fix": "Distinguish pre-send/timeout/unknown transport failures (fail closed, no retry) from definitive HTTP status codes or post-ack validation failures; only convert indeterminate transport errors to non-retryable unknown, and surface explicit provider rejections as ordinary failures without consuming the durable attempt fence when safe.",
+        "confidence": "high"
+      },
+      {
+        "severity": "P1",
+        "title": "Duplicate settle path can double-charge budget or mark accepted over unknown",
+        "file": "src/prm/storage/policy.py:333",
+        "issue": "`execute_reserved_groups` calls `settle(...)` for each prepared operation in the success path, but `settle()` allows transition from states `prepared`/`accepted`/`unknown` and, when `op['actual'] is None`, will recompute the window charge on a second call if the operation is already `accepted`/`unknown` (it does not return early for those states when `actual is None`). A retry or observer-driven `settle(...)` after `execute_reserved`/`execute_reserved_groups` already settled (e.g., usage callback in `composition.scoped_client`) can double-decrement `reserved` or double-increment `consumed`, or",
+        "fix": "Make `settle` strictly idempotent: only transition from `prepared` exactly once and treat any subsequent call (with identical or absent `actual`) as a no-op, raising `StateConflict` only on conflicting `actual` values.",
+        "confidence": "high"
+      }
+    ],
+    "not_verified": [
+      "Runtime composition/archive and network-blocked native report path were read but not executed; end-to-end behavior of `RuntimeArchiveTransport` error classification and `scoped_client` usage-observer/",
+      "Actual concurrency behavior of `pa_policy` table constraints and transaction isolation under simultaneous `settle` calls was not test",
+      "Full live provider behavior (OpenAI/Graph/Brave) remains synthetic-only as designed; no human/deep-role approval assessment performed."
+    ],
+    "summary": "Implementation shows strong fail-closed and durable-fence design overall, but two concrete P1 defects remain: speech/vision transport error handling collapses definitive post-response failures into a non-retryable unknown, and the shared `settle` routine is not idempotent for `actual=None`, allowing double-charging or state overwrite on redundant settlement paths (notably the usage observer invoked after `execute_reserved*` has already settled). These should be fixed before broader rollout to avoid budget corruption and unnecessary permanent task-fencing on clearly failed requests."
+  },
+  "duration_seconds": 131.055
+}

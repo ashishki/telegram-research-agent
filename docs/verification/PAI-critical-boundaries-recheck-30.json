@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "status": "reviewed",
+  "call_number": 30,
+  "call_limit": 30,
+  "phase": "F",
+  "read_only": true,
+  "provider": "opencode_go",
+  "requested_model": "mimo-v2.6-pro",
+  "observed_model": "mimo-v2.6-pro",
+  "requested_effort": "thinking_disabled",
+  "observed_effort": "thinking_disabled",
+  "head_sha": "761ffd21bf10aab39325d3d47d8fd3117d037858",
+  "base_sha": "5d0f1208884411d8564bfa467fa0026363117d5b",
+  "paths": [
+    "src/prm/storage/policy.py",
+    "src/prm/runtime/model.py",
+    "src/prm/runtime/model_attempts.py",
+    "src/prm/runtime/model_errors.py",
+    "src/prm/runtime/speech.py",
+    "src/prm/runtime/vision.py",
+    "src/prm/runtime/cost_cache.py",
+    "src/prm/runtime/composition.py",
+    "src/prm/runtime/migration.py",
+    "src/prm/runtime/deletion.py",
+    "src/prm/runtime/reader.py",
+    "src/prm/runtime/archive.py",
+    "src/prm/runtime/render.py",
+    "src/prm/runtime/network_guard.py"
+  ],
+  "diff_sha256": "573f500f7073c162c9d3954ee918c2aeb2fe082facfc5f53139a39e12de27814",
+  "input_sha256": "e891efe311f68de612843122cbfbce818fb76473a9bd4cb50d8fb0a1975ff40d",
+  "input_bytes": 150500,
+  "output_token_cap": 16000,
+  "timeout_seconds": 900,
+  "role": "independent_code_review_with_privacy_and_test_adequacy",
+  "workflow_receipt": false,
+  "human_authority": false,
+  "recheck": true,
+  "scope": "selected full source",
+  "thinking_reference": "https://mimo.mi.com/docs/en-US/quick-start/usage-guide/other/deep-thinking",
+  "final_text_bytes": 1859,
+  "usage": {
+    "prompt_tokens": 31540,
+    "completion_tokens": 366,
+    "total_tokens": 31906,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    }
+  },
+  "finish_reason": "stop",
+  "candidate_shape": {
+    "type": "dict",
+    "keys": [
+      "verdict",
+      "findings",
+      "not_verified",
+      "summary"
+    ],
+    "verdict": "FIX_P1_FIRST",
+    "findings_type": "list"
+  },
+  "findings": {
+    "verdict": "FIX_P1_FIRST",
+    "findings": [
+      {
+        "severity": "P1",
+        "title": "Unknown outcomes are recorded as terminal and block all operator recovery",
+        "file": "src/prm/runtime/model.py:155",
+        "issue": "For model, speech and vision, the bare `except Exception` maps every non-`ModelProviderRejected` exception to `delivery_outcome='unknown'` and `retry_allowed=False`, including local pre-transport validation failures in message/payload construction (e.g. invalid bounded history or oversized request body) which never issued an HTTP request. In addition `execute_reserved`/`execute_reserved_groups` settle such failures as `outcome='unknown'`, which `settle()` treats as terminal (`state IN {'accepted','unknown'}`), so no later known actual can ever be applied and the logical task is permanently non",
+        "fix": "Distinguish local validation/authorization failures before transport from genuine transport indeterminacy and settle the former without marking the operation terminal, or add an explicit `awaiting_reconciliation` path that still accepts a later priced settlement.",
+        "confidence": "medium"
+      }
+    ],
+    "not_verified": [
+      "The claim that full test suite passes on this SHA.",
+      "Whether the model context/history reservation uses the same provider/connection scope as the text scope in all providers.",
+      "Whether delete_derived_in transitively cancels effect jobs awaiting reconciliation."
+    ],
+    "summary": "The two reported fixes (rejection vs invalid response classification and idempotent settle()) are present and appear correct, with one reservation state left terminal on unknown and a broader classification issue where pre-transport local validation failures collapse into `unknown`/non-retryable terminal state. No P0 defect found; the bounded media allowlists, revision monotonicity, migration fences and reader isolation show no concrete grant/permission escalation in this diff."
+  },
+  "duration_seconds": 85.203
+}

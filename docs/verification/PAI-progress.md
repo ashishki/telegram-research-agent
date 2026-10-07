@@ -173,3 +173,56 @@ providers, services, migrations or dependencies were executed/activated here.
 Next phase: pai-complete, actual fixes, focused checks and independent review.
 Full programme acceptance and PAI-27..29 live/human gates remain outstanding.
 Receipt: PAI-implementation-pass-20261007.md. Mimo remains 23/30.
+
+# 2026-10-07 deferred verification started by owner
+
+Owner: “делай, разрешаю” after the implementation handoff. Verification and
+independent review are now authorized under the existing local scope and call cap.
+Initial pai-complete: 20 failed, 204 passed, 796.86 s; no PASS claimed. Shared
+causes: academic row-lock privilege, misplaced synthetic citations, cache key
+string encoding, stale origin tags on controls, and missing object/Brief aliases.
+Fix SHA: 6ac7eca. Full corrected rerun is running. Focused-prm: 652 passed in
+175.91 s; subsequent Brief/conversation regression: 37 passed in 19.89 s.
+Retrofit boundaries: 150 passed in 14.36 s. Formal Playbook readiness still
+reports 51 TASK_DESIGN_APPROVAL_REQUIRED errors; approval is not forged.
+Mimo calls #24 (phase D) and #25 (phase E) requested as fresh read-only
+processes on 6ac7eca, 8000 output / 300 s; receipts capture actual outcomes.
+Calls consumed/reserved including failures: 25/30. No product/live approval.
+
+# 2026-10-07 independent findings and bounded review closure
+
+Review #24 D and #25 E exhausted/incompletely returned under 8000/300; #26
+with thinking disabled exhausted visible output; #27 focused native-render
+recheck returned an invalid verdict. No valid approval is inferred from them.
+Strict JSON-schema requests then produced actual independent reports: #28
+FIX_P1_FIRST (three findings), #29 FIX_P1_FIRST (two findings), #30 FIX_P1_FIRST
+(one medium-confidence finding). Requested/observed model mimo-v2.6-pro;
+standard reviews use explicitly recorded thinking_disabled/observed zero
+reasoning, not a governed Deep Review or Role Runner receipt.
+
+Implementer fixes: f073148 logical-task fences, preparation-error semantics and
+monotone import/deletion; 761ffd2 definitive response-error classification and
+idempotent settlement. #29 independently read the first three fixes; #30
+stated that the two further fixes appear correct. Final source SHA 761ffd2;
+5c5e7db adds executable counterexamples and response to the remaining finding.
+The remaining P1 stays open for independent resolution.
+
+Current observations: whole PAI tier on 3d837bc: 230 passed in 766.41 s;
+latest whole tier on 761ffd2 is still running. Current focused-prm: 652 passed
+in 107.54 s. Latest changed model/budget/scope tier: 33 passed in 75.57 s;
+remaining-finding counterexamples: 2 passed in 9.16 s. No skips or fabricated
+PASS. Reviewed SHA/scopes/outcomes in PAI-critical-boundaries-recheck-28/29/30.json.
+
+Mimo consumption is 30/30 including failures. No call #31, model substitution,
+paid product-provider experiment, live account or deployment was attempted.
+Fresh independent closure requires a scoped budget extension. Formal design,
+full phase/role, live/visual usefulness and owner acceptance remain separate.
+
+# 2026-10-07 final local validation
+
+Final source 761ffd2: pai-complete 233 passed in 706.20 s, zero skips/failures;
+all 69 names/ten scenarios enforced. Latest focused-prm 652 passed in 107.54 s.
+5c5e7db adds two separately passing counterexamples; no source change.
+Evidence: PAI-verification-20261007.md / PAI-validation-20261007.json.
+Remaining Mimo #30 P1 and accumulated role/phase/human/live gates stay open.
+Next proposed bounded review packets are prepared; 30/30 calls exhausted.

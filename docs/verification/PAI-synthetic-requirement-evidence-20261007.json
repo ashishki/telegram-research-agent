@@ -1,0 +1,501 @@
+{
+  "schema_version": 1,
+  "code_sha": "761ffd21bf10aab39325d3d47d8fd3117d037858",
+  "evidence": "observed_synthetic_pass",
+  "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/test_tiers.py pai-complete",
+  "acceptance_cases": 233,
+  "elapsed_seconds": 706.2,
+  "skipped": 0,
+  "failures": 0,
+  "spec_matrix_enforced": true,
+  "requirements": [
+    {
+      "spec_id": "ACADEMIC-01",
+      "case_name": "test_requirement_academic_01",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "ACADEMIC-02",
+      "case_name": "test_requirement_academic_02",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "ACADEMIC-03",
+      "case_name": "test_requirement_academic_03",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "ACADEMIC-04",
+      "case_name": "test_requirement_academic_04",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "ACADEMIC-05",
+      "case_name": "test_requirement_academic_05",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "ACT-01",
+      "case_name": "test_requirement_act_01",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "ACT-02",
+      "case_name": "test_requirement_act_02",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "ACT-03",
+      "case_name": "test_requirement_act_03",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "ARCH-01",
+      "case_name": "test_requirement_arch_01",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "ARCH-02",
+      "case_name": "test_requirement_arch_02",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "BRIEF-01",
+      "case_name": "test_requirement_brief_01",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "BRIEF-02",
+      "case_name": "test_requirement_brief_02",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "BRIEF-03",
+      "case_name": "test_requirement_brief_03",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "BRIEF-04",
+      "case_name": "test_requirement_brief_04",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "BRIEF-05",
+      "case_name": "test_requirement_brief_05",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "BRIEF-06",
+      "case_name": "test_requirement_brief_06",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "BRIEF-07",
+      "case_name": "test_requirement_brief_07",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "CHAT-01",
+      "case_name": "test_requirement_chat_01",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "CHAT-02",
+      "case_name": "test_requirement_chat_02",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "CONNECT-01",
+      "case_name": "test_requirement_connect_01",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "CONNECT-02",
+      "case_name": "test_requirement_connect_02",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "CONNECT-03",
+      "case_name": "test_requirement_connect_03",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "COST-01",
+      "case_name": "test_requirement_cost_01",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "COST-02",
+      "case_name": "test_requirement_cost_02",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "DONE-01",
+      "case_name": "test_requirement_done_01",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "EVAL-01",
+      "case_name": "test_requirement_eval_01",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "EVAL-02",
+      "case_name": "test_requirement_eval_02",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "EVAL-03",
+      "case_name": "test_requirement_eval_03",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "EVIDENCE-01",
+      "case_name": "test_requirement_evidence_01",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "EVIDENCE-02",
+      "case_name": "test_requirement_evidence_02",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "EVIDENCE-03",
+      "case_name": "test_requirement_evidence_03",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "MEDIA-01",
+      "case_name": "test_requirement_media_01",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "MEDIA-02",
+      "case_name": "test_requirement_media_02",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "MEDIA-03",
+      "case_name": "test_requirement_media_03",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "MEM-01",
+      "case_name": "test_requirement_mem_01",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "MEM-02",
+      "case_name": "test_requirement_mem_02",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "MEM-03",
+      "case_name": "test_requirement_mem_03",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "MIGRATION-01",
+      "case_name": "test_requirement_migration_01",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "MODEL-01",
+      "case_name": "test_requirement_model_01",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "MODEL-02",
+      "case_name": "test_requirement_model_02",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "OPS-01",
+      "case_name": "test_requirement_ops_01",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "OPS-02",
+      "case_name": "test_requirement_ops_02",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "PERM-01",
+      "case_name": "test_requirement_perm_01",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "PLAN-01",
+      "case_name": "test_requirement_plan_01",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "PLAN-02",
+      "case_name": "test_requirement_plan_02",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "PLAN-03",
+      "case_name": "test_requirement_plan_03",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "QUALITY-01",
+      "case_name": "test_requirement_quality_01",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "RAG-01",
+      "case_name": "test_requirement_rag_01",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "SEARCH-01",
+      "case_name": "test_requirement_search_01",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "SEARCH-02",
+      "case_name": "test_requirement_search_02",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "SEARCH-03",
+      "case_name": "test_requirement_search_03",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "SEARCH-04",
+      "case_name": "test_requirement_search_04",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "SEC-01",
+      "case_name": "test_requirement_sec_01",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "SEC-02",
+      "case_name": "test_requirement_sec_02",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "SEC-03",
+      "case_name": "test_requirement_sec_03",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "SEC-04",
+      "case_name": "test_requirement_sec_04",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "UX-01",
+      "case_name": "test_requirement_ux_01",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "UX-02",
+      "case_name": "test_requirement_ux_02",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "UX-03",
+      "case_name": "test_requirement_ux_03",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "UX-04",
+      "case_name": "test_requirement_ux_04",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "UX-05",
+      "case_name": "test_requirement_ux_05",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "VISUAL-01",
+      "case_name": "test_requirement_visual_01",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "VISUAL-02",
+      "case_name": "test_requirement_visual_02",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "VISUAL-03",
+      "case_name": "test_requirement_visual_03",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "VISUAL-04",
+      "case_name": "test_requirement_visual_04",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "WATCH-01",
+      "case_name": "test_requirement_watch_01",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "WATCH-02",
+      "case_name": "test_requirement_watch_02",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "WATCH-03",
+      "case_name": "test_requirement_watch_03",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    },
+    {
+      "spec_id": "WATCH-04",
+      "case_name": "test_requirement_watch_04",
+      "synthetic_evidence": "observed_pass",
+      "live_and_human_acceptance": "not_inferred"
+    }
+  ],
+  "scenarios": [
+    {
+      "scenario_id": "SC13.2-01",
+      "synthetic_test_node": "tests/test_pai_end_to_end.py::test_chat_multiturn_and_topic_return",
+      "recovery_test_node": null,
+      "synthetic_evidence": "observed_pass",
+      "human_evidence": "pending"
+    },
+    {
+      "scenario_id": "SC13.2-02",
+      "synthetic_test_node": "tests/test_pai_end_to_end.py::test_object_followups_confirmation_cancel_restart",
+      "recovery_test_node": "tests/test_pai_load_recovery.py::test_object_followups_confirmation_cancel_restart",
+      "synthetic_evidence": "observed_pass",
+      "human_evidence": "pending"
+    },
+    {
+      "scenario_id": "SC13.2-03",
+      "synthetic_test_node": "tests/test_pai_end_to_end.py::test_archive_web_conflicts_and_coverage",
+      "recovery_test_node": null,
+      "synthetic_evidence": "observed_pass",
+      "human_evidence": "pending"
+    },
+    {
+      "scenario_id": "SC13.2-04",
+      "synthetic_test_node": "tests/test_pai_end_to_end.py::test_weekly_brief_dedup_deadline_and_outage",
+      "recovery_test_node": null,
+      "synthetic_evidence": "observed_pass",
+      "human_evidence": "pending"
+    },
+    {
+      "scenario_id": "SC13.2-05",
+      "synthetic_test_node": "tests/test_pai_end_to_end.py::test_report_views_mobile_cyrillic_dark_theme",
+      "recovery_test_node": null,
+      "synthetic_evidence": "observed_pass",
+      "human_evidence": "pending"
+    },
+    {
+      "scenario_id": "SC13.2-06",
+      "synthetic_test_node": "tests/test_pai_end_to_end.py::test_watch_pause_dst_revoke_and_unknown_send",
+      "recovery_test_node": "tests/test_pai_load_recovery.py::test_watch_pause_dst_revoke_and_unknown_send",
+      "synthetic_evidence": "observed_pass",
+      "human_evidence": "pending"
+    },
+    {
+      "scenario_id": "SC13.2-07",
+      "synthetic_test_node": "tests/test_pai_end_to_end.py::test_academic_deadline_conflict_local_done_and_eligibility",
+      "recovery_test_node": null,
+      "synthetic_evidence": "observed_pass",
+      "human_evidence": "pending"
+    },
+    {
+      "scenario_id": "SC13.2-08",
+      "synthetic_test_node": "tests/test_pai_end_to_end.py::test_action_edit_confirm_double_click_owner_expiry_version",
+      "recovery_test_node": "tests/test_pai_load_recovery.py::test_action_edit_confirm_double_click_owner_expiry_version",
+      "synthetic_evidence": "observed_pass",
+      "human_evidence": "pending"
+    },
+    {
+      "scenario_id": "SC13.2-09",
+      "synthetic_test_node": "tests/test_pai_end_to_end.py::test_source_injection_secret_query_and_fallback_denials",
+      "recovery_test_node": "tests/test_pai_load_recovery.py::test_source_injection_secret_query_and_fallback_denials",
+      "synthetic_evidence": "observed_pass",
+      "human_evidence": "pending"
+    },
+    {
+      "scenario_id": "SC13.2-10",
+      "synthetic_test_node": "tests/test_pai_end_to_end.py::test_restore_migration_revoke_delete_and_cache",
+      "recovery_test_node": "tests/test_pai_load_recovery.py::test_restore_migration_revoke_delete_and_cache",
+      "synthetic_evidence": "observed_pass",
+      "human_evidence": "pending"
+    }
+  ],
+  "independent_review": "pending remaining finding and phase coverage",
+  "formal_design": "not approved by this receipt"
+}

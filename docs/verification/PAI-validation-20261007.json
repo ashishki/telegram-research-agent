@@ -1,0 +1,155 @@
+{
+  "schema_version": 1,
+  "code_sha": "761ffd21bf10aab39325d3d47d8fd3117d037858",
+  "status": "local_tests_passed_independent_and_human_gates_pending",
+  "checks": [
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/test_tiers.py pai-complete [initial ac2ec6f]",
+      "result": "20 failed, 204 passed in 796.86s (0:13:16)",
+      "log_sha256": "10bfcad4a3ca8391c7c4f4ddc700dd2440122918cb15c934f5cb8e2997e7e10b",
+      "private_synthetic_log_path": "/tmp/pai-complete-20261007-ac2ec6f.log"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/test_tiers.py pai-complete [6ac7eca]",
+      "result": "224 passed in 692.43s (0:11:32)",
+      "log_sha256": "bf27b00ead6389933ceb24aedd4d30ae22ff1263ebf2484c9a74a577cc949f84",
+      "private_synthetic_log_path": "/tmp/pai-complete-fixpass-20261007.log"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/test_tiers.py pai-complete [3d837bc]",
+      "result": "230 passed in 766.41s (0:12:46)",
+      "log_sha256": "a334a3cf0b12f24a16d0cdacc6f2a760b0592ad0c86f559f991f94865b2cf96d",
+      "private_synthetic_log_path": "/tmp/pai-complete-final-3d837bc-20261007.log"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/test_tiers.py pai-complete [761ffd2]",
+      "result": "233 passed in 706.20s (0:11:46)",
+      "log_sha256": "33194874fc1974db6352e1f285ae62ec98897d212385c70284feef1e1616ae16",
+      "private_synthetic_log_path": "/tmp/pai-complete-final-761ffd2-20261007.log",
+      "exit_code": 0
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/test_tiers.py focused-prm [initial fixes]",
+      "result": "652 passed in 175.91s (0:02:55)",
+      "log_sha256": "eae41bfe5f75d0360b3d33372ccaf4b11b27815860232f840a437259c63814c0",
+      "private_synthetic_log_path": "/tmp/pai-focused-prm-20261007.log"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/test_tiers.py focused-prm [P1 fixes]",
+      "result": "652 passed in 106.36s (0:01:46)",
+      "log_sha256": "57a4df96fe2504393d7be24179956b6ddaef81e126a28aca22a2568e42fdcf25",
+      "private_synthetic_log_path": "/tmp/pai-focused-final-20261007.log"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/test_tiers.py retrofit-boundaries",
+      "result": "150 passed in 14.36s",
+      "log_sha256": "b57c953dfc4749ca2c594422e79e86e87ddcd7a07aa497d2457d409a91e0238f",
+      "private_synthetic_log_path": "/tmp/pai-retrofit-boundaries-20261007.log"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python -m pytest tests/test_playbook_bridge.py -q",
+      "result": "16 passed in 1.17s",
+      "log_sha256": "e7f05abd0f96beb64fa8a0fa02ba2b82750e81605ac26d9ef109bc5d85d6af60",
+      "private_synthetic_log_path": "/tmp/pai-playbook-bridge-20261007.log"
+    },
+    {
+      "command": "PYTHONPATH=src .venv-pai/bin/python tools/prm_mat_eval.py --check safety",
+      "result": "prm_mat_eval: ok",
+      "log_sha256": "a815c0c066a4352e24ef358ee3cef396650353dd8dbff94335af1b8c70defacf",
+      "private_synthetic_log_path": "/tmp/pai-mat-safety-20261007.log"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/run_pai_acceptance.py -q tests/test_pai_media_runtime.py tests/test_pai_cost_cache.py tests/test_pai_durable_policy.py tests/test_pai_delivery.py",
+      "result": "33 passed in 75.57s (0:01:15)",
+      "log_sha256": "cc325ca397e4611ea8ba68053b188b15516c513401689b5066126efa2a6220ca",
+      "private_synthetic_log_path": "/tmp/pai-final-model-budget-scope-20261007.log"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/run_pai_acceptance.py -q tests/test_pai_report_runtime.py tests/test_assistant_report_exports.py",
+      "result": "12 passed in 21.67s",
+      "log_sha256": "ec971987f2b7641ccdd59fd163c3e8db0971dbcf87fd7d8e3d8e3c26fbf78ecb",
+      "private_synthetic_log_path": "/tmp/pai-designed-report-wiring-20261007.log"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/test_tiers.py focused-prm [761ffd2]",
+      "exit_code": 0,
+      "result": "652 passed in 107.54s (0:01:47)",
+      "log_sha256": "2311f677b08624ae284e2b8ed987abffa389793f5c2ccce6fb865fde83a22490",
+      "private_synthetic_log_path": "/tmp/pai-focused-final-761ffd2-20261007.log"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/run_pai_acceptance.py -q -x tests/test_pai_chat_runtime.py::test_local_payload_validation_creates_no_model_fence_and_can_be_corrected tests/test_pai_durable_policy.py::test_unknown_operation_accepts_later_known_actual_without_resetting_fence",
+      "exit_code": 0,
+      "result": "2 passed in 9.16s",
+      "log_sha256": "5f30bc94b64154eb328ed632b54e698b31a9e188d7621ca34ae8cd4559c63d55",
+      "private_synthetic_log_path": "/tmp/pai-review-30-counterexamples-20261007.log"
+    }
+  ],
+  "plan_checks": {
+    "pa": "passed; 19 slices",
+    "pai": "passed; 32 packets, 69 IDs and ten scenarios; two conditional planned test files absent"
+  },
+  "formal_playbook": {
+    "exit_code": 1,
+    "errors": 51,
+    "reason": "TASK_DESIGN_APPROVAL_REQUIRED",
+    "human_approval_manufactured": false
+  },
+  "independent_review": {
+    "provider": "opencode_go",
+    "model": "mimo-v2.6-pro",
+    "calls_consumed_including_failures": 30,
+    "call_cap": 30,
+    "24_25_26_27": "incomplete or invalid verdict; no approval claimed",
+    "28": "FIX_P1_FIRST; three findings addressed in f073148",
+    "29": "FIX_P1_FIRST; two findings addressed in 761ffd2",
+    "30": "FIX_P1_FIRST; one finding awaiting independent resolution; two executable counterexamples passed; no self-closure"
+  },
+  "authority": {
+    "live_accounts": "not_used",
+    "product_paid_models": "not_used",
+    "production": "not_deployed",
+    "human_acceptance": "pending"
+  },
+  "next_step": "Owner-scoped extension to maximum 33 Mimo calls; execute prepared remaining-P1/source packets; no automatic extra provider calls.",
+  "reviewed_code_sha": "761ffd21bf10aab39325d3d47d8fd3117d037858",
+  "current_head": "5c5e7db8c424dcf966413ec2104754232d52d15b",
+  "changed_code_files": [
+    "requirements-pai-crypto.lock",
+    "src/prm/briefs.py",
+    "src/prm/conversation.py",
+    "src/prm/runtime/archive.py",
+    "src/prm/runtime/composition.py",
+    "src/prm/runtime/cost_cache.py",
+    "src/prm/runtime/deletion.py",
+    "src/prm/runtime/media_extract.py",
+    "src/prm/runtime/migration.py",
+    "src/prm/runtime/model.py",
+    "src/prm/runtime/model_attempts.py",
+    "src/prm/runtime/model_errors.py",
+    "src/prm/runtime/network_guard.py",
+    "src/prm/runtime/render.py",
+    "src/prm/runtime/speech.py",
+    "src/prm/runtime/vision.py",
+    "src/prm/storage/academic.py",
+    "src/prm/storage/conversations.py",
+    "src/prm/storage/policy.py",
+    "tests/pai_runtime_fixtures.py",
+    "tests/test_pai_archive_search.py",
+    "tests/test_pai_chat_runtime.py",
+    "tests/test_pai_delivery.py",
+    "tests/test_pai_durable_policy.py",
+    "tests/test_pai_media_runtime.py",
+    "tests/test_pai_migration.py",
+    "tests/test_pai_report_runtime.py"
+  ],
+  "remaining_gates": [
+    "independent resolution of review #30",
+    "accumulated phase/role review coverage",
+    "formal design approval through Playbook",
+    "scoped real integrations/canary",
+    "production target/cutover/deployment authority",
+    "human visual and operator usefulness",
+    "conditional Redis/archive triggers remain unmeasured"
+  ]
+}

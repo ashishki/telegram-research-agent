@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "status": "incomplete_or_failed",
+  "call_number": 27,
+  "call_limit": 30,
+  "phase": "D",
+  "read_only": true,
+  "provider": "opencode_go",
+  "requested_model": "mimo-v2.6-pro",
+  "observed_model": "mimo-v2.6-pro",
+  "requested_effort": "thinking_disabled",
+  "observed_effort": "thinking_disabled",
+  "head_sha": "70311759c0024d741921c67317c6c82af15997bd",
+  "base_sha": "5d0f1208884411d8564bfa467fa0026363117d5b",
+  "paths": [
+    "src/prm/runtime/network_guard.py",
+    "src/prm/runtime/render.py",
+    "src/prm/runtime/media_extract.py",
+    "tests/test_pai_report_runtime.py"
+  ],
+  "diff_sha256": "f9cb47e8e0df269bf35c1422a8b05f09d8cf73a3962f4694a735183a6b5c428d",
+  "input_sha256": "51e221a58aa3ed8c6eacb145c898d8acad9bae4c4d80f3a85b1f8957fdd05835",
+  "input_bytes": 8753,
+  "output_token_cap": 16000,
+  "timeout_seconds": 900,
+  "role": "independent_code_review_with_privacy_and_test_adequacy",
+  "workflow_receipt": false,
+  "human_authority": false,
+  "recheck": true,
+  "scope": "selected full source",
+  "thinking_reference": "https://mimo.mi.com/docs/en-US/quick-start/usage-guide/other/deep-thinking",
+  "final_text_bytes": 2468,
+  "usage": {
+    "prompt_tokens": 2137,
+    "completion_tokens": 481,
+    "total_tokens": 2618,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    }
+  },
+  "finish_reason": "stop",
+  "error_code": "invalid_verdict",
+  "duration_seconds": 33.456
+}
