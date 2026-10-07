@@ -145,3 +145,18 @@ Evidence: docs/verification/PAI-delivery-review-incomplete.json.
 Total 23/30 consumed including
 failures; no automatic retries or substitution. Independent B/C and human/live
 acceptance remain pending. Next implementation card PAI-10.
+# 2026-10-07 implementation-only owner steering
+
+ADR-015: implementation first, tests/reviews afterwards. No new test run,
+validator, dependency installation, Mimo call, live account, service/timer or
+deployment in this pass. New code is implementation_unverified.
+
+Commits d4d45a2 and 19477b2 add explicit runtime/model/archive/web/research/
+Brief/reader, connection/source/action, memory/media, cost/cache and operation/
+restore/delta components plus prepared suites. Subsequent integration connects
+source services, typed delivery, Watch, transcription/vision and CLI processes.
+Receipt: docs/verification/PAI-implementation-pass-20261007.md.
+Draft access/cutover/pilot packages: PAI-27/28/29; conditional infrastructure
+triggers unmeasured. The complete programme and 69-case evidence obligations
+remain unfinished; do not mark planned slices accepted or manufacture PASS.
+Continue implementation gaps before the postponed validation phase. Mimo 23/30.

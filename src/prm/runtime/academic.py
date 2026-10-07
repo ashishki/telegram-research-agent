@@ -129,7 +129,8 @@ class AcademicRuntime:
             conflict=conflicting_deadlines(item)
             dates=', '.join(deadline.due_at.isoformat()+' ('+deadline.authority+')' for deadline in item.deadlines)
             lines.append(item.title+' — '+item.category+(' — конфликт сроков: '+dates if conflict else (' — '+dates if dates else ' — срок не подтверждён'))+
-                         (' — применимость требует уточнения' if item.eligibility_uncertain else ''))
+                         (' — применимость требует уточнения' if item.eligibility_uncertain else '')+
+                         (' — отмечено выполненным локально; сдача в источнике не подтверждена' if item.completion=='local_done' else ''))
         return '\n'.join(lines) or 'В проверенном покрытии кандидатов нет; отсутствующие источники не проверены.'
     def mark_done(self,object_ref,*,actor_ref):
         if actor_ref!=self.root.owner_ref:raise CapabilityDenied('private owner required')

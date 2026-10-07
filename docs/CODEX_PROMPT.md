@@ -1,6 +1,21 @@
 # Current handoff — implement PAI
 
-2026-10-06. Assigned branch: docs/personal-assistant-blueprint-playbook-20260918.
+2026-10-07. Assigned branch: docs/personal-assistant-blueprint-playbook-20260918.
+Latest owner steering: implement the whole remaining local queue first; tests
+and reviews afterwards. ADR-015 supersedes intermediate validation cadence.
+No test/validator/reviewer/provider diagnostic was executed on 2026-10-07.
+New code is implementation_unverified. Do not reuse yesterday's 652-pass
+result as evidence for current HEAD. Do not spend another Mimo call now.
+
+Current implementation: d4d45a2 initial composition; 19477b2 source/media/
+recovery components; later integration changes and prepared suites/packages.
+Read docs/verification/PAI-implementation-pass-20261007.md. Continue known
+implementation gaps, including full 69 named requirement cases, complete
+source/deletion/recovery integration and remaining slice behavior, before
+starting the deferred verification phase. Do not claim all tasks complete.
+PAI-27..29 access/cutover/pilot packets are drafts; 30/31 triggers unmeasured.
+
+Previous verified baseline (historical evidence follows):
 Owner explicitly directed moving past upfront ceremony to local implementation;
 ADR-014 records that scope. Execute the Sol queue PAI-02..26 in dependency order.
 Do not restart historical tasks or run the historical full pytest suite.

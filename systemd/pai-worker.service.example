@@ -1,0 +1,19 @@
+[Unit]
+Description=Personal Assistant worker (operator must review and configure)
+After=network.target
+
+[Service]
+Type=simple
+User=pai
+WorkingDirectory=/opt/pai
+EnvironmentFile=/etc/pai/private/runtime.env
+ExecStart=/opt/pai/.venv/bin/python -m prm.runtime.service --role worker --target /etc/pai/private/target.json --config /etc/pai/private/runtime.json --db-path /var/lib/pai/archive.sqlite
+Restart=on-failure
+RestartSec=10
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/pai
+
+# Template only. No Install section: enabling requires a reviewed deployment.

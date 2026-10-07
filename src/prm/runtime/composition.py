@@ -253,7 +253,7 @@ def runtime_from_config(config,*,target,settings):
     import os
     from prm.storage.policy import DurableCapabilityRegistry
     allowed={'owner_ref','owner_chat_id','budget_refs','job_budget','model','model_upper_bound','history_retention_seconds','model_resource_ref','archive_resource_ref',
-             'public_web','public_upper_bound','public_search_ref','public_fetch_ref','tariff_version','graph','github','artifact_root','media_root','local_services','speech','vision','delivery','media_download'}
+             'public_web','public_upper_bound','public_search_ref','public_fetch_ref','tariff_version','graph','github','canvas','artifact_root','media_root','local_services','speech','vision','delivery','media_download'}
     if not isinstance(config,dict) or set(config)-allowed or not {'owner_ref','owner_chat_id','budget_refs','job_budget'}<=set(config):
         raise StorageError('explicit complete runtime configuration required')
     registry=DurableCapabilityRegistry(target,budget_refs=tuple(config['budget_refs']),job_budget=config['job_budget'])
@@ -264,7 +264,7 @@ def runtime_from_config(config,*,target,settings):
         if key_ref is not None and (not isinstance(key_ref,str) or not key_ref.startswith('PAI_') or not key_ref.replace('_','').isalnum()):
             raise StorageError('explicit task-specific credential environment reference required')
         endpoint=ModelEndpoint(**value,token=os.environ.get(key_ref,'') if key_ref else '')
-    options={key:value for key,value in config.items() if key not in {'budget_refs','job_budget','model','public_web','graph','github','artifact_root','media_root','local_services','speech','vision','delivery','media_download'}}
+    options={key:value for key,value in config.items() if key not in {'budget_refs','job_budget','model','public_web','graph','github','canvas','artifact_root','media_root','local_services','speech','vision','delivery','media_download'}}
     if config.get('public_web'):
         from .web import BraveSearchProvider
         from prm.public_web import PublicWebBounds
@@ -352,4 +352,21 @@ def runtime_from_config(config,*,target,settings):
         value=dict(config['media_download']);key_ref=value.pop('token_env')
         if not key_ref.startswith('PAI_'):raise StorageError('explicit media credential reference required')
         root.media_downloader=TelegramMediaDownloader(root,token=os.environ[key_ref],**value)
+    if config.get('canvas'):
+        from .academic import CanvasReadAdapter,AcademicRuntime
+        from prm.academic_inbox import CanvasScopeSelection
+        from datetime import datetime
+        value=config['canvas'];key_ref=value['token_env']
+        if not key_ref.startswith('PAI_'):raise StorageError('explicit Canvas credential reference required')
+        selected=dict(value['selection']);selected['course_refs']=tuple(selected['course_refs'])
+        for name in ('window_start','window_end'):selected[name]=datetime.fromisoformat(selected[name])
+        selection=CanvasScopeSelection(**selected)
+        adapter=CanvasReadAdapter(registry=root.registry,origin=value['origin'],credential=os.environ[key_ref],institution_access_ref=value.get('institution_access_ref'))
+        academic=AcademicRuntime(root,scheduler=getattr(root,'watch_scheduler',None));root.academic=academic
+        def academic_answer(request,request_ref,guard):
+            guard();result=adapter.collect(selection,owner_ref=root.owner_ref,connection_ref=value['connection_ref'],upper_bound=value.get('upper_bound'))
+            candidates=academic.merge(result['candidates'],identity_bindings=value.get('identity_bindings',{}));guard()
+            return {'status':'ok' if result['complete'] else 'partial','text':academic.describe(candidates),'coverage':result['coverage'],
+                    'source_data_class':'private_connector_content','source_connections':[value['connection_ref']]}
+        root.services['academic']=academic_answer
     return root

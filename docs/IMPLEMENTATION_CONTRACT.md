@@ -3,11 +3,16 @@
 Status: current operating contract. Changes to an accepted decision require a
 new ADR under `docs/adr/`.
 
-Version: 4.3
+Version: 4.4
 
-Effective date: 2026-10-06
+Effective date: 2026-10-07
 
 ## Product Authority
+
+ADR-015 records the latest owner's sequencing: finish the local implementation
+pass before running tests/reviews. Add tests but do not execute intermediate
+tiers/providers. Engineering status stays implementation_unverified; acceptance,
+live access, production and final completion authority remain separate.
 
 ADR-012 records the 2026-10-06 PA implementation assignment and instruction
 reconciliation. This extends the applicable local development workstream to
