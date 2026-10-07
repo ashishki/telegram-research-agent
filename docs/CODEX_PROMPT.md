@@ -7,8 +7,8 @@ No test/validator/reviewer/provider diagnostic was executed on 2026-10-07.
 New code is implementation_unverified. Do not reuse yesterday's 652-pass
 result as evidence for current HEAD. Do not spend another Mimo call now.
 
-Current implementation: d4d45a2/19477b2/586bba7 plus the follow-through
-implementation recorded in docs/verification/PAI-implementation-pass-20261007.md.
+Current implementation: d4d45a2/19477b2/586bba7 plus e81b066 (follow-through),
+recorded in docs/verification/PAI-implementation-pass-20261007.md.
 Previously listed local source/deletion/recovery/69-case gaps now have code and
 prepared regression cases. The complete local code is implementation_unverified.
 Do not claim all tasks accepted, tested, reviewed or live.
