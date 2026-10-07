@@ -1,4 +1,4 @@
-# Current handoff — verification completed locally, review gates pending
+# Current handoff — review extension authorized, provider configuration missing
 
 2026-10-07. Assigned branch: docs/personal-assistant-blueprint-playbook-20260918.
 Owner authorized finishing implementation, then testing/review, and confirmed
@@ -28,12 +28,17 @@ remains pending. Requested/observed model and effort, hashes and scopes are in
 PAI-critical-boundaries-recheck-28/29/30.json. Thinking disabled and strict JSON
 schema produced usable reports; earlier incomplete attempts stay preserved.
 
-Paid review count: 30/30 consumed INCLUDING failures. Do not call 31 or swap
-models automatically. Prepared, uninvoked next packets:
-docs/verification/PAI-next-review-packets.json (proposed total cap 33).
-Next action after explicit budget extension: a fresh independent resolution of
+Paid review count: 30/33 consumed INCLUDING failures. On 2026-10-07 the owner
+answered “разрешаю, делай дотконца” to the explicit 30-to-33 extension proposal.
+Do not ask for the same budget authorization again or swap models automatically.
+Prepared, authorized next packets: docs/verification/PAI-next-review-packets.json.
+Call #31 stopped BEFORE provider I/O: OPENCODE_API_KEY/OPENCODE_API_KEY_FILE
+were not configured in this session; no key search or call occurred. The owner
+was asked for the previously configured key-file path (never the key in chat).
+Evidence: docs/verification/PAI-review-continuation-20261007.json.
+Next action once that configuration is supplied: a fresh independent resolution of
 remaining P1 against its counterexamples, then remaining connection/source review
-and an actual-finding recheck only if needed. Public code and synthetic evidence
+and call #33 for an actual-finding recheck only if needed. Public code and synthetic evidence
 only; no private corpus, tokens or account payloads to reviewers.
 
 Formal PA/PAI design states stay review_required/draft/planned. Playbook readiness

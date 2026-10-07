@@ -226,3 +226,21 @@ all 69 names/ten scenarios enforced. Latest focused-prm 652 passed in 107.54 s.
 Evidence: PAI-verification-20261007.md / PAI-validation-20261007.json.
 Remaining Mimo #30 P1 and accumulated role/phase/human/live gates stay open.
 Next proposed bounded review packets are prepared; 30/30 calls exhausted.
+
+# 2026-10-07 owner-authorized review continuation
+
+Owner: “разрешаю, делай дотконца” in response to the explicit proposal to
+extend the total review cap from 30 to 33. At this checkpoint 30/33 calls
+are consumed, including prior failures. Proceed sequentially: remaining P1
+recheck, connection/source review, then one actual-finding recheck only if
+needed. Same OpenCode Go / mimo-v2.6-pro, thinking disabled, strict JSON,
+16000 output / 900 s, public code and synthetic evidence only. No automatic
+retry/model substitution. No design acceptance, live access, production or
+release authority is inferred. Prepared packet hashes and playbook pin verified.
+
+First continuation command exited 2 before provider I/O: no configured
+OPENCODE_API_KEY/OPENCODE_API_KEY_FILE. No call #31 receipt or reservation
+was created; consumption remains 30/33. Owner was asked for the existing
+credential-file path. No credential scan, model swap or paid retry occurred.
+Exact non-invocation evidence: PAI-review-continuation-20261007.json.
+Existing passing broad tests were not repeated; P1 remains independently open.

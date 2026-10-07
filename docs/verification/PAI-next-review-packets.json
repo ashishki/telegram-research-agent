@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "status": "prepared_not_invoked",
-  "current_approved_call_cap": 30,
+  "status": "authorized_awaiting_provider_configuration",
+  "current_approved_call_cap": 33,
   "calls_consumed_including_failures": 30,
   "proposed_total_cap": 33,
   "new_calls_maximum": 3,
@@ -128,5 +128,10 @@
     "live-account consent",
     "production migration/deployment",
     "product-provider spending"
-  ]
+  ],
+  "authorization": {
+    "date": "2026-10-07",
+    "owner_message": "разрешаю, делай дотконца",
+    "scope": "Acceptance of the preceding explicit 30-to-33 call extension; other authority exclusions persist."
+  }
 }
