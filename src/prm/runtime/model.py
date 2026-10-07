@@ -3,8 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import json
 import time
+import hashlib
 from urllib.parse import urlsplit
-from urllib.request import Request, HTTPRedirectHandler, build_opener
+from urllib.request import Request, HTTPRedirectHandler,ProxyHandler, build_opener
 
 from llm.client import LLMCompletionReceipt, LLMOutcomeUnknown
 from prm.capabilities import CapabilityDenied, AuthorizationDecision
@@ -39,6 +40,12 @@ class ModelEndpoint:
                 raise StorageError('synthetic HTTP requires literal loopback endpoint')
         elif url.scheme!='https' or not url.hostname or not self.token:
             raise StorageError('credential-bound HTTPS model endpoint required')
+        elif self.connection_ref!=credential_connection_ref(self.provider_ref,self.endpoint,self.token):
+            raise StorageError('model connection must bind the exact configured credential and endpoint')
+
+
+def credential_connection_ref(provider_ref,endpoint,token):
+    return 'connection_'+hashlib.sha256((provider_ref+'\x1f'+endpoint+'\x1f'+token).encode()).hexdigest()[:32]
 
 
 @dataclass(frozen=True)
@@ -83,7 +90,7 @@ class ScopedModelClient:
             headers={'Content-Type':'application/json'}
             if endpoint.token:headers['Authorization']='Bearer '+endpoint.token
             request=Request(endpoint.endpoint,data=body,headers=headers,method='POST')
-            with build_opener(NoRedirect()).open(request,timeout=endpoint.timeout_seconds) as response:
+            with build_opener(ProxyHandler({}),NoRedirect()).open(request,timeout=endpoint.timeout_seconds) as response:
                 if response.headers.get_content_type()!='application/json':raise StorageError('model response type differs')
                 raw=response.read(1048577)
                 if len(raw)>1048576:raise StorageError('model response exceeds bound')
@@ -114,6 +121,6 @@ class ScopedModelClient:
         if self.usage_observer:
             normalized={'input':usage['prompt_tokens'],'cached_input':usage.get('prompt_tokens_details',{}).get('cached_tokens',0),
                         'cache_write':0,'output':usage['completion_tokens'],'reasoning':usage.get('completion_tokens_details',{}).get('reasoning_tokens',0),
-                        'semantics':'openai_chat_output_includes_reasoning'}
+                        'semantics':'openai_chat_output_includes_reasoning' if endpoint.provider_ref=='provider_openai' else 'unknown_compatible_provider'}
             self.usage_observer(receipt,normalized,self.groups)
         return receipt

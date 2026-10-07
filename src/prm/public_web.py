@@ -630,7 +630,7 @@ def _https_get(url: str, *, timeout_seconds: float, max_bytes: int, headers=None
         body = response.read(max_bytes + 1)
         if len(body) > max_bytes:
             raise PublicWebTransportError("response_too_large")
-        headers = {key.lower(): value for key, value in response.headers.items() if key.lower() in {"content-type", "last-modified", "date", "etag"}}
+        headers = {key.lower(): value for key, value in response.headers.items() if key.lower() in {"content-type", "last-modified", "date", "etag","link"}}
         return {"status": int(getattr(response, "status", 200)), "final_url": final_url, "content_type": content_type, "headers": headers, "body": body}
 
 

@@ -93,8 +93,15 @@ class ScheduleLease:
 
 
 class WatchScheduler:
-    def __init__(self, queue: JobQueue, *, clock=None):
+    def __init__(self, queue: JobQueue, *, clock=None,source_bindings=None):
         self.queue, self.clock = queue, clock
+        self.source_bindings=dict(source_bindings or {})
+    def collection_request(self,subscription,source,*,operation_ref=None):
+        request=collection_request(subscription,source,operation_ref=operation_ref)
+        binding=self.source_bindings.get(source)
+        if binding:
+            return replace(request,connection_ref=binding['connection_ref'],provider_ref=binding['provider_ref'])
+        return request
 
     def _now(self, conn):
         return _time(self.clock()) if self.clock else conn.execute('SELECT clock_timestamp() AS now').fetchone()['now']
@@ -185,7 +192,7 @@ class WatchScheduler:
             job = None
             if reason == 'active':
                 for source in sub.source_refs:
-                    request = collection_request(sub, source)
+                    request = self.collection_request(sub, source)
                     if not registry.authorize(request).allowed:
                         reason = 'collection_grant_denied'
                         break
@@ -279,7 +286,7 @@ class WatchCollectionWorker:
         notifications = []
         for index, source in enumerate(sub.source_refs):
             queue.checkpoint(lease, {'stage': 'collecting', 'source_number': index})
-            decision = self.registry.authorize_and_reserve(collection_request(sub, source,
+            decision = self.registry.authorize_and_reserve(self.scheduler.collection_request(sub, source,
                 operation_ref=f'watchread_{lease.job_id}_{lease.generation}_{index}'), upper_bound=self.upper_bound)
             if not decision.allowed:
                 return queue.complete(lease, {'status': 'collection_denied', 'notifications': 0})

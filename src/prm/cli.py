@@ -20,6 +20,14 @@ def build_parser() -> argparse.ArgumentParser:
     assistant_command.add_argument('--owner-ref')
     assistant_command.add_argument('--owner-chat-id')
     assistant_command.add_argument('--runtime-config')
+    for name in ('runtime-install','runtime-status','runtime-tick','runtime-research-worker','runtime-backup','runtime-drain','runtime-kill'):
+        command=sub.add_parser(name)
+        command.add_argument('--synthetic-target',required=True)
+        command.add_argument('--runtime-config')
+        command.add_argument('--db-path',default=':memory:')
+        command.add_argument('--artifact-root')
+        if name=='runtime-install':command.add_argument('--expected-base-version',type=int,required=True)
+        if name=='runtime-backup':command.add_argument('--destination',required=True)
     for name in ('job-status', 'job-cancel', 'job-result', 'job-worker'):
         command = sub.add_parser(name, help='Inspect or cancel an explicitly selected local synthetic job.')
         if name == 'job-worker':
@@ -127,6 +135,37 @@ def _explicit_job_ingress(args):
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.command.startswith('runtime-'):
+        import json
+        from pathlib import Path
+        from prm.storage.postgres import SyntheticTarget
+        from prm.runtime.operations import OperationsRuntime
+        config_path=Path(args.synthetic_target)
+        if config_path.stat().st_size>4096:raise ValueError('target exceeds bound')
+        target=SyntheticTarget.from_mapping(json.loads(config_path.read_text()))
+        if args.command=='runtime-install':
+            from prm.runtime.setup import install_runtime
+            result=install_runtime(target,expected_base_version=args.expected_base_version)
+        else:
+            operator=OperationsRuntime(target,artifact_root=args.artifact_root)
+            if args.command=='runtime-status':result=operator.status()
+            elif args.command=='runtime-drain':operator.drain();result={'status':'draining'}
+            elif args.command=='runtime-kill':operator.kill_switch();result={'status':'egress_disabled'}
+            elif args.command=='runtime-backup':result=operator.backup(destination=args.destination)
+            else:
+                if not args.runtime_config:raise ValueError('explicit runtime config required')
+                from types import SimpleNamespace
+                from prm.runtime.composition import runtime_from_config
+                config_path=Path(args.runtime_config)
+                if config_path.stat().st_size>8192:raise ValueError('runtime config exceeds bound')
+                root=runtime_from_config(json.loads(config_path.read_text()),target=target,settings=SimpleNamespace(db_path=args.db_path))
+                if args.command=='runtime-tick':
+                    from prm.runtime.scheduler import WatchScheduler
+                    result={'job_ref':WatchScheduler(root.queue).tick(owner=root.owner_ref,registry=root.registry)}
+                else:
+                    from prm.runtime.research import DurableResearchWorker
+                    result={'result_ref':DurableResearchWorker(root).run_once()}
+        print(json.dumps(result,default=str,ensure_ascii=False));return 0
     if args.command.startswith('job-'):
         ingress = _explicit_job_ingress(args)
         if args.command == 'job-worker':
@@ -152,7 +191,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         if any(explicit) and not all(explicit):
             raise ValueError('durable assistant requires target and complete owner tuple')
         if all(explicit):
-            run_bot(settings, runtime_mode=BOT_RUNTIME_PRM_ASSISTANT, job_ingress=_explicit_job_ingress(args))
+            ingress=_explicit_job_ingress(args)
+            if args.runtime_config:
+                import json
+                from pathlib import Path
+                from prm.runtime.composition import runtime_from_config
+                path=Path(args.runtime_config)
+                if path.stat().st_size>8192:raise ValueError('runtime config exceeds bound')
+                root=runtime_from_config(json.loads(path.read_text()),target=ingress.queue.store.target,settings=settings)
+                if (root.owner_ref,root.owner_chat_id)!=(args.owner_ref,args.owner_chat_id):raise ValueError('runtime owner differs')
+                ingress=root.ingress
+            run_bot(settings, runtime_mode=BOT_RUNTIME_PRM_ASSISTANT, job_ingress=ingress)
         else:
             run_bot(settings, runtime_mode=BOT_RUNTIME_PRM_ASSISTANT)
         return 0

@@ -1669,7 +1669,9 @@ class _OutsideBriefWindow(ValueError):
 
 
 def _evidence_from_mapping(raw: Mapping[str, Any], *, window: BriefWindow) -> BriefEvidence:
-    if raw.get("local_archive_provenance") is not True:
+    if raw.get("local_archive_provenance") is not True and not (
+        raw.get('local_source_provenance') is True and raw.get('source_kind') in {'mail','calendar','academic','memory'}
+    ):
         raise ValueError("brief source lacks local archive provenance")
     identity = _clean(
         raw.get("evidence_id") or raw.get("archive_document_id") or raw.get("post_archive_document_id") or raw.get("post_id"),
@@ -1693,7 +1695,7 @@ def _evidence_from_mapping(raw: Mapping[str, Any], *, window: BriefWindow) -> Br
     project_refs = _projects(raw)
     importance = _importance(raw)
     urgency = _urgency(raw)
-    reasons = ["local_archive_source", f"importance_{importance}", f"urgency_{urgency}"]
+    reasons = ["local_archive_source" if raw.get('local_archive_provenance') is True else 'selected_personal_source', f"importance_{importance}", f"urgency_{urgency}"]
     if bool(raw.get("personal_relevance") or _mapping(raw.get("relevance")).get("relevant")):
         reasons.append("personal_relevance_marked")
     change = _clean(raw.get("change_type"), 48)

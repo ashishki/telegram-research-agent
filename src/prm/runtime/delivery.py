@@ -87,6 +87,7 @@ class DeliveryExecutor:
             if result is None or not isinstance(result.payload.get('text'), str):
                 raise StorageError('result unavailable')
             payload = {'text': result.payload['text'], 'result_ref': result.object_id, 'result_digest': result.digest,
+                       'data_class':result.payload.get('data_class','private_archive'),
                        'request_ref': result.payload.get('request_ref')}
             if effect_lease is not None:
                 from prm.storage.jobs import JobQueue
@@ -108,6 +109,7 @@ class DeliveryExecutor:
             sub = _subscription_from_payload(subrow['payload'])
             notification = _notification_from_payload(note['payload'])
             payload = {'text': render_watch_notification(notification), 'schedule_id': note['schedule_id'],
+                       'data_class':notification.data_class,
                        'revision': note['revision'], 'notification_digest': _canonical(note['payload'])[1]}
         return self._deliver(owner=owner, delivery_id='watch_' + notification_id, kind='watch', source_ref=notification_id,
             destination_ref=sub.destination_ref, payload=payload, upper_bound=upper_bound)
@@ -152,7 +154,7 @@ class DeliveryExecutor:
         operation = 'send_' + hashlib.sha256(delivery_id.encode()).hexdigest()[:40]
         request = AuthorizationRequest(owner_ref=owner, connection_ref=None,
             capability='assistant.watch_delivery' if kind == 'watch' else 'assistant.result_delivery',
-            resource_ref=destination_ref, operation='deliver', data_class='model_generated' if kind == 'watch' else 'private_archive',
+            resource_ref=destination_ref, operation='deliver', data_class=payload['data_class'],
             provider_ref='provider_telegram', purpose='watch.delivery' if kind == 'watch' else 'answer.delivery', operation_ref=operation)
         decision = self.registry.authorize_and_reserve(request, upper_bound=upper_bound)
         if not decision.allowed:

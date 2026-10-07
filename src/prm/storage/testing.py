@@ -19,6 +19,10 @@ BIN = Path('/usr/lib/postgresql/14/bin')
 
 
 class PostgresSandbox:
+    def empty_database(self,name):
+        target=self.target(name,'pa_test_migrator')
+        with self._admin() as conn:conn.execute(sql.SQL('CREATE DATABASE {} OWNER pa_test_migrator').format(sql.Identifier(target.database)))
+        return target
     def __init__(self):
         self.instance_id=uuid.uuid4().hex
         self.root=None

@@ -86,6 +86,9 @@ class JobQueue:
         return item
     def enqueue_in(self,tx,*,owner,idempotency_key,payload,deadline,kind='compute.digest',mode='compute',priority=0,max_attempts=3):
         _check(tx.conn);_ref(owner);_ref(idempotency_key);payload=_payload(payload)
+        if tx.conn.execute("SELECT to_regclass('pa_control.state') AS table_ref").fetchone()['table_ref'] is not None:
+            control=tx.conn.execute('SELECT draining FROM pa_control.state WHERE id=1').fetchone()
+            if not control or control['draining']:raise StorageError('runtime intake is draining')
         if (mode not in {'compute','effect'} or kind not in {'compute.digest','compute.assistant','compute.watch','compute.research','effect.dispatch'} or (kind.startswith('compute.')!=(mode=='compute'))
             or (mode=='effect')!=('effect_key'in payload) or type(priority)is not int or not -1000<=priority<=1000
             or type(max_attempts)is not int or not 1<=max_attempts<=5 or not isinstance(deadline,datetime) or deadline.tzinfo is None):

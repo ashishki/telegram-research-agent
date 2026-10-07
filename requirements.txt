@@ -18,3 +18,5 @@ requests>=2.31,<3
 
 # PAI durable state driver; pure wheel uses the existing system libpq.
 psycopg==3.3.6
+# Explicit private OAuth vault; no dependency installation during implementation.
+cryptography>=46,<47

@@ -36,10 +36,28 @@ class AssistantRuntime:
         self.briefs=DurableBriefStore(target,owner_ref=owner_ref)
         self.public_web_provider=public_web_provider;self.deep_archive_reader=deep_archive_reader;self.github_context_provider=github_context_provider
         self.ingress=TelegramJobIngress(self.queue,owner_ref=owner_ref,owner_chat_id=owner_chat_id)
+        self.ingress.durable_results=True
         self.ingress.cancel_callback=lambda job_id:self.conversations.cancel(self.owner_chat_id)
 
     def worker(self):
-        return AssistantJobWorker(self.ingress,settings=self.settings,runtime=self)
+        return AssistantJobWorker(self.ingress,settings=self.settings,runtime=self,
+            voice_resolver=self.resolve_voice if hasattr(self,'media') and hasattr(self,'media_downloader') else None)
+    def resolve_voice(self,file_ref,lease):
+        with self.queue.store.transaction() as tx:self.queue._fenced(tx,lease)
+        content=self.media_downloader.download(file_ref,kind='voice');asset=self.media.ingest(content=content,kind='voice',mime_type='audio/ogg')
+        try:
+            value=self.media.extract(asset)
+            if value['status']!='transcribed':raise StorageError('authorized transcription adapter unavailable')
+            return value['pages'][0][1]
+        finally:self.media.cleanup(asset)
+    def answer_media(self,body,*,request_ref,lease):
+        if not hasattr(self,'media') or not hasattr(self,'media_downloader'):raise StorageError('media adapter unavailable')
+        with self.queue.store.transaction() as tx:self.queue._fenced(tx,lease)
+        selection=body['media_input'];content=self.media_downloader.download(selection['file_ref'],kind=selection['kind'])
+        asset=self.media.ingest(content=content,kind=selection['kind'],mime_type=selection['mime_type'])
+        value=self.media.question(asset,selection['question'],request_ref=request_ref)
+        from prm.contracts import AssistantResult
+        return AssistantResult(request_ref,value['status'],'research',value['text'],payload={**value,'source_data_class':'user_provided'})
 
     def answer(self,request:OperatorRequest,*,request_ref,lease=None):
         if (request.chat_id,request.actor_id,request.owner_chat_id)!=(self.owner_chat_id,)*3:
@@ -48,17 +66,33 @@ class AssistantRuntime:
             if lease is not None:
                 with self.queue.store.transaction() as tx:self.queue._fenced(tx,lease)
         guard()
+        if hasattr(self,'actions') and request.input_kind=='text' and request.query.strip().casefold() in {'да','yes','подтверждаю'}:
+            from prm.contracts import AssistantResult
+            with self.queue.store.transaction() as tx:
+                rows=tx.conn.execute("SELECT ref,version FROM pa_actions.proposals WHERE owner=%s AND status='prepared'",(self.owner_ref,)).fetchall()
+            versions={row['ref']:str(row['version']) for row in rows}
+            resolution=self.conversations.resolve_plain_yes(request.chat_id,actor_id=request.actor_id,owner_chat_id=request.owner_chat_id,proposal_versions=versions)
+            if resolution.status=='resolved':
+                receipt=self.actions.confirm_and_execute(resolution.confirmation_ref.proposal_ref,actor_ref=self.owner_ref)
+                return AssistantResult(request_ref,receipt.status,'chat','Исход подтверждённого действия: '+receipt.status,
+                    payload={'receipt_ref':receipt.idempotency_key,'source_data_class':'private_connector_content'})
+            return AssistantResult(request_ref,'confirmation_unavailable','chat','Для подтверждения нужен один текущий видимый предпросмотр с точной версией.')
         lowered=request.query.casefold()
         service=None
         for name,words in {'actions':('/actpreview','/actedit','/actconfirm'),
-                           'mail':('почт','письм','/mail'),'calendar':('календар','расписан','/calendar'),
-                           'contacts':('/contacts','адресат'),'academic':('/academic','академичес'),
-                           'memory':('/memory','/remember','/forget'),'brief':('/weekly',)}.items():
-            if name in self.services and any(word in lowered for word in words):service=self.services[name];break
+                           'mail':('/mail','что в почте','что требует ответа в почте'),'calendar':('/calendar','покажи календарь','конфликты расписания'),
+                           'contacts':('/contacts','найди адресата'),'academic':('/academic','покажи академическую сводку'),
+                           'memory':('/memory','/remember','/forget'),'media':('/transcriptedit',),'brief':('/weekly',)}.items():
+            if name in self.services and (request.mode!='chat' or request.query.startswith('/')) and any(lowered.startswith(word) for word in words):service=self.services[name];break
         if service is not None:
             from prm.contracts import AssistantResult
             value=service(request,request_ref,guard);guard()
             if isinstance(value,AssistantResult):return value
+            if name in {'mail','calendar','contacts','academic'}:value['source_data_class']='private_connector_metadata'
+            elif name=='memory':value['source_data_class']='user_provided'
+            elif name=='actions':value['source_data_class']='private_connector_content'
+            if value.get('status') not in {'preview'}:
+                self.conversations.record_response(request.chat_id,text=value['text'],topic='',item_texts=tuple(value['text'].splitlines()[:8]))
             return AssistantResult(request_ref,value.get('status','ok'),'research',value['text'],payload=value)
         if request.query.strip().casefold() in {'/new','новая тема','начни новую тему'}:
             from prm.conversation import conversation_id_for
@@ -79,7 +113,7 @@ class AssistantRuntime:
                 groups.append((decision,))
                 # Prior assistant output is a separate data class and purpose.
                 # Omitted history is never silently substituted into text scope.
-                prior=self.conversations.history(request.chat_id)[-4:]
+                prior=self.conversations.history_for_model(request.chat_id)[-4:]
                 if prior:
                     history_request=replace(text_request,capability='model.context_egress',data_class='model_generated',
                         purpose='dialogue.history',operation_ref=operation+'_history')
@@ -111,6 +145,12 @@ class AssistantRuntime:
         try:
             result=assistant.answer(replace(request,model_access=access,public_web_access=public_access))
             guard()
+            if result.payload.get('model_call_attempted') and result.status=='ok' and type(access)is RuntimeModelAccess:
+                state=self.conversations.record_response(request.chat_id,text=result.text,topic='')
+                self.conversations.tag_response_source(state.object_refs[0].response_ref,'model_generated')
+                result=replace(result,payload={**result.payload,'source_data_class':'model_generated',
+                    'conversation':{'conversation_id':state.conversation_id,'summary_version':state.summary_version,
+                                    'response_refs':[item.response_ref for item in state.object_refs],'retention':'durable_expiring'}})
             return result
         finally:
             if public_access is not None:
@@ -135,7 +175,14 @@ class AssistantRuntime:
             adapter=GraphMailAdapter(transport)
             def mail(request,request_ref,guard):
                 guard();sync=adapter.sync(mail_selection);guard();summary=adapter.summary(mail_selection)
-                return {'status':sync['status'],'text':summary['text'],'items':summary['items'],'limitations':[summary['limitation']]}
+                from .connector_summary import summarize_metadata
+                fallback='Проверено писем в выбранном покрытии: '+str(len(summary['items']))+'. Необходимость ответа и сроки не подтверждены метаданными.\n'+summary['text']
+                text,measurement=summarize_metadata(self,question=request.query,request_ref=request_ref,resource_ref=mail_selection.resource_ref,
+                    items=summary['items'],fallback=fallback,guard=guard)
+                return {'status':sync['status'],'text':text,'items':summary['items'],'limitations':[summary['limitation']],
+                        'summary_measurement':measurement,'source_data_class':'private_connector_metadata',
+                        'needed_scope_when_insufficient':{'data_class':'private_connector_content','message_refs':[item['id'] for item in summary['items'][:5]],
+                            'fields':['id','body'],'provider_token_permission':'Mail.Read (account-wide); app filter is exact message selection'}}
             self.services['mail']=mail
             self.brief_source_hooks.append(BriefSourceHook(mail_selection.resource_ref,AuthorizationRequest(owner_ref=self.owner_ref,
                 connection_ref=transport.connection_ref,capability='assistant.mail_read',resource_ref=mail_selection.resource_ref,operation='read',
@@ -177,6 +224,7 @@ class AssistantRuntime:
                 import json
                 command,_,argument=request.query.partition(' ');guard()
                 if command=='/actconfirm':
+                    if request.input_kind!='text':raise StorageError('editable voice transcription is not write confirmation; use the exact text/button preview')
                     receipt=action_runtime.confirm_and_execute(argument,actor_ref=self.owner_ref)
                     return {'status':receipt.status,'text':'Исход действия: '+receipt.status+'. Provider ref: '+receipt.provider_operation_ref,
                             'receipt_ref':receipt.idempotency_key,'delivery_completion':'provider acceptance is distinct from recipient delivery'}
@@ -205,7 +253,7 @@ def runtime_from_config(config,*,target,settings):
     import os
     from prm.storage.policy import DurableCapabilityRegistry
     allowed={'owner_ref','owner_chat_id','budget_refs','job_budget','model','model_upper_bound','history_retention_seconds','model_resource_ref','archive_resource_ref',
-             'public_web','public_upper_bound','public_search_ref','public_fetch_ref','tariff_version','graph','github','artifact_root','media_root','local_services'}
+             'public_web','public_upper_bound','public_search_ref','public_fetch_ref','tariff_version','graph','github','artifact_root','media_root','local_services','speech','vision','delivery','media_download'}
     if not isinstance(config,dict) or set(config)-allowed or not {'owner_ref','owner_chat_id','budget_refs','job_budget'}<=set(config):
         raise StorageError('explicit complete runtime configuration required')
     registry=DurableCapabilityRegistry(target,budget_refs=tuple(config['budget_refs']),job_budget=config['job_budget'])
@@ -216,7 +264,7 @@ def runtime_from_config(config,*,target,settings):
         if key_ref is not None and (not isinstance(key_ref,str) or not key_ref.startswith('PAI_') or not key_ref.replace('_','').isalnum()):
             raise StorageError('explicit task-specific credential environment reference required')
         endpoint=ModelEndpoint(**value,token=os.environ.get(key_ref,'') if key_ref else '')
-    options={key:value for key,value in config.items() if key not in {'budget_refs','job_budget','model','public_web','graph','github','artifact_root','media_root','local_services'}}
+    options={key:value for key,value in config.items() if key not in {'budget_refs','job_budget','model','public_web','graph','github','artifact_root','media_root','local_services','speech','vision','delivery','media_download'}}
     if config.get('public_web'):
         from .web import BraveSearchProvider
         from prm.public_web import PublicWebBounds
@@ -254,6 +302,9 @@ def runtime_from_config(config,*,target,settings):
             for name in ('window_start','window_end'):selected[name]=datetime.fromisoformat(selected[name])
             calendar=CalendarScopeSelection(**selected)
         root.attach_graph(transport,mail_selection=mail,calendar_selection=calendar)
+        if mail is not None:
+            from .watch import wire_mail_watch
+            wire_mail_watch(root,transport=transport,selection=mail)
         from .actions import ActionRuntime
         root.attach_local_services(action_runtime=ActionRuntime(root,graph_transport=transport,upper_bound=value.get('action_upper_bound')))
     if config.get('local_services'):
@@ -273,4 +324,32 @@ def runtime_from_config(config,*,target,settings):
     if config.get('media_root'):
         from .media import MediaRuntime
         root.media=MediaRuntime(root,temporary_root=config['media_root'])
+        def edit_transcript(request,request_ref,guard):
+            parts=request.query.split(' ',3)
+            if len(parts)!=4:raise StorageError('exact transcript ref, version and corrected text required')
+            guard();item=root.media.revise_transcript(parts[1],text=parts[3],expected_version=int(parts[2]))
+            return {'status':'corrected','text':'Расшифровка исправлена. Старое подтверждение больше не действует.','transcript_ref':item.object_id,'version':item.version}
+        root.services['media']=edit_transcript
+        if config.get('speech'):
+            from .speech import SpeechTranscriber
+            speech=dict(config['speech']);value=dict(speech.pop('endpoint'));key_ref=value.pop('token_env')
+            if not key_ref.startswith('PAI_'):raise StorageError('explicit speech credential reference required')
+            root.media.transcriber=SpeechTranscriber(root,endpoint=ModelEndpoint(**value,token=os.environ[key_ref]),**speech)
+        if config.get('vision'):
+            from .vision import VisionAdapter
+            vision=dict(config['vision']);value=dict(vision.pop('endpoint'));key_ref=value.pop('token_env')
+            if not key_ref.startswith('PAI_'):raise StorageError('explicit vision credential reference required')
+            root.media.vision=VisionAdapter(root,endpoint=ModelEndpoint(**value,token=os.environ[key_ref]),**vision)
+    if config.get('delivery'):
+        from .transports import BoundedTelegramSender
+        from .delivery import DeliveryExecutor
+        value=dict(config['delivery']);key_ref=value.pop('token_env');upper=value.pop('upper_bound')
+        if not key_ref.startswith('PAI_'):raise StorageError('explicit bot credential reference required')
+        root.delivery=DeliveryExecutor(target,registry=registry,sender=BoundedTelegramSender(token=os.environ[key_ref],owner_chat_id=root.owner_chat_id,**value))
+        root.ingress.delivery_executor=root.delivery;root.ingress.delivery_upper_bound=upper;root.ingress.destination_ref=value['destination_ref']
+    if config.get('media_download'):
+        from .media_download import TelegramMediaDownloader
+        value=dict(config['media_download']);key_ref=value.pop('token_env')
+        if not key_ref.startswith('PAI_'):raise StorageError('explicit media credential reference required')
+        root.media_downloader=TelegramMediaDownloader(root,token=os.environ[key_ref],**value)
     return root

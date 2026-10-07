@@ -167,6 +167,8 @@ class StateTransaction:
         if self.pid!=os.getpid() or self.conn.closed: raise StorageError('transaction cannot be reused across processes or after close')
     def put(self,owner,namespace,object_id,payload,*,expected_version:int):
         self._check();_identity(owner,namespace,object_id)
+        self._object_lock(owner,namespace,object_id)
+        if self._deleted(owner,namespace,object_id):raise StateConflict('deleted object cannot be resurrected')
         if type(expected_version) is not int or not 0<=expected_version<2**63-1: raise StateConflict('invalid expected version')
         encoded,digest=_canonical(payload)
         if expected_version==0:
@@ -182,6 +184,7 @@ class StateTransaction:
         return StateObject(owner,namespace,object_id,row['version'],json.loads(encoded),digest)
     def get(self,owner,namespace,object_id,*,version:int|None=None):
         self._check();_identity(owner,namespace,object_id)
+        if self._deleted(owner,namespace,object_id):return None
         if version is not None and (type(version) is not int or version<=0): raise StorageError('invalid object version')
         if version is None:
             row=self.conn.execute('''SELECT v.version,v.payload,v.digest FROM pa_runtime.object_versions v
@@ -194,6 +197,14 @@ class StateTransaction:
         _,digest=_canonical(row['payload'])
         if digest!=row['digest']:raise StorageError('stored object integrity check failed')
         return StateObject(owner,namespace,object_id,row['version'],row['payload'],digest)
+
+    def _deleted(self,owner,namespace,object_id):
+        if self.conn.execute("SELECT to_regclass('pa_memory.tombstones') AS table_ref").fetchone()['table_ref'] is None:return False
+        return self.conn.execute('SELECT 1 FROM pa_memory.tombstones WHERE owner=%s AND namespace=%s AND object_ref=%s',
+                                 (owner,namespace,object_id)).fetchone() is not None
+    def _object_lock(self,owner,namespace,object_id):
+        value=int.from_bytes(hashlib.sha256((owner+'\x1f'+namespace+'\x1f'+object_id).encode()).digest()[:8],'big')%(2**63)
+        self.conn.execute('SELECT pg_advisory_xact_lock(%s)',(value,))
 
 
 class PostgresStore:

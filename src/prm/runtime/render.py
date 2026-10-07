@@ -16,7 +16,7 @@ def main(argv=None):
     from prm.briefs import _stored_document
     from prm.report_exports import render_report
     source=Path(args.input)
-    if source.stat().st_size>64000:raise ValueError('bounded immutable render input required')
+    if source.stat().st_size>256000:raise ValueError('bounded immutable render input required')
     document=_stored_document(json.loads(source.read_text()))
     artifact=render_report(document,args.format)
     body=artifact.body.encode('utf-8') if isinstance(artifact.body,str) else artifact.body

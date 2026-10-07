@@ -107,7 +107,8 @@ class DurableConversationStore(ConversationStore):
                 if method=='record_response' and self.history_retention_seconds:
                     text=str(kwargs.get('text',''))[:2400]
                     tx.conn.execute('INSERT INTO pa_conversation.history(owner,conversation_id,id,expires,payload) VALUES(%s,%s,%s,%s,%s)',
-                        (self.owner_ref,conversation_id,uuid.uuid4().hex,now+timedelta(seconds=self.history_retention_seconds),Jsonb({'role':'assistant','text':text})))
+                        (self.owner_ref,conversation_id,uuid.uuid4().hex,now+timedelta(seconds=self.history_retention_seconds),
+                         Jsonb({'role':'assistant','text':text,'response_ref':state.object_refs[0].response_ref})))
             elif row and not state:
                 tx.conn.execute('DELETE FROM pa_conversation.states WHERE owner=%s AND id=%s',(self.owner_ref,conversation_id))
             return result
@@ -130,8 +131,19 @@ class DurableConversationStore(ConversationStore):
     def history(self,chat_id):
         with self.store.transaction() as tx:
             _check(tx.conn)
-            return tuple(row['payload'] for row in tx.conn.execute('''SELECT payload FROM pa_conversation.history
+            return tuple({'role':row['payload']['role'],'text':row['payload']['text']} for row in tx.conn.execute('''SELECT payload FROM pa_conversation.history
                 WHERE owner=%s AND conversation_id=%s AND expires>clock_timestamp() ORDER BY created_at,id''',(self.owner_ref,conversation_id_for(chat_id))).fetchall())
+    def history_for_model(self,chat_id):
+        with self.store.transaction() as tx:
+            return tuple(row['payload'] for row in tx.conn.execute('''SELECT payload FROM pa_conversation.history WHERE owner=%s
+                AND conversation_id=%s AND expires>clock_timestamp() AND payload->>'source_data_class'='model_generated' ORDER BY created_at,id''',
+                (self.owner_ref,conversation_id_for(chat_id))).fetchall())
+    def tag_response_source(self,response_ref,data_class):
+        if data_class not in {'model_generated','private_archive','private_connector_metadata','private_connector_content','user_provided','public'}:
+            raise StorageError('explicit response origin class required')
+        with self.store.transaction() as tx:
+            tx.conn.execute("UPDATE pa_conversation.history SET payload=jsonb_set(payload,'{source_data_class}',%s) WHERE owner=%s AND payload->>'response_ref'=%s",
+                (Jsonb(data_class),self.owner_ref,response_ref))
     def purge_history(self):
         with self.store.transaction() as tx:
             _check(tx.conn)
