@@ -270,6 +270,7 @@ class DurableCapabilityRegistry(CapabilityRegistry):
             op=conn.execute('SELECT * FROM pa_policy.operations WHERE owner=%s AND ref=%s FOR UPDATE',(owner,operation_ref)).fetchone()
             if not op or op['state'] not in {'prepared','accepted','unknown'}:raise StateConflict('no attempted operation to settle')
             if actual is not None and actual>op['upper_bound']:raise StorageError('reported cost exceeds reserved bound')
+            if op['state'] in {'accepted','unknown'} and actual is None:return
             if op['actual'] is not None:
                 if actual==op['actual']:return
                 raise StateConflict('usage already settled')

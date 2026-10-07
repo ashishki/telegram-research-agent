@@ -4,6 +4,8 @@ import uuid
 import time
 import hashlib
 from urllib.request import Request,ProxyHandler,build_opener
+from urllib.error import HTTPError
+from .model_errors import ModelProviderRejected,ModelResponseInvalid,DEFINITIVE_REJECTIONS
 from prm.capabilities import AuthorizationRequest,CapabilityDenied
 from prm.storage.postgres import StorageError
 from .model import NoRedirect,ModelEndpoint
@@ -30,11 +32,17 @@ class SpeechTranscriber:
             try:
                 with build_opener(ProxyHandler({}),NoRedirect()).open(request,timeout=endpoint.timeout_seconds) as response:
                     raw=response.read(64001)
-                    if len(raw)>64000 or response.headers.get_content_type()!='application/json':raise StorageError('speech response bound/type differs')
+                    if len(raw)>64000 or response.headers.get_content_type()!='application/json':raise ModelResponseInvalid()
                     value=json.loads(raw)
-            except Exception:raise StorageError('speech outcome unknown; automatic retry denied') from None
+            except HTTPError as error:
+                if error.code in DEFINITIVE_REJECTIONS:raise ModelProviderRejected(error.code) from None
+                raise StorageError('speech transport outcome unknown; do not retry') from None
+            except ModelResponseInvalid:raise
+            except (json.JSONDecodeError,UnicodeDecodeError):raise ModelResponseInvalid() from None
+            except Exception:raise StorageError('speech transport outcome unknown; do not retry') from None
+            if not isinstance(value,dict):raise ModelResponseInvalid()
             text=value.get('text')
-            if not isinstance(text,str) or len(text)>16000:raise StorageError('speech text unavailable')
+            if not isinstance(text,str) or len(text)>16000:raise ModelResponseInvalid()
             return text
         from .cost_cache import CostCacheRuntime
         from .model_attempts import prepare_model_attempt
@@ -45,6 +53,8 @@ class SpeechTranscriber:
         started=time.monotonic();outcome='unknown'
         try:
             text=self.root.registry.execute_reserved((decision.reservation,),transport);outcome='accepted';return text
+        except ModelProviderRejected:
+            outcome='rejected';raise
         finally:
             CostCacheRuntime(self.root).record(task_ref=task_ref or asset.media_ref,attempt_ref='stt_'+asset.media_ref,provider=endpoint.provider_ref,
                 model=endpoint.model,usage={'input':None,'cached_input':None,'cache_write':None,'output':None,'reasoning':None,'semantics':'speech_usage_unavailable'},

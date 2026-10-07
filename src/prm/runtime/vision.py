@@ -4,6 +4,8 @@ import json
 import time
 import hashlib
 from urllib.request import Request,ProxyHandler,build_opener
+from urllib.error import HTTPError
+from .model_errors import ModelProviderRejected,ModelResponseInvalid,DEFINITIVE_REJECTIONS
 from prm.capabilities import AuthorizationRequest,CapabilityDenied
 from prm.storage.postgres import StorageError
 from .model import NoRedirect
@@ -28,15 +30,22 @@ class VisionAdapter:
             try:
                 with build_opener(ProxyHandler({}),NoRedirect()).open(Request(endpoint.endpoint,data=body,headers={'Authorization':'Bearer '+endpoint.token,'Content-Type':'application/json'}),timeout=endpoint.timeout_seconds) as response:
                     raw=response.read(128001)
-                    if len(raw)>128000:raise StorageError('vision response exceeds bound')
+                    if len(raw)>128000 or response.headers.get_content_type()!='application/json':raise ModelResponseInvalid()
                     value=json.loads(raw)
-            except Exception:raise StorageError('vision outcome unknown; no provider fallback') from None
-            if value.get('model')!=endpoint.model or len(value.get('choices',[]))!=1 or value['choices'][0].get('finish_reason')!='stop':
-                raise StorageError('vision model identity or completion differs')
-            if value['choices'][0].get('message',{}).get('tool_calls'):raise StorageError('vision tool authority denied')
-            observed_usage.update(value.get('usage',{}))
-            text=value['choices'][0].get('message',{}).get('content')
-            if not isinstance(text,str) or not text.strip() or len(text)>12000:raise StorageError('vision text unavailable')
+            except HTTPError as error:
+                if error.code in DEFINITIVE_REJECTIONS:raise ModelProviderRejected(error.code) from None
+                raise StorageError('vision transport outcome unknown; do not retry') from None
+            except ModelResponseInvalid:raise
+            except (json.JSONDecodeError,UnicodeDecodeError):raise ModelResponseInvalid() from None
+            except Exception:raise StorageError('vision transport outcome unknown; do not retry') from None
+            if not isinstance(value,dict):raise ModelResponseInvalid()
+            choices=value.get('choices')
+            if value.get('model')!=endpoint.model or not isinstance(choices,list) or len(choices)!=1 or not isinstance(choices[0],dict) or choices[0].get('finish_reason')!='stop':raise ModelResponseInvalid()
+            message=choices[0].get('message');usage=value.get('usage',{})
+            if not isinstance(message,dict) or message.get('tool_calls') or not isinstance(usage,dict):raise ModelResponseInvalid()
+            observed_usage.update(usage)
+            text=message.get('content')
+            if not isinstance(text,str) or not text.strip() or len(text)>12000:raise ModelResponseInvalid()
             return {'status':'ok','text':text,'media_ref':asset.media_ref,'page_refs':[1],'extraction_method':'vision'}
         from .cost_cache import CostCacheRuntime
         from .model_attempts import prepare_model_attempt
@@ -47,6 +56,8 @@ class VisionAdapter:
         started=time.monotonic();outcome='unknown'
         try:
             result=self.root.registry.execute_reserved((decision.reservation,),transport);outcome='accepted';return result
+        except ModelProviderRejected:
+            outcome='rejected';raise
         finally:
             usage={'input':observed_usage.get('prompt_tokens'),'cached_input':observed_usage.get('prompt_tokens_details',{}).get('cached_tokens'),
                 'cache_write':0,'output':observed_usage.get('completion_tokens'),'reasoning':observed_usage.get('completion_tokens_details',{}).get('reasoning_tokens',0),

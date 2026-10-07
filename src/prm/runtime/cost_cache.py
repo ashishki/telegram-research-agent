@@ -43,7 +43,7 @@ class CostCacheRuntime:
         with self.store.transaction() as tx:
             tx.conn.execute('INSERT INTO pa_cache.tariffs VALUES(%s,%s,%s,%s)',(provider,model,version,Jsonb(payload)))
     def record(self,*,task_ref,attempt_ref,provider,model,usage,latency_ms,outcome,tariff_version=None):
-        if outcome not in {'accepted','unknown','not_attempted'} or type(latency_ms)is not int or latency_ms<0:raise StorageError('bounded actual attempt metadata required')
+        if outcome not in {'accepted','unknown','not_attempted','rejected'} or type(latency_ms)is not int or latency_ms<0:raise StorageError('bounded actual attempt metadata required')
         if not isinstance(usage,dict) or any(key not in {'input','cached_input','cache_write','output','reasoning','semantics'} for key in usage):
             raise StorageError('normalized provider usage required')
         for name in ('input','cached_input','cache_write','output','reasoning'):

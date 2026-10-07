@@ -45,7 +45,9 @@ def pai(tmp_path):
             if self.path.startswith('/v1.0/me/'):
                 body=json.loads(raw) if raw else {};requests.append(('write',self.path,body))
                 self.reply({'id':'synthetic_event_created','changeKey':'version_1'},201 if self.path.endswith('/events') else 202);return
-            self.reply({'error':'unsupported'},404)
+            if self.path=='/speech/malformed':
+                requests.append(('malformed',self.path,{}));self.reply({},200);return
+            requests.append(('rejected',self.path,{}));self.reply({'error':'unsupported'},404)
         def do_GET(self):
             requests.append(('read',self.path,{}));parsed=urlsplit(self.path);query=parse_qs(parsed.query)
             if parsed.path=='/v1.0/me':self.reply({'id':'account_synthetic'});return

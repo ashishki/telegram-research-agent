@@ -213,3 +213,19 @@ def test_compound_preparation_fault_is_unknown_and_first_group_cannot_replay(san
     assert not reg.authorize_and_reserve(request(grant,'group_first'),upper_bound=1).allowed
     operation=next(row for row in reg.snapshot(grant.owner_ref)['operations'] if row['ref']=='group_first')
     assert operation['state']=='unknown'
+
+
+def test_unpriced_settlement_is_idempotent_and_terminal_state_is_monotone(sandbox):
+    reg,grant=registry(sandbox,'settle_idempotent',capacity=10)
+    decision=reg.authorize_and_reserve(request(grant,'settle_once'),upper_bound=3)
+    reg.execute_reserved((decision.reservation,),lambda:True)
+    first=reg.snapshot(grant.owner_ref)
+    reg.settle(grant.owner_ref,'settle_once',outcome='accepted')
+    reg.settle(grant.owner_ref,'settle_once',outcome='unknown')
+    assert reg.snapshot(grant.owner_ref)==first
+    reg.settle(grant.owner_ref,'settle_once',outcome='accepted',actual=2)
+    priced=reg.snapshot(grant.owner_ref)
+    reg.settle(grant.owner_ref,'settle_once',outcome='unknown')
+    reg.settle(grant.owner_ref,'settle_once',outcome='accepted',actual=2)
+    assert reg.snapshot(grant.owner_ref)==priced
+    with pytest.raises(StateConflict):reg.settle(grant.owner_ref,'settle_once',outcome='accepted',actual=1)
