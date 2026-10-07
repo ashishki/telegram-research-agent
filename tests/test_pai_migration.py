@@ -47,3 +47,47 @@ def test_corrupted_domain_object_blocks_atomic_transfer(pai):
     data['sha256']=hashlib.sha256(json.dumps(data['rows'],sort_keys=True).encode()).hexdigest()
     with pytest.raises(StorageError):apply_domain_delta(target,delta,expected_target_manifest=expected)
     assert state_manifest(target)==expected
+
+
+def test_repeated_domain_import_keeps_target_tombstones_terminal_jobs_and_cleaned_files(pai):
+    from copy import deepcopy
+    from datetime import timedelta
+    from hashlib import sha256
+    from prm.runtime.migration import export_domain_delta,apply_domain_delta,state_manifest
+    from prm.storage.postgres import PostgresStore
+    from prm.storage.jobs import JobQueue
+    from prm.runtime.composition import AssistantRuntime
+    from prm.storage.policy import DurableCapabilityRegistry
+    from prm.runtime.reader import PrivateReportRuntime
+    from tests.test_pai_brief_runtime import stored_brief
+    actor={'chat_id':'42','actor_id':'42','owner_chat_id':'42'};root=pai.root;memory=MemoryRuntime(root)
+    preview=memory.preview(object_ref='memory_repeat_import',text='Synthetic derived content',source_refs=('source_fixture',),**actor)
+    item=memory.confirm(preview,**actor)
+    payload={'schema_version':1,'input_namespace':'memory','input_ref':item.object_id,'input_version':1,'input_digest':item.digest,
+        'connection_ref':None,'resource_ref':'resource_local','purpose':'local.assistant','consent_revision':1}
+    job=root.queue.enqueue(owner=root.owner_ref,idempotency_key='repeat_import_job',kind='compute.digest',payload=payload,deadline=pai.now+timedelta(minutes=10))
+    root.queue.complete(root.queue.claim(owner=root.owner_ref,kinds=('compute.digest',)),{'text':'Synthetic result copy'})
+    document,state=stored_brief(pai)
+    memory.register_dependency(parent_namespace='memory',parent_ref=item.object_id,child_namespace='result',child_ref=root.briefs._document_ref(document.brief_id))
+    root.reader=PrivateReportRuntime(root,artifact_root=pai.path/'source_artifacts')
+    token=root.reader.issue_session(**actor);root.reader.artifact(token,brief_id=document.brief_id,version=document.version,format='html')
+    pai.ops.kill_switch();OperationsRuntime(pai.pg.migrator,artifact_root=root.reader.path).backup(destination=pai.path/'repeat_baseline')
+    delta=export_domain_delta(pai.pg.migrator);original=deepcopy(delta)
+    target=pai.pg.empty_database('pa_test_repeat_import');directory=pai.path/'target_artifacts'
+    restore_bundle(bundle=pai.path/'repeat_baseline',target=target,artifact_root=directory)
+    app=pai.pg.target(target.database,'pa_test_app')
+    registry=DurableCapabilityRegistry(app,budget_refs=root.registry.budget_refs,job_budget=True)
+    restored=AssistantRuntime(target=app,settings=root.settings,registry=registry,owner_ref=root.owner_ref,owner_chat_id='42')
+    restored.reader=PrivateReportRuntime(restored,artifact_root=directory);MemoryRuntime(restored).forget(item.object_id,**actor)
+    assert not list(directory.iterdir()) and restored.queue.status(owner=root.owner_ref,job_id=job)['status']=='completed'
+    expected=state_manifest(target)
+    apply_domain_delta(target,delta,expected_target_manifest=expected)
+    once=state_manifest(target)
+    apply_domain_delta(target,delta,expected_target_manifest=once)
+    assert state_manifest(target)==once and delta==original
+    assert PostgresStore(app).get(root.owner_ref,'memory',item.object_id) is None
+    assert restored.queue.status(owner=root.owner_ref,job_id=job)['status']=='completed'
+    with PostgresStore(app).transaction() as tx:
+        row=tx.conn.execute('SELECT deleted,cleanup_pending,root_digest FROM pa_artifacts.files WHERE owner=%s',(root.owner_ref,)).fetchone()
+    assert row['deleted'] and not row['cleanup_pending']
+    assert row['root_digest']==sha256(str(directory.resolve()).encode()).hexdigest()

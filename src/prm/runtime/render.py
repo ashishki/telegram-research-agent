@@ -14,11 +14,11 @@ def main(argv=None):
     from .network_guard import install_network_block
     install_network_block()
     from prm.briefs import _stored_document
-    from prm.report_exports import render_report
+    from prm.report_exports import render_report,render_designed_html,render_paginated_pdf
     source=Path(args.input)
     if source.stat().st_size>256000:raise ValueError('bounded immutable render input required')
     document=_stored_document(json.loads(source.read_text()))
-    artifact=render_report(document,args.format)
+    artifact=render_designed_html(document) if args.format=='html' else render_paginated_pdf(document) if args.format=='pdf' else render_report(document,args.format)
     body=artifact.body.encode('utf-8') if isinstance(artifact.body,str) else artifact.body
     if len(body)>16000000:raise ValueError('artifact exceeds bound')
     Path(args.output).write_bytes(body)

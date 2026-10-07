@@ -115,9 +115,9 @@ def test_pause_winning_before_dispatch_prevents_transport(case, monkeypatch):
     scheduler, registry, sub, clock, actor = case
     grants(case); notification = pending_watch(case)[0]; calls = []
     commit = registry._commit_durable_transport
-    def pause_first(reservations):
+    def pause_first(reservations,**kwargs):
         scheduler.feedback(sub.subscription_id, 'pause', **actor)
-        return commit(reservations)
+        return commit(reservations,**kwargs)
     monkeypatch.setattr(registry, '_commit_durable_transport', pause_first)
     executor = DeliveryExecutor(scheduler.queue.store.target, registry=registry, sender=lambda *args: calls.append(args))
     assert executor.deliver_watch(owner=sub.owner_ref, notification_id=notification, upper_bound=1)['status'] == 'unknown'
@@ -152,7 +152,7 @@ def test_revoke_winning_before_final_send_and_foreground_scope_separation(case, 
     commit = registry._commit_durable_transport
     def revoke_first(reservations):
         registry.revoke_grant('grant_answer', owner_ref=sub.owner_ref)
-        return commit(reservations)
+        return commit(reservations,**kwargs)
     monkeypatch.setattr(registry, '_commit_durable_transport', revoke_first)
     executor = DeliveryExecutor(scheduler.queue.store.target, registry=registry, sender=lambda *args: calls.append(args))
     assert executor.deliver_result(owner=sub.owner_ref, job_id=job, destination_ref='destination_private', upper_bound=1)['status'] == 'unknown'

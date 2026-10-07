@@ -2,6 +2,7 @@
 import json
 import uuid
 import time
+import hashlib
 from urllib.request import Request,ProxyHandler,build_opener
 from prm.capabilities import AuthorizationRequest,CapabilityDenied
 from prm.storage.postgres import StorageError
@@ -36,6 +37,11 @@ class SpeechTranscriber:
             if not isinstance(text,str) or len(text)>16000:raise StorageError('speech text unavailable')
             return text
         from .cost_cache import CostCacheRuntime
+        from .model_attempts import prepare_model_attempt
+        try:prepare_model_attempt(self.root.queue.store,owner=self.root.owner_ref,task_ref=task_ref or asset.media_ref,purpose='voice.transcription',operation_refs=(decision.operation_ref,),input_digest=hashlib.sha256(body).hexdigest())
+        except Exception:
+            decision.reservation.abandon_before_transport()
+            raise
         started=time.monotonic();outcome='unknown'
         try:
             text=self.root.registry.execute_reserved((decision.reservation,),transport);outcome='accepted';return text

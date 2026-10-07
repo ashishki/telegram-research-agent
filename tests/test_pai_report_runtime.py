@@ -19,6 +19,7 @@ def test_actual_reader_subprocess_versions_and_private_http_headers(pai):
         with urlopen(Request(url,headers={'Authorization':'Bearer '+token})) as response:
             html=response.read().decode();assert 'noindex' in response.headers['X-Robots-Tag']
             assert document.content_digest in html and 'Важное событие' in html
+            assert 'brief-report--designed' in html and 'kpis' in html
         pdf,kind=reader.artifact(token,brief_id=document.brief_id,version=document.version,format='pdf')
         assert pdf.startswith(b'%PDF-') and kind=='application/pdf'
         reader.revoke(token)

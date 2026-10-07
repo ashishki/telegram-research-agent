@@ -23,3 +23,14 @@ def test_fabricated_provenance_and_revoked_archive_never_egress(pai):
     transport=RuntimeArchiveTransport(pai.root,request_ref='request_revoked_archive',guard=lambda:None,context_resource_ref='resource_archive')
     result=synthesize_archive_response(_archive_payload(),question='agent evals',evidence_items=_archive_evidence(),access=None,transport=transport)
     assert result.text is None and not pai.requests
+
+
+def test_compatible_model_provider_uses_separate_archive_scope_groups(pai):
+    from dataclasses import replace
+    pai.root.model_endpoint=replace(pai.root.model_endpoint,provider_ref='provider_mimo')
+    allow(pai,'model.generate','resource_dialogue','user_provided','answer.request',provider='provider_mimo')
+    allow(pai,'model.context_egress','resource_archive','private_archive','answer.context',provider='provider_mimo')
+    transport=RuntimeArchiveTransport(pai.root,request_ref='request_compatible_archive',guard=lambda:None,context_resource_ref='resource_archive')
+    result=synthesize_archive_response(_archive_payload(),question='agent evals',evidence_items=_archive_evidence(),access=None,transport=transport)
+    assert result.status=='generated_verified'
+    assert len([row for row in pai.requests if row[0]=='model'])==1

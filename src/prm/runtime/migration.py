@@ -4,6 +4,7 @@ from psycopg.types.json import Jsonb
 from .operations import OperationsRuntime,SCHEMAS,restore_bundle
 from prm.storage.postgres import StorageError,StateTransaction,_canonical,_identity
 import hashlib
+import copy
 import json
 from datetime import date,datetime
 
@@ -61,7 +62,7 @@ def apply_domain_delta(target,delta,*,expected_target_manifest):
     if target.user!='pa_test_migrator' or target.target!='synthetic-test' or delta.get('schema_version')!=1:
         raise StorageError('explicit supported isolated domain import required')
     if state_manifest(target)!=expected_target_manifest:raise StorageError('target changed; forward-fix review required')
-    tables=delta.get('tables',{})
+    tables=copy.deepcopy(delta.get('tables',{}))
     if set(tables)!={schema+'.'+table for schema,table in DOMAIN_TABLES}:raise StorageError('complete domain table set required')
     with target.connect() as conn:
         with conn.transaction():
@@ -99,6 +100,27 @@ def apply_domain_delta(target,delta,*,expected_target_manifest):
                         if row['status']!='unknown':
                             if incoming['status']!='unknown' and incoming['status']!=row['status']:raise StorageError('conflicting terminal delivery outcomes')
                             incoming.update(row)
+            # Terminal jobs are audit state, including when their result was
+            # deleted. An older source snapshot must not reopen that job.
+            jobs=tables['pa_jobs.jobs'];keys=jobs['keys'];source={tuple(row[key] for key in keys):row for row in jobs['rows']}
+            for original in conn.execute("SELECT * FROM pa_jobs.jobs WHERE status IN ('completed','cancelled','failed','awaiting_reconciliation')").fetchall():
+                row=_json_row(original);key=tuple(row[field] for field in keys);incoming=source.get(key)
+                if incoming is None:raise StorageError('target terminal job missing from source; forward fix required')
+                if (row['kind'],row['mode'],row['payload'])!=(incoming['kind'],incoming['mode'],incoming['payload']):raise StorageError('terminal job input differs across writers')
+                if incoming['status'] in {'completed','cancelled','failed','awaiting_reconciliation'} and (incoming['status'],incoming['result_ref'])!=(row['status'],row['result_ref']):raise StorageError('conflicting terminal job outcomes')
+                incoming.update(row)
+            # Domain JSON carries no bytes. Preserve the target directory and
+            # its already-completed cleanup; imports cannot recreate files.
+            artifacts=tables['pa_artifacts.files'];keys=artifacts['keys'];source={tuple(row[key] for key in keys):row for row in artifacts['rows']}
+            for original in conn.execute('SELECT * FROM pa_artifacts.files').fetchall():
+                row=_json_row(original);key=tuple(row[field] for field in keys);incoming=source.get(key)
+                if incoming is None:
+                    artifacts['rows'].append({**row,'deleted':True,'cleanup_pending':row['cleanup_pending'] or not row['deleted']})
+                    continue
+                if (row['parent_namespace'],row['parent_ref'],row['content_digest'])!=(incoming['parent_namespace'],incoming['parent_ref'],incoming['content_digest']):raise StorageError('artifact identity differs across writers')
+                incoming['root_digest']=row['root_digest']
+                incoming['deleted']=row['deleted'] or incoming['deleted']
+                incoming['cleanup_pending']=row['cleanup_pending'] if row['deleted'] else incoming['deleted'] or row['cleanup_pending']
             # A second writer's cost reservations require a forward fix, never a refund.
             for table in ('windows','operations','call_counts'):
                 item=tables['pa_policy.'+table];keys=item['keys'];source={tuple(row[key] for key in keys):row for row in item['rows']}

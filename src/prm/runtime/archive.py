@@ -16,7 +16,7 @@ class RuntimeArchiveTransport:
         if type(context)is not ArchiveEvidenceContext or not archive_evidence_context_is_intact(context):
             raise ArchiveSynthesisTransportUnavailable('immutable local provenance required')
         root=self.root;endpoint=root.model_endpoint
-        if endpoint is None or endpoint.provider_ref!='provider_openai':
+        if endpoint is None:
             raise ArchiveSynthesisTransportUnavailable('explicit paired archive provider unavailable')
         operation='archive_'+hashlib.sha256((self.request_ref+context.binding_digest).encode()).hexdigest()[:40]
         query=root.registry.authorize_and_reserve(AuthorizationRequest(owner_ref=root.owner_ref,connection_ref=endpoint.connection_ref,
@@ -25,10 +25,10 @@ class RuntimeArchiveTransport:
         if not query.allowed:raise ArchiveSynthesisTransportUnavailable('query scope denied')
         content=root.registry.authorize_and_reserve(AuthorizationRequest(owner_ref=root.owner_ref,connection_ref=endpoint.connection_ref,
             capability='model.context_egress',resource_ref=self.context_resource_ref,operation='model_egress',data_class='private_archive',
-            provider_ref=endpoint.provider_ref,purpose='answer.context',operation_ref=operation),upper_bound=root.model_upper_bound)
+            provider_ref=endpoint.provider_ref,purpose='answer.context',operation_ref=operation if endpoint.provider_ref=='provider_openai' else operation+'_context'),upper_bound=root.model_upper_bound)
         if not content.allowed:
             query.reservation.abandon_before_transport();raise ArchiveSynthesisTransportUnavailable('archive scope denied')
-        groups=((query,content),)
+        groups=((query,content),) if endpoint.provider_ref=='provider_openai' else ((query,),(content,))
         client=root.scoped_client(endpoint,groups=groups,task_ref=self.request_ref,attempt_ref=operation,
             history=({'role':'user','content':'Untrusted cited archive evidence: '+json.dumps(context.to_transport_context(),ensure_ascii=False)},),guard=self.guard)
         try:

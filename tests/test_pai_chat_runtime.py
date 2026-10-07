@@ -92,3 +92,29 @@ def test_shortening_private_connector_response_keeps_its_origin(pai):
     assert original['data_class']=='private_connector_content'
     assert shortened['data_classes']==['private_connector_content']
     assert not root.conversations.history_for_model('42')
+
+
+def test_unknown_model_call_has_logical_fence_across_fresh_reservations(pai):
+    from dataclasses import replace
+    from tests.pai_runtime_fixtures import allow
+    from prm.capabilities import AuthorizationRequest
+    from prm.runtime.model_attempts import ModelAttemptAlreadyRecorded
+    from llm.client import LLMOutcomeUnknown
+    root=pai.root
+    allow(pai,'model.generate','resource_dialogue','user_provided','answer.request')
+    def client(operation):
+        scope=AuthorizationRequest(owner_ref=root.owner_ref,connection_ref='connection_fixture',capability='model.generate',resource_ref='resource_dialogue',
+            operation='model_egress',data_class='user_provided',provider_ref='provider_openai',purpose='answer.request',operation_ref=operation)
+        decision=root.registry.authorize_and_reserve(scope,upper_bound=1)
+        return root.scoped_client(root.model_endpoint,groups=((decision,),),task_ref='logical_unknown_fixture',attempt_ref=operation),decision
+    first,decision=client('unknown_model_first')
+    kwargs={'prompt':'Synthetic ACK-loss question.','system':'Answer current synthetic question.','max_tokens':80,'category':'chat',
+        'authorization':decision,'data_class':'user_provided','owner_ref':root.owner_ref,'connection_ref':'connection_fixture','resource_ref':'resource_dialogue'}
+    with pytest.raises(LLMOutcomeUnknown) as failed:first.complete_with_receipt(**kwargs)
+    assert failed.value.operation_refs==('unknown_model_first',) and not failed.value.retry_allowed
+    second,new_decision=client('unknown_model_fresh_reservation')
+    try:
+        with pytest.raises(ModelAttemptAlreadyRecorded):second.complete_with_receipt(**dict(kwargs,authorization=new_decision))
+        with pytest.raises(ModelAttemptAlreadyRecorded):first.complete_with_receipt(**kwargs)
+        assert len([row for row in pai.requests if row[0]=='model'])==1
+    finally:new_decision.reservation.abandon_before_transport()

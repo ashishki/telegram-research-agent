@@ -194,3 +194,22 @@ def test_prepared_operation_survives_worker_loss_without_provider_retry(sandbox)
     restarted=DurableCapabilityRegistry(sandbox.app,budget_refs=reg.budget_refs)
     assert not restarted.authorize_and_reserve(request(grant,'op_prepared_lost_worker'),upper_bound=2).allowed
     assert all(w['reserved']==2 for w in restarted.snapshot(grant.owner_ref)['windows'])
+
+
+def test_compound_preparation_fault_is_unknown_and_first_group_cannot_replay(sandbox,monkeypatch):
+    from prm.storage.policy import ScopePreparationUnknown
+    from prm.storage.postgres import StorageError
+    reg,grant=registry(sandbox,'group_partial_fault',capacity=10)
+    first=reg.authorize_and_reserve(request(grant,'group_first'),upper_bound=1)
+    second=reg.authorize_and_reserve(request(grant,'group_second'),upper_bound=1)
+    real=reg._commit_durable_transport
+    def failing(group,*,strict=False):
+        if group[0].operation_ref=='group_second':raise StorageError('synthetic state outage')
+        return real(group,strict=strict)
+    monkeypatch.setattr(reg,'_commit_durable_transport',failing)
+    calls=[]
+    with pytest.raises(ScopePreparationUnknown) as failed:reg.execute_reserved_groups(((first.reservation,),(second.reservation,)),lambda:calls.append(True))
+    assert not failed.value.retry_allowed and 'group_first' in failed.value.operation_refs and not calls
+    assert not reg.authorize_and_reserve(request(grant,'group_first'),upper_bound=1).allowed
+    operation=next(row for row in reg.snapshot(grant.owner_ref)['operations'] if row['ref']=='group_first')
+    assert operation['state']=='unknown'

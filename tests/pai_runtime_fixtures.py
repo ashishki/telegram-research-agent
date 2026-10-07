@@ -33,6 +33,7 @@ def pai(tmp_path):
                 self.reply({'access_token':'synthetic_access_fixture','refresh_token':'synthetic_refresh_fixture','token_type':'Bearer','expires_in':3600,'scope':scopes});return
             if self.path=='/chat/completions':
                 body=json.loads(raw);requests.append(('model',self.path,body));text='Синтетический ответ на текущий вопрос.'
+                if body['messages'][-1].get('content')=='Synthetic ACK-loss question.':self.close_connection=True;return
                 for message in body['messages']:
                     value=message.get('content')
                     if isinstance(value,str) and value.startswith('Untrusted cited archive evidence: '):

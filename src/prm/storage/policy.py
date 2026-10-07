@@ -90,6 +90,13 @@ def _decode(row,now):
     return grant
 
 
+class ScopePreparationUnknown(StorageError):
+    """Preparation may have committed; the bound operations cannot be retried."""
+    def __init__(self,operation_refs):
+        super().__init__('compound authorization preparation is unknown; do not retry')
+        self.operation_refs=tuple(operation_refs);self.retry_allowed=False
+
+
 class DurableReservation(BudgetReservation):
     __slots__=('member_id',)
     def __init__(self,*,member_id,**kwargs):super().__init__(**kwargs);self.member_id=member_id
@@ -227,8 +234,10 @@ class DurableCapabilityRegistry(CapabilityRegistry):
                     ON o.owner=m.owner AND o.ref=m.operation_ref WHERE o.owner=%s AND o.ref=%s AND m.member_id=%s''',
                     (request.owner_ref,request.operation_ref,reservation.member_id)).fetchone()
                 return bool(decision.allowed and row and row['state']=='reserved' and row['request']==asdict(request))
-        except (StorageError,ValueError,KeyError,TypeError):return False
-    def _commit_durable_transport(self,reservations):
+        except (StorageError,ValueError,KeyError,TypeError):
+            if strict:raise ScopePreparationUnknown((ref,)) from None
+            return False
+    def _commit_durable_transport(self,reservations,*,strict=False):
         if not reservations or any(type(r) is not DurableReservation or r.registry is not self for r in reservations):return False
         owners={r._request.owner_ref for r in reservations};refs={r.operation_ref for r in reservations}
         if len(owners)!=1 or len(refs)!=1:return False
@@ -246,7 +255,9 @@ class DurableCapabilityRegistry(CapabilityRegistry):
                 conn.execute("UPDATE pa_policy.operations SET state='prepared' WHERE owner=%s AND ref=%s",(owner,ref))
             for r in reservations:r._consumed=True;r._transport_committed=True
             return True
-        except (StorageError,ValueError,KeyError,TypeError):return False
+        except (StorageError,ValueError,KeyError,TypeError):
+            if strict:raise ScopePreparationUnknown((ref,)) from None
+            return False
     def _commit_single_transport_reservation(self,reservation):return self._commit_durable_transport((reservation,))
     def _record_operation_outcome(self,reservation,outcome):
         if outcome not in {'accepted','unknown'}:raise StorageError('invalid provider outcome')
@@ -329,10 +340,10 @@ class DurableCapabilityRegistry(CapabilityRegistry):
         if len(bindings)!=1 or any(member.registry is not self for member in members):
             raise CapabilityDenied('transport groups must share owner, connection, provider and registry')
         owner=members[0]._request.owner_ref
-        prepared=[]
+        prepared=[];transport_started=False
         try:
             for group in groups:
-                if not self._commit_durable_transport(group):raise CapabilityDenied('scope group denied before transport')
+                if not self._commit_durable_transport(group,strict=True):raise CapabilityDenied('scope group denied before transport')
                 prepared.append(group[0].operation_ref)
             with self.store.transaction() as tx:
                 conn=tx.conn;_check_schema(conn)
@@ -341,14 +352,20 @@ class DurableCapabilityRegistry(CapabilityRegistry):
                 now=self._now(conn);auth=CapabilityRegistry([_decode(row,now) for row in rows])
                 if any(not auth.authorize(member._request,now=now).allowed for member in members):
                     raise CapabilityDenied('current scope group changed')
-                started=time.monotonic();result=self._invoke_transport(members,transport)
+                started=time.monotonic();transport_started=True;result=self._invoke_transport(members,transport)
                 if conn.closed or time.monotonic()-started>10:raise StorageError('scope group transport outcome unknown')
             for operation in prepared:self.settle(owner,operation,outcome='accepted')
             return result
-        except Exception:
-            for operation in prepared:self.settle(owner,operation,outcome='unknown')
+        except Exception as error:
+            for operation in prepared:
+                try:self.settle(owner,operation,outcome='unknown')
+                except StorageError:pass  # prepared remains a durable non-replayable fence
             for member in members:
-                if member.operation_ref not in prepared:member.abandon_before_transport()
+                if member.operation_ref not in prepared:
+                    try:member.abandon_before_transport()
+                    except StorageError:pass
+            if not transport_started and (prepared or isinstance(error,ScopePreparationUnknown)):
+                raise ScopePreparationUnknown(tuple(prepared)+tuple(getattr(error,'operation_refs',()))) from None
             raise
 
     def execute_prepared(self,reservation,transport):

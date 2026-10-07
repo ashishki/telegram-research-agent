@@ -29,7 +29,7 @@ def delete_derived_in(tx,*,owner,namespace,object_ref):
             payload=existing['payload'] if existing else None
         else:payload=old.payload
         tx.conn.execute('INSERT INTO pa_memory.tombstones(owner,namespace,object_ref) VALUES(%s,%s,%s) ON CONFLICT DO NOTHING',(owner,space,ref))
-        tx.conn.execute("UPDATE pa_jobs.jobs SET status='cancelled',token=NULL,lease_until=NULL WHERE owner=%s AND mode='compute' AND (payload->>'input_namespace'=%s AND payload->>'input_ref'=%s OR result_ref=%s)",(owner,space,ref,ref if space=='result' else ''))
+        tx.conn.execute("UPDATE pa_jobs.jobs SET status='cancelled',token=NULL,lease_until=NULL WHERE owner=%s AND mode='compute' AND status IN ('queued','retry_wait','leased','running') AND (payload->>'input_namespace'=%s AND payload->>'input_ref'=%s OR result_ref=%s)",(owner,space,ref,ref if space=='result' else ''))
         if payload and payload.get('kind')=='brief_manifest':
             tx.conn.execute('DELETE FROM pa_briefs.documents WHERE owner=%s AND id=%s',(owner,payload['brief_id']))
         if space=='memory' and tx.conn.execute("SELECT to_regclass('pa_academic.watches') AS meta").fetchone()['meta'] is not None:
@@ -39,17 +39,17 @@ def delete_derived_in(tx,*,owner,namespace,object_ref):
             for binding in bindings:
                 notes=tx.conn.execute("UPDATE pa_schedule.notifications SET payload=payload || %s WHERE owner=%s AND schedule_id=%s AND subject_ref=%s RETURNING id",
                     (Jsonb({'title':'[deleted by owner]','summary':'[deleted by owner]','why_now':'owner deletion','source_url':None}),owner,binding['schedule_id'],binding['subject_ref'])).fetchall()
-                for note in notes:tx.conn.execute("UPDATE pa_delivery.attempts SET payload=jsonb_set(payload,'{text}',%s) WHERE owner=%s AND source_ref=%s AND kind='watch'",(Jsonb('[deleted by owner]'),owner,note['id']))
+                for note in notes:tx.conn.execute("UPDATE pa_delivery.attempts SET payload=jsonb_set(payload,'{text}',%s) WHERE owner=%s AND source_ref=%s AND kind='watch' AND payload->>'text' IS DISTINCT FROM '[deleted by owner]'",(Jsonb('[deleted by owner]'),owner,note['id']))
             tx.conn.execute('DELETE FROM pa_academic.watches WHERE owner=%s AND object_ref=%s',(owner,ref))
         if space=='result':
             if tx.conn.execute("SELECT to_regclass('pa_delivery.attempts') AS meta").fetchone()['meta'] is not None:
-                tx.conn.execute("UPDATE pa_delivery.attempts SET payload=jsonb_set(payload,'{text}',%s) WHERE owner=%s AND payload->>'result_ref'=%s",(Jsonb('[deleted by owner]'),owner,ref))
+                tx.conn.execute("UPDATE pa_delivery.attempts SET payload=jsonb_set(payload,'{text}',%s) WHERE owner=%s AND payload->>'result_ref'=%s AND payload->>'text' IS DISTINCT FROM '[deleted by owner]'",(Jsonb('[deleted by owner]'),owner,ref))
             tx.conn.execute("DELETE FROM pa_conversation.history WHERE owner=%s AND payload->>'response_ref'=%s",(owner,ref))
             tx.conn.execute("DELETE FROM pa_conversation.states WHERE owner=%s AND EXISTS(SELECT 1 FROM jsonb_array_elements(payload->'object_refs') o WHERE o->>'response_ref'=%s)",(owner,ref))
         tx.conn.execute('DELETE FROM pa_cache.entries WHERE owner=%s AND dependencies @> %s',(owner,Jsonb([{'namespace':space,'object_ref':ref}])))
         if tx.conn.execute("SELECT to_regclass('pa_artifacts.files') AS meta").fetchone()['meta'] is not None:
-            changed=tx.conn.execute('UPDATE pa_artifacts.files SET deleted=true,cleanup_pending=true WHERE owner=%s AND parent_namespace=%s AND parent_ref=%s RETURNING key',(owner,space,ref)).fetchall()
-            artifacts+=len(changed)
+            changed=tx.conn.execute('UPDATE pa_artifacts.files SET deleted=true,cleanup_pending=true WHERE owner=%s AND parent_namespace=%s AND parent_ref=%s AND NOT deleted RETURNING key',(owner,space,ref)).fetchall()
+            artifacts+=tx.conn.execute('SELECT count(*) AS n FROM pa_artifacts.files WHERE owner=%s AND parent_namespace=%s AND parent_ref=%s AND deleted AND cleanup_pending',(owner,space,ref)).fetchone()['n']
         tx.conn.execute('DELETE FROM pa_runtime.object_heads WHERE owner=%s AND namespace=%s AND object_id=%s',(owner,space,ref))
         tx.conn.execute('DELETE FROM pa_runtime.object_versions WHERE owner=%s AND namespace=%s AND object_id=%s',(owner,space,ref))
         if space=='memory':

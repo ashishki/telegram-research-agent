@@ -64,10 +64,10 @@ class RuntimeModelAccess:
 
 
 class ScopedModelClient:
-    def __init__(self, endpoint: ModelEndpoint, registry: DurableCapabilityRegistry, *, groups, history=(), guard=None,usage_observer=None):
+    def __init__(self, endpoint: ModelEndpoint, registry: DurableCapabilityRegistry, *, groups, history=(), guard=None,usage_observer=None,task_ref=None):
         self.endpoint,self.registry,self.groups=endpoint,registry,tuple(tuple(group) for group in groups)
         self.history=tuple(history);self.guard=guard
-        self.usage_observer=usage_observer
+        self.usage_observer=usage_observer;self.task_ref=task_ref;self.attempt_ref=None;self._called=False
 
     def complete_with_receipt(self,*,prompt,system,max_tokens,category,authorization,data_class,owner_ref,connection_ref,resource_ref):
         endpoint=self.endpoint
@@ -84,12 +84,20 @@ class ScopedModelClient:
         body=json.dumps({'model':endpoint.model,'messages':messages,'max_completion_tokens':max_tokens,
                          'store':False,'stream':False},ensure_ascii=False).encode()
         if len(body)>48000:raise StorageError('model request exceeds bounded scope')
-        started=time.monotonic()
+        from .model_attempts import prepare_model_attempt,ModelAttemptAlreadyRecorded
+        operations=tuple(group[0].operation_ref for group in self.groups)
+        if self._called:raise ModelAttemptAlreadyRecorded(self.attempt_ref or operations[0],operations)
+        self._called=True
+        self.attempt_ref=prepare_model_attempt(self.registry.store,owner=owner_ref,task_ref=self.task_ref or operations[0],
+            purpose=self.groups[0][0].purpose,operation_refs=operations,input_digest=hashlib.sha256(body).hexdigest())
+        started=time.monotonic();http_attempted=False
         def transport():
+            nonlocal http_attempted
             if self.guard:self.guard()
             headers={'Content-Type':'application/json'}
             if endpoint.token:headers['Authorization']='Bearer '+endpoint.token
             request=Request(endpoint.endpoint,data=body,headers=headers,method='POST')
+            http_attempted=True
             with build_opener(ProxyHandler({}),NoRedirect()).open(request,timeout=endpoint.timeout_seconds) as response:
                 if response.headers.get_content_type()!='application/json':raise StorageError('model response type differs')
                 raw=response.read(1048577)
@@ -114,10 +122,12 @@ class ScopedModelClient:
         except Exception:
             unknown=LLMCompletionReceipt(text='',model=endpoint.model,input_tokens=0,output_tokens=0,
                 estimated_cost_usd=None,duration_ms=int((time.monotonic()-started)*1000),attempts=1,usage_recorded=False,
-                external_call_attempted=True,delivery_outcome='unknown')
+                external_call_attempted=http_attempted,delivery_outcome='unknown')
             if self.usage_observer:
                 self.usage_observer(unknown,{'input':None,'cached_input':None,'cache_write':None,'output':None,'reasoning':None,'semantics':'unknown_outcome'},self.groups)
-            raise LLMOutcomeUnknown(unknown) from None
+            error=LLMOutcomeUnknown(unknown)
+            error.operation_refs=operations;error.attempt_ref=self.attempt_ref;error.retry_allowed=False
+            raise error from None
         receipt=LLMCompletionReceipt(text=text,model=endpoint.model,input_tokens=usage['prompt_tokens'],
             output_tokens=usage['completion_tokens'],estimated_cost_usd=None,duration_ms=int((time.monotonic()-started)*1000),
             attempts=1,usage_recorded=False,external_call_attempted=True,delivery_outcome='accepted')

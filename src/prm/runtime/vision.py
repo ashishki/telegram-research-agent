@@ -2,6 +2,7 @@
 import base64
 import json
 import time
+import hashlib
 from urllib.request import Request,ProxyHandler,build_opener
 from prm.capabilities import AuthorizationRequest,CapabilityDenied
 from prm.storage.postgres import StorageError
@@ -38,6 +39,11 @@ class VisionAdapter:
             if not isinstance(text,str) or not text.strip() or len(text)>12000:raise StorageError('vision text unavailable')
             return {'status':'ok','text':text,'media_ref':asset.media_ref,'page_refs':[1],'extraction_method':'vision'}
         from .cost_cache import CostCacheRuntime
+        from .model_attempts import prepare_model_attempt
+        try:prepare_model_attempt(self.root.queue.store,owner=self.root.owner_ref,task_ref=task_ref or asset.media_ref,purpose='media.vision',operation_refs=(decision.operation_ref,),input_digest=hashlib.sha256(body).hexdigest())
+        except Exception:
+            decision.reservation.abandon_before_transport()
+            raise
         started=time.monotonic();outcome='unknown'
         try:
             result=self.root.registry.execute_reserved((decision.reservation,),transport);outcome='accepted';return result

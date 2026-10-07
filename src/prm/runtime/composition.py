@@ -1,6 +1,7 @@
 """One explicit composition root for Telegram, CLI and durable workers."""
 from __future__ import annotations
 from dataclasses import replace,asdict
+from contextvars import ContextVar
 import hashlib
 
 from prm.application import PersonalResearchAssistant
@@ -26,7 +27,7 @@ class AssistantRuntime:
         if brief_owner_ref_from_authenticated_private_tuple(owner_chat_id,owner_chat_id,owner_chat_id)!=owner_ref:
             raise StorageError('runtime owner must be derived from the exact private tuple')
         self.registry=registry;self.model_endpoint=model_endpoint;self.model_resource_ref=model_resource_ref
-        self.services={}
+        self.services={};self.task_context=ContextVar('pa_model_task',default=None)
         self.model_upper_bound=model_upper_bound
         self.tariff_version=tariff_version
         self.archive_resource_ref=archive_resource_ref
@@ -46,6 +47,7 @@ class AssistantRuntime:
         except StorageError:return None
 
     def scoped_client(self,endpoint,*,groups,task_ref,attempt_ref,history=(),guard=None):
+        task_ref=self.task_context.get() or task_ref
         def observe(receipt,usage,observed_groups):
             from .cost_cache import CostCacheRuntime
             with self.queue.store.transaction() as tx:
@@ -54,7 +56,7 @@ class AssistantRuntime:
                 usage=usage,latency_ms=receipt.duration_ms,outcome=receipt.delivery_outcome,tariff_version=self.tariff_version)
             if cost is not None:
                 for index,group in enumerate(observed_groups):self.registry.settle(self.owner_ref,group[0].operation_ref,outcome='accepted',actual=cost if index==0 else 0)
-        return ScopedModelClient(endpoint,self.registry,groups=groups,history=history,guard=guard,usage_observer=observe)
+        return ScopedModelClient(endpoint,self.registry,groups=groups,history=history,guard=guard,usage_observer=observe,task_ref=self.task_context.get() or task_ref)
 
     def worker(self):
         return AssistantJobWorker(self.ingress,settings=self.settings,runtime=self,
@@ -77,6 +79,11 @@ class AssistantRuntime:
         return AssistantResult(request_ref,value['status'],'research',value['text'],payload={**value,'source_data_class':'user_provided'})
 
     def answer(self,request:OperatorRequest,*,request_ref,lease=None):
+        marker=self.task_context.set(request_ref)
+        try:return self._answer(request,request_ref=request_ref,lease=lease)
+        finally:self.task_context.reset(marker)
+
+    def _answer(self,request:OperatorRequest,*,request_ref,lease=None):
         if (request.chat_id,request.actor_id,request.owner_chat_id)!=(self.owner_chat_id,)*3:
             raise StorageError('runtime request must preserve exact private owner')
         def guard():
@@ -327,7 +334,13 @@ class AssistantRuntime:
             self.services['actions']=actions
         if brief_runtime is not None:
             self.brief_runtime=brief_runtime
-            self.services['brief']=lambda request,request_ref,guard:brief_runtime.answer(topic=request.query.removeprefix('/weekly').strip() or 'Важное за неделю',timezone_name='Europe/Berlin')
+            def weekly(request,request_ref,guard):
+                guard()
+                with self.queue.store.transaction() as tx:
+                    item=tx.conn.execute("SELECT created_at FROM pa_runtime.object_versions WHERE owner=%s AND namespace='conversation' AND object_id=%s AND version=1",(self.owner_ref,request_ref)).fetchone()
+                return brief_runtime.answer(topic=request.query.removeprefix('/weekly').strip() or 'Важное за неделю',timezone_name='Europe/Berlin',
+                    end_at=item['created_at'] if item else None)
+            self.services['brief']=weekly
         if academic_runtime is not None:self.academic=academic_runtime
 
 
