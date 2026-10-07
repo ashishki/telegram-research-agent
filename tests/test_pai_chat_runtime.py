@@ -118,3 +118,26 @@ def test_unknown_model_call_has_logical_fence_across_fresh_reservations(pai):
         with pytest.raises(ModelAttemptAlreadyRecorded):first.complete_with_receipt(**kwargs)
         assert len([row for row in pai.requests if row[0]=='model'])==1
     finally:new_decision.reservation.abandon_before_transport()
+
+
+def test_local_payload_validation_creates_no_model_fence_and_can_be_corrected(pai):
+    from tests.pai_runtime_fixtures import allow
+    from prm.capabilities import AuthorizationRequest
+    from prm.storage.postgres import StorageError
+    root=pai.root
+    allow(pai,'model.generate','resource_dialogue','user_provided','answer.request')
+    scope=AuthorizationRequest(owner_ref=root.owner_ref,connection_ref='connection_fixture',capability='model.generate',resource_ref='resource_dialogue',
+        operation='model_egress',data_class='user_provided',provider_ref='provider_openai',purpose='answer.request',operation_ref='local_validation_fixture')
+    decision=root.registry.authorize_and_reserve(scope,upper_bound=1)
+    kwargs={'prompt':'Synthetic valid question','system':'Answer this question.','max_tokens':80,'category':'chat','authorization':decision,
+        'data_class':'user_provided','owner_ref':root.owner_ref,'connection_ref':'connection_fixture','resource_ref':'resource_dialogue'}
+    bad=root.scoped_client(root.model_endpoint,groups=((decision,),),task_ref='local_validation_task',attempt_ref='local_validation_fixture',history=({'role':'assistant','content':{}},))
+    with pytest.raises(StorageError,match='invalid bounded history'):bad.complete_with_receipt(**kwargs)
+    with root.queue.store.transaction() as tx:
+        count=tx.conn.execute("SELECT count(*) AS n FROM pa_runtime.object_heads WHERE owner=%s AND object_id LIKE 'model_attempt_%%'",(root.owner_ref,)).fetchone()['n']
+    assert count==0 and not pai.requests
+    current=next(row for row in root.registry.snapshot(root.owner_ref)['operations'] if row['ref']=='local_validation_fixture')
+    assert current['state']=='reserved'
+    fixed=root.scoped_client(root.model_endpoint,groups=((decision,),),task_ref='local_validation_task',attempt_ref='local_validation_fixture')
+    assert fixed.complete_with_receipt(**kwargs).delivery_outcome=='accepted'
+    assert len([row for row in pai.requests if row[0]=='model'])==1

@@ -229,3 +229,16 @@ def test_unpriced_settlement_is_idempotent_and_terminal_state_is_monotone(sandbo
     reg.settle(grant.owner_ref,'settle_once',outcome='accepted',actual=2)
     assert reg.snapshot(grant.owner_ref)==priced
     with pytest.raises(StateConflict):reg.settle(grant.owner_ref,'settle_once',outcome='accepted',actual=1)
+
+
+def test_unknown_operation_accepts_later_known_actual_without_resetting_fence(sandbox):
+    reg,grant=registry(sandbox,'unknown_actual_recovery',capacity=10)
+    decision=reg.authorize_and_reserve(request(grant,'unknown_actual_fixture'),upper_bound=3)
+    def failed():raise OSError('synthetic ACK loss')
+    with pytest.raises(OSError):reg.execute_reserved((decision.reservation,),failed)
+    assert all(row['consumed']==3 for row in reg.snapshot(grant.owner_ref)['windows'])
+    reg.settle(grant.owner_ref,'unknown_actual_fixture',outcome='unknown',actual=2)
+    state=reg.snapshot(grant.owner_ref)
+    assert all(row['consumed']==2 for row in state['windows'])
+    assert state['operations'][0]['state']=='unknown' and state['operations'][0]['actual']==2
+    assert not reg.authorize_and_reserve(request(grant,'unknown_actual_fixture'),upper_bound=3).allowed
