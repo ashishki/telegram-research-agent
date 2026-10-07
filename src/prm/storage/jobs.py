@@ -129,7 +129,7 @@ class JobQueue:
                 AND (kind<>'compute.assistant' OR NOT EXISTS(SELECT 1 FROM pa_jobs.jobs active
                     WHERE active.owner=%s AND active.kind='compute.assistant' AND active.status IN ('leased','running')
                     AND active.lease_until>clock_timestamp()))
-                ORDER BY priority DESC,id FOR UPDATE SKIP LOCKED LIMIT 1''',(owner,list(modes),list(kinds) if kinds else None,list(kinds) if kinds else None,owner)).fetchone()
+                ORDER BY priority DESC,available_at,id FOR UPDATE SKIP LOCKED LIMIT 1''',(owner,list(modes),list(kinds) if kinds else None,list(kinds) if kinds else None,owner)).fetchone()
             if not row:return None
             try:payload=_payload(row['payload']);self._input(tx,owner,payload)
             except StorageError:
@@ -165,11 +165,19 @@ class JobQueue:
     def complete(self,lease,result):
         if lease.mode!='compute':raise StorageError('effect completion requires its separate durable receipt executor')
         with self.store.transaction() as tx:
+            from prm.runtime.deletion import lineage_lock
+            lineage_lock(tx.conn,lease.owner)
             self._fenced(tx,lease);ref='result_'+lease.job_id
             tx.put(lease.owner,'result',ref,result,expected_version=0)
             if tx.conn.execute("SELECT to_regclass('pa_memory.dependencies') AS table_ref").fetchone()['table_ref'] is not None:
                 tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',
                     (lease.owner,lease.payload['input_namespace'],lease.payload['input_ref'],'result',ref))
+                parents=list(result.get('payload',result.get('answer_payload',{})).get('conversation',{}).get('response_refs',()))+list(result.get('evidence_refs',()))
+                if len(parents)>32:raise StorageError('bounded result dependencies required')
+                for parent_ref in set(parents):
+                    if tx.get(lease.owner,'result',parent_ref) is None:raise StorageError('derived result source was deleted')
+                    tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',
+                        (lease.owner,'result',parent_ref,'result',ref))
             tx.conn.execute("UPDATE pa_jobs.jobs SET status='completed',result_ref=%s,token=NULL,lease_until=NULL WHERE owner=%s AND id=%s",(ref,lease.owner,lease.job_id))
             return ref
     def cancel(self,*,owner,job_id):

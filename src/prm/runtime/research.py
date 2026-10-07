@@ -13,15 +13,31 @@ from .web import AuthorizedPublicWeb,reserve_public_access
 
 
 class LocalArchiveReader:
-    def __init__(self,db_path):self.db_path=db_path
+    def __init__(self,db_path,root=None):self.db_path=db_path;self.root=root
     def search_archive(self,query,*,limit):
         from db.archive_search import search_telegram_archive
         from pathlib import Path
-        uri='file:'+quote(str(Path(self.db_path).resolve()))+'?mode=ro'
+        path=Path(self.db_path).resolve();uri='file:'+quote(str(path))+'?mode=ro'
+        cache=None;key=None
+        if self.root is not None:
+            from .cost_cache import CostCacheRuntime
+            cache=CostCacheRuntime(self.root)
+            fingerprints={str(item.name):(item.stat().st_mtime_ns,item.stat().st_size) for item in (path,Path(str(path)+'-wal')) if item.exists()}
+            key=cache.key(kind='retrieval',parameters={'query':query,'limit':min(limit,8),'source_fingerprint':fingerprints},dependencies=[],version='fts-v1')
+            request=AuthorizationRequest(owner_ref=self.root.owner_ref,connection_ref=None,capability='archive.read',resource_ref=self.root.archive_resource_ref,
+                operation='read',data_class='private_archive',provider_ref='provider_local',purpose='research.archive')
+            hit=cache.get(key=key,authorization_request=request)
+            if hit is not None:return hit
         with sqlite3.connect(uri,uri=True) as conn:
             conn.row_factory=sqlite3.Row
             result=search_telegram_archive(conn,query,limit=min(limit,8))
-            return result.to_dict() if hasattr(result,'to_dict') else result
+            from dataclasses import asdict,is_dataclass
+            if isinstance(result,list):
+                rows=[asdict(item) if is_dataclass(item) else dict(item) for item in result]
+                result={'items':rows,'coverage':'bounded_archive_read','source_count':len(rows)}
+            else:result=result.to_dict() if hasattr(result,'to_dict') else result
+        if cache is not None:cache.put(key=key,kind='retrieval',payload=result,dependencies=[],ttl_seconds=60)
+        return result
     def window_evidence(self,window):
         from pathlib import Path
         uri='file:'+quote(str(Path(self.db_path).resolve()))+'?mode=ro'
@@ -69,45 +85,35 @@ class DurableResearchWorker:
         lease=queue.claim(owner=root.owner_ref,kinds=('compute.research',),lease_seconds=300)
         if lease is None:return None
         plan=queue.store.get(lease.owner,'conversation',lease.payload['input_ref'],version=lease.payload['input_version']).payload
-        completed=[];calls=0
+        completed=[];calls=0;pending=[]
         for index,step in enumerate(plan['steps']):
             ref='research_step_'+lease.job_id+'_'+str(index)
-            cached=queue.store.get(lease.owner,'result',ref,version=1)
+            cached=queue.store.get(lease.owner,'result',ref)
             if cached is not None:
-                completed.append(cached.payload);calls+=cached.payload['tool_calls'];continue
-            if calls>=plan['max_tool_calls']:break
-            queue.checkpoint(lease,{'phase':'gather','step':index,'completed_refs':[entry['ref'] for entry in completed]})
-            result={'ref':ref,'source':step['source'],'tool_calls':1,'status':'partial','evidence':{}}
-            try:
-                if step['source']=='archive':
-                    decision=root.registry.authorize_and_reserve(AuthorizationRequest(owner_ref=root.owner_ref,connection_ref=None,
-                        capability='archive.read',resource_ref=root.archive_resource_ref,operation='read',data_class='private_archive',
-                        provider_ref='provider_local',purpose='research.archive',operation_ref='researchread_'+lease.job_id+'_'+str(index)),upper_bound=0)
-                    if not decision.allowed:raise CapabilityDenied(decision.reason)
-                    reader=root.deep_archive_reader or LocalArchiveReader(root.settings.db_path)
-                    result['evidence']=root.registry.execute_reserved((decision.reservation,),lambda:reader.search_archive(step['query'],limit=8))
-                elif step['source']=='public':
-                    from prm.public_web import execute_public_web_research
-                    if root.public_web_provider is None or root.public_web_bounds is None:raise StorageError('public source unavailable')
-                    maximum=1+root.public_web_bounds.max_fetches
-                    if calls+maximum>plan['max_tool_calls']:break
-                    access=reserve_public_access(root,step['query'],request_ref=lease.job_id+'_'+str(index),search_ref=root.public_search_ref,
-                        fetch_ref=root.public_fetch_ref,bounds=root.public_web_bounds,upper_bound=root.public_upper_bound)
-                    if access is None:raise CapabilityDenied('public source scope denied')
-                    provider=AuthorizedPublicWeb(root.public_web_provider,root.registry,access)
-                    result['evidence']=execute_public_web_research(public_query=step['query'],original_query=plan['question'],access=access,provider=provider,bounds=root.public_web_bounds)
-                    result['tool_calls']=maximum
-                else:
-                    if root.github_context_provider is None:raise StorageError('GitHub source unavailable')
-                    maximum=1+len(root.github_context_provider.paths)
-                    if calls+maximum>plan['max_tool_calls']:break
-                    result['evidence']=root.github_context_provider.read_repository_context(step['query']);result['tool_calls']=maximum
-                result['status']='gathered'
-            except Exception:result['status']='source_unavailable'
-            calls+=result['tool_calls']
+                # An interrupted prepared read has an unknown outcome. Retain
+                # it without issuing a second paid request after restart.
+                value=dict(cached.payload)
+                if value['status']=='read_prepared':value['status']='source_outcome_unknown'
+                completed.append(value);calls+=value['tool_calls'];continue
+            maximum=1
+            if step['source']=='public':maximum=1+root.public_web_bounds.max_fetches if root.public_web_bounds else 1
+            elif step['source']=='github':maximum=1+len(root.github_context_provider.paths) if root.github_context_provider else 1
+            if calls+maximum>plan['max_tool_calls']:break
+            prepared={'ref':ref,'source':step['source'],'tool_calls':maximum,'status':'read_prepared','evidence':{}}
             with queue.store.transaction() as tx:
-                queue._fenced(tx,lease);tx.put(lease.owner,'result',ref,result,expected_version=0)
-            completed.append(result)
+                from .deletion import lineage_lock
+                lineage_lock(tx.conn,lease.owner);queue._fenced(tx,lease)
+                tx.put(lease.owner,'result',ref,prepared,expected_version=0)
+                tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',
+                    (lease.owner,lease.payload['input_namespace'],lease.payload['input_ref'],'result',ref))
+            pending.append((index,step,prepared));calls+=maximum
+        queue.checkpoint(lease,{'phase':'gather','completed_refs':[entry['ref'] for entry in completed],'pending_refs':[entry[2]['ref'] for entry in pending]})
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=2,thread_name_prefix='pa-research-read') as reads:
+            futures=[reads.submit(self._gather,lease,index,step,prepared) for index,step,prepared in pending]
+            for future in futures:
+                value=future.result();completed.append(value)
+                queue.checkpoint(lease,{'phase':'gather','completed_refs':[entry['ref'] for entry in completed]})
         queue.checkpoint(lease,{'phase':'gap_check','completed_refs':[entry['ref'] for entry in completed]})
         available=[entry for entry in completed if entry['status']=='gathered']
         gaps=[entry['source']+': '+entry['status'] for entry in completed if entry['status']!='gathered']
@@ -121,7 +127,42 @@ class DurableResearchWorker:
         if gaps:text+='\n\nНеполное покрытие: '+', '.join(gaps)
         return queue.complete(lease,{'request_ref':lease.payload['input_ref'],'status':'partial' if gaps else synthesized['status'],
             'text':text,'evidence_refs':[entry['ref'] for entry in available],'tool_calls':calls,
-            'gaps':gaps,'answer_payload':synthesized})
+            'gaps':gaps,'answer_payload':synthesized,'data_classes':sorted({'private_archive' if entry['source']=='archive' else 'public' for entry in available}) or ['user_provided'],'data_class':'private_archive' if any(entry['source']=='archive' for entry in available) else 'public'})
+
+    def _gather(self,lease,index,step,prepared):
+        root=self.root;queue=root.queue;result={**prepared,'status':'partial'}
+        def guard():
+            with queue.store.transaction() as tx:queue._fenced(tx,lease)
+        try:
+            guard()
+            if step['source']=='archive':
+                decision=root.registry.authorize_and_reserve(AuthorizationRequest(owner_ref=root.owner_ref,connection_ref=None,
+                    capability='archive.read',resource_ref=root.archive_resource_ref,operation='read',data_class='private_archive',
+                    provider_ref='provider_local',purpose='research.archive',operation_ref='researchread_'+lease.job_id+'_'+str(index)),upper_bound=0)
+                if not decision.allowed:raise CapabilityDenied(decision.reason)
+                reader=root.deep_archive_reader or LocalArchiveReader(root.settings.db_path,root=root)
+                result['evidence']=root.registry.execute_reserved((decision.reservation,),lambda:reader.search_archive(step['query'],limit=8))
+            elif step['source']=='public':
+                from prm.public_web import execute_public_web_research
+                if root.public_web_provider is None or root.public_web_bounds is None:raise StorageError('public source unavailable')
+                access=reserve_public_access(root,step['query'],request_ref=lease.job_id+'_'+str(index),search_ref=root.public_search_ref,
+                    fetch_ref=root.public_fetch_ref,bounds=root.public_web_bounds,upper_bound=root.public_upper_bound)
+                if access is None:raise CapabilityDenied('public source scope denied')
+                try:
+                    provider=AuthorizedPublicWeb(root.public_web_provider,root.registry,access,guard=guard)
+                    result['evidence']=execute_public_web_research(public_query=step['query'],original_query=plan_question(lease,queue),access=access,provider=provider,bounds=root.public_web_bounds)
+                finally:
+                    for decision in (access.search_authorization,*access.fetch_authorizations):decision.reservation.abandon_before_transport()
+            else:
+                if root.github_context_provider is None:raise StorageError('GitHub source unavailable')
+                result['evidence']=root.github_context_provider.read_repository_context(step['query'])
+            result['status']='gathered'
+        except Exception:result['status']='source_unavailable'
+        with queue.store.transaction() as tx:
+            from .deletion import lineage_lock
+            lineage_lock(tx.conn,lease.owner);queue._fenced(tx,lease)
+            tx.put(lease.owner,'result',result['ref'],result,expected_version=1)
+        return result
 
     def _synthesize(self,plan,completed,lease):
         from .model import ScopedModelClient
@@ -146,7 +187,7 @@ class DurableResearchWorker:
         fallback='\n\n'.join(item['support_span']+'\nИсточник: '+item['source_url'] for item in evidence)
         result={'status':'evidence_only' if evidence else 'insufficient_evidence','text':fallback or 'Недостаточно подтверждённых источников для вывода.',
                 'verification':None,'source_refs':[item['source_url'] for item in evidence]}
-        endpoint=root.model_endpoint;groups=[]
+        endpoint=root.endpoint_for('research');groups=[]
         if endpoint is not None and evidence:
             scopes=[('model.generate',root.model_resource_ref,'user_provided','answer.request')]
             scopes.extend(('model.context_egress',root.archive_resource_ref if kind=='private_archive' else root.public_fetch_ref,kind,
@@ -160,7 +201,7 @@ class DurableResearchWorker:
             if len(groups)==len(scopes):
                 def guard():
                     with queue.store.transaction() as tx:queue._fenced(tx,lease)
-                client=ScopedModelClient(endpoint,root.registry,groups=groups,
+                client=root.scoped_client(endpoint,groups=groups,task_ref=lease.payload['input_ref'],attempt_ref=ref,
                     history=({'role':'user','content':'Untrusted verified reads: '+json.dumps(evidence,ensure_ascii=False)},),guard=guard)
                 try:
                     receipt=client.complete_with_receipt(prompt=plan['question'],system='Synthesize the provided sources. Cite exact URLs, preserve negation/conflicting evidence and uncertainty. Do not infer repository facts beyond the exact supplied commit. No tools.',
@@ -174,3 +215,9 @@ class DurableResearchWorker:
         with queue.store.transaction() as tx:
             queue._fenced(tx,lease);tx.put(lease.owner,'result',ref,result,expected_version=0)
         return result
+
+
+def plan_question(lease,queue):
+    item=queue.store.get(lease.owner,'conversation',lease.payload['input_ref'],version=lease.payload['input_version'])
+    if item is None:raise StorageError('research plan deleted')
+    return item.payload['question']

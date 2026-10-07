@@ -29,6 +29,7 @@ def install_briefs(target):
 class DurableBriefStore(BriefDocumentStore):
     def __init__(self,target,*,owner_ref):
         super().__init__();self.store=PostgresStore(target);self.owner_ref=owner_ref
+        self.pending_dependencies={};self.pending_classes={};self.pending_scopes={}
 
     def _document_ref(self,brief_id):return 'brief_'+hashlib.sha256(brief_id.encode()).hexdigest()[:32]
     def _binding_ref(self,conversation_id):return 'brief_binding_'+hashlib.sha256(conversation_id.encode()).hexdigest()[:32]
@@ -38,6 +39,8 @@ class DurableBriefStore(BriefDocumentStore):
         if owner!=self.owner_ref or kwargs['document'].owner_ref!=owner:raise StorageError('exact private Brief owner required')
         document=kwargs['document'];comparison=kwargs.get('comparison_document')
         with self.store.transaction() as tx:
+            from prm.runtime.deletion import lineage_lock
+            lineage_lock(tx.conn,owner)
             for item in (document,comparison):
                 if item is None:continue
                 ref=self._document_ref(item.brief_id);encoded=_storage_document(item)
@@ -49,13 +52,27 @@ class DurableBriefStore(BriefDocumentStore):
                     if old.payload.get('storage_digest')!=digest:raise StateConflict('immutable Brief version differs')
                 else:
                     tx.put(owner,'result',ref,{'kind':'brief_manifest','brief_id':item.brief_id,'version':item.version,
-                        'content_digest':item.content_digest,'storage_digest':digest},expected_version=item.version-1)
+                        'content_digest':item.content_digest,'storage_digest':digest,'source_data_classes':list(self.pending_classes.get(item.content_digest,('private_archive','private_connector_content'))),'source_scopes':self.pending_scopes.get(item.content_digest,[])},expected_version=item.version-1)
                     tx.conn.execute('INSERT INTO pa_briefs.documents VALUES(%s,%s,%s,%s,%s)',(owner,item.brief_id,item.version,digest,Jsonb(encoded)))
+                if tx.conn.execute("SELECT to_regclass('pa_memory.dependencies') AS meta").fetchone()['meta'] is not None:
+                    for dependency in self.pending_dependencies.get(item.content_digest,()):
+                        parent=tx.get(owner,dependency['namespace'],dependency['object_ref'])
+                        if parent is None or parent.version!=dependency['version'] or parent.digest!=dependency['digest']:
+                            raise StateConflict('Brief source changed or was deleted while building')
+                        tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',
+                            (owner,dependency['namespace'],dependency['object_ref'],'result',ref))
             ref=self._binding_ref(kwargs['conversation_id']);old=tx.get(owner,'conversation',ref)
             binding={'response_ref':kwargs['response_ref'],'brief_id':document.brief_id,'version':document.version,
                 'comparison':None if comparison is None else {'brief_id':comparison.brief_id,'version':comparison.version},
                 'active_item_number':kwargs.get('active_item_number'),'forgotten':False}
             tx.put(owner,'conversation',ref,binding,expected_version=old.version if old else 0)
+            if tx.conn.execute("SELECT to_regclass('pa_memory.dependencies') AS meta").fetchone()['meta'] is not None:
+                for item in (document,comparison):
+                    if item is not None:
+                        tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',
+                            (owner,'result',self._document_ref(item.brief_id),'conversation',ref))
+                        tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',
+                            (owner,'result',self._document_ref(item.brief_id),'result',kwargs['response_ref']))
         super().bind_visible(**kwargs)
 
     def _load_visible(self,conversation_id,response_ref):
@@ -89,6 +106,10 @@ class DurableBriefStore(BriefDocumentStore):
         if owner!=self.owner_ref:return None
         item=self.store.get(owner,'result',self._document_ref(brief_id),version=version)
         return self._decode_document(item) if item else None
+    def source_scopes(self,brief_id,version):
+        item=self.store.get(self.owner_ref,'result',self._document_ref(brief_id),version=version)
+        return tuple(item.payload.get('source_scopes',())) if item else ()
+
     def _decode_document(self,item):
         if item.payload.get('kind')!='brief_manifest':return _stored_document(item.payload)
         with self.store.transaction() as tx:

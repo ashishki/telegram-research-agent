@@ -117,12 +117,38 @@ class AcademicRuntime:
             merged=replace(winner,deadlines=deadlines,source_refs=tuple(dict.fromkeys(ref for entry in group for ref in entry.source_refs)),
                            eligibility_uncertain=any(entry.eligibility_uncertain for entry in group))
             ref='academic_'+hashlib.sha256(canonical.encode()).hexdigest()[:32]
+            merged=replace(merged,candidate_ref=ref)
             old=self.root.queue.store.get(self.root.owner_ref,'memory',ref)
-            payload=merged.to_payload()
+            payload={**merged.to_payload(),'source_versions':{entry.candidate_ref:entry.source_version for entry in group}}
             if old and old.payload.get('completion')=='local_done':payload['completion']='local_done';merged=replace(merged,completion='local_done')
             if not old or old.payload!=payload:self.root.queue.store.put(self.root.owner_ref,'memory',ref,payload,expected_version=old.version if old else 0)
             result.append(merged)
         return tuple(result)
+    def selected_context(self):
+        """Collect only explicitly configured academic metadata selections."""
+        result=[];coverage=[]
+        for name,scope,collector,bound in getattr(self.root,'academic_source_hooks',()):
+            import uuid
+            decision=self.root.registry.authorize_and_reserve(replace(scope,operation_ref='academiccontext_'+uuid.uuid4().hex),upper_bound=bound)
+            if not decision.allowed:coverage.append(name+':scope_denied');continue
+            try:
+                batch=self.root.registry.execute_reserved((decision.reservation,),collector)
+                if len(batch)>48:raise StorageError('academic metadata batch exceeds bound')
+                result.extend(batch);coverage.append(name+':checked')
+            except Exception:coverage.append(name+':unavailable')
+        return tuple(result),coverage
+
+    def stage(self):
+        item=self.root.queue.store.get(self.root.owner_ref,'memory','memory_academic_stage')
+        value=item.payload['text'] if item is not None else ''
+        return value.removeprefix('academic_stage:') if value.startswith('academic_stage:') and value.removeprefix('academic_stage:') in {'preparation','waiting','studying','completed'} else 'unknown'
+    def preview_stage(self,stage,*,actor_ref):
+        if actor_ref!=self.root.owner_ref:raise CapabilityDenied('explicit private owner stage selection required')
+        if stage not in {'preparation','waiting','studying','completed'}:raise StorageError('unsupported academic stage')
+        from .memory import MemoryRuntime
+        old=self.root.queue.store.get(self.root.owner_ref,'memory','memory_academic_stage')
+        return MemoryRuntime(self.root).preview(object_ref='memory_academic_stage',text='academic_stage:'+stage,source_refs=('explicit_owner_stage',),
+            kind='preference',expected_version=old.version if old else 0,chat_id=self.root.owner_chat_id,actor_id=self.root.owner_chat_id,owner_chat_id=self.root.owner_chat_id)
     def describe(self,candidates):
         lines=[]
         for item in candidates:
@@ -130,12 +156,55 @@ class AcademicRuntime:
             dates=', '.join(deadline.due_at.isoformat()+' ('+deadline.authority+')' for deadline in item.deadlines)
             lines.append(item.title+' — '+item.category+(' — конфликт сроков: '+dates if conflict else (' — '+dates if dates else ' — срок не подтверждён'))+
                          (' — применимость требует уточнения' if item.eligibility_uncertain else '')+
-                         (' — отмечено выполненным локально; сдача в источнике не подтверждена' if item.completion=='local_done' else ''))
+                         (' — отмечено выполненным локально; сдача в источнике не подтверждена' if item.completion=='local_done' else '\nОтметить выполненным: /academicdone '+item.candidate_ref))
         return '\n'.join(lines) or 'В проверенном покрытии кандидатов нет; отсутствующие источники не проверены.'
     def mark_done(self,object_ref,*,actor_ref):
         if actor_ref!=self.root.owner_ref:raise CapabilityDenied('private owner required')
-        item=self.root.queue.store.get(self.root.owner_ref,'memory',object_ref)
-        if item is None:raise StorageError('academic candidate unavailable')
-        payload={**item.payload,'completion':'local_done'}
-        self.root.queue.store.put(self.root.owner_ref,'memory',object_ref,payload,expected_version=item.version)
-        return {'completion':'local_done','source_submission_performed':False}
+        from .scheduler import WatchScheduler
+        scheduler=self.scheduler or WatchScheduler(self.root.queue)
+        with self.root.queue.store.transaction() as tx:
+            from .deletion import lineage_lock
+            lineage_lock(tx.conn,self.root.owner_ref)
+            bindings=tx.conn.execute('SELECT schedule_id,subject_ref FROM pa_academic.watches WHERE owner=%s AND object_ref=%s ORDER BY schedule_id,subject_ref FOR UPDATE',
+                (self.root.owner_ref,object_ref)).fetchall()
+            for binding in bindings:scheduler.complete_subject_in(tx,owner=self.root.owner_ref,subscription_id=binding['schedule_id'],subject_ref=binding['subject_ref'])
+            item=tx.get(self.root.owner_ref,'memory',object_ref)
+            if item is None:raise StorageError('academic candidate unavailable')
+            if item.payload.get('completion')!='local_done':
+                tx.put(self.root.owner_ref,'memory',object_ref,{**item.payload,'completion':'local_done'},expected_version=item.version)
+        return {'completion':'local_done','source_submission_performed':False,'stopped_watch_subjects':len(bindings)}
+
+    def link_watch(self,object_ref,*,schedule_id,subject_ref,actor_ref):
+        if actor_ref!=self.root.owner_ref:raise CapabilityDenied('private owner required')
+        if not isinstance(subject_ref,str) or not 0<len(subject_ref)<=128:raise StorageError('exact bounded Watch subject required')
+        with self.root.queue.store.transaction() as tx:
+            from .deletion import lineage_lock
+            lineage_lock(tx.conn,self.root.owner_ref)
+            item=tx.get(self.root.owner_ref,'memory',object_ref)
+            if item is None or not item.payload.get('candidate_ref'):raise StorageError('owned academic item required')
+            schedule=tx.conn.execute('SELECT id FROM pa_schedule.schedules WHERE owner=%s AND id=%s FOR UPDATE',(self.root.owner_ref,schedule_id)).fetchone()
+            if schedule is None:raise CapabilityDenied('confirmed owned Watch subscription required')
+            tx.conn.execute('INSERT INTO pa_academic.watches VALUES(%s,%s,%s,%s) ON CONFLICT DO NOTHING',(self.root.owner_ref,object_ref,schedule_id,subject_ref))
+            if item.payload.get('completion')=='local_done':
+                from .scheduler import WatchScheduler
+                (self.scheduler or WatchScheduler(self.root.queue)).complete_subject_in(tx,owner=self.root.owner_ref,subscription_id=schedule_id,subject_ref=subject_ref)
+
+    def brief_evidence(self,window):
+        with self.root.queue.store.transaction() as tx:
+            rows=tx.conn.execute("SELECT h.object_id,min(v.created_at) AS discovered_at FROM pa_runtime.object_heads h JOIN pa_runtime.object_versions v USING(owner,namespace,object_id) WHERE h.owner=%s AND h.namespace='memory' AND h.object_id LIKE 'academic_%%' GROUP BY h.object_id ORDER BY h.object_id LIMIT 48",(self.root.owner_ref,)).fetchall()
+            items=[(tx.get(self.root.owner_ref,'memory',row['object_id']),row['discovered_at']) for row in rows]
+        evidence=[]
+        for item,discovered in items:
+            if item is None:continue
+            value=item.payload
+            if value.get('completion') in {'local_done','source_completed'}:continue
+            instants=[datetime.fromisoformat(deadline['due_at'].replace('Z','+00:00')) for deadline in value.get('deadlines',[])]
+            if not window.contains(discovered) and not any(window.contains(instant) for instant in instants):continue
+            for source in value.get('source_refs',[])[:1]:
+                evidence.append({'evidence_id':item.object_id,'source_url':source,'title':value['title'],
+                    'support_span':value['summary'][:1000]+('; сроки: '+', '.join(instant.isoformat() for instant in instants) if instants else '; срок не подтверждён'),
+                    'first_discovered_at':discovered.isoformat(),'source_version':str(item.version),'source_state':'active',
+                    'source_kind':'academic','local_source_provenance':True,'source_owner_ref':self.root.owner_ref,
+                    'source_data_class':'private_connector_content','importance':'high',
+                    'dependency_ref':{'namespace':'memory','object_ref':item.object_id,'version':item.version,'digest':item.digest}})
+        return evidence

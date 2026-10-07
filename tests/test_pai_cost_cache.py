@@ -28,3 +28,12 @@ def test_cache_hit_rechecks_version_and_live_grant(pai):
     assert cache.get(key=key,authorization_request=access)
     pai.root.registry.revoke_grant(grant.grant_id,owner_ref=pai.root.owner_ref)
     assert cache.get(key=key,authorization_request=access) is None
+
+
+def test_unpriced_model_attempt_is_recorded_for_the_whole_user_request(pai):
+    from tests.pai_runtime_fixtures import request
+    allow(pai,'model.generate','resource_dialogue','user_provided','answer.request')
+    _,result=request(pai,9200,'/chat Объясни сортировку.')
+    costs=CostCacheRuntime(pai.root).task_cost(result['request_ref'])
+    assert costs['attempts']==1 and costs['unknown_priced_attempts']==1
+    assert costs['known_microdollars'] is None

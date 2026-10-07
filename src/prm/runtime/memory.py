@@ -65,34 +65,34 @@ class MemoryRuntime:
         owner=self._owner(chat_id,actor_id,owner_chat_id);return self.store.get(owner,'memory',object_ref)
     def forget(self,object_ref,*,chat_id,actor_id,owner_chat_id):
         owner=self._owner(chat_id,actor_id,owner_chat_id)
+        from .deletion import delete_derived_in
         with self.store.transaction() as tx:
-            tx.conn.execute("SELECT id FROM pa_jobs.jobs WHERE owner=%s AND payload->>'input_namespace'='memory' AND payload->>'input_ref'=%s ORDER BY id FOR UPDATE",(owner,object_ref)).fetchall()
-            descendants=tx.conn.execute('''WITH RECURSIVE refs(namespace,object_ref) AS (
-                SELECT 'memory'::text,%s::text UNION SELECT d.child_namespace,d.child_ref FROM pa_memory.dependencies d JOIN refs r
-                ON d.parent_namespace=r.namespace AND d.parent_ref=r.object_ref WHERE d.owner=%s)
-                SELECT namespace,object_ref FROM refs ORDER BY namespace,object_ref LIMIT 129''',(object_ref,owner)).fetchall()
-            if len(descendants)>128:raise StorageError('deletion dependency batch exceeds bound')
-            for child in descendants:
-                namespace,ref=child['namespace'],child['object_ref'];tx._object_lock(owner,namespace,ref)
-                tx.conn.execute('INSERT INTO pa_memory.tombstones(owner,namespace,object_ref) VALUES(%s,%s,%s) ON CONFLICT DO NOTHING',(owner,namespace,ref))
-                tx.conn.execute("UPDATE pa_jobs.jobs SET status='cancelled',token=NULL,lease_until=NULL WHERE owner=%s AND payload->>'input_namespace'=%s AND payload->>'input_ref'=%s AND mode='compute'",(owner,namespace,ref))
-                tx.conn.execute('DELETE FROM pa_runtime.object_heads WHERE owner=%s AND namespace=%s AND object_id=%s',(owner,namespace,ref))
-                tx.conn.execute('DELETE FROM pa_runtime.object_versions WHERE owner=%s AND namespace=%s AND object_id=%s',(owner,namespace,ref))
-            # Fence before removing content; all future reads/writes consult it.
-            tx.conn.execute('INSERT INTO pa_memory.tombstones(owner,namespace,object_ref) VALUES(%s,%s,%s) ON CONFLICT DO NOTHING',(owner,'memory',object_ref))
-            tx.conn.execute("UPDATE pa_jobs.jobs SET status='cancelled',token=NULL,lease_until=NULL WHERE owner=%s AND payload->>'input_namespace'='memory' AND payload->>'input_ref'=%s AND status IN ('queued','leased','running','retry_wait')",(owner,object_ref))
-            tx.conn.execute('DELETE FROM pa_runtime.object_heads WHERE owner=%s AND namespace=%s AND object_id=%s',(owner,'memory',object_ref))
-            tx.conn.execute('DELETE FROM pa_runtime.object_versions WHERE owner=%s AND namespace=%s AND object_id=%s',(owner,'memory',object_ref))
-            tx.conn.execute('UPDATE pa_memory.previews SET consumed=true,payload=%s WHERE owner=%s AND object_ref=%s',(Jsonb({'deleted':True}),owner,object_ref))
-            if tx.conn.execute("SELECT to_regclass('pa_cache.entries') AS table_ref").fetchone()['table_ref']:
-                tx.conn.execute('DELETE FROM pa_cache.entries WHERE owner=%s AND dependencies @> %s',(owner,Jsonb([{'namespace':'memory','object_ref':object_ref}])))
-        return {'deleted':True,'object_ref':object_ref,'backup_limitation':'Past backup content persists until its retention expiry; restore must apply current tombstones before egress.'}
+            state=delete_derived_in(tx,owner=owner,namespace='memory',object_ref=object_ref)
+        if getattr(self.root,'reader',None) is not None:
+            self.root.reader.cleanup_deleted()
+            with self.store.transaction() as tx:
+                pending=tx.conn.execute('SELECT count(*) AS n FROM pa_artifacts.files WHERE owner=%s AND deleted AND cleanup_pending',(owner,)).fetchone()['n']
+            state['pending_artifacts']=pending
+        return {'deleted':True,'object_ref':object_ref,**state,
+                'deletion_state':'cleanup_pending' if state['pending_artifacts'] else 'complete',
+                'backup_limitation':'Past backup content persists until its retention expiry; restore applies current tombstones before egress.'}
     def register_dependency(self,*,parent_namespace,parent_ref,child_namespace,child_ref):
         with self.store.transaction() as tx:
+            from .deletion import lineage_lock
+            lineage_lock(tx.conn,self.root.owner_ref)
             if tx.get(self.root.owner_ref,parent_namespace,parent_ref) is None or tx.get(self.root.owner_ref,child_namespace,child_ref) is None:
                 raise StorageError('live owner-bound dependency objects required')
             tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',
                             (self.root.owner_ref,parent_namespace,parent_ref,child_namespace,child_ref))
+    def search(self,query,*,chat_id,actor_id,owner_chat_id,limit=20):
+        owner=self._owner(chat_id,actor_id,owner_chat_id)
+        if not isinstance(query,str) or len(query)>500 or not 1<=limit<=50:raise StorageError('bounded memory search required')
+        with self.store.transaction() as tx:
+            rows=tx.conn.execute('''SELECT h.object_id FROM pa_runtime.object_heads h JOIN pa_runtime.object_versions v USING(owner,namespace,object_id,version)
+                WHERE h.owner=%s AND h.namespace='memory' AND position(lower(%s) in lower(v.payload::text))>0
+                ORDER BY h.object_id LIMIT %s''',(owner,query,limit)).fetchall()
+            return [item for row in rows if (item:=tx.get(owner,'memory',row['object_id'])) is not None]
+
     def export(self,*,chat_id,actor_id,owner_chat_id):
         owner=self._owner(chat_id,actor_id,owner_chat_id)
         with self.store.transaction() as tx:

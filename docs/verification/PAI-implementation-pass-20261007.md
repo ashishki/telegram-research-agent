@@ -22,14 +22,60 @@ examples are inactive. Restores disable egress and drain intake; old unknown
 attempts never authorize resend. Historical SQLite archive/watch sender paths
 were retained. No Redis/vector/archive migration was introduced.
 
-Remaining implementation/acceptance obligations are deliberately not hidden:
-the 69 individually named requirement cases still need full binding and scope
-assessment; all new cases are unexecuted. Production storage selection,
-actual provider/account access, visual/operator evidence and measured RPO/RTO
-remain gates. Metadata-only mail cannot establish body-level reply obligations;
-the runtime produces an exact additional selected-message scope request.
-Canvas requires an institutional reference before a live path. Provider
-reconciliation without authoritative lookup remains unknown.
+The follow-through pass closes the previously recorded local gaps:
+
+- Brief source hooks include selected calendar snapshots and academic state,
+  with explicit source classes, current scopes and durable dependency edges.
+- Academic local completion stops linked Watch subjects in the same transaction.
+  The displayed completion command identifies the persisted item; source
+  submission and academic eligibility remain distinct. Explicit stage selection
+  uses memory preview/confirmation. Selected mail/calendar metadata can enter
+  the academic merge only through configured academic selections and grants.
+- Forget invalidates derived response/job copies, history, caches, Brief rows,
+  files and linked reminders. Delivery fences retain digests/outcomes while
+  deleted text is redacted. A failed filesystem cleanup remains cleanup_pending.
+- Restore applies current and backed-up tombstones through that same graph,
+  relocates the private artifact index and removes deleted/unindexed bytes.
+- Domain transfer covers selected runtime tables, including conversation,
+  memory, source/cache, schedule and artifact state. It preserves consumed
+  confirmations, terminal/unknown receipts and spent budgets, verifies the
+  target again under table locks, and leaves egress disabled.
+- Source origin survives shortening, item follow-ups and mixed-source delivery.
+  Each delivered data class needs a current scope. Long answers have separate
+  bounded part attempts and an aggregate unknown fence; interrupted partial
+  sends are never blindly repeated.
+- Action execution checks account/recipients/thread, current event ETag and
+  selected calendar availability before confirmation is consumed. User command
+  confirmation includes exact proposal version/digest; plain yes additionally
+  requires provider-confirmed delivery of the current preview. Positive
+  reconciliation matches the original sent-item headers or event transactionId.
+- `/deep` enqueues a bounded research plan; independent reads use at most two
+  threads and precommitted step records. Interrupted ambiguous reads are not
+  reissued. `/watch` prepares an exact subscription for confirmation; selected
+  archive/mail sources share the durable scheduler.
+- `/mailread` obtains only an explicitly scoped selected message body, converts
+  HTML to inert text and requires separate body egress for model synthesis.
+  Selected calendars share a bounded page plan; original provider time-zone
+  metadata is retained alongside normalized instants and the local display zone.
+- Task-cost recording now includes Chat/archive/research/editorial/connector/
+  media calls and unknown usage. Extraction/retrieval/render caches are wired;
+  model-role profiles retain the baseline until comparable quality is measured.
+  The paired holdout comparator never grants release authority.
+- Operations expose queue/unknown ages, sync freshness, connection/lock counts,
+  disk and costs. CLI commands cover private state manifest/domain export/import
+  and isolated restore. Backup requires drained, egress-disabled state.
+- All 69 named requirement cases are prepared in test_pai_requirements.py.
+  Required pai-complete registration binds them to the existing ten scenarios.
+  New regression cases cover the additions above. None has been executed.
+
+Remaining work is evidence and acceptance: run the deferred synthetic tiers,
+fix observed failures, independently review the exact code, assess each of the
+69 cases for sufficient behavioral evidence, and obtain scoped actual-provider,
+visual/operator and measured recovery observations. Code presence is not proof
+of complete behavior. No current SHA is reviewed or tested. Production target
+selection belongs to the separately scoped cutover work; live account,
+institution, deployment and release gates persist. Missing authoritative
+provider lookup remains unknown; bounded absence never proves non-delivery.
 
 Publication commits: d4d45a2 (initial composition) and 19477b2 (source/media/
 recovery components), plus subsequent integration/doc commits in this branch.
@@ -51,3 +97,15 @@ Primary API sources used during implementation: [OpenAI Chat Completions](https:
 [Graph event creation](https://learn.microsoft.com/en-us/graph/api/user-post-events?view=graph-rest-1.0),
 [Graph event update](https://learn.microsoft.com/en-us/graph/api/event-update?view=graph-rest-1.0),
 [Canvas assignments](https://developerdocs.instructure.com/services/canvas/resources/assignments).
+
+
+Next command, for the deferred verification phase (not run in this pass):
+
+```bash
+PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/test_tiers.py pai-complete
+```
+
+Then run the required focused project/Playbook checks and accumulated fresh
+independent Mimo review on the exact implementation SHA. Do not reuse b267854's
+652 passes or infer live/visual evidence from synthetic cases. Review budget is
+still 23/30 consumed; no call was made in this follow-through pass.

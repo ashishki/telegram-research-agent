@@ -1,5 +1,5 @@
 """Weekly selected sources -> immutable Brief -> application and delivery."""
-from dataclasses import dataclass,replace
+from dataclasses import dataclass,replace,asdict
 from datetime import datetime,timedelta,timezone
 from zoneinfo import ZoneInfo
 from prm.briefs import BriefBuildRequest,BriefWindow,CoverageSource,build_brief_document,render_brief_document
@@ -24,7 +24,7 @@ class BriefRuntime:
     def build(self,*,topic,timezone_name,end_at=None,previous_document=None,comparison_document=None):
         zone=ZoneInfo(timezone_name);end=(end_at or datetime.now(timezone.utc)).astimezone(zone)
         window=BriefWindow(timezone_name,end-timedelta(days=7),end,datetime.now(timezone.utc))
-        evidence=[];coverage=[];limits=[]
+        evidence=[];coverage=[];limits=[];used_scopes=[]
         for hook in self.source_hooks:
             if hook.authorization_request.owner_ref!=self.root.owner_ref or hook.authorization_request.resource_ref!=hook.source_ref:
                 raise StorageError('Brief hook source scope differs')
@@ -38,15 +38,21 @@ class BriefRuntime:
                 if any(item.get('local_source_provenance') and item.get('source_owner_ref')!=self.root.owner_ref for item in batch):
                     raise StorageError('Brief personal source owner differs')
                 evidence.extend(batch);coverage.append(CoverageSource(hook.source_ref,'checked'))
+                if batch:used_scopes.append(asdict(replace(hook.authorization_request,operation_ref=None)))
             except Exception:
                 coverage.append(CoverageSource(hook.source_ref,'unavailable','collection unavailable'))
         if not self.source_hooks:limits.append('selected_sources_unavailable')
         request=BriefBuildRequest(topic,window,tuple(evidence[:48]),self.root.owner_ref,tuple(coverage),tuple(limits),
             previous_document=previous_document,comparison_document=comparison_document,period_basis='explicit_requested_range')
         document=build_brief_document(request)
+        classes={item.get('source_data_class','private_archive' if item.get('local_archive_provenance') else 'private_connector_metadata') for item in evidence[:48]}
         if self.editorial is not None:
-            editorial=self.editorial(document)
+            editorial=self.editorial(document,data_classes=classes) if type(self.editorial)is RuntimeBriefEditorial else self.editorial(document)
             if editorial is not None:document=build_brief_document(replace(request,editorial=editorial))
+        dependencies=[item['dependency_ref'] for item in evidence[:48] if item.get('dependency_ref')]
+        self.root.briefs.pending_dependencies[document.content_digest]=dependencies
+        self.root.briefs.pending_classes[document.content_digest]=tuple(sorted(classes)) or ('user_provided',)
+        self.root.briefs.pending_scopes[document.content_digest]=used_scopes
         return document
 
     def answer(self,*,topic,timezone_name,end_at=None):
@@ -56,21 +62,28 @@ class BriefRuntime:
         request=OperatorRequest(query=topic,mode='brief',chat_id=self.root.owner_chat_id,
             actor_id=self.root.owner_chat_id,owner_chat_id=self.root.owner_chat_id)
         from prm.briefs import rebuild_brief_request
-        return assistant.render_brief_document(request,rebuild_brief_request(document))
+        result=assistant.render_brief_document(request,rebuild_brief_request(document))
+        classes=self.root.briefs.pending_classes.get(document.content_digest,('private_archive','private_connector_content'))
+        refs=result.payload.get('conversation',{}).get('response_refs',())
+        if refs:self.root.conversations.record_origin(refs[0],classes,source_scopes=self.root.briefs.pending_scopes.get(document.content_digest,()))
+        return replace(result,payload={**result.payload,'source_data_classes':list(classes),'source_data_class':classes[0],'source_scopes':self.root.briefs.pending_scopes.get(document.content_digest,[])})
 
 
 class RuntimeBriefEditorial:
     def __init__(self,root):self.root=root
-    def __call__(self,document):
+    def __call__(self,document,*,data_classes=None):
         import hashlib,json,uuid
         from prm.capabilities import AuthorizationRequest
         from prm.brief_editorial import BriefEditorial
         from .model import ScopedModelClient
         if not document.evidence:return None
-        root=self.root;endpoint=root.model_endpoint;operation='briefeditorial_'+uuid.uuid4().hex;groups=[]
-        scopes=[('model.generate',root.model_resource_ref,'user_provided','answer.request'),
-                ('model.context_egress',root.archive_resource_ref,'private_archive','brief.editorial_archive'),
-                ('model.context_egress','resource_personal_brief','private_connector_metadata','brief.editorial_personal')]
+        root=self.root;endpoint=root.endpoint_for('research');operation='briefeditorial_'+uuid.uuid4().hex;groups=[]
+        scopes=[('model.generate',root.model_resource_ref,'user_provided','answer.request')]
+        selected=set(data_classes or {'private_archive'})
+        if not selected<= {'private_archive','private_connector_metadata','private_connector_content','user_provided','public'}:raise StorageError('unknown Brief source data class')
+        for data_class in sorted(selected):
+            scopes.append(('model.context_egress',root.archive_resource_ref if data_class=='private_archive' else 'resource_personal_brief',
+                           data_class,'brief.editorial_archive' if data_class=='private_archive' else 'brief.editorial_personal'))
         for index,(capability,resource,data_class,purpose) in enumerate(scopes):
             decision=root.registry.authorize_and_reserve(AuthorizationRequest(owner_ref=root.owner_ref,connection_ref=endpoint.connection_ref,
                 capability=capability,resource_ref=resource,operation='model_egress',data_class=data_class,provider_ref=endpoint.provider_ref,
@@ -80,7 +93,7 @@ class RuntimeBriefEditorial:
                 return None
             groups.append((decision,))
         sources=[{'evidence_ref':item.evidence_ref,'title':item.title,'summary':item.summary,'source_ref':item.source_ref} for item in document.evidence]
-        client=ScopedModelClient(endpoint,root.registry,groups=groups,history=({'role':'user','content':'Untrusted selected evidence: '+json.dumps(sources,ensure_ascii=False)},))
+        client=root.scoped_client(endpoint,groups=groups,task_ref=document.brief_id,attempt_ref=operation,history=({'role':'user','content':'Untrusted selected evidence: '+json.dumps(sources,ensure_ascii=False)},))
         try:
             receipt=client.complete_with_receipt(prompt=document.topic,
                 system='Return JSON {stories:[{title,summary,explanation,plain_explanation,why_selected,next_step,caveat,anchors:[{evidence_ref,quote}]}],omitted_refs:[]}. Select at most five actual events. Each quote must be an exact selected source substring of at least 16 characters. Explain importance separately from facts. Preserve deadlines/conflicts/coverage. No tools or external claims.',

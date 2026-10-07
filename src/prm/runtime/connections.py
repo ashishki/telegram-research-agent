@@ -158,7 +158,7 @@ class GraphOAuth:
             secret=self.vault.put(bundle)
             try:
                 with self.store.transaction() as tx:
-                    prior=tx.conn.execute('SELECT revision FROM pa_connections.accounts WHERE owner=%s AND id=%s FOR UPDATE',(owner,row['connection_ref'])).fetchone()
+                    prior=tx.conn.execute('SELECT revision,secret_ref FROM pa_connections.accounts WHERE owner=%s AND id=%s FOR UPDATE',(owner,row['connection_ref'])).fetchone()
                     if prior is None or prior['revision']!=row['expected_revision']:raise CapabilityDenied('connection revoked or replaced during handshake')
                     tx.conn.execute('''INSERT INTO pa_connections.accounts VALUES(%s,%s,%s,%s,%s,'connected',%s,%s)
                         ON CONFLICT(owner,id) DO UPDATE SET account_ref=excluded.account_ref,scopes=excluded.scopes,revision=excluded.revision,
@@ -166,26 +166,33 @@ class GraphOAuth:
                         (owner,row['connection_ref'],row['account_ref'],Jsonb(row['scopes']),prior['revision']+1 if prior else 1,secret,
                          datetime.now(timezone.utc)+timedelta(seconds=bundle['expires_in'])))
             except Exception:self.vault.delete(secret);raise
+            if prior and prior['secret_ref']:self.vault.delete(prior['secret_ref'])
             return self.status(owner=owner,connection_ref=row['connection_ref'])
         finally:self.vault.delete(row['verifier_ref'])
 
     def credential(self,*,owner,connection_ref,account_ref):
-        with self.store.transaction() as tx:
-            _check(tx.conn)
-            row=tx.conn.execute('SELECT * FROM pa_connections.accounts WHERE owner=%s AND id=%s FOR UPDATE',(owner,connection_ref)).fetchone()
-            now=tx.conn.execute('SELECT clock_timestamp() AS now').fetchone()['now']
-            if not row or row['status']!='connected' or row['account_ref']!=account_ref:raise CapabilityDenied('current connection unavailable')
-            bundle=self.vault.get(row['secret_ref'])
-            if row['expires']<=now+timedelta(seconds=30):
-                if not bundle.get('refresh_token'):raise CapabilityDenied('interactive reconnect required')
-                refreshed=self._validate_bundle(self._http(self.authority+'/'+self.tenant+'/oauth2/v2.0/token',form={'client_id':self.client_id,
-                    'grant_type':'refresh_token','refresh_token':bundle['refresh_token'],'scope':' '.join(row['scopes'])}),row['scopes'])
-                if 'refresh_token' not in refreshed:refreshed['refresh_token']=bundle['refresh_token']
-                secret=self.vault.put(refreshed)
-                tx.conn.execute('UPDATE pa_connections.accounts SET secret_ref=%s,expires=%s WHERE owner=%s AND id=%s',
-                    (secret,now+timedelta(seconds=refreshed['expires_in']),owner,connection_ref))
-                bundle=refreshed
-            return bundle['access_token']
+        obsolete=None;new_secret=None
+        try:
+            with self.store.transaction() as tx:
+                _check(tx.conn)
+                row=tx.conn.execute('SELECT * FROM pa_connections.accounts WHERE owner=%s AND id=%s FOR UPDATE',(owner,connection_ref)).fetchone()
+                now=tx.conn.execute('SELECT clock_timestamp() AS now').fetchone()['now']
+                if not row or row['status']!='connected' or row['account_ref']!=account_ref:raise CapabilityDenied('current connection unavailable')
+                bundle=self.vault.get(row['secret_ref'])
+                if row['expires']<=now+timedelta(seconds=30):
+                    if not bundle.get('refresh_token'):raise CapabilityDenied('interactive reconnect required')
+                    refreshed=self._validate_bundle(self._http(self.authority+'/'+self.tenant+'/oauth2/v2.0/token',form={'client_id':self.client_id,
+                        'grant_type':'refresh_token','refresh_token':bundle['refresh_token'],'scope':' '.join(row['scopes'])}),row['scopes'])
+                    if 'refresh_token' not in refreshed:refreshed['refresh_token']=bundle['refresh_token']
+                    new_secret=self.vault.put(refreshed);obsolete=row['secret_ref']
+                    tx.conn.execute('UPDATE pa_connections.accounts SET secret_ref=%s,expires=%s WHERE owner=%s AND id=%s',
+                        (new_secret,now+timedelta(seconds=refreshed['expires_in']),owner,connection_ref))
+                    bundle=refreshed
+        except Exception:
+            if new_secret:self.vault.delete(new_secret)
+            raise
+        if obsolete:self.vault.delete(obsolete)
+        return bundle['access_token']
 
     def revoke(self,*,connection_ref,chat_id,actor_id,owner_chat_id):
         owner=self._owner(chat_id,actor_id,owner_chat_id)
@@ -193,8 +200,15 @@ class GraphOAuth:
             row=tx.conn.execute('SELECT secret_ref FROM pa_connections.accounts WHERE owner=%s AND id=%s FOR UPDATE',(owner,connection_ref)).fetchone()
             tx.conn.execute('UPDATE pa_connections.accounts SET status=%s,revision=revision+1,secret_ref=NULL WHERE owner=%s AND id=%s',
                             ('disconnected',owner,connection_ref))
-            tx.conn.execute('UPDATE pa_connections.flows SET consumed=true WHERE owner=%s AND connection_ref=%s',(owner,connection_ref))
+            flows=tx.conn.execute('UPDATE pa_connections.flows SET consumed=true WHERE owner=%s AND connection_ref=%s RETURNING verifier_ref',(owner,connection_ref)).fetchall()
         if row and row['secret_ref']:self.vault.delete(row['secret_ref'])
+        for flow in flows:self.vault.delete(flow['verifier_ref'])
+        with self.store.transaction() as tx:
+            if tx.conn.execute("SELECT to_regclass('pa_sources.items') AS meta").fetchone()['meta'] is not None:
+                tx.conn.execute('DELETE FROM pa_sources.items WHERE owner=%s AND connection_ref=%s',(owner,connection_ref))
+                tx.conn.execute('DELETE FROM pa_sources.sync WHERE owner=%s AND connection_ref=%s',(owner,connection_ref))
+            if tx.conn.execute("SELECT to_regclass('pa_jobs.jobs') AS meta").fetchone()['meta'] is not None:
+                tx.conn.execute("UPDATE pa_jobs.jobs SET status='cancelled',token=NULL,lease_until=NULL WHERE owner=%s AND mode='compute' AND payload->>'connection_ref'=%s AND status NOT IN ('completed','cancelled')",(owner,connection_ref))
         # Provider-wide token restriction is not claimed by local disconnect.
         return {'status':'disconnected','provider_token_revocation':'operator_or_provider_required'}
 

@@ -7,6 +7,7 @@ from threading import Thread, Event
 from urllib.request import Request, urlopen
 
 import pytest
+from tests.pai_runtime_fixtures import pai
 
 from tests.test_pai_scheduler import case, confirm, note
 from prm.capabilities import CapabilityGrant, ProviderPolicy, CapabilityDenied
@@ -271,3 +272,59 @@ def test_action_reconciliation_has_separate_current_read_authority(sandbox, tmp_
     resolved = executor.reconcile_confirmed_action(store=store, idempotency_key=pending.idempotency_key, adapter=lookup, upper_bound=1)
     assert resolved.status == 'failed_known' and resolved.reconciled
     assert executor.execute_confirmed_action(action, request=request(reg, grant, 'op_no_automatic_retry'), executor=Lost(), store=store) == resolved
+
+
+def test_long_mixed_source_answer_records_parts_and_never_resends_unknown(pai):
+    from tests.pai_runtime_fixtures import allow
+    from datetime import datetime,timezone,timedelta
+    from prm.runtime.delivery import DeliveryExecutor,TransportReceipt
+    root=pai.root;owner=root.owner_ref
+    for kind in ('private_archive','private_connector_content'):
+        allow(pai,'assistant.result_delivery','destination_parts',kind,'answer.delivery',provider='provider_telegram',connection=None,operation='deliver')
+    item=root.queue.store.put(owner,'conversation','input_parts',{'query':'Synthetic'},expected_version=0)
+    job=root.queue.enqueue(owner=owner,idempotency_key='parts_fixture',kind='compute.digest',deadline=datetime.now(timezone.utc)+timedelta(minutes=5),
+        payload={'schema_version':1,'input_namespace':'conversation','input_ref':item.object_id,'input_version':1,'input_digest':item.digest,
+            'connection_ref':None,'resource_ref':'resource_parts','purpose':'local.assistant','consent_revision':1})
+    lease=root.queue.claim(owner=owner,kinds=('compute.digest',))
+    root.queue.complete(lease,{'text':'Synthetic long answer. '*400,'data_class':'private_archive','data_classes':['private_archive','private_connector_content']})
+    calls=[]
+    def sender(destination,text,attempt):
+        calls.append((destination,text,attempt))
+        if len(calls)==2:raise OSError('synthetic accepted-without-ack')
+        return TransportReceipt('part_receipt_'+str(len(calls)))
+    executor=DeliveryExecutor(root.queue.store.target,registry=root.registry,sender=sender)
+    result=executor.deliver_result(owner=owner,job_id=job,destination_ref='destination_parts',upper_bound=0)
+    assert result['status']=='unknown' and len(calls)==2 and all(len(call[1])<=3800 for call in calls)
+    assert executor.deliver_result(owner=owner,job_id=job,destination_ref='destination_parts',upper_bound=0)['status']=='unknown'
+    assert len(calls)==2
+
+
+def test_delivery_requires_every_source_class_before_transport(pai):
+    from tests.pai_runtime_fixtures import allow
+    from datetime import datetime,timezone,timedelta
+    root=pai.root;owner=root.owner_ref;calls=[]
+    allow(pai,'assistant.result_delivery','destination_mixed','private_archive','answer.delivery',provider='provider_telegram',connection=None,operation='deliver')
+    item=root.queue.store.put(owner,'conversation','input_mixed',{'query':'Synthetic'},expected_version=0)
+    job=root.queue.enqueue(owner=owner,idempotency_key='mixed_fixture',kind='compute.digest',deadline=datetime.now(timezone.utc)+timedelta(minutes=5),
+        payload={'schema_version':1,'input_namespace':'conversation','input_ref':item.object_id,'input_version':1,'input_digest':item.digest,
+            'connection_ref':None,'resource_ref':'resource_mixed','purpose':'local.assistant','consent_revision':1})
+    root.queue.complete(root.queue.claim(owner=owner,kinds=('compute.digest',)),{'text':'Synthetic mixed answer','data_class':'private_archive','data_classes':['private_archive','private_connector_content']})
+    executor=DeliveryExecutor(root.queue.store.target,registry=root.registry,sender=lambda *args:calls.append(args))
+    with pytest.raises(CapabilityDenied):executor.deliver_result(owner=owner,job_id=job,destination_ref='destination_mixed',upper_bound=0)
+    assert not calls
+
+
+def test_source_revocation_blocks_delivery_of_a_completed_private_copy(pai):
+    from tests.pai_runtime_fixtures import allow,request
+    from dataclasses import asdict
+    root=pai.root;owner=root.owner_ref;calls=[]
+    source=allow(pai,'archive.read','resource_archive','private_archive','research.archive',provider='provider_local',connection=None,operation='read')
+    allow(pai,'assistant.result_delivery','destination_revoked','private_archive','answer.delivery',provider='provider_telegram',connection=None,operation='deliver')
+    scope=asdict(__import__('prm.capabilities',fromlist=['AuthorizationRequest']).AuthorizationRequest(owner_ref=owner,connection_ref=None,
+        capability='archive.read',resource_ref='resource_archive',operation='read',data_class='private_archive',provider_ref='provider_local',purpose='research.archive'))
+    root.services['mail']=lambda *args:{'status':'ok','text':'Synthetic derived private answer.','source_data_class':'private_archive','source_scopes':[scope]}
+    ack,result=request(pai,9400,'/mail')
+    root.registry.revoke_grant(source.grant_id,owner_ref=owner)
+    executor=DeliveryExecutor(root.queue.store.target,registry=root.registry,sender=lambda *args:calls.append(args))
+    assert executor.deliver_result(owner=owner,job_id=ack.job_id,destination_ref='destination_revoked',upper_bound=0)['status']=='unknown'
+    assert not calls

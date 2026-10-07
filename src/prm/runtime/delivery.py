@@ -88,7 +88,8 @@ class DeliveryExecutor:
                 raise StorageError('result unavailable')
             payload = {'text': result.payload['text'], 'result_ref': result.object_id, 'result_digest': result.digest,
                        'data_class':result.payload.get('data_class','private_archive'),
-                       'request_ref': result.payload.get('request_ref')}
+                       'data_classes':result.payload.get('data_classes',[result.payload.get('data_class','private_archive')]),
+                       'request_ref': result.payload.get('request_ref'),'source_scopes':result.payload.get('payload',{}).get('source_scopes',[])}
             if effect_lease is not None:
                 from prm.storage.jobs import JobQueue
                 if (effect_lease.owner != owner or effect_lease.mode != 'effect'
@@ -97,8 +98,33 @@ class DeliveryExecutor:
                        != ('result', result.object_id, result.version, result.digest)):
                     raise CapabilityDenied('effect lease does not bind the exact result')
                 JobQueue(self.store.target)._fenced(tx, effect_lease)
-        return self._deliver(owner=owner, delivery_id='answer_' + job_id, kind='answer', source_ref=job_id,
-            destination_ref=destination_ref, payload=payload, upper_bound=upper_bound, effect_lease=effect_lease)
+        if len(payload['text'])<=3800:
+            return self._deliver(owner=owner, delivery_id='answer_' + job_id, kind='answer', source_ref=job_id,
+                destination_ref=destination_ref, payload=payload, upper_bound=upper_bound, effect_lease=effect_lease)
+        # The aggregate is durably unknown before any part is attempted. A
+        # restart never repeats already accepted or ambiguous partial sends.
+        if len(payload['text'])>32000:raise StorageError('bounded answer exceeds delivery size')
+        delivery_id='answer_'+job_id;digest=_canonical(payload)[1]
+        with self.store.transaction() as tx:
+            existing=tx.conn.execute('SELECT * FROM pa_delivery.attempts WHERE owner=%s AND id=%s FOR UPDATE',(owner,delivery_id)).fetchone()
+            if existing:
+                if existing['digest']!=digest or existing['destination_ref']!=destination_ref:raise StateConflict('aggregate delivery identity differs')
+                return existing
+            tx.conn.execute('''INSERT INTO pa_delivery.attempts(owner,id,attempt_ref,kind,source_ref,destination_ref,digest,payload,status)
+                VALUES(%s,%s,%s,'answer',%s,%s,%s,%s,'unknown')''',
+                (owner,delivery_id,'attempt_'+uuid.uuid4().hex,job_id,destination_ref,digest,Jsonb(payload)))
+        parts=[payload['text'][index:index+3600] for index in range(0,len(payload['text']),3600)]
+        receipts=[]
+        for index,text in enumerate(parts):
+            part={**payload,'text':'['+str(index+1)+'/'+str(len(parts))+']\n'+text,'part':index+1,'parts':len(parts)}
+            attempt=self._deliver(owner=owner,delivery_id=delivery_id+'_part_'+str(index+1),kind='answer',source_ref=job_id,
+                destination_ref=destination_ref,payload=part,upper_bound=upper_bound,effect_lease=effect_lease)
+            if attempt['status']!='sent':return self.attempt(owner=owner,delivery_id=delivery_id)
+            receipts.append(attempt['provider_receipt'])
+        with self.store.transaction() as tx:
+            tx.conn.execute("UPDATE pa_delivery.attempts SET status='sent',provider_receipt=%s,reason='all_parts_provider_accepted' WHERE owner=%s AND id=%s AND status='unknown'",
+                ('parts:'+hashlib.sha256('|'.join(receipts).encode()).hexdigest(),owner,delivery_id))
+        return self.attempt(owner=owner,delivery_id=delivery_id)
 
     def deliver_watch(self, *, owner, notification_id, upper_bound):
         with self.store.transaction() as tx:
@@ -142,6 +168,25 @@ class DeliveryExecutor:
             if quota is None or quota['local_day'] != local.date():
                 raise CapabilityDenied('delivery day changed after preparation')
 
+    def _source_current(self,tx,owner,payload):
+        scopes=payload.get('source_scopes',())
+        if len(scopes)>16:raise StorageError('bounded delivery source scopes required')
+        requests=[AuthorizationRequest(**scope) for scope in scopes]
+        chosen=[]
+        for request in requests:
+            if request.owner_ref!=owner:raise CapabilityDenied('delivery source owner differs')
+            decision,_,_=self.registry._decision(tx.conn,request)
+            if not decision.allowed:raise CapabilityDenied('delivery source was revoked')
+            chosen.append(replace(request,grant_ref=decision.grant_ref,expected_grant_revision=decision.grant_revision))
+        ids=sorted({request.grant_ref for request in chosen})
+        if ids:tx.conn.execute('SELECT grant_id FROM pa_policy.grants WHERE owner=%s AND grant_id=ANY(%s) ORDER BY grant_id FOR SHARE',(owner,ids)).fetchall()
+        for request in chosen:
+            decision,_,_=self.registry._decision(tx.conn,request)
+            if not decision.allowed:raise CapabilityDenied('delivery source scope changed')
+        for connection in sorted({request.connection_ref for request in chosen if request.provider_ref=='provider_microsoft_graph' and request.connection_ref}):
+            row=tx.conn.execute('SELECT status FROM pa_connections.accounts WHERE owner=%s AND id=%s FOR SHARE',(owner,connection)).fetchone()
+            if not row or row['status']!='connected':raise CapabilityDenied('delivery source disconnected')
+
     def _deliver(self, *, owner, delivery_id, kind, source_ref, destination_ref, payload, upper_bound, effect_lease=None):
         if not isinstance(destination_ref, str) or not 0 < len(destination_ref) <= 128:
             raise StorageError('bounded destination reference required')
@@ -156,14 +201,20 @@ class DeliveryExecutor:
             capability='assistant.watch_delivery' if kind == 'watch' else 'assistant.result_delivery',
             resource_ref=destination_ref, operation='deliver', data_class=payload['data_class'],
             provider_ref='provider_telegram', purpose='watch.delivery' if kind == 'watch' else 'answer.delivery', operation_ref=operation)
-        decision = self.registry.authorize_and_reserve(request, upper_bound=upper_bound)
-        if not decision.allowed:
-            concurrent = self.attempt(owner=owner, delivery_id=delivery_id)
-            if concurrent:
-                if concurrent['digest'] != digest or concurrent['destination_ref'] != destination_ref:
-                    raise StateConflict('concurrent delivery scope differs')
-                return concurrent
-            raise CapabilityDenied(decision.reason)
+        classes=tuple(sorted(set(payload.get('data_classes',(payload['data_class'],)))))
+        if not classes or len(classes)>6:raise StorageError('bounded delivery source classes required')
+        groups=[]
+        for index,data_class in enumerate(classes):
+            scoped=replace(request,data_class=data_class,operation_ref=operation if index==0 else operation+'_'+str(index))
+            decision=self.registry.authorize_and_reserve(scoped,upper_bound=upper_bound)
+            if not decision.allowed:
+                for group in groups:group[0].reservation.abandon_before_transport()
+                concurrent=self.attempt(owner=owner,delivery_id=delivery_id)
+                if concurrent:
+                    if concurrent['digest']!=digest or concurrent['destination_ref']!=destination_ref:raise StateConflict('concurrent delivery scope differs')
+                    return concurrent
+                raise CapabilityDenied(decision.reason)
+            groups.append((decision,))
         try:
             with self.store.transaction() as tx:
                 _check(tx.conn)
@@ -176,16 +227,22 @@ class DeliveryExecutor:
                     VALUES(%s,%s,%s,%s,%s,%s,%s,%s,'unknown')''',
                     (owner, delivery_id, 'attempt_' + uuid.uuid4().hex, kind, source_ref, destination_ref, digest, Jsonb(payload)))
         except Exception:
-            decision.reservation.abandon_before_transport()
+            for group in groups:group[0].reservation.abandon_before_transport()
             raise
         status, receipt, reason = 'unknown', '', 'transport_outcome_unknown'
         def transport():
             with self.store.transaction() as tx:
+                if kind == 'answer':
+                    from .deletion import lineage_lock
+                    lineage_lock(tx.conn,owner)
+                    current=tx.get(owner,'result',payload['result_ref'],version=1)
+                    if current is None or current.digest!=payload['result_digest']:raise CapabilityDenied('answer deleted or changed before delivery')
                 if kind == 'watch':
                     self._guard_watch(tx, owner, source_ref, payload, destination_ref, delivery_id=delivery_id)
                 if effect_lease is not None:
                     from prm.storage.jobs import JobQueue
                     JobQueue(self.store.target)._fenced(tx, effect_lease)
+                self._source_current(tx,owner,payload)
                 row = tx.conn.execute('SELECT * FROM pa_delivery.attempts WHERE owner=%s AND id=%s FOR UPDATE', (owner, delivery_id)).fetchone()
                 if row['status'] != 'unknown' or row['digest'] != digest:
                     raise CapabilityDenied('attempt already settled or changed')
@@ -194,7 +251,7 @@ class DeliveryExecutor:
                     raise StorageError('final scope connection lost; retain unknown attempt')
                 return result
         try:
-            result = self.registry.execute_reserved((decision.reservation,), transport)
+            result = self.registry.execute_reserved_groups(tuple(tuple(decision.reservation for decision in group) for group in groups), transport)
             if type(result) is not TransportReceipt or not isinstance(result.provider_receipt, str) or not 0 < len(result.provider_receipt) <= 256:
                 raise StorageError('typed actual provider receipt required')
             status, receipt, reason = 'sent', result.provider_receipt, 'provider_accepted'

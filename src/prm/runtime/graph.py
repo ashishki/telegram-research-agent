@@ -1,6 +1,7 @@
 """Bounded metadata-only Graph reads, paging/delta and durable derived state."""
 from __future__ import annotations
 from datetime import datetime,timezone
+from dataclasses import asdict,replace
 import hashlib
 import json
 from urllib.parse import quote,urlencode,urlsplit,parse_qs
@@ -223,6 +224,39 @@ class GraphMailAdapter:
         items=[row['payload'] for row in rows]
         return {'text':'\n'.join(str(item.get('subject','Без темы'))+' — '+str(item.get('webLink','')) for item in items[:10]) or 'В выбранном покрытии писем нет.',
                 'items':items,'limitation':'Metadata does not prove reply obligation, deadline or body content. Exact wider scope is required when insufficient.'}
+    def read_message(self,selection,message_ref):
+        if selection.account_ref!=self.transport.account_ref or not isinstance(message_ref,str) or not 0<len(message_ref)<=256:
+            raise CapabilityDenied('exact selected message/account required')
+        import uuid
+        from html.parser import HTMLParser
+        from dataclasses import asdict
+        scope=AuthorizationRequest(owner_ref=self.transport.owner_ref,connection_ref=self.transport.connection_ref,capability='assistant.mail_read',
+            resource_ref=message_ref,operation='read',data_class='private_connector_content',provider_ref='provider_microsoft_graph',purpose='mail.read',
+            operation_ref='mailbody_'+uuid.uuid4().hex)
+        decision=self.transport.registry.authorize_and_reserve(scope,upper_bound=self.transport.upper_bound)
+        if not decision.allowed:raise CapabilityDenied(decision.reason)
+        value,_=self.transport.request(decision,path='/v1.0/me/messages/'+quote(message_ref,safe='')+'?'+urlencode({'$select':'id,subject,body,from,receivedDateTime,parentFolderId,conversationId,webLink'}))
+        received=datetime.fromisoformat(value['receivedDateTime'].replace('Z','+00:00'))
+        sender=value.get('from',{}).get('emailAddress',{}).get('address','')
+        if (value.get('id')!=message_ref or value.get('parentFolderId') not in selection.folders or
+            selection.sender_domains and sender.rsplit('@',1)[-1].casefold() not in selection.sender_domains or
+            selection.since and received<selection.since or selection.until and received>=selection.until):raise CapabilityDenied('message is outside the selected source scope')
+        text=value.get('body',{}).get('content','')
+        if not isinstance(text,str):raise StorageError('bounded message body required')
+        if value.get('body',{}).get('contentType','').casefold()=='html':
+            class PlainText(HTMLParser):
+                def __init__(self):super().__init__();self.fragments=[];self.hidden=0
+                def handle_starttag(self,tag,attrs):
+                    if tag in {'script','style'}:self.hidden+=1
+                def handle_endtag(self,tag):
+                    if tag in {'script','style'}:self.hidden=max(0,self.hidden-1)
+                def handle_data(self,data):
+                    if not self.hidden:self.fragments.append(data)
+            parser=PlainText();parser.feed(text);text=' '.join(parser.fragments)
+        truncated=len(text)>12000;text=text[:12000]
+        return {'id':message_ref,'subject':value.get('subject',''),'content':text,'webLink':value.get('webLink',''),
+            'conversation_ref':value.get('conversationId'),'truncated':truncated,'source_scope':asdict(replace(scope,operation_ref=None))}
+
     def brief_evidence(self,selection,window):
         with self.store.transaction() as tx:
             state=tx.conn.execute("SELECT completed FROM pa_sources.sync WHERE owner=%s AND connection_ref=%s AND kind='mail' AND scope_digest=%s",
@@ -240,7 +274,7 @@ class GraphMailAdapter:
 
 
 class GraphCalendarAdapter:
-    FIELDS=('id','subject','start','end','isAllDay','isCancelled','type','seriesMasterId','changeKey','webLink')
+    FIELDS=('id','subject','start','end','isAllDay','isCancelled','type','seriesMasterId','changeKey','webLink','originalStartTimeZone','originalEndTimeZone')
     def __init__(self,transport):self.transport=transport
     def fetch_page(self,request):
         if request.authorization is not None and request.authorization.data_class=='private_connector_metadata':
@@ -258,8 +292,9 @@ class GraphCalendarAdapter:
         if not isinstance(rows,list) or len(rows)>selection.max_items:raise StorageError('calendar page exceeds bound')
         self.next_cursor=value.get('@odata.nextLink')
         if self.next_cursor:self.transport.next_path(self.next_cursor,base_path=base,allowed_fields=self.FIELDS)
-        output=[]
+        output=[];self.original_timezones={}
         for row in rows:
+            self.original_timezones[row['id']]={key:row.get(key) for key in ('originalStartTimeZone','originalEndTimeZone')}
             def moment(field):
                 value=row[field];parsed=datetime.fromisoformat(value['dateTime'].replace('Z','+00:00'))
                 if parsed.tzinfo is None:

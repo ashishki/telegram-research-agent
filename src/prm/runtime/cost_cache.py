@@ -77,6 +77,8 @@ class CostCacheRuntime:
         if kind not in {'extraction','retrieval','render'} or not 1<=ttl_seconds<=86400 or len(dependencies)>32:raise StorageError('bounded non-effect cache required')
         _canonical(payload)
         with self.store.transaction() as tx:
+            from .deletion import lineage_lock
+            lineage_lock(tx.conn,self.root.owner_ref)
             for dependency in dependencies:
                 item=tx.get(self.root.owner_ref,dependency['namespace'],dependency['object_ref'],version=dependency['version'])
                 if item is None or item.digest!=dependency['digest']:raise StorageError('cache dependency unavailable')

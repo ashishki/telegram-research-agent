@@ -1,6 +1,7 @@
 """Concrete one-call STT transport under a modality-specific current grant."""
 import json
 import uuid
+import time
 from urllib.request import Request,ProxyHandler,build_opener
 from prm.capabilities import AuthorizationRequest,CapabilityDenied
 from prm.storage.postgres import StorageError
@@ -11,7 +12,7 @@ class SpeechTranscriber:
     def __init__(self,root,*,endpoint:ModelEndpoint,upper_bound,resource_ref=None):
         self.root,self.endpoint,self.upper_bound,self.resource_ref=root,endpoint,upper_bound,resource_ref
         self.provider_ref=endpoint.provider_ref
-    def __call__(self,asset,path):
+    def __call__(self,asset,path,*,task_ref=None):
         endpoint=self.endpoint
         if asset.owner_ref!=self.root.owner_ref:raise CapabilityDenied('foreign voice input')
         decision=self.root.registry.authorize_and_reserve(AuthorizationRequest(owner_ref=self.root.owner_ref,connection_ref=endpoint.connection_ref,
@@ -34,4 +35,11 @@ class SpeechTranscriber:
             text=value.get('text')
             if not isinstance(text,str) or len(text)>16000:raise StorageError('speech text unavailable')
             return text
-        return self.root.registry.execute_reserved((decision.reservation,),transport)
+        from .cost_cache import CostCacheRuntime
+        started=time.monotonic();outcome='unknown'
+        try:
+            text=self.root.registry.execute_reserved((decision.reservation,),transport);outcome='accepted';return text
+        finally:
+            CostCacheRuntime(self.root).record(task_ref=task_ref or asset.media_ref,attempt_ref='stt_'+asset.media_ref,provider=endpoint.provider_ref,
+                model=endpoint.model,usage={'input':None,'cached_input':None,'cache_write':None,'output':None,'reasoning':None,'semantics':'speech_usage_unavailable'},
+                latency_ms=int((time.monotonic()-started)*1000),outcome=outcome,tariff_version=self.root.tariff_version)

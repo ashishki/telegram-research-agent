@@ -1649,7 +1649,8 @@
         "docs/adr/ADR-01*.md",
         "tests/test_pai_end_to_end.py",
         "tests/test_pai_load_recovery.py",
-        "tests/fixtures/assistant/**"
+        "tests/fixtures/assistant/**",
+        "tests/test_pai_requirements.py"
       ],
       "change_budget": "files<=24",
       "dependencies": [
@@ -1771,7 +1772,8 @@
             "tests/test_pai_scheduler.py",
             "tests/test_pai_storage.py",
             "tests/test_pai_web_github.py",
-            "tests/test_pai_workers.py"
+            "tests/test_pai_workers.py",
+            "tests/test_pai_requirements.py"
           ],
           "expected_exit_code": 0,
           "id": "complete_requirement_scenarios",

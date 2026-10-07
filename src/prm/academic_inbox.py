@@ -40,7 +40,7 @@ MAX_ITEMS_LIMIT = 500
 MAX_DEADLINES = 8
 
 CATEGORIES = ("obligation", "opportunity", "reading", "administrative", "uncertain")
-SOURCE_KINDS = ("canvas_assignment", "canvas_announcement", "canvas_calendar", "mail", "utd_public")
+SOURCE_KINDS = ("canvas_assignment", "canvas_announcement", "canvas_calendar", "mail", "calendar", "utd_public")
 AUTHORITIES = ("canvas", "official_message", "aggregator")
 COMPLETIONS = ("not_done", "local_done", "source_completed", "unknown")
 _AUTHORITY_RANK = {"canvas": 3, "official_message": 2, "aggregator": 1}
@@ -175,7 +175,7 @@ class AcademicDeadline:
 class AcademicCandidate:
     candidate_ref: str
     owner_ref: str
-    source_kind: Literal["canvas_assignment", "canvas_announcement", "canvas_calendar", "mail", "utd_public"]
+    source_kind: Literal["canvas_assignment", "canvas_announcement", "canvas_calendar", "mail", "calendar", "utd_public"]
     title: str
     summary: str
     category: Literal["obligation", "opportunity", "reading", "administrative", "uncertain"]

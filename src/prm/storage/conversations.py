@@ -144,6 +144,34 @@ class DurableConversationStore(ConversationStore):
         with self.store.transaction() as tx:
             tx.conn.execute("UPDATE pa_conversation.history SET payload=jsonb_set(payload,'{source_data_class}',%s) WHERE owner=%s AND payload->>'response_ref'=%s",
                 (Jsonb(data_class),self.owner_ref,response_ref))
+    def response_origin(self,response_ref):
+        ref='response_origin_'+hashlib.sha256(response_ref.encode()).hexdigest()[:32]
+        item=self.store.get(self.owner_ref,'conversation',ref)
+        return tuple(item.payload['data_classes']) if item else ('private_archive','private_connector_content','user_provided')
+
+    def response_source_scopes(self,response_ref):
+        ref='response_origin_'+hashlib.sha256(response_ref.encode()).hexdigest()[:32]
+        item=self.store.get(self.owner_ref,'conversation',ref)
+        return tuple(item.payload.get('source_scopes',())) if item else ()
+
+    def record_origin(self,response_ref,data_classes,*,source_scopes=()):
+        classes=tuple(sorted(set(data_classes)))
+        if not classes or not set(classes)<= {'model_generated','private_archive','private_connector_metadata','private_connector_content','user_provided','public'}:
+            raise StorageError('explicit response origin classes required')
+        from prm.runtime.deletion import lineage_lock
+        ref='response_origin_'+hashlib.sha256(response_ref.encode()).hexdigest()[:32]
+        with self.store.transaction() as tx:
+            lineage_lock(tx.conn,self.owner_ref)
+            if tx.get(self.owner_ref,'result',response_ref) is None:raise StorageError('response unavailable')
+            old=tx.get(self.owner_ref,'conversation',ref)
+            payload={'response_ref':response_ref,'data_classes':list(classes),'source_scopes':list(source_scopes)}
+            if old and old.payload!=payload:raise StateConflict('response origin cannot be relabelled')
+            if old is None:tx.put(self.owner_ref,'conversation',ref,payload,expected_version=0)
+            if tx.conn.execute("SELECT to_regclass('pa_memory.dependencies') AS meta").fetchone()['meta'] is not None:
+                tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',
+                    (self.owner_ref,'result',response_ref,'conversation',ref))
+        if classes==('model_generated',):self.tag_response_source(response_ref,'model_generated')
+
     def purge_history(self):
         with self.store.transaction() as tx:
             _check(tx.conn)

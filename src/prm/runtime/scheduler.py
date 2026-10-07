@@ -100,7 +100,7 @@ class WatchScheduler:
         request=collection_request(subscription,source,operation_ref=operation_ref)
         binding=self.source_bindings.get(source)
         if binding:
-            return replace(request,connection_ref=binding['connection_ref'],provider_ref=binding['provider_ref'])
+            return replace(request,connection_ref=binding['connection_ref'],provider_ref=binding['provider_ref'],data_class=binding.get('data_class',request.data_class))
         return request
 
     def _now(self, conn):
@@ -251,14 +251,15 @@ class WatchScheduler:
     def complete_subject(self, subscription_id, subject_ref, *, chat_id, actor_id, owner_chat_id):
         owner = self._owner(chat_id, actor_id, owner_chat_id)
         with self.queue.store.transaction() as tx:
-            _check(tx.conn)
-            row = tx.conn.execute('SELECT id FROM pa_schedule.schedules WHERE owner=%s AND id=%s FOR UPDATE', (owner, subscription_id)).fetchone()
-            if row is None:
-                raise StorageError('subscription unavailable')
-            tx.conn.execute("INSERT INTO pa_schedule.subjects VALUES(%s,%s,%s,'completed') ON CONFLICT(owner,schedule_id,subject_ref) DO UPDATE SET state='completed'",
-                            (owner, subscription_id, subject_ref))
-            tx.conn.execute("UPDATE pa_schedule.notifications SET status='cancelled' WHERE owner=%s AND schedule_id=%s AND subject_ref=%s AND status='queued'",
-                            (owner, subscription_id, subject_ref))
+            self.complete_subject_in(tx,owner=owner,subscription_id=subscription_id,subject_ref=subject_ref)
+
+    @staticmethod
+    def complete_subject_in(tx,*,owner,subscription_id,subject_ref):
+        _check(tx.conn)
+        row=tx.conn.execute('SELECT id FROM pa_schedule.schedules WHERE owner=%s AND id=%s FOR UPDATE',(owner,subscription_id)).fetchone()
+        if row is None:raise StorageError('subscription unavailable')
+        tx.conn.execute("INSERT INTO pa_schedule.subjects VALUES(%s,%s,%s,'completed') ON CONFLICT(owner,schedule_id,subject_ref) DO UPDATE SET state='completed'",(owner,subscription_id,subject_ref))
+        tx.conn.execute("UPDATE pa_schedule.notifications SET status='cancelled' WHERE owner=%s AND schedule_id=%s AND subject_ref=%s AND status='queued'",(owner,subscription_id,subject_ref))
 
 
 def collection_request(subscription, source, *, operation_ref=None):

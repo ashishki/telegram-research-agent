@@ -88,6 +88,17 @@
       "required": true,
       "expected_exit_code": 0,
       "timeout_seconds": 600
+    },
+    {
+      "id": "pai_complete",
+      "argv": [
+        "{python}",
+        "tools/test_tiers.py",
+        "pai-complete"
+      ],
+      "required": true,
+      "expected_exit_code": 0,
+      "timeout_seconds": 1800
     }
   ]
 }

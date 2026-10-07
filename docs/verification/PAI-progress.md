@@ -160,3 +160,16 @@ Draft access/cutover/pilot packages: PAI-27/28/29; conditional infrastructure
 triggers unmeasured. The complete programme and 69-case evidence obligations
 remain unfinished; do not mark planned slices accepted or manufacture PASS.
 Continue implementation gaps before the postponed validation phase. Mimo 23/30.
+
+# 2026-10-07 local follow-through implementation
+
+Previously recorded Brief/calendar/academic, completion/Watch, derived-delete,
+artifact restore, complete domain transfer and individually named 69-case gaps
+now have implementation and prepared cases. Additional composition connects
+/deep, confirmed Watch creation, selected body read, exact action version/digest,
+source-origin propagation, mixed/part delivery and whole-task usage.
+Status: implementation_unverified. No tests, validators, reviewer calls,
+providers, services, migrations or dependencies were executed/activated here.
+Next phase: pai-complete, actual fixes, focused checks and independent review.
+Full programme acceptance and PAI-27..29 live/human gates remain outstanding.
+Receipt: PAI-implementation-pass-20261007.md. Mimo remains 23/30.

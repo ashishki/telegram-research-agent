@@ -20,7 +20,9 @@ the service template is systemd/pai-worker.service.example and is inactive.
 Do not fill production argv/paths/budgets from guesses. Attach measured rehearsal
 RPO/RTO, actual backup location/retention, rollback decision and operator window.
 
-Rollback after new writes uses receipt/tombstone delta plus the required domain
-state transfer or forward fix. A stale snapshot cannot re-enable confirmation
+Rollback after new writes uses the implemented complete selected-domain
+export/import, with an exact locked target manifest and monotone effect/budget
+fences, or a forward fix. Receipt-only transfer does not substitute for domain
+state transfer. A stale snapshot cannot re-enable confirmation
 or clear unknown fences. Existing report timers stay disabled. Hosting a reader
 and exposing owner authentication also require the explicit reviewed deployment.

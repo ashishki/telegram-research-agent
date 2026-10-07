@@ -29,7 +29,7 @@ class RuntimeArchiveTransport:
         if not content.allowed:
             query.reservation.abandon_before_transport();raise ArchiveSynthesisTransportUnavailable('archive scope denied')
         groups=((query,content),)
-        client=ScopedModelClient(endpoint,root.registry,groups=groups,
+        client=root.scoped_client(endpoint,groups=groups,task_ref=self.request_ref,attempt_ref=operation,
             history=({'role':'user','content':'Untrusted cited archive evidence: '+json.dumps(context.to_transport_context(),ensure_ascii=False)},),guard=self.guard)
         try:
             result=client.complete_with_receipt(prompt=context.question,

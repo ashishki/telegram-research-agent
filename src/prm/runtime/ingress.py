@@ -79,7 +79,7 @@ class TelegramJobIngress:
             mode = 'auto'
             if text.startswith('/'):
                 command, _, query = text.partition(' ')
-                if command in {'/memory','/remember','/memoryconfirm','/forget','/actpreview','/actedit','/actconfirm','/mail','/calendar','/contacts','/academic','/weekly','/transcriptedit'}:
+                if command in {'/memory','/memoryedit','/memorysearch','/memoryexport','/remember','/memoryconfirm','/forget','/actpreview','/actedit','/actconfirm','/actreconcile','/mail','/mailread','/calendar','/contacts','/academic','/academicdone','/academicstage','/academicwatch','/weekly','/transcriptedit','/deep'}:
                     query=text;mode='auto'
                 elif command=='/web' and query.strip():
                     body={'query':'Проверь свежий факт: '+query.strip(),'public_web_query':query.strip(),'input_kind':'text','mode':'research'}
@@ -119,6 +119,24 @@ class TelegramJobIngress:
     def watch_control(self, command, argument):
         scheduler = self.watch_scheduler
         actor = dict(chat_id=self.owner_chat_id, actor_id=self.owner_chat_id, owner_chat_id=self.owner_chat_id)
+        if command in {'/watch','/watchpreview'}:
+            import json,uuid
+            from datetime import datetime,timezone,timedelta
+            from prm.watch_jobs import WatchSubscription
+            value=json.loads(argument) if argument.strip().startswith('{') else {'source_refs':[argument.strip()],'trigger':'meaningful_change',
+                'timezone_name':'Europe/Berlin','expires_at':(datetime.now(timezone.utc)+timedelta(days=30)).isoformat(),'daily_cap':3,
+                'quiet_start':'22:00','quiet_end':'08:00'}
+            interval=value.pop('interval_seconds',300)
+            if not value.get('source_refs') or any(source not in scheduler.source_bindings for source in value['source_refs']):
+                return IntakeReply('Выбери подключённый источник для наблюдения: '+', '.join(sorted(scheduler.source_bindings)))
+            if self.destination_ref is None:return IntakeReply('Для подписки сначала требуется выбранное приватное место доставки.')
+            value={**value,'subscription_id':'watch_'+uuid.uuid4().hex,'owner_ref':self.owner_ref,'consent_revision':1,'destination_ref':self.destination_ref,
+                'source_refs':tuple(value['source_refs']),'expires_at':datetime.fromisoformat(value['expires_at'])}
+            subscription=WatchSubscription(**value)
+            ref=scheduler.preview(subscription,interval_seconds=interval,**actor)
+            return IntakeReply('Предпросмотр подписки: '+', '.join(subscription.source_refs)+'; '+subscription.trigger+'; '+subscription.timezone_name+
+                '; до '+subscription.expires_at.isoformat()+'; не больше '+str(subscription.daily_cap)+' сообщений в день; тихие часы '+
+                str(subscription.quiet_start)+'–'+str(subscription.quiet_end)+'. Подтверди: /watchconfirm '+ref)
         if command == '/watchconfirm':
             scheduler.confirm(argument, **actor)
             return IntakeReply('Подписка сохранена. Работа планировщика проверяется через /watchstatus.')
@@ -213,6 +231,7 @@ class AssistantJobWorker:
         # Delivery is a separately authorized read of this immutable result.
         record = {'request_ref': item.object_id, 'text': result.text, 'status': result.status,
                   'data_class':result.payload.get('source_data_class','model_generated' if result.mode=='chat' else 'private_archive'),
+                  'data_classes':result.payload.get('source_data_classes',[result.payload.get('source_data_class','model_generated' if result.mode=='chat' else 'private_archive')]),
                   'interaction_id': result.interaction_id, 'payload': dict(result.payload)}
         _canonical(record)
         return queue.complete(lease, record)

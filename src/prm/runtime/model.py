@@ -112,9 +112,12 @@ class ScopedModelClient:
             text,usage=self.registry.execute_reserved_groups(reservations,transport)
         except CapabilityDenied:raise
         except Exception:
-            raise LLMOutcomeUnknown(LLMCompletionReceipt(text='',model=endpoint.model,input_tokens=0,output_tokens=0,
+            unknown=LLMCompletionReceipt(text='',model=endpoint.model,input_tokens=0,output_tokens=0,
                 estimated_cost_usd=None,duration_ms=int((time.monotonic()-started)*1000),attempts=1,usage_recorded=False,
-                external_call_attempted=True,delivery_outcome='unknown')) from None
+                external_call_attempted=True,delivery_outcome='unknown')
+            if self.usage_observer:
+                self.usage_observer(unknown,{'input':None,'cached_input':None,'cache_write':None,'output':None,'reasoning':None,'semantics':'unknown_outcome'},self.groups)
+            raise LLMOutcomeUnknown(unknown) from None
         receipt=LLMCompletionReceipt(text=text,model=endpoint.model,input_tokens=usage['prompt_tokens'],
             output_tokens=usage['completion_tokens'],estimated_cost_usd=None,duration_ms=int((time.monotonic()-started)*1000),
             attempts=1,usage_recorded=False,external_call_attempted=True,delivery_outcome='accepted')

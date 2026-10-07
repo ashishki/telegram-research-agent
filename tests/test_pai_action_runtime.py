@@ -18,3 +18,16 @@ def test_edited_preview_confirm_and_double_click_have_one_actual_write(pai):
     writes=[row for row in pai.requests if row[0]=='write'];assert len(writes)==1
     assert writes[0][2]['message']['body']['content']=='Edited body'
     with pytest.raises(CapabilityDenied):runtime.confirm_and_execute(edited.proposal_ref,actor_ref='owner_foreign')
+
+
+def test_calendar_write_checks_free_busy_before_consuming_confirmation(pai):
+    from datetime import timedelta
+    manager,transport,actor=graph(pai)
+    allow(pai,'assistant.calendar_read',transport.account_ref,'private_connector_metadata','calendar.read',provider='provider_microsoft_graph',connection=transport.connection_ref,operation='read')
+    allow(pai,'assistant.action_execute','resource_selected_calendar','private_connector_content','action.execute',provider='provider_microsoft_graph',connection=transport.connection_ref,operation='write')
+    runtime=ActionRuntime(pai.root,graph_transport=transport,upper_bound=0)
+    preview=runtime.preview(action_code='calendar.create',resource_ref='resource_selected_calendar',content={'calendar_ref':'calendar_fixture','title':'Synthetic meeting',
+        'start_at':(pai.now+timedelta(hours=1)).isoformat(),'end_at':(pai.now+timedelta(hours=2)).isoformat(),'timezone':'Europe/Berlin'},rationale_refs=('source_fixture',))
+    with pytest.raises(CapabilityDenied,match='busy'):runtime.confirm_and_execute(preview.proposal_ref,actor_ref=pai.root.owner_ref)
+    assert not [row for row in pai.requests if row[0]=='write']
+    assert not runtime.store.all()

@@ -5,6 +5,7 @@ from threading import Thread
 from types import SimpleNamespace
 import json
 import pytest
+from tests.pai_runtime_fixtures import pai
 
 from prm.capabilities import CapabilityGrant,ProviderPolicy
 from prm.storage.postgres import migrate
@@ -80,3 +81,14 @@ def test_no_grants_no_http_and_history_scope_is_separate(runtime):
     assert not any(message['role']=='assistant' for message in requests[-1]['messages'])
     root.registry.revoke_grant('grant_text',owner_ref=root.owner_ref)
     count=len(requests);turn(root,4,'/chat ещё один запрос');assert len(requests)==count
+
+
+def test_shortening_private_connector_response_keeps_its_origin(pai):
+    from tests.pai_runtime_fixtures import request
+    root=pai.root
+    root.services['mail']=lambda *args:{'status':'ok','text':'Synthetic selected message subject and additional details.','source_data_class':'private_connector_content'}
+    _,original=request(pai,9100,'/mail')
+    _,shortened=request(pai,9101,'короче')
+    assert original['data_class']=='private_connector_content'
+    assert shortened['data_classes']==['private_connector_content']
+    assert not root.conversations.history_for_model('42')

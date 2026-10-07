@@ -32,7 +32,7 @@ def main(argv=None):
         if not hasattr(root,'delivery'):raise StorageError('explicit durable sender is not configured')
         def run():
             with root.queue.store.transaction() as tx:
-                job=tx.conn.execute("SELECT j.id FROM pa_jobs.jobs j WHERE j.owner=%s AND j.status='completed' AND j.deadline>clock_timestamp() AND j.kind IN ('compute.assistant','compute.research') AND NOT EXISTS(SELECT 1 FROM pa_delivery.attempts a WHERE a.owner=j.owner AND a.kind='answer' AND a.source_ref=j.id) ORDER BY j.available_at,j.id LIMIT 1",(root.owner_ref,)).fetchone()
+                job=tx.conn.execute("SELECT j.id FROM pa_jobs.jobs j WHERE j.owner=%s AND j.status='completed' AND j.deadline>clock_timestamp() AND j.kind IN ('compute.assistant','compute.research') AND NOT EXISTS(SELECT 1 FROM pa_delivery.attempts a WHERE a.owner=j.owner AND a.id='answer_'||j.id) ORDER BY j.available_at,j.id LIMIT 1",(root.owner_ref,)).fetchone()
             if job:return root.delivery.deliver_result(owner=root.owner_ref,job_id=job['id'],destination_ref=root.ingress.destination_ref,upper_bound=root.ingress.delivery_upper_bound)
             if hasattr(root,'watch_collector'):
                 for note in root.watch_collector.eligible_notifications():

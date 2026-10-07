@@ -15,3 +15,16 @@ def test_mail_canvas_conflict_and_local_done_do_not_submit_anything(pai):
     ref='academic_'+__import__('hashlib').sha256(b'assignment_1').hexdigest()[:32]
     assert runtime.mark_done(ref,actor_ref=pai.root.owner_ref)['source_submission_performed'] is False
     assert not pai.requests
+
+
+def test_local_done_atomically_stops_bound_watch_subject_and_future_notifications(pai):
+    from tests.test_pai_requirements import academic_pair,watch
+    runtime,candidates,ref=academic_pair(pai);scheduler,subscription=watch(pai)
+    runtime.link_watch(ref,schedule_id=subscription.subscription_id,subject_ref=ref,actor_ref=pai.root.owner_ref)
+    result=runtime.mark_done(ref,actor_ref=pai.root.owner_ref)
+    assert result['stopped_watch_subjects']==1 and result['source_submission_performed'] is False
+    with pai.root.queue.store.transaction() as tx:
+        row=tx.conn.execute('SELECT state FROM pa_schedule.subjects WHERE owner=%s AND schedule_id=%s AND subject_ref=%s',
+            (pai.root.owner_ref,subscription.subscription_id,ref)).fetchone()
+    assert row['state']=='completed'
+    assert pai.root.queue.store.get(pai.root.owner_ref,'memory',ref).payload['completion']=='local_done'

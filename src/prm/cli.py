@@ -20,14 +20,18 @@ def build_parser() -> argparse.ArgumentParser:
     assistant_command.add_argument('--owner-ref')
     assistant_command.add_argument('--owner-chat-id')
     assistant_command.add_argument('--runtime-config')
-    for name in ('runtime-install','runtime-status','runtime-tick','runtime-research-worker','runtime-backup','runtime-drain','runtime-kill'):
+    for name in ('runtime-install','runtime-status','runtime-tick','runtime-research-worker','runtime-backup','runtime-drain','runtime-kill','runtime-domain-export','runtime-domain-import','runtime-state-manifest','runtime-restore'):
         command=sub.add_parser(name)
         command.add_argument('--synthetic-target',required=True)
         command.add_argument('--runtime-config')
         command.add_argument('--db-path',default=':memory:')
         command.add_argument('--artifact-root')
         if name=='runtime-install':command.add_argument('--expected-base-version',type=int,required=True)
-        if name=='runtime-backup':command.add_argument('--destination',required=True)
+        if name in {'runtime-backup','runtime-domain-export','runtime-state-manifest'}:command.add_argument('--destination',required=True)
+        if name=='runtime-domain-import':
+            command.add_argument('--delta',required=True)
+            command.add_argument('--expected-manifest',required=True)
+        if name=='runtime-restore':command.add_argument('--bundle',required=True)
     for name in ('job-status', 'job-cancel', 'job-result', 'job-worker'):
         command = sub.add_parser(name, help='Inspect or cancel an explicitly selected local synthetic job.')
         if name == 'job-worker':
@@ -152,6 +156,25 @@ def main(argv: Sequence[str] | None = None) -> int:
             elif args.command=='runtime-drain':operator.drain();result={'status':'draining'}
             elif args.command=='runtime-kill':operator.kill_switch();result={'status':'egress_disabled'}
             elif args.command=='runtime-backup':result=operator.backup(destination=args.destination)
+            elif args.command in {'runtime-domain-export','runtime-state-manifest'}:
+                import os
+                from prm.runtime.migration import export_domain_delta,state_manifest
+                value=export_domain_delta(target) if args.command=='runtime-domain-export' else state_manifest(target)
+                destination=Path(args.destination)
+                if not destination.is_absolute():raise ValueError('explicit private absolute destination required')
+                fd=os.open(destination,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
+                with os.fdopen(fd,'w') as output:
+                    json.dump(value,output,ensure_ascii=False,default=str);output.flush();os.fsync(output.fileno())
+                result={'status':'private_state_exported','kind':args.command}
+            elif args.command=='runtime-domain-import':
+                from prm.runtime.migration import apply_domain_delta
+                delta_path,manifest_path=Path(args.delta),Path(args.expected_manifest)
+                if delta_path.stat().st_size>256000000 or manifest_path.stat().st_size>64000:raise ValueError('bounded private state inputs required')
+                result=apply_domain_delta(target,json.loads(delta_path.read_text()),expected_target_manifest=json.loads(manifest_path.read_text()))
+            elif args.command=='runtime-restore':
+                from prm.runtime.operations import restore_bundle
+                if not args.artifact_root:raise ValueError('explicit fresh private artifact directory required')
+                result=restore_bundle(bundle=args.bundle,target=target,artifact_root=args.artifact_root)
             else:
                 if not args.runtime_config:raise ValueError('explicit runtime config required')
                 from types import SimpleNamespace

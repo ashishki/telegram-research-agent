@@ -322,7 +322,7 @@ class DurableCapabilityRegistry(CapabilityRegistry):
         context or refund is invented when usage is unavailable.
         """
         groups=tuple(tuple(group) for group in groups)
-        if not 1<=len(groups)<=3 or any(not group for group in groups):
+        if not 1<=len(groups)<=6 or any(not group for group in groups):
             raise StorageError('bounded explicit scope groups required')
         members=tuple(member for group in groups for member in group)
         bindings={(member._request.owner_ref,member._request.connection_ref,member._request.provider_ref) for member in members}
