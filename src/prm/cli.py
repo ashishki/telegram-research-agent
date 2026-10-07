@@ -19,6 +19,7 @@ def build_parser() -> argparse.ArgumentParser:
     assistant_command.add_argument('--synthetic-target')
     assistant_command.add_argument('--owner-ref')
     assistant_command.add_argument('--owner-chat-id')
+    assistant_command.add_argument('--runtime-config')
     for name in ('job-status', 'job-cancel', 'job-result', 'job-worker'):
         command = sub.add_parser(name, help='Inspect or cancel an explicitly selected local synthetic job.')
         if name == 'job-worker':
@@ -28,6 +29,7 @@ def build_parser() -> argparse.ArgumentParser:
         command.add_argument('--synthetic-target', required=True)
         command.add_argument('--owner-ref', required=True)
         command.add_argument('--owner-chat-id', required=True)
+        command.add_argument('--runtime-config')
     for name in ("research", "brief", "chat"):
         command = sub.add_parser(name, help=f"Run one {name} request.")
         command.add_argument("question")
@@ -130,7 +132,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == 'job-worker':
             from types import SimpleNamespace
             from prm.runtime.ingress import AssistantJobWorker
-            result_ref = AssistantJobWorker(ingress, settings=SimpleNamespace(db_path=args.db_path)).run_once()
+            if args.runtime_config:
+                import json
+                from pathlib import Path
+                from prm.runtime.composition import runtime_from_config
+                config=Path(args.runtime_config)
+                if config.stat().st_size>8192:raise ValueError('runtime config exceeds its bound')
+                runtime=runtime_from_config(json.loads(config.read_text()),target=ingress.queue.store.target,settings=SimpleNamespace(db_path=args.db_path))
+                if (runtime.owner_ref,runtime.owner_chat_id)!=(args.owner_ref,args.owner_chat_id):raise ValueError('runtime owner differs')
+                result_ref=runtime.worker().run_once()
+            else:result_ref = AssistantJobWorker(ingress, settings=SimpleNamespace(db_path=args.db_path)).run_once()
             print(result_ref or 'Нет готовых задач.')
         else:
             print(ingress.control(args.command[4:], args.job_id).text)

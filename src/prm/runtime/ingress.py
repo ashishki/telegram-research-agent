@@ -28,6 +28,7 @@ class TelegramJobIngress:
         self.owner_chat_id = owner_chat_id
         self.watch_scheduler = watch_scheduler
         self.delivery_executor = delivery_executor
+        self.cancel_callback=None
 
     def receive(self, update: dict) -> IntakeReply | None:
         if not isinstance(update, dict) or type(update.get('update_id')) is not int or update['update_id'] < 0:
@@ -55,6 +56,7 @@ class TelegramJobIngress:
                 return IntakeReply('Укажи ID задачи после команды.')
             return self.control(parts[0][1:], parts[1])
         voice = message.get('voice')
+        body=None
         transcript = message.get('voice_transcript') or (voice or {}).get('transcript')
         if transcript:
             body = {'query': str(transcript), 'input_kind': 'voice_transcript', 'mode': 'auto'}
@@ -67,10 +69,18 @@ class TelegramJobIngress:
             mode = 'auto'
             if text.startswith('/'):
                 command, _, query = text.partition(' ')
-                if command not in {'/auto', '/chat', '/research', '/brief'} or not query.strip():
+                if command in {'/memory','/remember','/memoryconfirm','/forget','/actpreview','/actedit','/actconfirm','/mail','/calendar','/contacts','/academic','/weekly'}:
+                    query=text;mode='auto'
+                elif command=='/web' and query.strip():
+                    body={'query':'Проверь свежий факт: '+query.strip(),'public_web_query':query.strip(),'input_kind':'text','mode':'research'}
+                    text=query.strip();mode='research'
+                elif command in {'/new'}:
+                    query=command;mode='chat'
+                elif command not in {'/auto', '/chat', '/research', '/brief'} or not query.strip():
                     return IntakeReply('Отправь вопрос или /status, /result, /cancel с ID задачи.')
-                mode, text = command[1:], query.strip()
-            body = {'query': text, 'input_kind': 'text', 'mode': mode}
+                else:mode=command[1:]
+                text = query.strip()
+            if body is None:body = {'query': text, 'input_kind': 'text', 'mode': mode}
         else:
             return None
         if len(body.get('query', '').encode('utf-8')) > 16000:
@@ -122,6 +132,7 @@ class TelegramJobIngress:
             return IntakeReply('Задача не найдена.')
         if command == 'cancel':
             cancelled = self.queue.cancel(owner=self.owner_ref, job_id=job_id)
+            if cancelled and state['status'] in {'leased','running'} and self.cancel_callback is not None:self.cancel_callback(job_id)
             return IntakeReply('Задача отменена.' if cancelled else f"Задача уже имеет статус {state['status']}.", job_id=job_id)
         if command == 'result' and state['status'] == 'completed':
             result = self.queue.store.get(self.owner_ref, 'result', state['result_ref'], version=1)
@@ -146,9 +157,10 @@ class RequestConversations:
 
 
 class AssistantJobWorker:
-    def __init__(self, ingress: TelegramJobIngress, *, settings, assistant_factory=None, voice_resolver=None):
+    def __init__(self, ingress: TelegramJobIngress, *, settings, assistant_factory=None, voice_resolver=None,runtime=None):
         self.ingress, self.settings = ingress, settings
         self.assistant_factory, self.voice_resolver = assistant_factory, voice_resolver
+        self.runtime=runtime
 
     def run_once(self):
         from prm.application import PersonalResearchAssistant
@@ -178,9 +190,9 @@ class AssistantJobWorker:
             owner_ref=lease.owner, history_retention_seconds=0), item.object_id)
         assistant = (self.assistant_factory or PersonalResearchAssistant)(settings=self.settings, conversations=conversations)
         request = OperatorRequest(query=body['query'], mode=body['mode'], input_kind=body['input_kind'],
-                                  chat_id=body['chat_id'], actor_id=body['actor_id'], owner_chat_id=body['owner_chat_id'])
+                                  chat_id=body['chat_id'], actor_id=body['actor_id'], owner_chat_id=body['owner_chat_id'],public_web_query=body.get('public_web_query',''))
         queue.checkpoint(lease, {'stage': 'answering', 'request_ref': item.object_id})
-        result = assistant.answer(request)
+        result = self.runtime.answer(request,request_ref=item.object_id,lease=lease) if self.runtime is not None else assistant.answer(request)
         # Fenced completion rejects cancellation/expiry during the slow call.
         # Delivery is a separately authorized read of this immutable result.
         record = {'request_ref': item.object_id, 'text': result.text, 'status': result.status,

@@ -601,7 +601,7 @@ class _PinnedHTTPSHandler(request.HTTPSHandler):
         )
 
 
-def _https_get(url: str, *, timeout_seconds: float, max_bytes: int) -> dict[str, Any]:
+def _https_get(url: str, *, timeout_seconds: float, max_bytes: int, headers=None) -> dict[str, Any]:
     parsed = _validate_https_url(url)
     addresses = _resolve_public_addresses(str(parsed.hostname or ""))
     # Ambient proxy configuration can point a request at a local endpoint.
@@ -612,7 +612,7 @@ def _https_get(url: str, *, timeout_seconds: float, max_bytes: int) -> dict[str,
         _NoRedirect(),
         _PinnedHTTPSHandler(approved_addresses=addresses),
     )
-    req = request.Request(url, headers={"User-Agent": "telegram-research-agent-public-web/1", "Accept": "application/json,text/html,text/plain,application/xml"})
+    req = request.Request(url, headers={"User-Agent": "telegram-research-agent-public-web/1", "Accept": "application/json,text/html,text/plain,application/xml",**(headers or {})})
     try:
         response = opener.open(req, timeout=timeout_seconds)
     except PublicWebTransportError:

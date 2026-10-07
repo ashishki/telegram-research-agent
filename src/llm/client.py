@@ -75,7 +75,7 @@ class LLMCompletionReceipt:
     model: str
     input_tokens: int
     output_tokens: int
-    estimated_cost_usd: float
+    estimated_cost_usd: float | None
     duration_ms: int
     attempts: int
     usage_recorded: bool

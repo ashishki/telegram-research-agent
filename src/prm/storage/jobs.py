@@ -86,7 +86,7 @@ class JobQueue:
         return item
     def enqueue_in(self,tx,*,owner,idempotency_key,payload,deadline,kind='compute.digest',mode='compute',priority=0,max_attempts=3):
         _check(tx.conn);_ref(owner);_ref(idempotency_key);payload=_payload(payload)
-        if (mode not in {'compute','effect'} or kind not in {'compute.digest','compute.assistant','compute.watch','effect.dispatch'} or (kind.startswith('compute.')!=(mode=='compute'))
+        if (mode not in {'compute','effect'} or kind not in {'compute.digest','compute.assistant','compute.watch','compute.research','effect.dispatch'} or (kind.startswith('compute.')!=(mode=='compute'))
             or (mode=='effect')!=('effect_key'in payload) or type(priority)is not int or not -1000<=priority<=1000
             or type(max_attempts)is not int or not 1<=max_attempts<=5 or not isinstance(deadline,datetime) or deadline.tzinfo is None):
             raise StorageError('invalid bounded job intent')
@@ -111,14 +111,22 @@ class JobQueue:
         _ref(owner)
         if type(lease_seconds)is not int or not 1<=lease_seconds<=300 or not isinstance(modes,tuple) or not set(modes)<= {'compute','effect'}:
             raise StorageError('invalid bounded worker claim')
-        if kinds is not None and (not isinstance(kinds,tuple) or not kinds or not set(kinds)<= {'compute.digest','compute.assistant','compute.watch','effect.dispatch'}):
+        if kinds is not None and (not isinstance(kinds,tuple) or not kinds or not set(kinds)<= {'compute.digest','compute.assistant','compute.watch','compute.research','effect.dispatch'}):
             raise StorageError('invalid worker kind filter')
         with self.store.transaction() as tx:
             conn=tx.conn;_check(conn)
+            if conn.execute("SELECT to_regclass('pa_control.state') AS table_ref").fetchone()['table_ref'] is not None:
+                control=conn.execute('SELECT draining FROM pa_control.state WHERE id=1').fetchone()
+                if not control or control['draining']:return None
+            lock=int.from_bytes(hashlib.sha256(('pa.jobs.claim:'+owner).encode()).digest()[:8],'big')%(2**63)
+            conn.execute('SELECT pg_advisory_xact_lock(%s)',(lock,))
             conn.execute("UPDATE pa_jobs.jobs SET status='failed',error_code='deadline' WHERE owner=%s AND status IN ('queued','retry_wait') AND deadline<=clock_timestamp()",(owner,))
             row=conn.execute('''SELECT * FROM pa_jobs.jobs WHERE owner=%s AND mode=ANY(%s) AND (%s::text[] IS NULL OR kind=ANY(%s)) AND status IN ('queued','retry_wait')
                 AND available_at<=clock_timestamp() AND deadline>clock_timestamp()
-                ORDER BY priority DESC,id FOR UPDATE SKIP LOCKED LIMIT 1''',(owner,list(modes),list(kinds) if kinds else None,list(kinds) if kinds else None)).fetchone()
+                AND (kind<>'compute.assistant' OR NOT EXISTS(SELECT 1 FROM pa_jobs.jobs active
+                    WHERE active.owner=%s AND active.kind='compute.assistant' AND active.status IN ('leased','running')
+                    AND active.lease_until>clock_timestamp()))
+                ORDER BY priority DESC,id FOR UPDATE SKIP LOCKED LIMIT 1''',(owner,list(modes),list(kinds) if kinds else None,list(kinds) if kinds else None,owner)).fetchone()
             if not row:return None
             try:payload=_payload(row['payload']);self._input(tx,owner,payload)
             except StorageError:
@@ -156,6 +164,9 @@ class JobQueue:
         with self.store.transaction() as tx:
             self._fenced(tx,lease);ref='result_'+lease.job_id
             tx.put(lease.owner,'result',ref,result,expected_version=0)
+            if tx.conn.execute("SELECT to_regclass('pa_memory.dependencies') AS table_ref").fetchone()['table_ref'] is not None:
+                tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',
+                    (lease.owner,lease.payload['input_namespace'],lease.payload['input_ref'],'result',ref))
             tx.conn.execute("UPDATE pa_jobs.jobs SET status='completed',result_ref=%s,token=NULL,lease_until=NULL WHERE owner=%s AND id=%s",(ref,lease.owner,lease.job_id))
             return ref
     def cancel(self,*,owner,job_id):

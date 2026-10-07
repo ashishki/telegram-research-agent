@@ -134,6 +134,7 @@ def synthesize_archive_response(
     question: str,
     evidence_items: Sequence[Mapping[str, Any]],
     access: ArchiveSynthesisAccess | None,
+    transport=None,
 ) -> ArchiveSynthesisOutcome:
     """Generate only from a locally selected, immutable archive evidence set.
 
@@ -157,14 +158,20 @@ def synthesize_archive_response(
             measurement={"provider_egress_attempted": False, "context_egress_attempted": False},
         )
     base_measurement: dict[str, object] = {**context.public_measurement()}
-    if type(access) is not ArchiveSynthesisAccess:
+    if type(access) is not ArchiveSynthesisAccess and transport is None:
         return ArchiveSynthesisOutcome(
             text=None,
             status="authorization_required",
             measurement={**base_measurement, "provider_egress_attempted": False, "context_egress_attempted": False},
         )
     try:
-        result = complete_archive_synthesis(context=context, access=access)
+        if transport is not None:
+            from prm.runtime.archive import RuntimeArchiveTransport
+            if type(transport) is not RuntimeArchiveTransport:
+                raise ArchiveSynthesisTransportUnavailable('unsupported runtime archive transport')
+            result=transport.complete(context)
+        else:
+            result = complete_archive_synthesis(context=context, access=access)
     except ArchiveSynthesisTransportEmptyResponse as exc:
         return ArchiveSynthesisOutcome(
             text=None,

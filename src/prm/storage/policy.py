@@ -6,6 +6,9 @@ import hashlib
 import json
 import uuid
 import time
+from contextvars import ContextVar
+
+_ACTIVE_TRANSPORT=ContextVar('pa_active_transport',default=None)
 
 from psycopg.types.json import Jsonb
 from prm.capabilities import (CapabilityRegistry,CapabilityGrant,AuthorizationRequest,AuthorizationDecision,
@@ -101,12 +104,31 @@ class DurableCapabilityRegistry(CapabilityRegistry):
         for value in budget_refs:_ref(value)
         self.store=PostgresStore(target);self.budget_refs=tuple(sorted(budget_refs));self.job_budget=job_budget
     def _now(self,conn):return conn.execute('SELECT clock_timestamp() AS now').fetchone()['now']
+    @property
+    def current_transport_requests(self):
+        active=_ACTIVE_TRANSPORT.get()
+        return active[1] if active and active[0] is self else ()
+    def _invoke_transport(self,reservations,transport):
+        marker=_ACTIVE_TRANSPORT.set((self,tuple(member._request for member in reservations)))
+        try:
+            with self.store.transaction() as tx:
+                if tx.conn.execute("SELECT to_regclass('pa_control.state') AS table_ref").fetchone()['table_ref'] is not None:
+                    row=tx.conn.execute('SELECT egress_enabled,draining FROM pa_control.state WHERE id=1 FOR SHARE').fetchone()
+                    if any(member._request.provider_ref!='provider_local' for member in reservations) and (not row or not row['egress_enabled'] or row['draining']):
+                        raise CapabilityDenied('execution epoch is disabled or draining')
+                result=transport()
+                if tx.conn.closed:raise StorageError('execution epoch guard connection lost')
+                return result
+        finally:_ACTIVE_TRANSPORT.reset(marker)
     def _grants(self,conn,owner,now,*,lock=False):
         rows=conn.execute('SELECT owner,grant_id,revision,document FROM pa_policy.grants WHERE owner=%s ORDER BY grant_id'+(' FOR UPDATE' if lock else ''),(owner,)).fetchall()
         now=self._now(conn)
         return [_decode(row,now) for row in rows]
     def _decision(self,conn,request,*,lock=False):
         _check_schema(conn);now=self._now(conn)
+        if request.provider_ref!='provider_local' and conn.execute("SELECT to_regclass('pa_control.state') AS table_ref").fetchone()['table_ref'] is not None:
+            row=conn.execute('SELECT egress_enabled,draining FROM pa_control.state WHERE id=1').fetchone()
+            if not row or not row['egress_enabled'] or row['draining']:return self._deny(request,'execution_epoch_disabled'),[],now
         grants=self._grants(conn,request.owner_ref,now,lock=lock)
         now=self._now(conn)
         return CapabilityRegistry(grants).authorize(request,now=now),grants,now
@@ -283,7 +305,7 @@ class DurableCapabilityRegistry(CapabilityRegistry):
                 if any(not auth.authorize(r._request,now=now).allowed for r in reservations):
                     raise CapabilityDenied('grant changed before transport')
                 started=time.monotonic()
-                result=transport()
+                result=self._invoke_transport(reservations,transport)
                 if conn.closed:raise StorageError('final policy connection lost; retain unknown operation')
                 if time.monotonic()-started>10:raise StorageError('bounded transport deadline exceeded; outcome requires reconciliation')
             self.settle(owner,operation,outcome='accepted')
@@ -291,3 +313,65 @@ class DurableCapabilityRegistry(CapabilityRegistry):
         except Exception:
             self.settle(owner,operation,outcome='unknown')
             raise
+
+    def execute_reserved_groups(self,groups,transport):
+        """One HTTP call requiring distinct data scopes; all scopes precede I/O.
+
+        Independent operation fences keep the legacy closed archive pair intact.
+        Bounds are conservatively reserved for each scope; no implicit free
+        context or refund is invented when usage is unavailable.
+        """
+        groups=tuple(tuple(group) for group in groups)
+        if not 1<=len(groups)<=3 or any(not group for group in groups):
+            raise StorageError('bounded explicit scope groups required')
+        members=tuple(member for group in groups for member in group)
+        bindings={(member._request.owner_ref,member._request.connection_ref,member._request.provider_ref) for member in members}
+        if len(bindings)!=1 or any(member.registry is not self for member in members):
+            raise CapabilityDenied('transport groups must share owner, connection, provider and registry')
+        owner=members[0]._request.owner_ref
+        prepared=[]
+        try:
+            for group in groups:
+                if not self._commit_durable_transport(group):raise CapabilityDenied('scope group denied before transport')
+                prepared.append(group[0].operation_ref)
+            with self.store.transaction() as tx:
+                conn=tx.conn;_check_schema(conn)
+                ids=sorted({member.grant_ref for member in members})
+                rows=conn.execute('SELECT owner,grant_id,revision,document FROM pa_policy.grants WHERE owner=%s AND grant_id=ANY(%s) ORDER BY grant_id FOR UPDATE',(owner,ids)).fetchall()
+                now=self._now(conn);auth=CapabilityRegistry([_decode(row,now) for row in rows])
+                if any(not auth.authorize(member._request,now=now).allowed for member in members):
+                    raise CapabilityDenied('current scope group changed')
+                started=time.monotonic();result=self._invoke_transport(members,transport)
+                if conn.closed or time.monotonic()-started>10:raise StorageError('scope group transport outcome unknown')
+            for operation in prepared:self.settle(owner,operation,outcome='accepted')
+            return result
+        except Exception:
+            for operation in prepared:self.settle(owner,operation,outcome='unknown')
+            for member in members:
+                if member.operation_ref not in prepared:member.abandon_before_transport()
+            raise
+
+    def execute_prepared(self,reservation,transport):
+        """Final I/O guard for legacy adapters that already consumed a slot."""
+        if type(reservation)is not DurableReservation or reservation.registry is not self or not reservation._transport_committed:
+            raise CapabilityDenied('exact locally consumed durable reservation required')
+        request=reservation._request
+        try:
+            with self.store.transaction() as tx:
+                conn=tx.conn;_check_schema(conn)
+                rows=conn.execute('SELECT owner,grant_id,revision,document FROM pa_policy.grants WHERE owner=%s AND grant_id=%s FOR UPDATE',
+                                  (request.owner_ref,reservation.grant_ref)).fetchall()
+                now=self._now(conn)
+                if not CapabilityRegistry([_decode(row,now) for row in rows]).authorize(request,now=now).allowed:
+                    raise CapabilityDenied('prepared transport grant changed')
+                op=conn.execute('SELECT state FROM pa_policy.operations WHERE owner=%s AND ref=%s FOR UPDATE',
+                                (request.owner_ref,request.operation_ref)).fetchone()
+                member=conn.execute('SELECT request FROM pa_policy.members WHERE owner=%s AND operation_ref=%s AND member_id=%s',
+                    (request.owner_ref,request.operation_ref,reservation.member_id)).fetchone()
+                if not op or op['state']!='prepared' or not member or member['request']!=asdict(request):
+                    raise CapabilityDenied('prepared operation unavailable or already settled')
+                started=time.monotonic();result=self._invoke_transport((reservation,),transport)
+                if conn.closed or time.monotonic()-started>10:raise StorageError('prepared transport outcome unknown')
+            self.settle(request.owner_ref,request.operation_ref,outcome='accepted');return result
+        except Exception:
+            self.settle(request.owner_ref,request.operation_ref,outcome='unknown');raise
