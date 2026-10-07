@@ -24,7 +24,7 @@ class TestTestTiers(unittest.TestCase):
     def test_required_tiers_are_declared(self):
         self.assertEqual(
             sorted(self.module.TEST_TIERS),
-            ["block-review", "fast-contract", "focused-prm", "full", "ops-date-sensitive"],
+            ["block-review", "fast-contract", "focused-prm", "full", "legacy-compat", "ops-date-sensitive", "pai-complete", "retrofit-boundaries"],
         )
 
     def test_focused_prm_prints_exact_command_without_running(self):
@@ -35,8 +35,19 @@ class TestTestTiers(unittest.TestCase):
         output = stream.getvalue()
         self.assertEqual(exit_code, 0)
         self.assertIn("PYTHONPATH=src", output)
-        self.assertIn("tests/test_archive_retrieval_eval.py", output)
-        self.assertIn("tests/test_pi_chat.py", output)
+        self.assertIn("tests/test_archive_search.py", output)
+        self.assertIn("tests/test_prm_application.py", output)
+        self.assertIn("tests/test_assistant_conversation.py", output)
+        self.assertNotIn("tests/test_pi_chat.py", output)
+
+    def test_pai_complete_enforces_matrix_and_includes_review_recovery_cases(self):
+        commands=self.module.TEST_TIERS['pai-complete'].commands
+        self.assertEqual(len(commands),1)
+        command=self.module.display_command(commands[0])
+        self.assertIn('tools/run_pai_acceptance.py --require-spec-matrix',command)
+        self.assertIn('tests/test_pai_review_recovery.py',command)
+        self.assertIn('tests/test_pai_media_runtime.py',command)
+        self.assertIn('tests/test_pai_durable_policy.py',command)
 
     def test_fast_contract_excludes_date_sensitive_ops_file(self):
         commands = [

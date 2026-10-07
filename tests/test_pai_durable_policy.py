@@ -242,3 +242,22 @@ def test_unknown_operation_accepts_later_known_actual_without_resetting_fence(sa
     assert all(row['consumed']==2 for row in state['windows'])
     assert state['operations'][0]['state']=='unknown' and state['operations'][0]['actual']==2
     assert not reg.authorize_and_reserve(request(grant,'unknown_actual_fixture'),upper_bound=3).allowed
+
+
+def test_compound_post_invocation_denial_is_unknown_with_non_replayable_refs(sandbox):
+    from prm.capabilities import CapabilityDenied
+    from prm.storage.policy import ScopeTransportUnknown
+    reg,grant=registry(sandbox,'compound_transport_unknown')
+    first=reg.authorize_and_reserve(request(grant,'compound_unknown_first'),upper_bound=2)
+    second=reg.authorize_and_reserve(request(grant,'compound_unknown_second'),upper_bound=2)
+    calls=[]
+    def denied():calls.append(True);raise CapabilityDenied('synthetic denial during compound invocation')
+    with pytest.raises(ScopeTransportUnknown) as failure:
+        reg.execute_reserved_groups(((first.reservation,),(second.reservation,)),denied)
+    assert failure.value.operation_refs==('compound_unknown_first','compound_unknown_second') and not failure.value.retry_allowed
+    assert calls==[True]
+    snapshot=reg.snapshot(grant.owner_ref)
+    assert all(row['state']=='unknown' for row in snapshot['operations'])
+    assert all(row['reserved']==0 and row['consumed']==4 for row in snapshot['windows'])
+    assert not reg.authorize_and_reserve(request(grant,'compound_unknown_first'),upper_bound=2).allowed
+    assert not reg.authorize_and_reserve(request(grant,'compound_unknown_second'),upper_bound=2).allowed

@@ -97,6 +97,13 @@ class ScopePreparationUnknown(StorageError):
         self.operation_refs=tuple(operation_refs);self.retry_allowed=False
 
 
+class ScopeTransportUnknown(StorageError):
+    """A compound invocation started; do not mistake its failure for a new grant."""
+    def __init__(self,operation_refs):
+        super().__init__('compound transport outcome is unknown; do not retry automatically')
+        self.operation_refs=tuple(operation_refs);self.retry_allowed=False
+
+
 class DurableReservation(BudgetReservation):
     __slots__=('member_id',)
     def __init__(self,*,member_id,**kwargs):super().__init__(**kwargs);self.member_id=member_id
@@ -366,6 +373,7 @@ class DurableCapabilityRegistry(CapabilityRegistry):
                     except StorageError:pass
             if not transport_started and (prepared or isinstance(error,ScopePreparationUnknown)):
                 raise ScopePreparationUnknown(tuple(prepared)+tuple(getattr(error,'operation_refs',()))) from None
+            if transport_started:raise ScopeTransportUnknown(tuple(prepared)) from None
             raise
 
     def execute_prepared(self,reservation,transport):

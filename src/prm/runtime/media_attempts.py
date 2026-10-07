@@ -4,7 +4,7 @@ import hashlib
 import time
 from llm.client import LLMCompletionReceipt
 from prm.storage.postgres import StorageError
-from .model_errors import MediaOutcomeUnknown,ModelProviderRejected,ModelResponseInvalid
+from .model_errors import MediaOutcomeUnknown,MediaAccountingUnconfirmed,AcceptedMediaReceipt,ModelProviderRejected,ModelResponseInvalid
 
 
 def read_bounded_media(asset,path,*,maximum,signatures):
@@ -41,6 +41,9 @@ def execute_fenced_media(registry,reservation,transport,record,*,attempt_ref,mod
         if isinstance(error,ModelProviderRejected):outcome='rejected'
     try:record(outcome,int((time.monotonic()-started)*1000))
     except Exception as error:
-        if failure is None:failure=fenced(error)
+        if failure is None:
+            receipt=AcceptedMediaReceipt(model=model,text=result if isinstance(result,str) else result['text'],
+                duration_ms=int((time.monotonic()-started)*1000),external_call_attempted=http_attempted())
+            failure=MediaAccountingUnconfirmed(receipt,result,attempt_ref,operations)
     if failure is not None:raise failure from None
     return result

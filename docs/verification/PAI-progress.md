@@ -278,3 +278,20 @@ The actual-finding packet includes explicit hash-bound source excerpts under
 the 200000-byte input bound. Next: one fresh call #33 for #31/#32 findings;
 no #34, automatic retry or model substitution. No live/private/product-provider
 call, service, timer or production migration was executed.
+
+Review #33 reserved/attempted, 33/33 consumed including failures.
+Purpose: actual_finding_recheck; source HEAD f28f51fd0c3072836e41163b3f67d57fefc8c08d. No automatic retry.
+
+# 2026-10-07 review 33 resolution and final local repair
+
+Review #33 on f28f51f returned valid FIX_P1_FIRST (P1 accepted media result
+misclassified when accounting fails; P2 raw compound post-invocation error).
+It independently resolves #31 findings and the supplied fixes for #32 P0
+allegations. Exact receipt: PAI-review-continuation-33.json. All 33/33 paid
+calls consumed. Local response/failures/commands: PAI-review-33-response.md.
+Final affected acceptance: 38 passed in 145.07 s, zero skips/failures; real
+accepted media result is preserved, accounting stays unconfirmed, compound
+error refs are typed/non-replayable. No independent closure fabricated.
+One-call #34 packet is prepared, explicitly uninvoked and unapproved until
+the owner extends 33 to 34. Formal role/design, live-account/production and
+operator acceptance gates remain open. No services/timers were enabled.

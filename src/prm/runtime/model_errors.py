@@ -1,6 +1,26 @@
 """Safe provider error classification; a response never authorizes blind retry."""
 from prm.storage.postgres import StorageError
 from llm.client import LLMOutcomeUnknown
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class AcceptedMediaReceipt:
+    model: str
+    text: str
+    duration_ms: int
+    delivery_outcome: str = 'accepted'
+    external_call_attempted: bool = True
+    usage_recorded: bool = False
+    estimated_cost_usd: None = None
+
+
+class MediaAccountingUnconfirmed(StorageError):
+    def __init__(self,receipt,result,attempt_ref,operation_refs):
+        super().__init__('media response accepted; cost accounting is unconfirmed; do not retry')
+        self.receipt=receipt;self.result=result
+        self.attempt_ref=attempt_ref;self.operation_refs=tuple(operation_refs)
+        self.retry_allowed=False;self.reason_kind='accepted_accounting_unconfirmed'
 
 
 class MediaOutcomeUnknown(LLMOutcomeUnknown):

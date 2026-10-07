@@ -1,0 +1,215 @@
+{
+  "schema_version": 1,
+  "status": "reviewed",
+  "call_number": 33,
+  "call_limit": 33,
+  "purpose": "actual_finding_recheck",
+  "read_only": true,
+  "provider": "opencode_go",
+  "requested_model": "mimo-v2.6-pro",
+  "observed_model": "mimo-v2.6-pro",
+  "requested_effort": "thinking_disabled",
+  "observed_effort": "thinking_disabled",
+  "head_sha": "f28f51fd0c3072836e41163b3f67d57fefc8c08d",
+  "base_sha": "761ffd21bf10aab39325d3d47d8fd3117d037858",
+  "diff_sha256": "a03d85814fe3587dcdbd442a8677e88b531c5c6a1f40ee3d689181a3c2ce0526",
+  "sources": [
+    {
+      "path": "src/prm/runtime/model_errors.py",
+      "sha256": "5e0d0d96363bff9f008ebb2d0c23b53e5972114615437ebb9e9ff41ec4c7bcb7",
+      "bytes": 1106
+    },
+    {
+      "path": "src/prm/runtime/media_attempts.py",
+      "sha256": "bc430642b8cf5032206b7cd2fc5b71f4a4669d5ad034dcb3effe414d5fae16f5",
+      "bytes": 2427
+    },
+    {
+      "path": "src/prm/runtime/speech.py",
+      "sha256": "a9244bc94b07eb0e585c87ee30f274a25c3305e582c4e6a5a42045d30793c5fe",
+      "bytes": 4617
+    },
+    {
+      "path": "src/prm/runtime/vision.py",
+      "sha256": "b873cf98e91c577756d8c3aff394399bdb6bf76afb96e53b369317906cdadda3",
+      "bytes": 6183
+    },
+    {
+      "path": "src/prm/runtime/model_attempts.py",
+      "sha256": "5498d7273a349037dac1fcce150df5fb7328937910419240ce6e2b86a6882d87",
+      "bytes": 1588
+    },
+    {
+      "path": "src/prm/storage/policy.py",
+      "sha256": "476ef57dce41b2eab38d9978421805cadeb7ee80cbeff2f7823863ef91a93859",
+      "bytes": 29630
+    },
+    {
+      "path": "src/prm/runtime/connections.py",
+      "sha256": "942996b79d409674b79f46d75925e3d2e150fc5a2afc714d5e73ab13c235835f",
+      "bytes": 20203
+    },
+    {
+      "path": "src/prm/runtime/graph.py",
+      "sha256": "881ff4a92756ab8a6592bf1e5c3df422e5dd8a272cabf65f6740a495401df6f9",
+      "bytes": 28398,
+      "line_ranges": [
+        [
+          1,
+          18
+        ],
+        [
+          46,
+          128
+        ],
+        [
+          131,
+          132
+        ],
+        [
+          133,
+          133
+        ],
+        [
+          135,
+          183
+        ],
+        [
+          230,
+          265
+        ]
+      ]
+    },
+    {
+      "path": "src/prm/runtime/schedule.py",
+      "sha256": "9028c8c672fec19c57497b5e15e98c26d52f6455a1ca6e9b435172037bd2ea4b",
+      "bytes": 8739
+    },
+    {
+      "path": "src/prm/runtime/academic.py",
+      "sha256": "f97eec3f4e4fd9f5ed8e007bac1a02a7ca494b4530635023d672a04e39b8b0a1",
+      "bytes": 17843,
+      "line_ranges": [
+        [
+          1,
+          103
+        ]
+      ]
+    },
+    {
+      "path": "src/prm/runtime/actions.py",
+      "sha256": "d346ed47015c33ee0174ccf8e424f3048f42a068a9cd11071d4e3c7516500aa3",
+      "bytes": 16086
+    },
+    {
+      "path": "src/prm/storage/actions.py",
+      "sha256": "6f1738970ab681dcc264c8739122085e0ae8a66ed8423b2a1553fe535650f74f",
+      "bytes": 13893
+    },
+    {
+      "path": "src/prm/confirmed_actions.py",
+      "sha256": "aa933b7af329bca26c7c81a50ef324608a3cf0d8d0ada322ac25d34574dc8d3a",
+      "bytes": 16470,
+      "line_ranges": [
+        [
+          273,
+          289
+        ]
+      ]
+    },
+    {
+      "path": "tests/test_pai_media_runtime.py",
+      "sha256": "d8994866f97392615c479ad1edc9a5d0c1aadbcb39be13a3da9d46f91fd2b272",
+      "bytes": 11018
+    },
+    {
+      "path": "tests/test_pai_review_recovery.py",
+      "sha256": "4904f5ab9958d4e6ddb4b51b3372bb6cbb319d4cbf80c67ca3a375542572b91e",
+      "bytes": 14739
+    },
+    {
+      "path": "tests/pai_runtime_fixtures.py",
+      "sha256": "9fea5d1aa9e60f0b338638072ed5cd73c9b19ed825fc2e72b4c01cf032e6ed1d",
+      "bytes": 10375
+    },
+    {
+      "path": "docs/verification/PAI-review-32-candidate.json",
+      "sha256": "9cb1ad710ad0bf77ff3fc2ce9a445280b600ee92058b8a33940a423235b290fc",
+      "bytes": 10267
+    },
+    {
+      "path": "docs/verification/PAI-review-31-response.md",
+      "sha256": "e8963c8f95fd7b86b7918c7a616da53bf5a7e8190286bb555b713e490ee3de91",
+      "bytes": 3763
+    }
+  ],
+  "scope": "actual-finding recheck; full sources and explicitly manifested excerpts",
+  "input_sha256": "437e8e6fd2d8a8490c48bb2942b763ef55367a09e8b65c526b43884ed01da9fe",
+  "input_bytes": 198595,
+  "output_token_cap": 16000,
+  "timeout_seconds": 900,
+  "workflow_receipt": false,
+  "human_authority": false,
+  "runner_path": ".playbook-artifacts/pai-review-final-recheck.py",
+  "runner_sha256": "2216d5e028baa4204a8524bc3d8465bfc3ac2ccb2f50aafcfd511aeef6c08c9f",
+  "transport_path": "tools/mimo_code_review.py",
+  "transport_sha256": "2ba3cbf032166616aa2eeba61f654308379b32d228e98f389f2099a02679262f",
+  "command": ".venv-pai/bin/python .playbook-artifacts/pai-review-final-recheck.py --call-number 33 --purpose actual_finding_recheck",
+  "source_exclusions": [
+    "actual private corpus",
+    "live account payload",
+    "credentials",
+    "production configuration"
+  ],
+  "authority_exclusions": [
+    "human/workflow completion",
+    "live-account consent",
+    "production migration/deployment",
+    "product-provider spending"
+  ],
+  "request_body_sha256": "54a886659dce2cf1385faabd5e7fb3ac297a9f19e69becb3f0521f1ea3f8efbb",
+  "provider_call_attempted": true,
+  "usage": {
+    "prompt_tokens": 49069,
+    "completion_tokens": 1383,
+    "total_tokens": 50452,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    }
+  },
+  "finish_reason": "stop",
+  "response_sha256": "fb838fd4ce168bc38c1c55322a4f8261ea100552f43185b422eb58716ded1ee7",
+  "findings": {
+    "verdict": "FIX_P1_FIRST",
+    "findings": [
+      {
+        "severity": "P1",
+        "title": "Media unknown/rejection accounting failures surface a raw StorageError instead of a typed non-retryable error",
+        "file": "src/prm/runtime/media_attempts.py:42",
+        "issue": "When registry.execute_reserved returns successfully (accepted) and the record() accounting call raises, fenced(error) is invoked with a raw StorageError, which is not ModelProviderRejected/ModelResponseInvalid, so a MediaOutcomeUnknown is produced — that path is fine. However, when execute_reserved raises ModelResponseInvalid/ModelProviderRejected and record() also raises, the code preserves the provider error only because it checks failure is not None first; but if record() raises BEFORE execute_reserved (e.g., on the first call when failure is None) with a StorageError that is not a provider rejection, fenced() builds MediaOutcomeUnknown with http_attempted() possibly False, and raises it. In the accepted-then-accounting-failure case (speech.py record), the user-visible error is MediaOutcomeUnknown, which is correct; but in the case where the transport succeeded and returned a valid result AND record() raised, execute_fenced_media raises failure instead of returning result — the accepted result is discarded, and the error carries http_attempted=True and delivery_outcome='unknown' despite a known accepted response. That mislabels a delivered answer as an unknown outcome to the caller while the operation state may be 'accepted' with actual=None, and the result is lost rather than surfaced as an accepted-but-accounting-failed typed error. Executable path: monkeypatch CostCacheRuntime.record to raise StorageError after a successful '/speech/accepted' transport (test_media_post_attempt_failures failure_stage='accounting' at tests/test_pai_media_runtime.py:100).",
+        "fix": "Distinguish 'accepted response but accounting lost' from 'unknown transport outcome' with a distinct typed non-retryable error carrying the accepted receipt (delivery_outcome='accepted', usage_recorded=False) instead of MediaOutcomeUnknown with delivery_outcome='unknown', or return the result with a warning sidecar. Never relabel a known accepted response as unknown.",
+        "confidence": "medium"
+      },
+      {
+        "severity": "P2",
+        "title": "execute_reserved_groups abandons only unprepared members and leaves prepared non-transported scopes in unknown state without surfacing ScopePreparationUnknown when transport already started",
+        "file": "src/prm/storage/policy.py:359",
+        "issue": "When transport_started=True and an exception occurs, prepared operations are settled as 'unknown' and the original error is re-raised; members not in prepared are abandoned. If the error occurred after some but not all groups were prepared (transport not yet started), ScopePreparationUnknown is raised with the prepared refs. This is fail-closed, but when transport_started=True and the error is a CapabilityDenied from the post-transport grant recheck (line 354) the raw CapabilityDenied is re-raised after settling prepared groups as unknown, without the MediaOutcomeUnknown/ScopePreparationUnknown typed fence refs, so a caller could interpret it as a pre-transport denial and potentially re-attempt with a new reservation. The durable fence (model_attempt_/operation 'unknown') does persist, so replay is blocked at the model-attempt layer for media but not for generic model calls without a prepare_model_attempt fence.",
+        "fix": "Wrap post-transport exceptions (after transport_started=True) into a typed non-retryable unknown error carrying operation_refs, consistent with execute_reserved's settle('unknown') plus raise path, so callers cannot mistake a post-attempt failure for a pre-transport deny.",
+        "confidence": "medium"
+      }
+    ],
+    "not_verified": [
+      "Actual provider billing, live-account OAuth/token endpoints, real Postgres concurrency beyond the synthetic sandbox.",
+      "Whether CostCacheRuntime.record or snapshot() logs leak prompt/image text (cost_cache.py source not supplied).",
+      "Whether model.py (chat path) enforces the 48KB bound before prepare_model_attempt — source not supplied in this packet.",
+      "Whether llm/client.py LLMOutcomeUnknown base class sets retry_allowed=False by default (source not supplied).",
+      "Full source of prm/runtime/model.py, cost_cache.py, delivery.py, and confirmed_actions.py beyond the 273-289 excerpt."
+    ],
+    "summary": "Review #32's two P0 allegations do not hold against current sources: _reservation_is_current (policy.py:228-238) has no reference to 'strict' and correctly returns False on storage errors, and connections.py begin()/callback() do enforce a scope-set match (lines 137-138) so a second begin with different scopes on the same connection_ref is rejected; the candidate's remaining P1 items are either already addressed in current code (academic.py:100 already splits CapabilityDenied -> 'scope_denied' from other exceptions -> 'unavailable'; vault.put does fsync the directory at connections.py:66-67/69-72; token-vault cleanup is durable via _queue_retirement; ActionReceipt.retry_allowed is hardcoded False at confirmed_actions.py:286-289) or rest on wrong line numbers/omitted sources. The review #31 P1 (raw transport exceptions surfacing after an unknown outcome) is resolved: media_attempts.execute_fenced_media now wraps every post-attempt failure in MediaOutcomeUnknown (retry_allowed=False) or preserves typed ModelProviderRejected/ModelResponseInvalid with fence refs, and accounting failures cannot replace a provider reason. The review #31 P2 (vision body-size bound) is resolved at vision.py:34 with MAX_VISION_BODY_BYTES checked before prepare_model_attempt. Remaining P1: in execute_fenced_media a known accepted response combined with an accounting failure is surfaced to the caller as MediaOutcomeUnknown with delivery_outcome='unknown' (and the valid result is discarded), which mislabels a delivered answer as unknown; this should carry a distinct accepted-but-unaccounted typed non-retryable error or return the result. A P2 concern is that execute_reserved_groups re-raises a raw post-transport CapabilityDenied after settling prepared operations as unknown rather than a typed unknown fence carrying operation_refs. No P0 found in the supplied scope; outside files (model.py, cost_cache.py, llm/client.py, delivery.py) were not reviewed and no claim is made about them."
+  },
+  "duration_seconds": 33.561
+}

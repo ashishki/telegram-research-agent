@@ -15,6 +15,7 @@ from prm.media_connectors import MediaAsset,Transcription,revise_transcription
 from prm.capabilities import AuthorizationRequest,CapabilityDenied
 from prm.storage.postgres import StorageError,StateConflict
 from .model import ScopedModelClient
+from .model_errors import MediaAccountingUnconfirmed
 
 
 class MediaRuntime:
@@ -45,12 +46,16 @@ class MediaRuntime:
         if asset.kind=='voice':
             if self.transcriber is None:return {'status':'transcription_unavailable','pages':[]}
             from .speech import SpeechTranscriber
-            text=self.transcriber(asset,source,task_ref=task_ref) if isinstance(self.transcriber,SpeechTranscriber) else self.transcriber(asset,source)
+            accounting_unconfirmed=False
+            try:text=self.transcriber(asset,source,task_ref=task_ref) if isinstance(self.transcriber,SpeechTranscriber) else self.transcriber(asset,source)
+            except MediaAccountingUnconfirmed as error:text=error.result;accounting_unconfirmed=True
             if not isinstance(text,str) or len(text)>16000:raise StorageError('bounded transcription required')
             transcript=Transcription('transcript_'+uuid.uuid4().hex,asset.media_ref,self.root.owner_ref,text,'',self.transcriber.provider_ref,1,datetime.now(timezone.utc))
             payload=asdict(transcript);payload['created_at']=transcript.created_at.isoformat()
             self.root.queue.store.put(self.root.owner_ref,'result',transcript.transcript_ref,payload,expected_version=0)
-            return {'status':'transcribed','pages':[[1,text]],'transcript_ref':transcript.transcript_ref,'version':1}
+            result={'status':'transcribed','pages':[[1,text]],'transcript_ref':transcript.transcript_ref,'version':1}
+            if accounting_unconfirmed:result['accounting_status']='unconfirmed'
+            return result
         from .cost_cache import CostCacheRuntime
         cache=CostCacheRuntime(self.root)
         item=self.root.queue.store.get(self.root.owner_ref,'conversation',asset.media_ref)
@@ -81,7 +86,8 @@ class MediaRuntime:
             extracted=self.extract(asset,task_ref=request_ref)
             if asset.kind=='image' and self.vision is not None:
                 from .vision import VisionAdapter
-                return self.vision(asset,question,self.path/asset.media_ref,task_ref=request_ref) if isinstance(self.vision,VisionAdapter) else self.vision(asset,question,self.path/asset.media_ref)
+                try:return self.vision(asset,question,self.path/asset.media_ref,task_ref=request_ref) if isinstance(self.vision,VisionAdapter) else self.vision(asset,question,self.path/asset.media_ref)
+                except MediaAccountingUnconfirmed as error:return {**error.result,'accounting_status':'unconfirmed'}
             if extracted['status'] in {'ocr_unavailable','transcription_unavailable'}:return {'status':extracted['status'],'text':'Для этого файла нужен отдельно разрешённый обработчик.'}
             endpoint=self.root.endpoint_for('extraction')
             if endpoint is None:return {'status':'provider_egress_required','text':'Текст извлечён локально; передача модели требует отдельного разрешения.'}

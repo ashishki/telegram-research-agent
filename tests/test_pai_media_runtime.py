@@ -91,7 +91,7 @@ def media_adapter(pai,modality,endpoint_suffix):
 @pytest.mark.parametrize('failure_stage',['ack_loss','accounting'])
 def test_media_post_attempt_failures_are_typed_and_reconstructed_clients_cannot_replay(pai,monkeypatch,modality,failure_stage):
     from prm.runtime.cost_cache import CostCacheRuntime
-    from prm.runtime.model_errors import MediaOutcomeUnknown
+    from prm.runtime.model_errors import MediaOutcomeUnknown,MediaAccountingUnconfirmed
     from prm.runtime.model_attempts import ModelAttemptAlreadyRecorded
     media=MediaRuntime(pai.root,temporary_root=pai.path/'fenced_media')
     suffix='ack-loss' if failure_stage=='ack_loss' else 'accepted'
@@ -101,10 +101,17 @@ def test_media_post_attempt_failures_are_typed_and_reconstructed_clients_cannot_
         def failed_record(*args,**kwargs):raise StorageError('synthetic usage acknowledgment lost')
         monkeypatch.setattr(CostCacheRuntime,'record',failed_record)
     asset=media.ingest(**content)
-    with pytest.raises(MediaOutcomeUnknown) as failure:invoke(asset,media.path/asset.media_ref,task)
+    expected=MediaOutcomeUnknown if failure_stage=='ack_loss' else MediaAccountingUnconfirmed
+    with pytest.raises(expected) as failure:invoke(asset,media.path/asset.media_ref,task)
     error=failure.value
     assert not error.retry_allowed and error.receipt.external_call_attempted
-    assert error.receipt.delivery_outcome=='unknown' and error.attempt_ref.startswith('model_attempt_')
+    assert error.receipt.delivery_outcome==('unknown' if failure_stage=='ack_loss' else 'accepted')
+    assert error.attempt_ref.startswith('model_attempt_')
+    if failure_stage=='accounting':
+        assert error.result==('Synthetic transcription.' if modality=='speech' else {'status':'ok','text':'Synthetic image answer.',
+            'media_ref':asset.media_ref,'page_refs':[1],'extraction_method':'vision'})
+        assert not error.receipt.usage_recorded and error.receipt.estimated_cost_usd is None
+        assert error.receipt.text==('Synthetic transcription.' if modality=='speech' else 'Synthetic image answer.')
     assert len(error.operation_refs)==1 and 'Anthropic' not in str(error)
     operation=next(op for op in pai.root.registry.snapshot(pai.root.owner_ref)['operations'] if op['ref']==error.operation_refs[0])
     assert operation['state'] in {'unknown','accepted'} and operation['actual'] is None
@@ -164,3 +171,38 @@ def test_media_bookkeeping_failure_preserves_non_retryable_provider_reason(pai,m
     with pytest.raises(getattr(model_errors,error_name)) as failure:invoke(asset,media.path/asset.media_ref,'preserved_'+suffix)
     assert not failure.value.retry_allowed and failure.value.attempt_ref.startswith('model_attempt_')
     assert len(failure.value.operation_refs)==1 and len(pai.requests)==1
+
+
+@pytest.mark.parametrize('modality',['speech','vision'])
+def test_media_runtime_preserves_accepted_result_when_accounting_is_unconfirmed(pai,monkeypatch,modality):
+    import struct
+    import zlib
+    from dataclasses import replace
+    from tests.pai_runtime_fixtures import allow
+    from prm.runtime.cost_cache import CostCacheRuntime
+    from prm.runtime.speech import SpeechTranscriber
+    from prm.runtime.vision import VisionAdapter
+    media=MediaRuntime(pai.root,temporary_root=pai.path/'accepted_media_result')
+    def failed_record(*args,**kwargs):raise StorageError('synthetic accounting acknowledgment lost')
+    monkeypatch.setattr(CostCacheRuntime,'record',failed_record)
+    if modality=='speech':
+        allow(pai,'media.transcribe','resource_voice','user_provided','voice.transcription')
+        media.transcriber=SpeechTranscriber(pai.root,endpoint=replace(pai.root.model_endpoint,endpoint=pai.origin+'/speech/accepted'),upper_bound=1,resource_ref='resource_voice')
+        asset=media.ingest(content=b'OggS synthetic accepted voice',kind='voice',mime_type='audio/ogg')
+        result=media.extract(asset,task_ref='accepted_voice_runtime')
+        assert result['status']=='transcribed' and result['pages']==[[1,'Synthetic transcription.']]
+        stored=pai.root.queue.store.get(pai.root.owner_ref,'result',result['transcript_ref'])
+        assert stored.payload['text']=='Synthetic transcription.'
+        media.cleanup(asset)
+    else:
+        allow(pai,'media.vision','resource_image','user_provided','media.vision')
+        media.vision=VisionAdapter(pai.root,endpoint=replace(pai.root.model_endpoint,endpoint=pai.origin+'/vision/accepted'),upper_bound=1,resource_ref='resource_image')
+        def chunk(kind,data):return struct.pack('!I',len(data))+kind+data+struct.pack('!I',zlib.crc32(kind+data))
+        image=b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('!IIBBBBB',1,1,8,6,0,0,0))+chunk(b'IDAT',zlib.compress(b'\x00\xff\xff\xff\xff'))+chunk(b'IEND',b'')
+        asset=media.ingest(content=image,kind='image',mime_type='image/png')
+        result=media.question(asset,'Synthetic image question',request_ref='accepted_image_runtime')
+        assert result['status']=='ok' and result['text']=='Synthetic image answer.'
+        assert not (media.path/asset.media_ref).exists()
+    assert result['accounting_status']=='unconfirmed'
+    assert len(pai.requests)==1
+    assert all(window['consumed']==1 for window in pai.root.registry.snapshot(pai.root.owner_ref)['windows'])
