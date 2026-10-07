@@ -1,5 +1,14 @@
 """Safe provider error classification; a response never authorizes blind retry."""
 from prm.storage.postgres import StorageError
+from llm.client import LLMOutcomeUnknown
+
+
+class MediaOutcomeUnknown(LLMOutcomeUnknown):
+    def __init__(self,receipt,attempt_ref,operation_refs):
+        super().__init__(receipt)
+        self.args=('selected media provider outcome is unknown; do not retry automatically',)
+        self.attempt_ref=attempt_ref;self.operation_refs=tuple(operation_refs)
+        self.retry_allowed=False;self.reason_kind='provider_outcome_unknown'
 
 
 class ModelProviderRejected(StorageError):

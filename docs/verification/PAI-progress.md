@@ -244,3 +244,20 @@ was created; consumption remains 30/33. Owner was asked for the existing
 credential-file path. No credential scan, model swap or paid retry occurred.
 Exact non-invocation evidence: PAI-review-continuation-20261007.json.
 Existing passing broad tests were not repeated; P1 remains independently open.
+
+Review #31 reserved/attempted, 31/33 consumed including failures.
+Purpose: remaining_P1_recheck; source HEAD e492ca6674a051bb88828ea38602acfcb40c12f6. No automatic retry.
+
+# 2026-10-07 review 31 and media-boundary response
+
+Owner directed key lookup to Georgia-Community-Navigator. The selected
+credential worked at the authorized OpenCode Go endpoint; actual observed
+model mimo-v2.6-pro, thinking disabled. Review #31 independently resolves
+the two #30 allegations, then finds one new media P1 and one vision-bound P2.
+Source at review: e492ca6. Receipt: PAI-review-continuation-31.json.
+Local fixes and actual evidence: PAI-review-31-response.md (12 media cases
+passed in 56.23 s; 7 cost/model/settlement regressions passed in 32.03 s;
+zero skips/failures). Independent closure of the new findings remains open.
+Consumption: 31/33 including failures. Next #32 connection/source review;
+#33 only for actual-finding recheck. No other provider, live account, service,
+production or human acceptance was used/inferred.

@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "status": "reviewed",
+  "call_number": 31,
+  "call_limit": 33,
+  "purpose": "remaining_P1_recheck",
+  "read_only": true,
+  "provider": "opencode_go",
+  "requested_model": "mimo-v2.6-pro",
+  "observed_model": "mimo-v2.6-pro",
+  "requested_effort": "thinking_disabled",
+  "observed_effort": "thinking_disabled",
+  "head_sha": "e492ca6674a051bb88828ea38602acfcb40c12f6",
+  "base_sha": "761ffd21bf10aab39325d3d47d8fd3117d037858",
+  "diff_sha256": "3f75c736d52495935b3dec98a891ac7fa6c33aac007e396247f70b61ab1a6a5a",
+  "sources": [
+    {
+      "path": "src/prm/runtime/model.py",
+      "sha256": "76ecda296ecad2d6658b9479a09b3a42045349027f63f93c984e785e2da90df4",
+      "bytes": 8531
+    },
+    {
+      "path": "src/prm/runtime/model_attempts.py",
+      "sha256": "5498d7273a349037dac1fcce150df5fb7328937910419240ce6e2b86a6882d87",
+      "bytes": 1588
+    },
+    {
+      "path": "src/prm/storage/policy.py",
+      "sha256": "f7456178adba4a911f74987f9832937a99473a4e772141a7c90adcc4b95f8680",
+      "bytes": 29700
+    },
+    {
+      "path": "src/prm/runtime/speech.py",
+      "sha256": "a878e1746842049cf52ebbecf286d78b7d3990d989a37d4b9da80649f394915c",
+      "bytes": 4390
+    },
+    {
+      "path": "src/prm/runtime/vision.py",
+      "sha256": "f2c4c11508b049649de23f729aa7ae9015de5bd732ca9e74b4006339f96b9e33",
+      "bytes": 5407
+    },
+    {
+      "path": "tests/test_pai_chat_runtime.py",
+      "sha256": "161789fde64868948daf32d129772b33cac90ac62be2ecb0944c7f78ed22dbad",
+      "bytes": 9523
+    },
+    {
+      "path": "tests/test_pai_durable_policy.py",
+      "sha256": "14739e62c8804f324c90a45d50167d1ccc51970d6e6cd30e2a1af6ffe4dfb5ae",
+      "bytes": 14493
+    },
+    {
+      "path": "docs/verification/PAI-review-30-response.md",
+      "sha256": "0d963304f3b6048aa3b2fe0eb2fc06d9a921b2190c6472e1233f119445b42a1c",
+      "bytes": 2567
+    }
+  ],
+  "scope": "selected full source",
+  "input_sha256": "f1a92ec1e975018bcd814f0bc739cd4eb9117ece81f13d3668c5981e05472646",
+  "input_bytes": 83941,
+  "output_token_cap": 16000,
+  "timeout_seconds": 900,
+  "workflow_receipt": false,
+  "human_authority": false,
+  "runner_path": ".playbook-artifacts/pai-review-continuation.py",
+  "runner_sha256": "a659cef7117af98086b374c430eee326985df0c56d53359cefe09ace33fc4945",
+  "transport_path": "tools/mimo_code_review.py",
+  "transport_sha256": "2ba3cbf032166616aa2eeba61f654308379b32d228e98f389f2099a02679262f",
+  "command": ".venv-pai/bin/python .playbook-artifacts/pai-review-continuation.py --call-number 31 --purpose remaining_P1_recheck",
+  "source_exclusions": [
+    "actual private corpus",
+    "live account payload",
+    "credentials",
+    "production configuration"
+  ],
+  "authority_exclusions": [
+    "human/workflow completion",
+    "live-account consent",
+    "production migration/deployment",
+    "product-provider spending"
+  ],
+  "request_body_sha256": "13cb1f693b1e31c1d1f0156b9040cb647dffdd7cb7aecf805bdd0a06f4eebd68",
+  "provider_call_attempted": true,
+  "usage": {
+    "prompt_tokens": 21680,
+    "completion_tokens": 665,
+    "total_tokens": 22345,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    }
+  },
+  "finish_reason": "stop",
+  "response_sha256": "a31596074dbae24a9db4b271061c791d7227c48472fc21a15819c2228cb69be7",
+  "findings": {
+    "verdict": "FIX_P1_FIRST",
+    "findings": [
+      {
+        "severity": "P1",
+        "title": "Speech and vision transport exceptions are recorded as an outcome that is not a provider rejection and then re-raised as-is, allowing retry without the durable non-replay fence being surfaced",
+        "file": "src/prm/runtime/speech.py:55",
+        "issue": "`execute_reserved` re-raises the original transport exception after settling the operation as 'unknown'; speech/vision only classify `ModelProviderRejected` as 'rejected' and otherwise keep `outcome='unknown'` in the cost cache, but the caller sees the raw exception type (e.g. `StorageError('...do not retry')` for the wrapped path, yet `LLMOutcomeUnknown`-style fencing is not guaranteed because `ModelProviderRejected` may be raised by an inner re-raise while `finally` still records outcome and then `registry.settle` for vision runs with `outcome=outcome` where `outcome` may be 'rejected').",
+        "fix": "Normalize every post-attempt exception into `LLMOutcomeUnknown` with `retry_allowed=False` (or the existing `ModelAttemptAlreadyRecorded` class), including `ModelProviderRejected`, and make the cost/settle path use a single terminal outcome per attempt; never re-raise an exception type that a caller could interpret as retryable.",
+        "confidence": "medium"
+      },
+      {
+        "severity": "P2",
+        "title": "Vision payload and model output bounds are not consistently enforced before the durable attempt fence",
+        "file": "src/prm/runtime/vision.py:24",
+        "issue": "The image bytes are read and base64-encoded before `prepare_model_attempt`, but there is no explicit bound on the encoded body size (unlike model.py's 48KB cap), so oversized payloads can be hashed into a one-use fence and then rejected by the provider, leaving a non-replayable attempt for a request that was never billable.",
+        "fix": "Validate `len(body)` (and decoded image size) before calling `prepare_model_attempt`, and keep the attempt fence strictly after all local validation, matching the speech/model path.",
+        "confidence": "medium"
+      }
+    ],
+    "not_verified": [
+      "Actual network traffic, provider billing reconciliation, and real Postgres concurrency beyond the synthetic sandbox.",
+      "Whether `execute_reserved_groups` correctly settles all group members when multiple operations share one HTTP call under failure.",
+      "Whether `CostCacheRuntime.record` leaks private prompt/image text into reports or logs."
+    ],
+    "summary": "The two allegations in review #30 are not supported by the current code: local payload/history validation in `ScopedModelClient` occurs before `prepare_model_attempt`, so it leaves no model fence and the reservation remains usable; `DurableCapabilityRegistry.settle` treats `actual=None` as the terminal no-op branch, so a later known `actual` can still adjust an unknown operation's windows without resetting the replay fence. Speech and vision boundaries are mostly correct in scope binding and media bounds, but their exception paths surface raw errors after an unknown outcome instead of a uniform non-retryable unknown class, which is a P1 retry-safety risk, and vision lacks a body-size bound before fencing (P2). No P0 found in the reviewed scope; the fail-closed reservation and unknown-cost handling otherwise look sound."
+  },
+  "duration_seconds": 49.553
+}

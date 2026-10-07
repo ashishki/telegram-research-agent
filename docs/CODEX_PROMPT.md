@@ -1,11 +1,11 @@
-# Current handoff — review extension authorized, provider configuration missing
+# Current handoff — independent review continuation and media fix
 
 2026-10-07. Assigned branch: docs/personal-assistant-blueprint-playbook-20260918.
 Owner authorized finishing implementation, then testing/review, and confirmed
 “делай, разрешаю” after the implementation handoff. ADR-015 sequencing honored.
 Do not restart upfront permission loops, historical tasks or reviewer frameworks.
 
-Current code: 761ffd2. Test/response commit: 5c5e7db. Exact final evidence:
+Whole-tier source: 761ffd2. Test/response commit: 5c5e7db. Exact final evidence:
 docs/verification/PAI-verification-20261007.md and PAI-validation-20261007.json.
 Required pai-complete: 233 passed in 706.20 s, zero skips/failures; all 69 exact
 named requirements and ten scenarios enforced. Latest focused-prm: 652 passed
@@ -20,25 +20,26 @@ explicit compound preparation-unknown errors, monotone tombstone/artifact/job
 transfer and idempotent settlement, plus typed provider-error outcomes. Passing
 tests never authorize resetting a fence after a possibly processed/billable call.
 
-Independent Mimo #30 on 761ffd2 returns FIX_P1_FIRST with one remaining finding.
-Executable counterexamples: docs/verification/PAI-review-30-response.md.
-Do not clear it via implementer approval. Scoped advisory reviews are not
+Independent Mimo #31 on e492ca6 resolves the two #30 allegations against the
+counterexamples, but returns FIX_P1_FIRST for a new media error-boundary P1
+and vision input-bound P2. Local fixes: docs/verification/PAI-review-31-response.md;
+12 media cases and 7 model/cost/settlement regressions passed, zero skips.
+New media findings remain open pending independent recheck #33. Scoped advisory reviews are not
 Deep Review/Role Runner/human approval receipts; accumulated phase/role coverage
 remains pending. Requested/observed model and effort, hashes and scopes are in
 PAI-critical-boundaries-recheck-28/29/30.json. Thinking disabled and strict JSON
 schema produced usable reports; earlier incomplete attempts stay preserved.
 
-Paid review count: 30/33 consumed INCLUDING failures. On 2026-10-07 the owner
+Paid review count: 31/33 consumed INCLUDING failures. On 2026-10-07 the owner
 answered “разрешаю, делай дотконца” to the explicit 30-to-33 extension proposal.
 Do not ask for the same budget authorization again or swap models automatically.
 Prepared, authorized next packets: docs/verification/PAI-next-review-packets.json.
-Call #31 stopped BEFORE provider I/O: OPENCODE_API_KEY/OPENCODE_API_KEY_FILE
-were not configured in this session; no key search or call occurred. The owner
-was asked for the previously configured key-file path (never the key in chat).
-Evidence: docs/verification/PAI-review-continuation-20261007.json.
-Next action once that configuration is supplied: a fresh independent resolution of
-remaining P1 against its counterexamples, then remaining connection/source review
-and call #33 for an actual-finding recheck only if needed. Public code and synthetic evidence
+The initial no-credential command stopped before provider I/O, preserving
+30/33. Owner then explicitly directed lookup to Georgia-Community-Navigator;
+its secrets/openrouter_api_key was used ONLY at the authorized OpenCode Go
+endpoint, which confirmed mimo-v2.6-pro. Do not print/copy the credential.
+Next: independent connection/source review #32, then #33 for an actual-finding
+recheck of #31 and any actionable #32 findings. Public code and synthetic evidence
 only; no private corpus, tokens or account payloads to reviewers.
 
 Formal PA/PAI design states stay review_required/draft/planned. Playbook readiness

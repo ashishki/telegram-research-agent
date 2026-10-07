@@ -66,3 +66,101 @@ def test_vision_http_rejection_preserves_logical_retry_fence(pai):
         finally:media.cleanup(retry)
         assert len([row for row in pai.requests if row[0]=='rejected'])==1
     finally:media.cleanup(asset)
+
+
+def media_adapter(pai,modality,endpoint_suffix):
+    from dataclasses import replace
+    from tests.pai_runtime_fixtures import allow
+    from prm.runtime.speech import SpeechTranscriber
+    from prm.runtime.vision import VisionAdapter
+    root=pai.root
+    if modality=='speech':
+        allow(pai,'media.transcribe','resource_voice','user_provided','voice.transcription')
+        adapter=SpeechTranscriber(root,endpoint=replace(root.model_endpoint,endpoint=pai.origin+'/speech/'+endpoint_suffix),
+            upper_bound=3,resource_ref='resource_voice')
+        def invoke(asset,path,task):return adapter(asset,path,task_ref=task)
+        return invoke,{'content':b'OggS synthetic voice input','kind':'voice','mime_type':'audio/ogg'}
+    allow(pai,'media.vision','resource_image','user_provided','media.vision')
+    adapter=VisionAdapter(root,endpoint=replace(root.model_endpoint,endpoint=pai.origin+'/vision/'+endpoint_suffix),
+        upper_bound=3,resource_ref='resource_image')
+    def invoke(asset,path,task):return adapter(asset,'Synthetic question',path,task_ref=task)
+    return invoke,{'content':b'\x89PNG\r\n\x1a\nsynthetic image','kind':'image','mime_type':'image/png'}
+
+
+@pytest.mark.parametrize('modality',['speech','vision'])
+@pytest.mark.parametrize('failure_stage',['ack_loss','accounting'])
+def test_media_post_attempt_failures_are_typed_and_reconstructed_clients_cannot_replay(pai,monkeypatch,modality,failure_stage):
+    from prm.runtime.cost_cache import CostCacheRuntime
+    from prm.runtime.model_errors import MediaOutcomeUnknown
+    from prm.runtime.model_attempts import ModelAttemptAlreadyRecorded
+    media=MediaRuntime(pai.root,temporary_root=pai.path/'fenced_media')
+    suffix='ack-loss' if failure_stage=='ack_loss' else 'accepted'
+    invoke,content=media_adapter(pai,modality,suffix)
+    task='media_failure_'+modality+'_'+failure_stage
+    if failure_stage=='accounting':
+        def failed_record(*args,**kwargs):raise StorageError('synthetic usage acknowledgment lost')
+        monkeypatch.setattr(CostCacheRuntime,'record',failed_record)
+    asset=media.ingest(**content)
+    with pytest.raises(MediaOutcomeUnknown) as failure:invoke(asset,media.path/asset.media_ref,task)
+    error=failure.value
+    assert not error.retry_allowed and error.receipt.external_call_attempted
+    assert error.receipt.delivery_outcome=='unknown' and error.attempt_ref.startswith('model_attempt_')
+    assert len(error.operation_refs)==1 and 'Anthropic' not in str(error)
+    operation=next(op for op in pai.root.registry.snapshot(pai.root.owner_ref)['operations'] if op['ref']==error.operation_refs[0])
+    assert operation['state'] in {'unknown','accepted'} and operation['actual'] is None
+    assert all(window['consumed']==3 for window in pai.root.registry.snapshot(pai.root.owner_ref)['windows'])
+    before=len(pai.requests)
+    retry,content=media_adapter(pai,modality,suffix)
+    second=media.ingest(**content)
+    with pytest.raises(ModelAttemptAlreadyRecorded):retry(second,media.path/second.media_ref,task)
+    assert len(pai.requests)==before==1
+    assert all(window['reserved']==0 and window['consumed']==3 for window in pai.root.registry.snapshot(pai.root.owner_ref)['windows'])
+
+
+@pytest.mark.parametrize('modality',['speech','vision'])
+def test_media_file_growth_is_rejected_without_transport_or_logical_fence(pai,modality):
+    media=MediaRuntime(pai.root,temporary_root=pai.path/'oversized_media')
+    invoke,content=media_adapter(pai,modality,'accepted')
+    asset=media.ingest(**content);path=media.path/asset.media_ref
+    path.write_bytes(content['content']+b'x'*(16000001 if modality=='speech' else 5000001))
+    task='media_local_growth_'+modality
+    with pytest.raises(StorageError,match='bounded media identity changed'):invoke(asset,path,task)
+    assert not pai.requests
+    with pai.root.queue.store.transaction() as tx:
+        count=tx.conn.execute("SELECT count(*) AS n FROM pa_runtime.object_heads WHERE owner=%s AND object_id LIKE 'model_attempt_%%'",(pai.root.owner_ref,)).fetchone()['n']
+    assert count==0
+    assert all(window['reserved']==0 and window['consumed']==0 for window in pai.root.registry.snapshot(pai.root.owner_ref)['windows'])
+    valid=media.ingest(**content)
+    assert invoke(valid,media.path/valid.media_ref,task)
+    assert len(pai.requests)==1
+
+
+def test_vision_encoded_body_bound_precedes_attempt_and_releases_reservation(pai,monkeypatch):
+    from prm.runtime import vision
+    media=MediaRuntime(pai.root,temporary_root=pai.path/'body_bound')
+    invoke,content=media_adapter(pai,'vision','accepted');asset=media.ingest(**content)
+    with monkeypatch.context() as bounds:
+        bounds.setattr(vision,'MAX_VISION_BODY_BYTES',100)
+        with pytest.raises(StorageError,match='vision request exceeds bounded scope'):
+            invoke(asset,media.path/asset.media_ref,'vision_body_bound')
+    assert not pai.requests
+    with pai.root.queue.store.transaction() as tx:
+        count=tx.conn.execute("SELECT count(*) AS n FROM pa_runtime.object_heads WHERE owner=%s AND object_id LIKE 'model_attempt_%%'",(pai.root.owner_ref,)).fetchone()['n']
+    assert count==0
+    assert all(window['reserved']==0 for window in pai.root.registry.snapshot(pai.root.owner_ref)['windows'])
+    valid=media.ingest(**content)
+    assert invoke(valid,media.path/valid.media_ref,'vision_body_bound')['status']=='ok'
+    assert len(pai.requests)==1
+
+
+@pytest.mark.parametrize('suffix,error_name',[('rejected','ModelProviderRejected'),('malformed','ModelResponseInvalid')])
+def test_media_bookkeeping_failure_preserves_non_retryable_provider_reason(pai,monkeypatch,suffix,error_name):
+    from prm.runtime import model_errors
+    from prm.runtime.cost_cache import CostCacheRuntime
+    invoke,content=media_adapter(pai,'speech',suffix)
+    media=MediaRuntime(pai.root,temporary_root=pai.path/'reason_preserved');asset=media.ingest(**content)
+    def failed_record(*args,**kwargs):raise StorageError('synthetic usage acknowledgment lost')
+    monkeypatch.setattr(CostCacheRuntime,'record',failed_record)
+    with pytest.raises(getattr(model_errors,error_name)) as failure:invoke(asset,media.path/asset.media_ref,'preserved_'+suffix)
+    assert not failure.value.retry_allowed and failure.value.attempt_ref.startswith('model_attempt_')
+    assert len(failure.value.operation_refs)==1 and len(pai.requests)==1

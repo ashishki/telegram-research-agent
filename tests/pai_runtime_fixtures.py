@@ -47,6 +47,15 @@ def pai(tmp_path):
                 self.reply({'id':'synthetic_event_created','changeKey':'version_1'},201 if self.path.endswith('/events') else 202);return
             if self.path=='/speech/malformed':
                 requests.append(('malformed',self.path,{}));self.reply({},200);return
+            if self.path in {'/speech/ack-loss','/vision/ack-loss'}:
+                requests.append(('media_ack_loss',self.path,{}));self.close_connection=True;return
+            if self.path=='/speech/accepted':
+                requests.append(('speech',self.path,{}));self.reply({'text':'Synthetic transcription.'});return
+            if self.path=='/vision/accepted':
+                requests.append(('vision',self.path,{}));self.reply({'model':'fixture_model',
+                    'choices':[{'finish_reason':'stop','message':{'content':'Synthetic image answer.'}}],
+                    'usage':{'prompt_tokens':40,'completion_tokens':12,'prompt_tokens_details':{'cached_tokens':0},
+                        'completion_tokens_details':{'reasoning_tokens':0}}});return
             requests.append(('rejected',self.path,{}));self.reply({'error':'unsupported'},404)
         def do_GET(self):
             requests.append(('read',self.path,{}));parsed=urlsplit(self.path);query=parse_qs(parsed.query)

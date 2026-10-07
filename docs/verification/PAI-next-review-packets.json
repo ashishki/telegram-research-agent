@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "status": "authorized_awaiting_provider_configuration",
+  "status": "authorized_review_in_progress",
   "current_approved_call_cap": 33,
-  "calls_consumed_including_failures": 30,
+  "calls_consumed_including_failures": 31,
   "proposed_total_cap": 33,
   "new_calls_maximum": 3,
   "third_call": "only if an actual new finding needs independent recheck",
@@ -118,9 +118,29 @@
           "path": "tests/test_pai_action_runtime.py",
           "sha256": "55c5878c8c3617a2475b7d51b215ff190d4d8915a2ccab7fcf7adbac0e37d02d",
           "bytes": 2696
+        },
+        {
+          "path": "src/prm/storage/actions.py",
+          "sha256": "2fef4f4955e1a052eecb06c606cacbceffe6e87145f5d7ccfe4f6ea5718b89f6",
+          "bytes": 13719
+        },
+        {
+          "path": "src/prm/runtime/deletion.py",
+          "sha256": "12ce6cf1397e7b67bc4f5b1f515bab9d870c3a4f26bf4e2a3709f94782315c04",
+          "bytes": 5678
+        },
+        {
+          "path": "tests/pai_runtime_fixtures.py",
+          "sha256": "bcb816e6140803276d8f07da31afc4b0e863640cc02f548a7b9214119cef4378",
+          "bytes": 9515
+        },
+        {
+          "path": "src/prm/storage/policy.py",
+          "sha256": "f7456178adba4a911f74987f9832937a99473a4e772141a7c90adcc4b95f8680",
+          "bytes": 29700
         }
       ],
-      "source_bytes": 95888
+      "source_bytes": 154500
     }
   ],
   "authority_exclusions": [
@@ -133,5 +153,11 @@
     "date": "2026-10-07",
     "owner_message": "разрешаю, делай дотконца",
     "scope": "Acceptance of the preceding explicit 30-to-33 call extension; other authority exclusions persist."
+  },
+  "credential_configuration": {
+    "source_project": "Georgia-Community-Navigator",
+    "owner_instruction": "ключ изи в георгия комьюниьи навигаторе",
+    "value_in_repository": false,
+    "provider_identity": "mimo-v2.6-pro observed on authorized OpenCode Go endpoint, review 31"
   }
 }
