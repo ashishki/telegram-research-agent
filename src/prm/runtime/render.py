@@ -11,8 +11,8 @@ def main(argv=None):
     parser.add_argument('--format',choices=('html','markdown','pdf'),required=True);args=parser.parse_args(argv)
     resource.setrlimit(resource.RLIMIT_CPU,(12,12));resource.setrlimit(resource.RLIMIT_FSIZE,(16000000,16000000))
     resource.setrlimit(resource.RLIMIT_NOFILE,(64,64));resource.setrlimit(resource.RLIMIT_AS,(1500000000,1500000000))
-    def denied(*args,**kwargs):raise RuntimeError('renderer network disabled')
-    socket.socket=denied;socket.create_connection=denied
+    from .network_guard import install_network_block
+    install_network_block()
     from prm.briefs import _stored_document
     from prm.report_exports import render_report
     source=Path(args.input)

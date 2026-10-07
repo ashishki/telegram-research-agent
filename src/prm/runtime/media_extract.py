@@ -10,8 +10,8 @@ def main(argv=None):
     parser=argparse.ArgumentParser();parser.add_argument('--input',required=True);parser.add_argument('--output',required=True);parser.add_argument('--mime',required=True)
     args=parser.parse_args(argv)
     resource.setrlimit(resource.RLIMIT_CPU,(8,8));resource.setrlimit(resource.RLIMIT_AS,(1000000000,1000000000));resource.setrlimit(resource.RLIMIT_FSIZE,(64000,64000))
-    def denied(*args,**kwargs):raise RuntimeError('extraction network disabled')
-    socket.socket=denied;socket.create_connection=denied
+    from .network_guard import install_network_block
+    install_network_block()
     path=Path(args.input)
     if path.stat().st_size>16000000:raise ValueError('media exceeds bound')
     pages=[]
