@@ -26,7 +26,6 @@ def verify_report(path: Path, *, matrix: dict | None = None) -> tuple[bool, str]
     if any(case.find(tag) is not None for case in cases for tag in ('skipped', 'failure', 'error')):
         return False, 'skipped, failed or errored acceptance test'
     if matrix is not None:
-        names = {case.get('name', '').split('[')[0] for case in cases}
         nodes = {(case.get('classname', ''), case.get('name', '').split('[')[0]) for case in cases}
         missing = [row['spec_id'] for row in matrix['requirements'] if not any(
             (module=='tests.test_pai_requirements' or module.startswith('tests.test_pai_requirements.'))
@@ -34,7 +33,11 @@ def verify_report(path: Path, *, matrix: dict | None = None) -> tuple[bool, str]
         for row in matrix['scenarios']:
             for key in ('synthetic_test_node', 'recovery_test_node'):
                 if not row.get(key): continue
-                file, name = row[key].split('::')
+                parts = row[key].split('::')
+                if len(parts)!=2 or not parts[0].endswith('.py') or not parts[1]:
+                    return False, 'invalid binding test node'
+                file, name = parts
+                name = name.split('[')[0]
                 module = file.removesuffix('.py').replace('/', '.')
                 if not any((cls == module or cls.startswith(module + '.')) and actual == name for cls, actual in nodes):
                     missing.append(row['scenario_id'] + '/' + key)
@@ -69,7 +72,7 @@ def main(argv=None) -> int:
             return result.returncode
         matrix = json.loads((ROOT / 'docs/design/PAI.requirements.json').read_text()) if args.require_spec_matrix else None
         passed, detail = verify_report(report, matrix=matrix)
-        print('PAI acceptance: ' + detail)
+        print(('PAI full-spec acceptance: ' if args.require_spec_matrix else 'PAI scoped test verification (full-spec coverage not checked): ') + detail)
         return 0 if passed else 1
 
 

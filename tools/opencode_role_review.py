@@ -56,6 +56,7 @@ PACKET_REFS = (
     "docs/design/PAI.requirements.json",
 )
 TOOLING_REFS = (
+    'docs/verification/PAI-native-tooling-74-response.md',
     '.playbook/upstream.lock.json', 'requirements-playbook.txt',
     'tools/render_codex_exec_prompt.py', 'tools/render_slice_context.py',
     "docs/REVIEW_POLICY.md", "tools/playbook.py", "tools/run_codex_role.py",
@@ -78,9 +79,14 @@ def verify_packet_snapshot(root: Path, head: str, manifest: list) -> None:
     This is reported provider metadata over TLS, not signed model attestation.
     """
     for item in manifest:
+        tree=subprocess.run(['git','-C',str(root),'ls-tree',head,'--',item['path']],capture_output=True,text=True)
+        entries=tree.stdout.splitlines()
+        if (tree.returncode or len(entries)!=1 or entries[0].split('\t',1)[-1]!=item['path']
+            or entries[0].split(' ',2)[:2] not in (['100644','blob'],['100755','blob'])):
+            raise ReviewBlocked('review inputs must be regular tracked blobs at captured committed HEAD')
         result=subprocess.run(['git','-C',str(root),'show',head+':'+item['path']],capture_output=True)
         if (result.returncode or digest(result.stdout)!=item['sha256']
-            or digest((root/item['path']).read_bytes())!=item['sha256']):
+            or digest(read_review_source(root/item['path']))!=item['sha256']):
             raise ReviewBlocked('review inputs must match captured committed HEAD')
 
 
@@ -228,7 +234,8 @@ def require_trusted_design_records(root: Path, feature: str) -> None:
     for role in ROLES:
         record = json.loads(approval.design_review_record_path(root, feature, role).read_text())
         binding = record.get("reviewer_binding", "")
-        if not binding.startswith(("opencode_go:", "opencode_go_complete:")):
+        allowed=('opencode_go_complete:',) if feature=='PAI' else ('opencode_go:','opencode_go_complete:')
+        if not binding.startswith(allowed):
             raise ReviewBlocked("design record has no honest OpenCode provenance")
         result_path = lib.safe_repo_path(root, binding.split(":", 1)[1])
         if result_path is None or result_path.is_symlink():
@@ -289,7 +296,9 @@ def prepare_packet(root: Path, task: str, feature: str, role: str, tooling_revie
             content = "Authority hash retained in manifest; full feature brief/spec included."
         manifest[-1]['rendered_sha256']=digest(content.encode('utf-8'))
         manifest[-1]['rendered_bytes']=len(content.encode('utf-8'))
-        manifest[-1]['representation']='exact rendered section; original bytes/hash retained above; documented lossless normalization or declared scope projection'
+        manifest[-1]['representation']=('AST executable-source normalization; comments and original formatting omitted; original hash retained'
+            if ref in {"tools/opencode_role_review.py", "tools/run_codex_role.py", "tools/mimo_code_review.py", "tools/check_pai_plan.py", "tests/test_pai_plan.py", "tools/finalize_opencode_design_reviews.py", "tools/run_pai_acceptance.py"}
+            else 'exact rendered section; original hash retained; JSON factoring or declared scope projection where specified')
         sections.append(f"\n--- DOCUMENT: {ref} ---\n" + content)
     instruction = (
         f"You are an independent read-only {role} reviewer. Review the supplied "
@@ -305,6 +314,9 @@ def prepare_packet(root: Path, task: str, feature: str, role: str, tooling_revie
         "If more than twelve independent blockers remain, return STOP_SHIP and "
         "state the remaining unreviewed risk in not_verified; never call it PASS. "
         "Table JSON is lossless: resolve $N strings with symbols and map table rows to columns.\n"
+        "Budget internal analysis to at most 6000 tokens and reserve room for the final JSON. "
+        "For each blocker cite the exact function and a concrete reachable failing case. "
+        "Verify the alleged case against all existing guards; missing tests alone do not prove a runtime defect.\n"
     )
     if tooling_review:
         instruction += "Scope is the actual review transport/checker code only, not full feature design approval. Challenge budget/credentials, schema, provenance, source coverage, tamper guards and negative tests.\n"
@@ -381,6 +393,8 @@ def execute(args):
         return 0
     if planning_error:
         raise ReviewBlocked(planning_error)
+    if args.feature_id=='PAI' and not tooling_review and not slice_group:
+        raise ReviewBlocked('PAI design requires four phase reviews and complete aggregation')
     if not args.allow_provider_egress or args.call_cap != 1:
         raise ReviewBlocked("explicit provider scope and exactly one budgeted call required")
     tooling_audit_ref = None if tooling_review else require_tooling_audit(root)
@@ -486,6 +500,7 @@ def execute(args):
         "reviewed_spec_sections": [] if tooling_review else sorted(SPEC_GROUPS[slice_group]) if slice_group else list(range(16)),
         "requested_model": args.model, "observed_model": response["model"],
         "identity_semantics": "provider-reported metadata over TLS; no signed model attestation",
+        "evidence_integrity": "trusted workspace/Git; local hashes are not signed or append-only; privileged wholesale replacement is outside guarantees",
         "source_snapshot": "captured committed HEAD; unrelated dirty files allowed, dirty inputs denied",
         "extended_review_authority":authority,"runtime_dependencies":dependencies,
         "requested_effort": request_evidence['requested_effort'],

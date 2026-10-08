@@ -78,6 +78,7 @@ def finalize(root: Path, feature: str, role: str, results: list[Path]):
     manifest = {"schema_version":"assistant.opencode_complete_review.v1","role":role,
                 "feature_id":feature,"reviewed_head":head,"design_hashes":current_hashes,
                 "verdict":verdict,"tooling_audit_ref":tooling_audit_ref,
+                "evidence_integrity":"trusted workspace/Git; local hashes are not signed or append-only; privileged wholesale replacement is outside guarantees",
                 "coverage":{"slices":sorted(slices),"spec_sections":sorted(sections)},
                 "parts":[{"group":g,"result":p.relative_to(root).as_posix(),"sha256":digest(p.read_bytes()),
                           "verdict":r["verdict"]} for g,(r,p,_) in by_group.items()]}

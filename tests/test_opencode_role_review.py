@@ -354,7 +354,9 @@ def test_json_factoring_preserves_complete_registry_and_literal_references():
     document = {"rows": [
         {"id": 1, "scope": "a long repeated scope with every requirement", "path": "src/prm/runtime/worker.py"},
         {"id": 2, "scope": "a long repeated scope with every requirement", "path": "src/prm/runtime/worker.py"},
-    ], "literal": "$0", "flags": [False, None, 600]}
+    ], "literal": "$0", "flags": [False, None, 600],
+        "numeric_keys":{"0":"$2","2":{"$0":"$99"}},
+        "mixed":[{"a":"$99"},{"b":["$0","$2",{"nested":"$99"}]}]}
     packed = review.factor_json(document)
     def decode(node):
         if isinstance(node, str) and re.fullmatch(r"[$][0-9]+", node): return packed["symbols"][node[1:]]
@@ -796,3 +798,52 @@ def test_rehashed_packet_cannot_claim_the_original_source_projection(tmp_path,mo
     data=json.loads((run/'result.json').read_text());(run/'input_packet.txt').write_text('different omitted source')
     data['input_sha256']=review.digest((run/'input_packet.txt').read_bytes())
     with pytest.raises(review.ReviewBlocked,match='source projection'):review.verify_stored_packet(tmp_path,data,run)
+
+
+@pytest.mark.parametrize('change',['absent','renamed','symlink','hardlink'])
+def test_snapshot_rejects_untracked_or_linked_equal_content(tmp_path,change):
+    import os
+    import subprocess
+    subprocess.run(['git','init','-q',str(tmp_path)],check=True)
+    doc=tmp_path/'public.md';doc.write_text('synthetic public source')
+    subprocess.run(['git','-C',str(tmp_path),'add','public.md'],check=True)
+    subprocess.run(['git','-C',str(tmp_path),'-c','user.name=Synthetic','-c','user.email=synthetic@example.test','commit','-qm','synthetic'],check=True)
+    head=subprocess.check_output(['git','-C',str(tmp_path),'rev-parse','HEAD'],text=True).strip()
+    expected=review.digest(doc.read_bytes())
+    if change=='absent':
+        doc=tmp_path/'absent.md';doc.write_text('synthetic public source')
+    elif change=='renamed':doc=doc.rename(tmp_path/'renamed.md')
+    else:
+        alias=tmp_path/'alias.md';doc.rename(alias)
+        if change=='symlink':doc.symlink_to(alias)
+        else:os.link(alias,doc)
+    with pytest.raises((review.ReviewBlocked,OSError)):
+        review.verify_packet_snapshot(tmp_path,head,[{'path':doc.name,'sha256':expected}])
+
+
+def test_pai_single_full_run_denied_before_credentials(tmp_path,monkeypatch):
+    args,calls,records=setup_run(tmp_path,monkeypatch);args.feature_id='PAI'
+    with pytest.raises(review.ReviewBlocked,match='four phase reviews'):
+        review.execute(args)
+    assert calls==[] and records==[]
+
+
+@pytest.mark.parametrize('failure',['http','network','timeout'])
+def test_deep_review_failure_receipt_is_unknown_and_contains_no_exception_text(tmp_path,monkeypatch,capsys,failure):
+    from urllib.error import HTTPError,URLError
+    private='synthetic-private-error-body-never-record'
+    monkeypatch.setattr(mimo_code_review,'_git',lambda *args:'a'*40 if args[0]=='rev-parse' else 'synthetic public diff')
+    monkeypatch.setattr(mimo_code_review,'_api_key',lambda path:'synthetic-key')
+    def broken(**kwargs):
+        if failure=='http':raise HTTPError('https://example.test',502,private,{},None)
+        if failure=='network':raise URLError(private)
+        raise TimeoutError(private)
+    monkeypatch.setattr(mimo_code_review,'_call_model',broken)
+    out=tmp_path/'failure.json'
+    monkeypatch.setattr(sys,'argv',['mimo_code_review.py','--base','base','--out',str(out),'--allow-provider-egress','--call-cap','1'])
+    assert mimo_code_review.main()==1
+    evidence=json.loads(out.read_text())
+    assert evidence['provider_outcome']=='unknown' and evidence['usage'] is None
+    assert evidence['observed_model'] is None and evidence['provider_call_attempted'] is True
+    assert evidence['governed_role_receipt'] is False and evidence['human_authority'] is False
+    assert private not in out.read_text()+capsys.readouterr().out

@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "status": "native73_length_no_verdict_native74_allocated",
-  "current_approved_call_cap": 82,
-  "calls_consumed_including_failures": 73,
+  "status": "native74_STOP_preserved_native75_allocated",
+  "current_approved_call_cap": 83,
+  "calls_consumed_including_failures": 74,
   "proposed_total_cap": 34,
   "new_calls_maximum": 3,
   "third_call": "only if an actual new finding needs independent recheck",
@@ -1894,49 +1894,49 @@
   },
   "native_design_allocations": [
     {
-      "call_number": 75,
-      "role": "program_design_review",
-      "slice_group": "foundation",
-      "status": "allocated_not_invoked"
-    },
-    {
       "call_number": 76,
       "role": "program_design_review",
-      "slice_group": "product",
+      "slice_group": "foundation",
       "status": "allocated_not_invoked"
     },
     {
       "call_number": 77,
       "role": "program_design_review",
-      "slice_group": "sources",
+      "slice_group": "product",
       "status": "allocated_not_invoked"
     },
     {
       "call_number": 78,
       "role": "program_design_review",
-      "slice_group": "completeness",
+      "slice_group": "sources",
       "status": "allocated_not_invoked"
     },
     {
       "call_number": 79,
-      "role": "product_design_review",
-      "slice_group": "foundation",
+      "role": "program_design_review",
+      "slice_group": "completeness",
       "status": "allocated_not_invoked"
     },
     {
       "call_number": 80,
       "role": "product_design_review",
-      "slice_group": "product",
+      "slice_group": "foundation",
       "status": "allocated_not_invoked"
     },
     {
       "call_number": 81,
       "role": "product_design_review",
-      "slice_group": "sources",
+      "slice_group": "product",
       "status": "allocated_not_invoked"
     },
     {
       "call_number": 82,
+      "role": "product_design_review",
+      "slice_group": "sources",
+      "status": "allocated_not_invoked"
+    },
+    {
+      "call_number": 83,
       "role": "product_design_review",
       "slice_group": "completeness",
       "status": "allocated_not_invoked"
@@ -1981,8 +1981,15 @@
   },
   "native_tooling_recheck_74": {
     "call_number": 74,
-    "status": "allocated_not_invoked",
+    "status": "native_tooling_completed",
     "purpose": "fresh same-source native recheck after default-reasoning output exhaustion; explicit thinking-disabled mode",
+    "output_cap": 16000,
+    "timeout": 900
+  },
+  "native_tooling_recheck_75": {
+    "call_number": 75,
+    "status": "allocated_not_invoked",
+    "purpose": "provider-default reasoning native audit of concrete74 fixes and executable factual resolutions; final JSON budget explicitly requested",
     "output_cap": 16000,
     "timeout": 900
   }

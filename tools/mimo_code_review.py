@@ -16,6 +16,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import tempfile
 import time
 import uuid
 from typing import Any, Mapping
@@ -244,6 +245,33 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _write_report(path: Path, report: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(mode='w',encoding='utf-8',dir=path.parent,delete=False) as target:
+        temporary=Path(target.name)
+        try:
+            target.write(json.dumps(report,ensure_ascii=False,indent=2)+'\n')
+            target.flush()
+            os.fsync(target.fileno())
+        except BaseException:
+            temporary.unlink(missing_ok=True)
+            raise
+    try:os.replace(temporary,path)
+    finally:temporary.unlink(missing_ok=True)
+
+
+def _transport_failure(args, head_sha, base_sha, prompt, error_kind, http_status=None):
+    report={'status':'provider_error','error_kind':error_kind,'provider_outcome':'unknown',
+        'provider':'opencode_go','requested_model':args.model,'observed_model':None,
+        'requested_effort':'not_requested','observed_effort':'unknown','usage':None,'cost':'unknown',
+        'head_sha':head_sha,'base_sha':base_sha,'input_sha256':hashlib.sha256(prompt.encode()).hexdigest(),
+        'call_cap':1,'provider_call_attempted':True,'human_authority':False,'governed_role_receipt':False,
+        'http_status':http_status if type(http_status)is int and 100<=http_status<=599 else None}
+    _write_report(args.out,report)
+    print(json.dumps({'status':'provider_error','error_kind':error_kind,'provider_outcome':'unknown'}))
+    return 1
+
+
 def main() -> int:
     args = build_parser().parse_args()
     head_sha = _git("rev-parse", args.head).strip()
@@ -276,11 +304,11 @@ def main() -> int:
             prompt=prompt, timeout=args.timeout, max_output_tokens=8000, stream=True,
         )
     except HTTPError as error:
-        print(json.dumps({"status": "provider_error", "error": f"http_{error.code}"}))
-        return 1
-    except URLError as error:
-        print(json.dumps({"status": "provider_error", "error": f"url_{type(error.reason).__name__}"}))
-        return 1
+        return _transport_failure(args,head_sha,base_sha,prompt,'http',error.code)
+    except URLError:
+        return _transport_failure(args,head_sha,base_sha,prompt,'network')
+    except Exception:
+        return _transport_failure(args,head_sha,base_sha,prompt,'incomplete_transport')
     if payload.get('model') != args.model or len(payload.get('choices', [])) != 1 or payload['choices'][0].get('finish_reason') != 'stop':
         print(json.dumps({"status": "invalid_identity_or_completion"}))
         return 1
@@ -313,8 +341,7 @@ def main() -> int:
         "diff_chars": len(diff),
         "findings": findings,
     }
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    _write_report(args.out,report)
     print(json.dumps({
         "status": "reviewed", "verdict": findings.get("verdict"),
         "findings": len(findings.get("findings") or []), "out": str(args.out),

@@ -107,3 +107,13 @@ blocks before credentials/provider calls. Historical bootstrap reports and
 synthetic diagnostics cannot unlock this gate. Any critical-source/policy change
 requires fresh independent re-audit before design receipts are consumed.
 This technical gate never grants human design, live or release authority.
+
+The supported approval route is tools/playbook.py and its repository proxies.
+Direct upstream imports/execution by a privileged operator are outside this
+route; local hashes do not supply signed or append-only evidence. Universal
+enforcement inside arbitrary direct kit consumers needs the separately reviewed
+upstream hook/pin proposal in verification/PAI-upstream-gate-proposal.md.
+PAI role acceptance requires all four genuine phase parts through the complete
+aggregator; a single full-design request cannot publish a PAI role record.
+Scoped strict test runs report scoped verification only; full-spec acceptance
+requires --require-spec-matrix, as bound in the pai-complete tier.

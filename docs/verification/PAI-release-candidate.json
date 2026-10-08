@@ -1712,14 +1712,14 @@
     "program_design_review": "pending_native_complete_aggregation",
     "product_design_review": "pending_native_complete_aggregation",
     "slice_test_critic_privacy_maintainability": "non-Codex governed adapter/receipts remain pending; advisory source rechecks are not substituted",
-    "tooling": "native73 default-reasoning recheck pending; native72 STOP includes actual STOP/projection fixes and direct-consumer policy boundary"
+    "tooling": "native74 STOP preserved; executable factual resolution and concrete post74 changes await independent native75 default-reasoning audit"
   },
   "live_provider_evidence": false,
   "human_design_approval": false,
   "human_visual_usefulness_acceptance": false,
   "production_deployment": false,
   "remaining_gates": [
-    "Close genuine native tooling audit and actual all-four-group program/product design sets; runtime full320/focused673/retrofit150 and latest tooling106 passed at named snapshots.",
+    "Close genuine native tooling audit and all-four-group program/product design sets; runtime320/focused678/retrofit150 and latest scoped117 passed at named snapshots.",
     "Preserve any native STOP/P0/P1 until corrected and independently rechecked.",
     "Exact hash-bound owner design decision through the pinned workflow; unsupported governed acceptance roles remain separate.",
     "PAI-27 exact source/account/provider/operation/private-egress/budget canary scope and actual observations.",
@@ -1730,7 +1730,7 @@
   "source_boundary_closure": "Latest media budget/cancel #68 SHIP_OK; other unchanged runtime source closures as recorded.",
   "changed_files": {
     "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
-    "head_sha": "37221c01782831611f2038fa9085c85c50274b7b",
+    "head_sha": "14730046059589e13089b5b342ca7b5c64478dc8",
     "paths": [
       ".gitignore",
       ".playbook/instruction_manifest.json",
@@ -1799,12 +1799,15 @@
       "docs/verification/PAI-implementation-pass-20261007.md",
       "docs/verification/PAI-local-code-receipt-20261007.json",
       "docs/verification/PAI-native-tooling-66-response.md",
+      "docs/verification/PAI-native-tooling-69-response.md",
       "docs/verification/PAI-next-review-packets.json",
       "docs/verification/PAI-phase-c-review-failure.json",
       "docs/verification/PAI-phase-d-review-24.json",
       "docs/verification/PAI-phase-e-review-25.json",
       "docs/verification/PAI-phase-f-review-26.json",
       "docs/verification/PAI-progress.md",
+      "docs/verification/PAI-release-candidate.json",
+      "docs/verification/PAI-release-candidate.md",
       "docs/verification/PAI-render-recheck-27.json",
       "docs/verification/PAI-review-30-response.md",
       "docs/verification/PAI-review-31-response.md",
@@ -1868,11 +1871,16 @@
       "docs/verification/PAI-review-continuation-67.json",
       "docs/verification/PAI-review-continuation-68.json",
       "docs/verification/PAI-review-continuation-69.json",
+      "docs/verification/PAI-review-continuation-70.json",
+      "docs/verification/PAI-review-continuation-71.json",
+      "docs/verification/PAI-review-continuation-72.json",
+      "docs/verification/PAI-review-continuation-73.json",
       "docs/verification/PAI-review-continuation.json",
       "docs/verification/PAI-synthetic-requirement-evidence-20261007.json",
       "docs/verification/PAI-tooling-maintenance-packet.md",
       "docs/verification/PAI-tooling-review-41-response.md",
       "docs/verification/PAI-tooling-review-43-response.md",
+      "docs/verification/PAI-upstream-gate-proposal.md",
       "docs/verification/PAI-validation-20261007.json",
       "docs/verification/PAI-validation-20261008.json",
       "docs/verification/PAI-verification-20261007.md",
@@ -1989,8 +1997,19 @@
       "tools/run_pai_acceptance.py",
       "tools/test_tiers.py"
     ],
-    "count": 256,
-    "diff_sha256": "a0d54ca8e7fe6dd6a8a598ffe1bb2c34f05b13cc2637f07575823cfd1f10f1ad"
+    "note": "Exact committed path inventory at the recorded snapshot; later evidence-only handoff commit recorded separately."
   },
-  "upstream_enforcement_proposal": "docs/verification/PAI-upstream-gate-proposal.md"
+  "upstream_enforcement_proposal": "docs/verification/PAI-upstream-gate-proposal.md",
+  "regression_floor": {
+    "source_snapshot": "0110ec0",
+    "result": "678 passed in 147.72 s",
+    "log_path": ".playbook-artifacts/pai-validation-20261008/focused-prm-0110ec0.log",
+    "log_sha256": "64c737456d76f8973e7dbc9c16a56f2e8e10fa12899cb63fdc87f774033902b0"
+  },
+  "tooling_tests": {
+    "source_snapshot": "final post74 source before commit",
+    "result": "117 passed in 7.12 s",
+    "log_path": ".playbook-artifacts/pai-validation-20261008/tooling-75-final.log",
+    "log_sha256": "1d25360584a751167911aaef84cff203b8e7e9d414c9a0f2c10415aad89953e8"
+  }
 }

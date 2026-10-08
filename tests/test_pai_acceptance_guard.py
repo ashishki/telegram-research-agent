@@ -56,3 +56,14 @@ def test_no_implicit_historical_suite_or_filter_bypass():
         result = subprocess.run([sys.executable, str(ROOT / 'tools/run_pai_acceptance.py'), *args], capture_output=True, text=True)
         assert result.returncode == 2
         assert 'usage:' in result.stderr
+
+
+def test_malformed_and_parameterized_scenario_nodes_have_explicit_results(tmp_path):
+    report=tmp_path/'report.xml'
+    report.write_text('<testsuite><testcase classname="tests.test_pai_end_to_end" name="test_chat[param]"/></testsuite>')
+    row={'scenario_id':'SC13.2-01','synthetic_test_node':'tests/test_pai_end_to_end.py::test_chat[param]'}
+    matrix={'requirements':[],'scenarios':[row]}
+    assert guard.verify_report(report,matrix=matrix)[0] is True
+    for node in ('tests/test_pai_end_to_end.py::Class::test_chat','malformed','tests/test_pai_end_to_end.py::'):
+        row['synthetic_test_node']=node
+        assert guard.verify_report(report,matrix=matrix)==(False,'invalid binding test node')
