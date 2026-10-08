@@ -1,4 +1,4 @@
-# Current handoff — local runtime tested; native tooling recheck76 allocated
+# Current handoff — local runtime tested; native tooling recheck77 allocated
 
 2026-10-08. Branch docs/personal-assistant-blueprint-playbook-20260918.
 Owner authorizes safe local PAI completion and necessary Mimo review increases
@@ -7,8 +7,8 @@ Exact human design, live/private-product egress, production, services, timers
 and release remain separate. Preserve master, other owner work and UTD/Astra.
 
 Runtime source caf97a7: pai-complete320 passed962.74s, all69 exact named cases
-and ten scenarios, zero skips/failures; retrofit150 passed23.11s. Latest tooling
-source0110ec0: scoped108 passed6.31s and focused-prm678 passed147.72s.
+and ten scenarios, zero skips/failures; retrofit150 passed23.11s. Latest tooling source5d6d0f2: scoped117 passed7.12s. Focused-prm678
+passed147.72s at0110ec0; later changes are tooling-only.
 Exact commands/snapshots/preserved failures/log hashes are in
 PAI-validation-20261008.json. Use .venv-pai/bin/python, PYTHONPATH=src and
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1; no full historical pytest suite.
@@ -29,8 +29,8 @@ See PAI-review-continuation-73.json; no design consumption is unlocked.
 Native74 returned STOP; factual resolutions and concrete improvements are in
 PAI-native-tooling-74-response.md. 117 final scoped tests passed7.12s at5d6d0f2. Native75 timed out901.164s,
 no verdict/usage/observed identity. Native76 is allocated for a fresh same-model
-audit with explicit thinking-disabled mode, bounds16000 output/900s, one call, no automatic retry. 75 calls consumed;
-current allocation84 includes eight future program/product design parts77..84.
+audit with explicit thinking-disabled mode, bounds16000 output/900s, one call, no automatic retry. 76 calls consumed;
+current allocation85 includes eight future program/product design parts78..85.
 Never mutate HEAD, critical sources or native packet docs during a request.
 Authorized key path is Georgia-Community-Navigator/secrets/openrouter_api_key;
 never print or copy the value. Record requested/observed mode/model honestly.
@@ -55,3 +55,10 @@ scoped commit/push; last remote push5d6d0f2. No merge/deploy. PAI-27/28/29 acces
 cutover and pilot packets exist as drafts; conditional30/31 triggers unmeasured.
 No private corpus/account canary or product paid API used. Old goal API is blocked
 with no resume method; do not create duplicate or declare whole programme done.
+
+Native76 STOP sole P0 EOF allegation was actually reproduced against its original
+c4b689b function: all3 cases EOF denied, no accepted return; see committed
+PAI-native76-eof-reproducer.py and dated ledger. Current EOF check moved before
+byte counting; 3 exact native-pipeline regressions assert no result/design record.
+Scoped120 passed7.45s before final packet registration. Native77 allocated
+thinking-disabled independent recheck at next committed source; never self-close76.

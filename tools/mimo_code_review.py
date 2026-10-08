@@ -144,17 +144,17 @@ def _read_review_stream(response, model: str, deadline: float) -> dict[str, Any]
         # SSE repeats JSON metadata for every chunk; its wire envelope is
         # larger than the same bounded final answer in one JSON response.
         line = response.readline(min(65_537, 8_388_609 - wire_bytes))
-        wire_bytes += len(line)
-        if time.monotonic() > deadline:
-            raise TimeoutError("review_stream_deadline")
-        if wire_bytes > 8_388_608 or len(line) > 65_536:
-            raise ValueError("review_response_too_large")
         if not line:
             error = ValueError("review_stream_incomplete")
             error.review_stream_state = {"wire_bytes": wire_bytes, "final_text_bytes": text_bytes,
                                          "finish_reason": finish,
                                          "terminal_event": "eof"}
             raise error
+        wire_bytes += len(line)
+        if time.monotonic() > deadline:
+            raise TimeoutError("review_stream_deadline")
+        if wire_bytes > 8_388_608 or len(line) > 65_536:
+            raise ValueError("review_response_too_large")
         line = line.strip()
         if not line or line.startswith(b":"):
             continue

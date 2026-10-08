@@ -1712,14 +1712,14 @@
     "program_design_review": "pending_native_complete_aggregation",
     "product_design_review": "pending_native_complete_aggregation",
     "slice_test_critic_privacy_maintainability": "non-Codex governed adapter/receipts remain pending; advisory source rechecks are not substituted",
-    "tooling": "native75 timeout901.164s, no valid verdict/observed model/usage; native76 thinking-disabled allocated to independently assess current post74 fixes"
+    "tooling": "native76 STOP sole EOF allegation; original committed function and current native pipeline deny all exact cases; current EOF order clarified; fresh native77 required, not self-closed"
   },
   "live_provider_evidence": false,
   "human_design_approval": false,
   "human_visual_usefulness_acceptance": false,
   "production_deployment": false,
   "remaining_gates": [
-    "Close genuine native tooling audit and all-four-group program/product design sets; runtime320/focused678/retrofit150 and latest scoped117 passed at named snapshots.",
+    "Close genuine native tooling audit and all-four-group program/product design sets; runtime320/focused678/retrofit150 and latest scoped120 passed at named snapshots.",
     "Preserve any native STOP/P0/P1 until corrected and independently rechecked.",
     "Exact hash-bound owner design decision through the pinned workflow; unsupported governed acceptance roles remain separate.",
     "PAI-27 exact source/account/provider/operation/private-egress/budget canary scope and actual observations.",
@@ -2009,10 +2009,10 @@
     "log_sha256": "64c737456d76f8973e7dbc9c16a56f2e8e10fa12899cb63fdc87f774033902b0"
   },
   "tooling_tests": {
-    "source_snapshot": "final post74 source before commit",
-    "result": "117 passed in 7.12 s",
-    "log_path": ".playbook-artifacts/pai-validation-20261008/tooling-75-final.log",
-    "log_sha256": "1d25360584a751167911aaef84cff203b8e7e9d414c9a0f2c10415aad89953e8"
+    "source_snapshot": "final post76 code before commit",
+    "result": "120 passed in 6.24 s",
+    "log_path": ".playbook-artifacts/pai-validation-20261008/tooling-77-final.log",
+    "log_sha256": "48bcff31126a1093f0313762b407076bdc1087b0ece07314e3558799ca6879af"
   },
   "last_scoped_push": {
     "head_sha": "5d6d0f2f45005e2638683dc08340fa2a7bc5a907",

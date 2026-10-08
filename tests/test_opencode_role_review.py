@@ -847,3 +847,25 @@ def test_deep_review_failure_receipt_is_unknown_and_contains_no_exception_text(t
     assert evidence['observed_model'] is None and evidence['provider_call_attempted'] is True
     assert evidence['governed_role_receipt'] is False and evidence['human_authority'] is False
     assert private not in out.read_text()+capsys.readouterr().out
+
+
+@pytest.mark.parametrize('finish',['none','stop','empty'])
+def test_exact_eof_after_complete_json_cannot_publish_native_review(tmp_path,monkeypatch,finish):
+    real_model=mimo_code_review._call_model
+    args,calls,records=setup_run(tmp_path,monkeypatch)
+    monkeypatch.setattr(mimo_code_review,'_call_model',real_model)
+    verdict=response()['choices'][0]['message']['content']
+    events=[] if finish=='empty' else [stream_event({'content':verdict})]
+    if finish=='stop':events.append(stream_event(finish='stop'))
+    wire=stream_response(events)
+    expected_bytes=len(wire.data.getvalue())
+    monkeypatch.setattr(mimo_code_review,'urlopen',lambda request,timeout:wire)
+    with pytest.raises(ValueError,match='review_stream_incomplete') as error:
+        review.execute(args)
+    state=error.value.review_stream_state
+    assert state['terminal_event']=='eof' and state['wire_bytes']==expected_bytes
+    assert state['finish_reason']==('stop' if finish=='stop' else None)
+    assert not list((tmp_path/'.playbook-artifacts/opencode-runs').glob('*/result.json'))
+    failure=json.loads(next((tmp_path/'.playbook-artifacts/opencode-runs').glob('*/failure.json')).read_text())
+    assert failure['status']=='no_valid_verdict' and failure['provider_outcome']=='unknown'
+    assert failure['stream_state']['terminal_event']=='eof' and records==[]

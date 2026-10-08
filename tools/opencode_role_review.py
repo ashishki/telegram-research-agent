@@ -57,6 +57,7 @@ PACKET_REFS = (
 )
 TOOLING_REFS = (
     'docs/verification/PAI-native-tooling-74-response.md',
+    'docs/verification/PAI-native76-eof-reproducer.py',
     '.playbook/upstream.lock.json', 'requirements-playbook.txt',
     'tools/render_codex_exec_prompt.py', 'tools/render_slice_context.py',
     "docs/REVIEW_POLICY.md", "tools/playbook.py", "tools/run_codex_role.py",

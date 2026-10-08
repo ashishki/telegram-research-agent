@@ -488,3 +488,7 @@ Native tooling review #74 reserved under ongoing authority at 14730046059589e130
 Native tooling review #75 reserved under ongoing authority at 5d6d0f2f45005e2638683dc08340fa2a7bc5a907; one bounded request, not_requested, no automatic retry.
 
 Native75 attempted/consumed at5d6d0f2; TimeoutError901.164s, no valid verdict/observed identity/usage, provider outcome/cost unknown. 75 calls consumed including failures. Native76 explicitly allocated under ongoing authority with thinking_disabled, unchanged critical source, bounds16000/900; current cap84 includes eight later design parts77..84 only after accepted audit.
+
+Native tooling review #76 reserved under ongoing authority at c4b689b03c5fc38070e87e57e85543c68b58e90d; one bounded request, thinking_disabled, no automatic retry.
+
+Native76 STOP sole EOF allegation preserved. Exact original c4b689b function executed on BytesIO EOF: empty, completeJSON and completeJSON+stop all denied, wire0/222/321, no returned verdict. Current terminal check moved before counting; three native transport/execute cases emit failure only, no design writer. Final scoped120passed6.24s; native77 explicitly allocated thinking-disabled fresh independent recheck. 76 calls consumed, allocation85 includes eight future design parts78..85.

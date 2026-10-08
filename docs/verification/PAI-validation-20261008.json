@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "date": "2026-10-08",
-  "status": "runtime320_focused678_tooling117_native75_timeout",
+  "status": "runtime320_focused678_tooling120_native76_STOP_independent_recheck_required",
   "runtime_head": "caf97a7",
   "checks": [
     {
@@ -433,6 +433,30 @@
       "exit_code": 0,
       "log_path": ".playbook-artifacts/pai-validation-20261008/tooling-75-final.log",
       "log_sha256": "1d25360584a751167911aaef84cff203b8e7e9d414c9a0f2c10415aad89953e8"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python -m pytest -q tests/test_opencode_role_review.py tests/test_pai_acceptance_guard.py tests/test_playbook_bridge.py tests/test_pai_plan.py",
+      "result": "120 passed in 7.45 s",
+      "source_snapshot": "post76 EOF order/current-native publication negatives; before original reproducer registration",
+      "exit_code": 0,
+      "log_path": ".playbook-artifacts/pai-validation-20261008/tooling-76-eof.log",
+      "log_sha256": "32ae0b116e73964ec60c7dc32e09f31256d682712ebe82e85cc9af7a90b6355c"
+    },
+    {
+      "command": ".venv-pai/bin/python docs/verification/PAI-native76-eof-reproducer.py",
+      "result": "3 original c4b689b stream-reader cases EOF denied; exact empty/json-only/json+stop without DONE; zero acceptance/publishing",
+      "source_snapshot": "exact c4b689b function loaded from committed Git blob; current control harness",
+      "exit_code": 0,
+      "log_path": ".playbook-artifacts/pai-validation-20261008/native76-original-eof.log",
+      "log_sha256": "fcb45044d49fb955bcafbb1259fb5ba2f4338331c72a7777f4255f83e29fe03b"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python -m pytest -q tests/test_opencode_role_review.py tests/test_pai_acceptance_guard.py tests/test_playbook_bridge.py tests/test_pai_plan.py",
+      "result": "120 passed in 6.24 s",
+      "source_snapshot": "final post76 code/tests/factual packet/reproducer registration before commit",
+      "exit_code": 0,
+      "log_path": ".playbook-artifacts/pai-validation-20261008/tooling-77-final.log",
+      "log_sha256": "48bcff31126a1093f0313762b407076bdc1087b0ece07314e3558799ca6879af"
     }
   ],
   "source_notes": "Tests preceded the named source commits; intermediate worktree observations are not projected onto later changes. Whole tier precedes foundation/Watch/delivery fixes. No full historical pytest.",

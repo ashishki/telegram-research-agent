@@ -3,7 +3,7 @@
   "slice_id": "PAI-00",
   "kind": "declared_scope_not_completion",
   "file_limit": 72,
-  "expected_count": 70,
+  "expected_count": 71,
   "paths": [
     ".playbook/instruction_manifest.json",
     ".playbook/project_verification.json",
@@ -44,6 +44,7 @@
     "docs/verification/PAI-native-tooling-66-response.md",
     "docs/verification/PAI-native-tooling-69-response.md",
     "docs/verification/PAI-native-tooling-74-response.md",
+    "docs/verification/PAI-native76-eof-reproducer.py",
     "docs/verification/PAI-progress.md",
     "docs/verification/PAI-release-candidate.json",
     "docs/verification/PAI-release-candidate.md",
