@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "status": "native_design_65_STOP_preserved_factual_bindings_and_checker_reaudit_pending",
-  "current_approved_call_cap": 76,
-  "calls_consumed_including_failures": 66,
+  "status": "native67_timeout_no_verdict_source68_independent_recheck",
+  "current_approved_call_cap": 77,
+  "calls_consumed_including_failures": 68,
   "proposed_total_cap": 34,
   "new_calls_maximum": 3,
   "third_call": "only if an actual new finding needs independent recheck",
@@ -1801,6 +1801,45 @@
       ],
       "source_bytes": 158969,
       "instructions": "Resolve every #63 P1 independently against current sources. record_accounting_unconfirmed persists exact bounded accepted/accounting-status/usage-missing metadata in existing durable owner model attempt without model text; underlying policy operations already persist actual=None and conservative charges. ModelAccountingReceipt remains known accepted with explicit unconfirmed accounting/ref/retryfalse, not a claim of fully settled billing. If marker write also fails, typed ModelAccountingUnconfirmed carries accepted receipt; supplied Chat caller catches it and persists actual answer/accounting_status in normal fenced result. Existing callers may inspect accepted text without asserting price, so do not equate delivery_outcome accepted with billing settled. ScopePreparationUnknown now declares attempt_ref/external_call_attempted at constructor; client constructs preserved type. Actual tests 28 passed96.67s plus2 marker recovery13.07s with real HTTP/isolated PG. Application source is an explicit original-line-number excerpt, other supplied sources complete; no claimed review of omitted legacy application. Consistent SHIP_OK if no actual P0/P1, otherwise executable counterexample. No human/workflow/live approval."
+    },
+    {
+      "purpose": "media_local_validation_cancel_recheck",
+      "base_sha": "baaf3a2",
+      "sources": [
+        {
+          "path": "src/prm/runtime/media.py",
+          "sha256": "21cbef9e274d9617248c736cc381a8be4c7c78f23e93352abd704baa10f2f50f",
+          "bytes": 13430
+        },
+        {
+          "path": "src/prm/runtime/composition.py",
+          "sha256": "725e9201270ba4d55a50d41c4f09c3620be4be0cd646c99108e4445c4c50803d",
+          "bytes": 48187,
+          "line_ranges": [
+            [
+              43,
+              100
+            ]
+          ]
+        },
+        {
+          "path": "src/prm/storage/policy.py",
+          "sha256": "9723e8aaffd3fa5b34cd8c3abfe6e70bfc65a17b87a939dfcd065887b5c57a7e",
+          "bytes": 30275
+        },
+        {
+          "path": "tests/test_pai_media_runtime.py",
+          "sha256": "2e78378cd46a37289c9aa841345480c860bbcf2bf5073035546e0d5ec66d1a1d",
+          "bytes": 19372
+        },
+        {
+          "path": "src/prm/storage/jobs.py",
+          "sha256": "539b441477e31952a7607621822d454b8df60ede19432d6a4b0bc3473c83df66",
+          "bytes": 15386
+        }
+      ],
+      "source_bytes": 126650,
+      "instructions": "Focused independent review of the concrete latest media changes only: release still-unprepared query/context reservations in finally on local body-size validation failure, without resetting prepared/unknown operations; fence voice/media again after download and fence media after local extraction and immediately before text model transport via passed guard. Actual tests43passed75.67s include oversized multibyte page context => no HTTP/all reserved and consumed zero, and actual job cancelled during local extraction => StateConflict/no model operations or HTTP. Existing #52 media scope/page/download closure and #64 model/accounting closure remain separate exact snapshots; do not claim omitted composition review outside declared lines. Recheck concrete budget/cancellation changes; report executable P0/P1 only with consistent SHIP_OK/FIX_P1_FIRST/STOP_SHIP. No human/workflow/live authority."
     }
   ],
   "authority_exclusions": [
@@ -1855,49 +1894,49 @@
   },
   "native_design_allocations": [
     {
-      "call_number": 69,
-      "role": "program_design_review",
-      "slice_group": "foundation",
-      "status": "allocated_not_invoked"
-    },
-    {
       "call_number": 70,
       "role": "program_design_review",
-      "slice_group": "product",
+      "slice_group": "foundation",
       "status": "allocated_not_invoked"
     },
     {
       "call_number": 71,
       "role": "program_design_review",
-      "slice_group": "sources",
+      "slice_group": "product",
       "status": "allocated_not_invoked"
     },
     {
       "call_number": 72,
       "role": "program_design_review",
-      "slice_group": "completeness",
+      "slice_group": "sources",
       "status": "allocated_not_invoked"
     },
     {
       "call_number": 73,
-      "role": "product_design_review",
-      "slice_group": "foundation",
+      "role": "program_design_review",
+      "slice_group": "completeness",
       "status": "allocated_not_invoked"
     },
     {
       "call_number": 74,
       "role": "product_design_review",
-      "slice_group": "product",
+      "slice_group": "foundation",
       "status": "allocated_not_invoked"
     },
     {
       "call_number": 75,
       "role": "product_design_review",
-      "slice_group": "sources",
+      "slice_group": "product",
       "status": "allocated_not_invoked"
     },
     {
       "call_number": 76,
+      "role": "product_design_review",
+      "slice_group": "sources",
+      "status": "allocated_not_invoked"
+    },
+    {
+      "call_number": 77,
       "role": "product_design_review",
       "slice_group": "completeness",
       "status": "allocated_not_invoked"
@@ -1912,5 +1951,10 @@
     "call_number": 67,
     "status": "allocated_not_invoked",
     "purpose": "committed-source/data-class/report-schema hardening after native66"
+  },
+  "native_tooling_recheck_69": {
+    "call_number": 69,
+    "status": "allocated_not_invoked",
+    "purpose": "fresh bounded native audit after #67 timeout; #68 independently closed latest media fixes"
   }
 }

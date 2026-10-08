@@ -3,7 +3,7 @@
   "slice_id": "PAI-00",
   "kind": "declared_scope_not_completion",
   "file_limit": 64,
-  "expected_count": 60,
+  "expected_count": 61,
   "paths": [
     ".playbook/instruction_manifest.json",
     ".playbook/project_verification.json",
@@ -48,6 +48,7 @@
     "docs/verification/PAI-review-continuation-44.json",
     "docs/verification/PAI-review-continuation-66.json",
     "docs/verification/PAI-review-continuation-67.json",
+    "docs/verification/PAI-review-continuation-69.json",
     "docs/verification/PAI-review-continuation.json",
     "docs/verification/PAI-tooling-maintenance-packet.md",
     "docs/verification/PAI-working-tree-evidence.json",

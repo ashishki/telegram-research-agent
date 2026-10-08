@@ -1,9 +1,17 @@
 {
   "schema_version": 1,
   "call_number": 67,
-  "status": "native_tooling_allocated_not_invoked",
-  "provider": "opencode_go",
-  "requested_model": "mimo-v2.6-pro",
+  "status": "native_tooling_no_valid_verdict",
+  "native_result_path": ".playbook-artifacts/opencode-runs/opencode-bff04761a12140e5848ec13265e49c60/failure.json",
+  "native_result_sha256": "7478960f840f3c44b7309afda4bd007b61d8ec6c62eac5bbe3afbf0db629b7e4",
+  "provider_call_attempted": true,
   "human_authority": false,
-  "provider_call_attempted": false
+  "native_tooling_receipt": false,
+  "design_approval_record": false,
+  "error_type": "TimeoutError",
+  "requested_model": "mimo-v2.6-pro",
+  "observed_model": null,
+  "reviewed_head": "caf97a709b100245f8a3f4b68ddeb1ec8562aa2c",
+  "input_sha256": "55e6047edde13700d822a1ea2a64990fc1698ce7df4aae0c5e08f99a06a4b3bf",
+  "timeout_seconds": 900
 }

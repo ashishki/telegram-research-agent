@@ -477,3 +477,6 @@ Review #64 reserved/attempted, 64 consumed under ongoing scoped authority includ
 Purpose: model_63_durable_accounting_recheck; source HEAD baaf3a2a971ad19d44ebc8e2e4d2d928607ef5d5. No automatic retry.
 
 Native design review #65 allocated under ongoing authority; program_design_review/foundation; HEAD ecb951615889bb5258bc6633dc4365b74da2e7c4; one bounded request, no automatic retry.
+
+Review #68 reserved/attempted, 68 consumed under ongoing scoped authority including failures.
+Purpose: media_local_validation_cancel_recheck; source HEAD caf97a709b100245f8a3f4b68ddeb1ec8562aa2c. No automatic retry.
