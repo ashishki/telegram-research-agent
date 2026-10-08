@@ -484,3 +484,7 @@ Purpose: media_local_validation_cancel_recheck; source HEAD caf97a709b100245f8a3
 2026-10-08 continuation: native #69/#70/#71/#72 STOP and #73 length failure are preserved in their numbered immutable-result references. 73 calls consumed including failures. #72 contradictory-audit and input-projection defects fixed at 0110ec0; 108 scoped tooling tests and 678 focused regressions passed. Native #74 allocated for explicit thinking-disabled same-Mimo recheck after #73 consumed its complete 16000 output allowance without a verdict. Total current allocation82 includes eight design parts75..82 only after accepted tooling; no automatic retry or model substitution.
 
 Native tooling review #74 reserved under ongoing authority at 14730046059589e13089b5b342ca7b5c64478dc8; one bounded request, thinking_disabled, no automatic retry.
+
+Native tooling review #75 reserved under ongoing authority at 5d6d0f2f45005e2638683dc08340fa2a7bc5a907; one bounded request, not_requested, no automatic retry.
+
+Native75 attempted/consumed at5d6d0f2; TimeoutError901.164s, no valid verdict/observed identity/usage, provider outcome/cost unknown. 75 calls consumed including failures. Native76 explicitly allocated under ongoing authority with thinking_disabled, unchanged critical source, bounds16000/900; current cap84 includes eight later design parts77..84 only after accepted audit.

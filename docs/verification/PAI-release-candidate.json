@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "status": "local_runtime_synthetic_verified_formal_review_pending",
-  "candidate_head": "0110ec0",
+  "candidate_head": "5d6d0f2f45005e2638683dc08340fa2a7bc5a907",
   "runtime_change_commit": "caf97a7",
   "canonical_matrix_ref": "docs/design/PAI.requirements.json",
   "canonical_matrix_sha256": "32d8dbbc05cb690887a37ba3cc63f5510108b0bc785ef7ea118330363e5a5ee7",
@@ -1712,7 +1712,7 @@
     "program_design_review": "pending_native_complete_aggregation",
     "product_design_review": "pending_native_complete_aggregation",
     "slice_test_critic_privacy_maintainability": "non-Codex governed adapter/receipts remain pending; advisory source rechecks are not substituted",
-    "tooling": "native74 STOP preserved; executable factual resolution and concrete post74 changes await independent native75 default-reasoning audit"
+    "tooling": "native75 timeout901.164s, no valid verdict/observed model/usage; native76 thinking-disabled allocated to independently assess current post74 fixes"
   },
   "live_provider_evidence": false,
   "human_design_approval": false,
@@ -1730,7 +1730,7 @@
   "source_boundary_closure": "Latest media budget/cancel #68 SHIP_OK; other unchanged runtime source closures as recorded.",
   "changed_files": {
     "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
-    "head_sha": "14730046059589e13089b5b342ca7b5c64478dc8",
+    "head_sha": "5d6d0f2f45005e2638683dc08340fa2a7bc5a907",
     "paths": [
       ".gitignore",
       ".playbook/instruction_manifest.json",
@@ -1800,6 +1800,7 @@
       "docs/verification/PAI-local-code-receipt-20261007.json",
       "docs/verification/PAI-native-tooling-66-response.md",
       "docs/verification/PAI-native-tooling-69-response.md",
+      "docs/verification/PAI-native-tooling-74-response.md",
       "docs/verification/PAI-next-review-packets.json",
       "docs/verification/PAI-phase-c-review-failure.json",
       "docs/verification/PAI-phase-d-review-24.json",
@@ -1875,6 +1876,7 @@
       "docs/verification/PAI-review-continuation-71.json",
       "docs/verification/PAI-review-continuation-72.json",
       "docs/verification/PAI-review-continuation-73.json",
+      "docs/verification/PAI-review-continuation-74.json",
       "docs/verification/PAI-review-continuation.json",
       "docs/verification/PAI-synthetic-requirement-evidence-20261007.json",
       "docs/verification/PAI-tooling-maintenance-packet.md",
@@ -2011,5 +2013,10 @@
     "result": "117 passed in 7.12 s",
     "log_path": ".playbook-artifacts/pai-validation-20261008/tooling-75-final.log",
     "log_sha256": "1d25360584a751167911aaef84cff203b8e7e9d414c9a0f2c10415aad89953e8"
+  },
+  "last_scoped_push": {
+    "head_sha": "5d6d0f2f45005e2638683dc08340fa2a7bc5a907",
+    "branch": "docs/personal-assistant-blueprint-playbook-20260918",
+    "status": "observed_success"
   }
 }

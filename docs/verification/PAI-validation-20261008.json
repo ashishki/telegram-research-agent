@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "date": "2026-10-08",
-  "status": "runtime320_focused678_tooling117_native74_STOP_recheck_required",
+  "status": "runtime320_focused678_tooling117_native75_timeout",
   "runtime_head": "caf97a7",
   "checks": [
     {
@@ -429,7 +429,7 @@
     {
       "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python -m pytest -q tests/test_opencode_role_review.py tests/test_pai_acceptance_guard.py tests/test_playbook_bridge.py tests/test_pai_plan.py",
       "result": "117 passed in 7.12 s",
-      "source_snapshot": "final post74 source/tests/policy/packet/manifest before commit",
+      "source_snapshot": "5d6d0f2 source/tests/policy/packet/manifest; run before commit with these identical bytes",
       "exit_code": 0,
       "log_path": ".playbook-artifacts/pai-validation-20261008/tooling-75-final.log",
       "log_sha256": "1d25360584a751167911aaef84cff203b8e7e9d414c9a0f2c10415aad89953e8"
@@ -439,6 +439,6 @@
   "live_provider_product": false,
   "human_acceptance": false,
   "services_timers_enabled": false,
-  "candidate_documentation_head": "37221c0",
-  "latest_tooling_head": "0110ec0"
+  "candidate_documentation_head": "1473004",
+  "latest_tooling_head": "5d6d0f2f45005e2638683dc08340fa2a7bc5a907"
 }

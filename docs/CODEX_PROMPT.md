@@ -1,4 +1,4 @@
-# Current handoff — local runtime tested; native tooling recheck75 allocated
+# Current handoff — local runtime tested; native tooling recheck76 allocated
 
 2026-10-08. Branch docs/personal-assistant-blueprint-playbook-20260918.
 Owner authorizes safe local PAI completion and necessary Mimo review increases
@@ -27,10 +27,10 @@ reasoning, observed mimo-v2.6-pro, finish_reason length16000: no valid verdict.
 See PAI-review-continuation-73.json; no design consumption is unlocked.
 
 Native74 returned STOP; factual resolutions and concrete improvements are in
-PAI-native-tooling-74-response.md. 117 scoped tests passed9.40s. Native75 is
-allocated for a fresh same-model audit with provider-default reasoning
-mode, bounds16000 output/900s, one call, no automatic retry. 74 calls consumed;
-current allocation83 includes eight future program/product design parts76..83.
+PAI-native-tooling-74-response.md. 117 final scoped tests passed7.12s at5d6d0f2. Native75 timed out901.164s,
+no verdict/usage/observed identity. Native76 is allocated for a fresh same-model
+audit with explicit thinking-disabled mode, bounds16000 output/900s, one call, no automatic retry. 75 calls consumed;
+current allocation84 includes eight future program/product design parts77..84.
 Never mutate HEAD, critical sources or native packet docs during a request.
 Authorized key path is Georgia-Community-Navigator/secrets/openrouter_api_key;
 never print or copy the value. Record requested/observed mode/model honestly.
@@ -51,7 +51,7 @@ slice/TestCritic/privacy/maintainability adapters remain separate pending gates.
 
 Prepared PAI-release-candidate.md/json map all69/ten to synthetic evidence and
 remaining role/live/human gates. Finish actual result/ledger consistency and
-scoped commit/push; last remote push56be451. No merge/deploy. PAI-27/28/29 access,
+scoped commit/push; last remote push5d6d0f2. No merge/deploy. PAI-27/28/29 access,
 cutover and pilot packets exist as drafts; conditional30/31 triggers unmeasured.
 No private corpus/account canary or product paid API used. Old goal API is blocked
 with no resume method; do not create duplicate or declare whole programme done.
