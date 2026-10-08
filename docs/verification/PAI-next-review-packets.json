@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "status": "native67_timeout_no_verdict_source68_independent_recheck",
-  "current_approved_call_cap": 80,
-  "calls_consumed_including_failures": 71,
+  "current_approved_call_cap": 81,
+  "calls_consumed_including_failures": 72,
   "proposed_total_cap": 34,
   "new_calls_maximum": 3,
   "third_call": "only if an actual new finding needs independent recheck",
@@ -1973,5 +1973,10 @@
     "purpose": "same Mimo provider-default reasoning factual recheck after thinking-disabled reports contradicted code",
     "output_cap": 16000,
     "timeout": 900
+  },
+  "native_tooling_recheck_73": {
+    "call_number": 73,
+    "status": "allocated_not_invoked",
+    "purpose": "default-reasoning native recheck of actual STOP/projection fixes and supported-wrapper trust boundary"
   }
 }

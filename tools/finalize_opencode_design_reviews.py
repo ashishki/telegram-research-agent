@@ -53,6 +53,7 @@ def finalize(root: Path, feature: str, role: str, results: list[Path]):
             raise ReviewBlocked('phase input manifest differs')
         if digest((path.parent/'input_packet.txt').read_bytes())!=result['input_sha256']:
             raise ReviewBlocked('phase input packet changed')
+        review.verify_stored_packet(root,result,path.parent)
         markers=re.findall(r'^'+ROLES[role]+r':\s*(PASS|ADVISORY|STOP_SHIP)\s*$',report.read_text(),re.M)
         if markers!=[result['verdict']]:raise ReviewBlocked('phase report marker differs')
         body='{'+report.read_text().split('\n{',1)[1]

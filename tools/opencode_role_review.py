@@ -117,6 +117,16 @@ def extended_review_authority(root,args,output_cap):
     except (OSError,ValueError,TypeError):raise ReviewBlocked('extended review authority missing or outside scope') from None
 
 
+def verify_stored_packet(root,result,run_dir):
+    raw=(run_dir/'input_packet.txt').read_bytes()
+    if digest(raw)!=result['input_sha256'] or json.loads((run_dir/'input_manifest.json').read_text())!=result['documents']:
+        raise ReviewBlocked('stored packet or manifest differs')
+    expected,manifest,_=prepare_packet(root,result['task'],result['feature_id'],result['role'],
+        result['review_scope']=='tooling',result.get('slice_group'))
+    if raw!=expected.encode() or manifest!=result['documents']:
+        raise ReviewBlocked('stored packet does not match declared source projection')
+
+
 def factor_json(document):
     """Losslessly share strings/record columns; preserve all reviewable fields."""
     strings = []
@@ -171,6 +181,7 @@ def pinned_modules(root: Path):
 
 def require_tooling_audit(root: Path) -> str:
     """Only independent, unchanged, complete tooling evidence unlocks design records."""
+    matching=[]
     for path in sorted((root / ".playbook-artifacts/opencode-runs").glob("*/result.json"), reverse=True):
         try:
             if path.is_symlink() or not path.resolve().is_relative_to(root / ".playbook-artifacts/opencode-runs"): continue
@@ -186,11 +197,11 @@ def require_tooling_audit(root: Path) -> str:
             if (result.get("review_scope") != "tooling" or result.get("role") != "program_design_review"
                 or result.get("provider") != "opencode_go" or result.get("read_only") is not True
                 or result.get("requested_model") != "mimo-v2.6-pro" or result.get("observed_model") != "mimo-v2.6-pro"
-                or result.get("verdict") not in {"PASS", "ADVISORY"}): continue
+                or result.get("verdict") not in {"PASS", "ADVISORY",'STOP_SHIP'}): continue
             manifest = {item["path"]: item for item in result["documents"]}
-            if not set(TOOLING_REFS) <= set(manifest): continue
+            if set(manifest)!=set(TOOLING_REFS)|{'docs/ASSISTANT_BOUNDARIES.md','docs/IMPLEMENTATION_CONTRACT.md'}:continue
             if any((root / ref).is_symlink() or not (root / ref).resolve().is_relative_to(root)
-                   or digest((root / ref).read_bytes()) != manifest[ref]["sha256"] for ref in TOOLING_REFS): continue
+                   or digest((root / ref).read_bytes()) != manifest[ref]["sha256"] for ref in manifest): continue
             if digest(report.read_bytes()) != result["report_sha256"]: continue
             markers = re.findall(r"(?m)^PROGRAM_DESIGN_REVIEW:\s*(PASS|ADVISORY|STOP_SHIP)\s*$", report.read_text())
             if markers != [result["verdict"]]: continue
@@ -198,9 +209,13 @@ def require_tooling_audit(root: Path) -> str:
             verdict = parse_response({"model": result["observed_model"], "choices": [{
                 "finish_reason": "stop", "message": {"content": content}}]}, result["observed_model"])
             if verdict["verdict"] != result["verdict"]: continue
-            return path.relative_to(root).as_posix()
+            verify_stored_packet(root,result,path.parent)
+            matching.append((result.get('generated_at',''),path,result['verdict']))
         except (OSError, ValueError, KeyError, TypeError, IndexError):
             continue
+    if matching:
+        if any(verdict=='STOP_SHIP' for _,_,verdict in matching):raise ReviewBlocked('matching STOP_SHIP tooling audit blocks consumption')
+        return max(matching,key=lambda item:(item[0],str(item[1])))[1].relative_to(root).as_posix()
     raise ReviewBlocked("independent current tooling audit required before design review/record publication")
 
 
@@ -294,6 +309,7 @@ def prepare_packet(root: Path, task: str, feature: str, role: str, tooling_revie
     if tooling_review:
         instruction += "Scope is the actual review transport/checker code only, not full feature design approval. Challenge budget/credentials, schema, provenance, source coverage, tamper guards and negative tests.\n"
         instruction += "Trust boundary: trusted runner/workspace/Git and provider-reported metadata over authenticated TLS; no signed physical-model or external append-only attestation is claimed. Privileged replacement of all code/Git/evidence is outside local hash-integrity guarantees and must remain an explicit limitation, not fabricated cryptographic proof. Read actual guards and real-consumer negative tests; report reproducible defects within the stated boundary and preserve unsupported attestation in not_verified.\n"
+        instruction += "The repository requires tools/playbook.py and supported proxies for approval; direct upstream/import/arbitrary Python execution is an unsupported privileged-operator bypass, not an OS-wide sandbox this wrapper claims to enforce. Universal direct-consumer enforcement would require a separately reviewed upstream hook/pin change; distinguish that missing scope decision from a defect on the supported route.\n"
     if selected:
         instruction += ("This is one declared phase of a COMPLETE programme review. Review only these slice scopes: "
                         + ",".join(sorted(selected)) + ". The COMPLETE canonical 32-slice registry and 69-requirement/10-scenario matrix are supplied as cross-phase context; only relevant specification sections are supplied. "

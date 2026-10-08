@@ -596,7 +596,7 @@ def test_real_tooling_gate_rejects_changed_source_and_verdict_disagreement(tmp_p
     run = tmp_path / '.playbook-artifacts/opencode-runs/opencode-synthetic'
     run.mkdir(parents=True)
     manifest = []
-    for ref in fresh.TOOLING_REFS:
+    for ref in (*fresh.TOOLING_REFS,'docs/ASSISTANT_BOUNDARIES.md','docs/IMPLEMENTATION_CONTRACT.md'):
         path = tmp_path / ref
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text('synthetic public toolchain fixture')
@@ -608,12 +608,24 @@ def test_real_tooling_gate_rejects_changed_source_and_verdict_disagreement(tmp_p
                'verdict': 'ADVISORY', 'documents': manifest, 'report_sha256': fresh.digest(report.read_bytes())}
     payload['pinned_gate_modules']=[{'path':str(module_file),'sha256':fresh.digest(module_file.read_bytes())}]
     payload['runtime_dependencies']=fresh.runtime_dependencies()
+    payload.update(task='T1',feature_id='F',generated_at='2026-10-08T12:00:00+00:00',input_sha256=fresh.digest(b'synthetic audit packet'))
+    (run/'input_packet.txt').write_text('synthetic audit packet')
+    (run/'input_manifest.json').write_text(json.dumps(manifest))
+    monkeypatch.setattr(fresh,'prepare_packet',lambda *args:('synthetic audit packet',manifest,{}))
     result = run / 'result.json'
     def write():
         result.write_text(json.dumps(payload))
         result.with_suffix('.json.sha256').write_text(fresh.digest(result.read_bytes()))
     write()
     assert fresh.require_tooling_audit(tmp_path) == result.relative_to(tmp_path).as_posix()
+    import shutil
+    conflicting=run.parent/'opencode-aaa-newer-stop';shutil.copytree(run,conflicting)
+    stopped={**payload,'verdict':'STOP_SHIP','generated_at':'2026-10-08T13:00:00+00:00'}
+    stop_report=conflicting/'report.md';stop_body=json.loads(response()['choices'][0]['message']['content']);stop_body['verdict']='STOP_SHIP'
+    stop_report.write_text('# Synthetic STOP\n\nPROGRAM_DESIGN_REVIEW: STOP_SHIP\n\n'+json.dumps(stop_body))
+    stopped['report_sha256']=fresh.digest(stop_report.read_bytes());stop_result=conflicting/'result.json';stop_result.write_text(json.dumps(stopped));stop_result.with_suffix('.json.sha256').write_text(fresh.digest(stop_result.read_bytes()))
+    with pytest.raises(ValueError,match='STOP_SHIP tooling audit'):fresh.require_tooling_audit(tmp_path)
+    shutil.rmtree(conflicting)
     module_file.write_text('changed pinned gate')
     with pytest.raises(ValueError):fresh.require_tooling_audit(tmp_path)
     module_file.write_text('synthetic immutable gate fixture')
@@ -776,3 +788,11 @@ def test_extended_review_limits_require_record_before_key_or_http(tmp_path,monke
     (tmp_path/'docs/verification/PAI-next-review-packets.json').unlink()
     with pytest.raises(review.ReviewBlocked,match='extended review authority'):review.execute(args)
     assert calls==[] and records==[]
+
+
+def test_rehashed_packet_cannot_claim_the_original_source_projection(tmp_path,monkeypatch):
+    args,calls,records=setup_run(tmp_path,monkeypatch);args.slice_group='foundation';assert review.execute(args)==0
+    run=next((tmp_path/'.playbook-artifacts/opencode-runs').glob('*/result.json')).parent
+    data=json.loads((run/'result.json').read_text());(run/'input_packet.txt').write_text('different omitted source')
+    data['input_sha256']=review.digest((run/'input_packet.txt').read_bytes())
+    with pytest.raises(review.ReviewBlocked,match='source projection'):review.verify_stored_packet(tmp_path,data,run)
