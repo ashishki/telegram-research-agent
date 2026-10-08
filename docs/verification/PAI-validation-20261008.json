@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-08",
+  "status": "in_progress_independent_phase_reviews_pending",
+  "runtime_head": "43e174b2db00686c69d2cbbb38bbdfcc3e37b7b1",
+  "checks": [
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/test_tiers.py pai-complete",
+      "result": "259 passed in 883.59 s",
+      "source_snapshot": "465503d",
+      "exit_code": 0,
+      "log_path": ".playbook-artifacts/pai-validation-20261008/pai-complete.log",
+      "log_sha256": "f2ae9831f880d6ceb76acbca34299c60b6b75b6c10dec200535e2ca28dcf9d04"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/run_pai_acceptance.py -q -x tests/test_pai_durable_policy.py tests/test_pai_durable_actions.py tests/test_pai_action_runtime.py tests/test_assistant_actions.py",
+      "result": "32 passed in 45.90 s",
+      "source_snapshot": "cf3c00b",
+      "exit_code": 0,
+      "log_path": ".playbook-artifacts/pai-validation-20261008/foundation-fixes.log",
+      "log_sha256": "2b8f26d296989937cafddb8028e3ff49171b940001a6a0fa229df39304235b49"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/test_tiers.py focused-prm",
+      "result": "652 passed in 132.56 s",
+      "source_snapshot": "cf3c00b",
+      "exit_code": 0,
+      "log_path": ".playbook-artifacts/pai-validation-20261008/focused-prm.log",
+      "log_sha256": "a8f07f38ec69acfd7dd68e7e1b05541edc36bd0942b3acb2525d29c904bd38f2"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/run_pai_acceptance.py -q -x tests/test_pai_delivery.py tests/test_pai_scheduler.py tests/test_pai_ingress_jobs.py",
+      "result": "46 passed in 68.69 s",
+      "source_snapshot": "watch intermediate worktree",
+      "exit_code": 0,
+      "log_path": ".playbook-artifacts/pai-validation-20261008/watch-fixes.log",
+      "log_sha256": "bab278e51357b8441afd76ed48c8541878989d6f3694908c4932f7180c427645"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/run_pai_acceptance.py -q -x tests/test_pai_delivery.py tests/test_pai_watch_wiring.py tests/test_pai_ingress_jobs.py",
+      "result": "35 passed in 60.61 s",
+      "source_snapshot": "c840ecc",
+      "exit_code": 0,
+      "log_path": ".playbook-artifacts/pai-validation-20261008/watch-origin-locks.log",
+      "log_sha256": "ce60a7fef2ae4922137e0cb36427e8bca4fe0aa36178412cf045e78b9c238fd4"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/test_tiers.py retrofit-boundaries",
+      "result": "150 passed in 12.29 s",
+      "source_snapshot": "c840ecc",
+      "exit_code": 0,
+      "log_path": ".playbook-artifacts/pai-validation-20261008/retrofit-boundaries.log",
+      "log_sha256": "7810b8ab21a6aaeb8e9d3b6cd35d5f1d48d5abaf84aeac814a35eefa15124fc1"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/run_pai_acceptance.py -q -x tests/test_opencode_role_review.py tests/test_pai_acceptance_guard.py tests/test_playbook_bridge.py tests/test_test_tiers.py",
+      "result": "80 passed in 4.10 s",
+      "source_snapshot": "review mode intermediate worktree",
+      "exit_code": 0,
+      "log_path": ".playbook-artifacts/pai-validation-20261008/reviewer-mode.log",
+      "log_sha256": "7a2304d74dfbfb947d81d6f3792c2822bd9b79f754052e33035821c71b8199e7"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/run_pai_acceptance.py -q -x tests/test_opencode_role_review.py",
+      "result": "57 passed in 1.73 s",
+      "source_snapshot": "15db746",
+      "exit_code": 0,
+      "log_path": ".playbook-artifacts/pai-validation-20261008/reviewer-mode-final.log",
+      "log_sha256": "e661b99789ad6d12cf75243ea0a1c323876279be24009cbb6f612b7658f139c9"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/run_pai_acceptance.py -q -x tests/test_pai_ingress_jobs.py tests/test_pai_delivery.py",
+      "result": "36 passed in 42.42 s",
+      "source_snapshot": "43e174b",
+      "exit_code": 0,
+      "log_path": ".playbook-artifacts/pai-validation-20261008/cancel-facts-aggregate-final.log",
+      "log_sha256": "cf7648d1028306c2981fece849095054965a4998a551fa54f22510da67cd0831"
+    },
+    {
+      "result": "preserved failed attempt; exact details in review-38/39 response",
+      "exit_code": 1,
+      "log_path": ".playbook-artifacts/pai-validation-20261008/delivery-lease-reconcile.log",
+      "log_sha256": "17cdfdb4ffed22214494abb386ea5585b0838e82fa2c7913f59af48a281b3b4f"
+    },
+    {
+      "result": "preserved failed attempt; exact details in review-38/39 response",
+      "exit_code": 1,
+      "log_path": ".playbook-artifacts/pai-validation-20261008/delivery-lease-reconcile-corrected.log",
+      "log_sha256": "c9e197b03d920c4de61e764994baed15b4801459c020b16c0e38ef6a87826f5c"
+    },
+    {
+      "result": "preserved failed attempt; exact details in review-38/39 response",
+      "exit_code": 1,
+      "log_path": ".playbook-artifacts/pai-validation-20261008/cancel-facts-aggregate.log",
+      "log_sha256": "fb7b54604b645d8565484cb65c418b2fb152d2be26ae16a9cd4eb6a6fb830845"
+    }
+  ],
+  "source_notes": "Tests preceded the named source commits; intermediate worktree observations are not projected onto later changes. Whole tier precedes foundation/Watch/delivery fixes. No full historical pytest.",
+  "live_provider_product": false,
+  "human_acceptance": false,
+  "services_timers_enabled": false
+}

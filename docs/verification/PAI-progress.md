@@ -371,3 +371,15 @@ Native planning selections restored via pinned interactive select-plan under
 the existing explicit delegation recorded in PAI-00/01 evidence, not invented
 from budget permission. Native prepare-only planning gate now passes.
 39 calls consumed. Next #40 C resolution, D/E/F and native tooling audit.
+
+Review #40 reserved/attempted, 40 consumed under ongoing scoped authority including failures.
+Purpose: phase_C_cancel_parent_resolution; source HEAD 43e174b2db00686c69d2cbbb38bbdfcc3e37b7b1. No automatic retry.
+
+# 2026-10-08 native tooling audit allocation
+
+#40 source C recheck in flight; source frozen at 43e174b. Allocate #41 for
+the separate actual native OpenCode --tooling-review route under ongoing
+authority. Planning selection restored from the existing recorded delegation;
+prepare-only planning gate null and packet 131737 bytes. Root must keep HEAD
+and critical sources unchanged until this actual audit returns. No existing
+role receipt is fabricated/promoted; failed calls remain consumed.
