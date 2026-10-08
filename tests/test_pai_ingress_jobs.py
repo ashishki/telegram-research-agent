@@ -85,6 +85,20 @@ def test_cancel_warning_uses_actual_attempts_if_worker_claims_after_status_read(
     assert notices==[ack.job_id] and status(owner=current.owner_ref,job_id=ack.job_id)['status']=='cancelled'
 
 
+def test_cancel_warning_when_claim_occurs_strictly_before_cancel_update(sandbox,monkeypatch):
+    current=ingress(sandbox,'cancel_update_race');ack=current.receive(update(911,'Synthetic update race'))
+    cancel=current.queue.cancel;observed=[]
+    def claim_before_update(**kwargs):
+        observed.append(current.queue.status(owner=current.owner_ref,job_id=ack.job_id)['status'])
+        assert current.queue.claim(owner=current.owner_ref,kinds=('compute.assistant',)) is not None
+        return cancel(**kwargs)
+    monkeypatch.setattr(current.queue,'cancel',claim_before_update)
+    reply=current.control('cancel',ack.job_id)
+    assert observed==['queued']
+    assert current.queue.status(owner=current.owner_ref,job_id=ack.job_id)['attempts']==1
+    assert reply.text=='Задача отменена. Уже начатый внешний вызов мог продолжиться.'
+
+
 @pytest.mark.parametrize('changes', [
     {'from': {'id': 43}}, {'chat': {'id': -10042, 'type': 'group'}},
     {'chat': {'id': 43, 'type': 'private'}}, {'chat': {'id': 42, 'type': 'group'}},

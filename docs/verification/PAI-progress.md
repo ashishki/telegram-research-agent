@@ -383,3 +383,14 @@ authority. Planning selection restored from the existing recorded delegation;
 prepare-only planning gate null and packet 131737 bytes. Root must keep HEAD
 and critical sources unchanged until this actual audit returns. No existing
 role receipt is fabricated/promoted; failed calls remain consumed.
+
+# 2026-10-08 review-40 source mismatch and actual tooling STOP
+
+#40 correctly downgrades aggregate no-child conservatism, but repeats a P1
+pre-state warning claim despite supplied current.attempts code. Two precise
+real races pass (2 cases, 6.04 s); independent factual resolution remains next.
+#41 is an actual native tooling STOP_SHIP on 4cfea92; immutable result/report
+retained, trust gate stays closed. Parser/provider schema alignment and exact
+rendered-section provenance strengthened; 81 final tests passed in 3.67 s.
+Response files record actual claims, fixes and existing negative drift cases;
+no self-approval, human design or live authority is inferred. 41 consumed.

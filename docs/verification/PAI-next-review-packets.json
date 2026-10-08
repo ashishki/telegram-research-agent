@@ -2,7 +2,7 @@
   "schema_version": 1,
   "status": "phase_C_delivery_fixes_verified_recheck_pending",
   "current_approved_call_cap": 41,
-  "calls_consumed_including_failures": 40,
+  "calls_consumed_including_failures": 41,
   "proposed_total_cap": 34,
   "new_calls_maximum": 3,
   "third_call": "only if an actual new finding needs independent recheck",
@@ -1051,6 +1051,39 @@
       ],
       "instructions": "Resolve the two #39 P1 claims independently. Actual cancel race now uses post-cancel attempts and has a real read-then-claim counterexample. The reviewer #39 analysis itself confirms existing aggregate prevents retry and exact per-part reconciliation, yet labels an unknown prepared parent with no children a blocker. Assess that allegation under the explicitly documented no-blind-retry/prepared boundary and the new immediate-post-parent interruption test. Do NOT recommend removing potentially processed/billable durable fences simply to make retries possible. Prepared/unknown means reconciliation/new explicit intent, not fabricated known failure. Review only reproducible correctness/safety defects in supplied sources, distinguish deliberate conservatism/availability tradeoffs from permission escalation or duplicate effects. Use consistent verdict: no P0/P1 SHIP_OK, P1 FIX_P1_FIRST, any P0 STOP_SHIP. No role/human/live acceptance is granted.",
       "source_bytes": 162327
+    },
+    {
+      "purpose": "cancel_actual_source_resolution",
+      "base_sha": "43e174b",
+      "sources": [
+        {
+          "path": "src/prm/runtime/ingress.py",
+          "sha256": "ae119826e01c05f27ef2305f10acb61cd27cd992ee7f739178b1ec07e9517e36",
+          "bytes": 17603
+        },
+        {
+          "path": "src/prm/storage/jobs.py",
+          "sha256": "539b441477e31952a7607621822d454b8df60ede19432d6a4b0bc3473c83df66",
+          "bytes": 15386
+        },
+        {
+          "path": "tests/test_pai_ingress_jobs.py",
+          "sha256": "1729a088a7aafa55c6a7a647b266e424f6335214769770ed445c24971d3f1067",
+          "bytes": 12210
+        },
+        {
+          "path": "docs/verification/PAI-review-continuation-40.json",
+          "sha256": "859d8de5b05f93f964bd0625134812a73ab15c89c4f0c3358f5b431bcdd79c36",
+          "bytes": 8984
+        },
+        {
+          "path": "docs/verification/PAI-review-40-response.md",
+          "sha256": "0a97dc819ae75c661b6357dfd14ad181fb33c8e45c980db8f89c319bf5724584",
+          "bytes": 2019
+        }
+      ],
+      "instructions": "Focused independent factual resolution of review #40 P1 only. Read ACTUAL control code: both callback and warning condition use current attempts > 0 from the post-cancel status, not the old state. Two real PostgreSQL counterexamples include claim after status snapshot and claim STRICTLY before the real cancel UPDATE. Determine independently whether #40 allegation matches these exact supplied statements; quote the actual current condition if reporting a defect, and give an executable failure. Do not copy stale line references/claims from the prior report. No runtime fix or human approval is inferred from assertions. Consistent SHIP_OK if no P0/P1; other scope limitations remain separate.",
+      "source_bytes": 56202
     }
   ],
   "authority_exclusions": [

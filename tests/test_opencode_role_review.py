@@ -133,6 +133,27 @@ def test_explicit_thinking_mode_is_sent_once_and_invalid_mode_cannot_call_provid
     assert len(requests)==1
 
 
+@pytest.mark.parametrize('change',['too_many_findings','long_title','long_summary','unknown_field'])
+def test_parser_enforces_the_exact_same_provider_json_schema(change):
+    payload=response();value=json.loads(payload['choices'][0]['message']['content'])
+    finding={'severity':'P2','title':'Synthetic','issue':'Synthetic issue','fix':'Synthetic fix'}
+    if change=='too_many_findings':value['findings']=[finding]*13
+    elif change=='long_title':value['findings']=[{**finding,'title':'x'*141}]
+    elif change=='long_summary':value['summary']='x'*1601
+    else:value['extra']='not declared'
+    payload['choices'][0]['message']['content']=json.dumps(value)
+    with pytest.raises(review.ReviewBlocked,match='invalid verdict schema'):
+        review.parse_response(payload,'mimo-v2.6-pro')
+
+
+def test_real_tooling_packet_manifest_hashes_exact_rendered_sections():
+    packet,manifest,_=review.prepare_packet(Path(__file__).resolve().parents[1],'PAI-00','PAI','program_design_review',True,None)
+    for entry in manifest:
+        section=packet.split('\n--- DOCUMENT: '+entry['path']+' ---\n',1)[1].split('\n--- DOCUMENT:',1)[0]
+        assert review.digest(section.encode())==entry['rendered_sha256']
+        assert len(section.encode())==entry['rendered_bytes']
+
+
 @pytest.mark.parametrize("timeout,expected", [(300, 0), (900, 0), (901, 2), (29, 2)])
 def test_design_review_deadline_bounds_reach_actual_transport(tmp_path, monkeypatch, timeout, expected):
     _, calls, records = setup_run(tmp_path, monkeypatch)

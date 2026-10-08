@@ -1,0 +1,141 @@
+{
+  "schema_version": 1,
+  "status": "reviewed",
+  "call_number": 40,
+  "call_limit": 40,
+  "purpose": "phase_C_cancel_parent_resolution",
+  "read_only": true,
+  "provider": "opencode_go",
+  "requested_model": "mimo-v2.6-pro",
+  "observed_model": "mimo-v2.6-pro",
+  "requested_effort": "thinking_disabled",
+  "observed_effort": "thinking_disabled",
+  "head_sha": "43e174b2db00686c69d2cbbb38bbdfcc3e37b7b1",
+  "base_sha": "15db746",
+  "diff_sha256": "4b6d00d95ec6a25e1b12e4f7ce9e3174ea47fc7b16dc4d3c496330ab48ccb8fc",
+  "sources": [
+    {
+      "path": "src/prm/runtime/delivery.py",
+      "sha256": "2ffaff380f23d0a80d64c05ccb7079e293b8ed505f48ffc8458fc65f50a26804",
+      "bytes": 28875
+    },
+    {
+      "path": "src/prm/runtime/ingress.py",
+      "sha256": "ae119826e01c05f27ef2305f10acb61cd27cd992ee7f739178b1ec07e9517e36",
+      "bytes": 17603
+    },
+    {
+      "path": "src/prm/runtime/service.py",
+      "sha256": "f132f2f97fbc571e503d1df46849112f7e153ddbca63446834dec56b9632ea6a",
+      "bytes": 3355
+    },
+    {
+      "path": "src/prm/storage/jobs.py",
+      "sha256": "539b441477e31952a7607621822d454b8df60ede19432d6a4b0bc3473c83df66",
+      "bytes": 15386
+    },
+    {
+      "path": "src/prm/storage/policy.py",
+      "sha256": "6e16889bdd9f889daf7ced9c447e2e7c514a623c9d4958bdd9fd1f246a9bb4c2",
+      "bytes": 30184
+    },
+    {
+      "path": "tests/test_pai_delivery.py",
+      "sha256": "caa499ffff8b4af32fc30ace0a431685685d2d3a95c7a4216f5f4628c1f38f26",
+      "bytes": 30520
+    },
+    {
+      "path": "tests/test_pai_ingress_jobs.py",
+      "sha256": "ef1aa82baa578658a03bbaed441df4b70904c38999160e29aacccbac072b4853",
+      "bytes": 11318
+    },
+    {
+      "path": "tests/test_pai_workers.py",
+      "sha256": "3bf1b7e86e9a77d170b5451c1f7cb10df4b384c8ff630159aef4a2014fb7d3b6",
+      "bytes": 7435
+    },
+    {
+      "path": "docs/verification/PAI-review-continuation-39.json",
+      "sha256": "9569bfe70b9e683b4fc6d6bc1beec3dc21484331e2944b1083c2b7d60c700758",
+      "bytes": 12780
+    },
+    {
+      "path": "docs/verification/PAI-review-39-response.md",
+      "sha256": "76fd3aeffdbae668427aa6112dc83ac984570c24c3c072b7222ec83c712c572b",
+      "bytes": 2800
+    },
+    {
+      "path": "docs/ASSISTANT_BOUNDARIES.md",
+      "sha256": "5f50392570a250032cb97e45fdd187ea891c1a2aafa3141247579e6e43fdccc3",
+      "bytes": 2071
+    }
+  ],
+  "scope": "phase_C_cancel_parent_resolution; supplied full current source/tests and explicitly labeled integration diff if present",
+  "input_sha256": "275b4d53426da7a7ee788205d7810eac2006cdaaf13510ada6fd97b25b5130b2",
+  "input_bytes": 176528,
+  "output_token_cap": 16000,
+  "timeout_seconds": 900,
+  "workflow_receipt": false,
+  "human_authority": false,
+  "runner_path": ".playbook-artifacts/pai-review-as-needed.py",
+  "runner_sha256": "8306b7e250e58139ee08be8c58de615d3d6fe684f5a4726c091ce9eaf689d545",
+  "transport_path": "tools/mimo_code_review.py",
+  "transport_sha256": "b0ba01f2647f21c004e54d2b9840573b38ac43ea541e394fd61bdfa2c9705c75",
+  "command": ".venv-pai/bin/python .playbook-artifacts/pai-review-as-needed.py --call-number 40 --purpose phase_C_cancel_parent_resolution",
+  "source_exclusions": [
+    "actual private corpus",
+    "live account payload",
+    "credentials",
+    "production configuration"
+  ],
+  "authority_exclusions": [
+    "human/workflow completion",
+    "live-account consent",
+    "production migration/deployment",
+    "product-provider spending"
+  ],
+  "request_body_sha256": "6560f9135a49d815659bf3285c144cbfa94ddbfcc46c40fbf6f36b195dd620b8",
+  "provider_call_attempted": true,
+  "usage": {
+    "prompt_tokens": 46481,
+    "completion_tokens": 1011,
+    "total_tokens": 47492,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    }
+  },
+  "finish_reason": "stop",
+  "response_sha256": "eb71c26e64861f154874c2091efe015840e03201c554bfbd4f1d23ddf1f99c21",
+  "findings": {
+    "verdict": "FIX_P1_FIRST",
+    "findings": [
+      {
+        "severity": "P1",
+        "title": "Cancel acknowledgement omits external-call warning for jobs claimed after pre-read",
+        "file": "src/prm/runtime/ingress.py:163",
+        "issue": "control() reads state before queue.cancel() and derives the warning text from that pre-read state (line 167), but the warning callback fires only when the post-cancel attempts>0. In the real race where the pre-read saw queued/retry_wait but a worker claimed (attempts incremented) before cancel, the job may have an in-flight external call, yet the text omits 'Уже начатый внешний вызов мог продолжиться.' The test test_cancel_warning_uses_actual_attempts_if_worker_claims_after_status_read only covers the case where claims happen during the status read; the transition claim→cancel is not covered for the warning string.",
+        "fix": "Decide the warning text and callback from the authoritative post-cancel attempts/status (or the cancel return value plus a fresh read), not the pre-read state; include the warning whenever the job was ever leased/running (attempts>0 at cancellation). Extend the deterministic test to cover a claim that occurs strictly between the pre-read and the cancel UPDATE.",
+        "confidence": "high"
+      },
+      {
+        "severity": "P2",
+        "title": "Unknown aggregate with zero children is permanently unreconcilable and unrecoverable",
+        "file": "src/prm/runtime/delivery.py:117",
+        "issue": "The parent row is inserted as 'unknown' before any part attempt; a crash after the insert and before the first child leaves zero children. reconcile then returns the parent at delivery.py:297 without ever producing evidence, and deliver_result early-returns the existing aggregate (113-116), so no future explicit intent can deliver the message and no adapter can observe the unattempted state. This is consistent with the documented no-blind-retry/prepared boundary (unknown ≠ known failure) and test_aggregate_preparation_without_parts_never_authorizes_second_dispatch verifies it, so it is a deliberate availability loss, not permission escalation — but the operator has no documented reconciliation/new-intent path for this state.",
+        "fix": "Keep the non-replayable fence; surface the state explicitly in describe() (e.g. 'prepared before any part; requires explicit new owner intent or provider evidence') and document a bounded operator recovery path that requires new explicit owner confirmation rather than fabricating a known-failure or resuming automatically.",
+        "confidence": "high"
+      }
+    ],
+    "not_verified": [
+      "src/prm/watch_jobs.py, src/prm/runtime/scheduler.py, src/prm/storage/actions.py, deletion.py, capabilities.py and bot/prm_handlers.py are not in the packet; only their inline usage in the supplied sources was reviewed.",
+      "Actual execution against a live/synthetic PostgreSQL instance was not performed; findings are static analysis of the supplied sources and tests.",
+      "Runtime composition/config validation in runtime_from_config and OperationsRuntime status semantics were not supplied.",
+      "Whether effect_lease is passed on all production deliver_result call sites outside the packet was not verified (ingress /result passes none; the delivery.py:93-96 guard covers the scheduled-effect case)."
+    ],
+    "summary": "No P0: the supplied sources preserve fail-closed semantics — unknown/lost-ACK attempts are never resent (delivery.py:113-116, 204-208), unknown effect jobs are not reclaimed (jobs.py recover_expired→awaiting_reconciliation), reconciliation requires exact per-attempt and per-part evidence (delivery.py:290-307, 325-330) and a missing part cannot be inferred from another's receipt (test_multipart_missing_part_cannot_be_reconciled_by_one_aggregate_receipt), media MIME is allowlisted (ingress.py:75), and grants/reservations bind provider, purpose and data class per operation. Resolving the two #39 P1 claims: the aggregate-prepared-with-no-children case is not a correctness or safety defect — existing aggregate rows provably prevent any second dispatch (test_aggregate_preparation_without_parts_never_authorizes_second_dispatch and test_fake_server...confirm one send), and the recommended 'resume loop' would remove a durable, possibly billable fence contrary to the documented prepared/unknown no-blind-retry boundary; it is recorded below as a P2 availability/explicit-recovery gap only. The cancel race is real and remains partially unfixed: ingress.py:163-167 still derives the 'already started external call' warning from the pre-read state, so a job claimed between the pre-read and the cancel UPDATE can be cancelled with an in-flight call without the warning (callback firing is now correct via post-cancel attempts, but the user-facing text is not), which is a P1 information/acknowledgment defect. With one P1 present, verdict is FIX_P1_FIRST."
+  },
+  "duration_seconds": 249.021
+}

@@ -218,6 +218,9 @@ def prepare_packet(root: Path, task: str, feature: str, role: str, tooling_revie
             # Its full intent is already in the feature brief/spec. Keep the
             # exact authority hash and drift guard while avoiding repetition.
             content = "Authority hash retained in manifest; full feature brief/spec included."
+        manifest[-1]['rendered_sha256']=digest(content.encode('utf-8'))
+        manifest[-1]['rendered_bytes']=len(content.encode('utf-8'))
+        manifest[-1]['representation']='exact rendered section; original bytes/hash retained above; documented lossless normalization or declared scope projection'
         sections.append(f"\n--- DOCUMENT: {ref} ---\n" + content)
     instruction = (
         f"You are an independent read-only {role} reviewer. Review the supplied "
@@ -260,6 +263,9 @@ def parse_response(payload: dict, requested_model: str) -> dict:
     if not isinstance(content, str):
         raise ReviewBlocked("missing reviewer response")
     verdict = json.loads(content)
+    import jsonschema
+    try:jsonschema.validate(verdict,VERDICT_SCHEMA)
+    except jsonschema.ValidationError:raise ReviewBlocked('invalid verdict schema') from None
     if set(verdict) != {"verdict", "findings", "not_verified", "summary"}:
         raise ReviewBlocked("invalid verdict shape")
     if verdict["verdict"] not in {"PASS", "ADVISORY", "STOP_SHIP"}:
@@ -269,7 +275,7 @@ def parse_response(payload: dict, requested_model: str) -> dict:
     if not isinstance(verdict["not_verified"], list) or not all(isinstance(v, str) for v in verdict["not_verified"]):
         raise ReviewBlocked("invalid limitations")
     findings = verdict["findings"]
-    if not isinstance(findings, list) or len(findings) > 50:
+    if not isinstance(findings, list) or len(findings) > 12:
         raise ReviewBlocked("invalid findings")
     for item in findings:
         if not isinstance(item, dict) or set(item) != {"severity", "title", "issue", "fix"}:
@@ -318,6 +324,7 @@ def execute(args):
     run_dir = root / ".playbook-artifacts" / "opencode-runs" / run_id
     run_dir.mkdir(parents=True, exist_ok=False)
     (run_dir / "input_manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    (run_dir / 'input_packet.txt').write_text(packet,encoding='utf-8')
     request_evidence = {
         "schema_version": "assistant.opencode_review_attempt.v1",
         "run_id": run_id, "role": args.role, "task": args.task,
