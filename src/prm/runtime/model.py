@@ -1,6 +1,6 @@
 """Explicit bounded Chat Completions transport; no ambient key/provider/model."""
 from __future__ import annotations
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 import json
 import time
 import hashlib
@@ -9,9 +9,9 @@ from urllib.request import Request, HTTPRedirectHandler,ProxyHandler, build_open
 
 from llm.client import LLMCompletionReceipt, LLMOutcomeUnknown
 from prm.capabilities import CapabilityDenied, AuthorizationDecision
-from prm.storage.policy import DurableCapabilityRegistry
+from prm.storage.policy import DurableCapabilityRegistry,ScopePreparationUnknown
 from prm.storage.postgres import StorageError
-from .model_errors import ModelResponseInvalid
+from .model_errors import ModelResponseInvalid,ModelAccountingReceipt,ModelPreparationUnknown
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -98,7 +98,7 @@ class ScopedModelClient:
         self.input_digest=digest
         self.attempt_ref=prepare_model_attempt(self.registry.store,owner=owner_ref,task_ref=self.task_ref or operations[0],
             purpose=self.groups[0][0].purpose,operation_refs=operations,input_digest=digest)
-        started=time.monotonic();http_attempted=False;known_reply_error=None
+        started=time.monotonic();http_attempted=False;known_reply_error=None;accepted_reply=None;accounting_unconfirmed=False
         def transport():
             nonlocal http_attempted
             if self.guard:self.guard()
@@ -131,27 +131,37 @@ class ScopedModelClient:
                 if not isinstance(entry,dict) or type(entry.get(key,0))is not int or not 0<=entry.get(key,0)<=usage[total]:raise ModelResponseInvalid()
             return text,usage
         def checked_transport():
-            nonlocal known_reply_error
-            try:return transport()
+            nonlocal known_reply_error,accepted_reply
+            try:
+                accepted_reply=transport();return accepted_reply
             except ModelResponseInvalid as error:
                 known_reply_error=error;raise
         try:
             reservations=tuple(tuple(decision.reservation for decision in group) for group in self.groups)
             text,usage=self.registry.execute_reserved_groups(reservations,checked_transport)
         except CapabilityDenied:raise
+        except ScopePreparationUnknown as error:
+            error.attempt_ref=self.attempt_ref;error.external_call_attempted=False
+            raise
         except Exception:
-            unknown=LLMCompletionReceipt(text='',model=endpoint.model,input_tokens=0,output_tokens=0,
-                estimated_cost_usd=None,duration_ms=int((time.monotonic()-started)*1000),attempts=1,usage_recorded=False,
-                external_call_attempted=http_attempted,delivery_outcome='unknown')
-            # Compound execution may wrap the original validation error. Keep
-            # the positively observed invalid reply independent of that wrapper.
-            error=known_reply_error or LLMOutcomeUnknown(unknown)
-            error.operation_refs=operations;error.attempt_ref=self.attempt_ref;error.retry_allowed=False
-            if self.usage_observer:
-                try:self.usage_observer(unknown,{'input':None,'cached_input':None,'cache_write':None,'output':None,'reasoning':None,
-                    'semantics':'invalid_provider_response' if known_reply_error else 'unknown_outcome'},self.groups)
-                except Exception:error.accounting_status='unconfirmed'
-            raise error from None
+            if accepted_reply is not None:
+                # The reply was positively observed even if final settlement
+                # lost its acknowledgement. Preserve it without another call.
+                text,usage=accepted_reply;accounting_unconfirmed=True
+            elif not http_attempted:
+                raise ModelPreparationUnknown(self.attempt_ref,operations) from None
+            else:
+                unknown=LLMCompletionReceipt(text='',model=endpoint.model,input_tokens=0,output_tokens=0,
+                    estimated_cost_usd=None,duration_ms=int((time.monotonic()-started)*1000),attempts=1,usage_recorded=False,
+                    external_call_attempted=http_attempted,delivery_outcome='unknown')
+                # Compound execution may wrap the original validation error.
+                error=known_reply_error or LLMOutcomeUnknown(unknown)
+                error.operation_refs=operations;error.attempt_ref=self.attempt_ref;error.retry_allowed=False
+                if self.usage_observer:
+                    try:self.usage_observer(unknown,{'input':None,'cached_input':None,'cache_write':None,'output':None,'reasoning':None,
+                        'semantics':'invalid_provider_response' if known_reply_error else 'unknown_outcome'},self.groups)
+                    except Exception:error.accounting_status='unconfirmed'
+                raise error from None
         receipt=LLMCompletionReceipt(text=text,model=endpoint.model,input_tokens=usage['prompt_tokens'],
             output_tokens=usage['completion_tokens'],estimated_cost_usd=None,duration_ms=int((time.monotonic()-started)*1000),
             attempts=1,usage_recorded=False,external_call_attempted=True,delivery_outcome='accepted')
@@ -159,5 +169,9 @@ class ScopedModelClient:
             normalized={'input':usage['prompt_tokens'],'cached_input':usage.get('prompt_tokens_details',{}).get('cached_tokens',0),
                         'cache_write':0,'output':usage['completion_tokens'],'reasoning':usage.get('completion_tokens_details',{}).get('reasoning_tokens',0),
                         'semantics':'openai_chat_output_includes_reasoning' if endpoint.provider_ref=='provider_openai' else 'unknown_compatible_provider'}
-            self.usage_observer(receipt,normalized,self.groups)
+            try:self.usage_observer(receipt,normalized,self.groups)
+            except Exception:accounting_unconfirmed=True
+        if accounting_unconfirmed:
+            return ModelAccountingReceipt(**{item.name:getattr(receipt,item.name) for item in fields(LLMCompletionReceipt)},
+                attempt_ref=self.attempt_ref,operation_refs=operations)
         return receipt

@@ -2,6 +2,22 @@
 from prm.storage.postgres import StorageError
 from llm.client import LLMOutcomeUnknown
 from dataclasses import dataclass
+from llm.client import LLMCompletionReceipt
+
+
+@dataclass(frozen=True)
+class ModelAccountingReceipt(LLMCompletionReceipt):
+    accounting_status: str = 'unconfirmed'
+    attempt_ref: str = ''
+    operation_refs: tuple = ()
+    retry_allowed: bool = False
+
+
+class ModelPreparationUnknown(StorageError):
+    def __init__(self,attempt_ref,operation_refs):
+        super().__init__('model preparation is unconfirmed; transport was not attempted; do not retry automatically')
+        self.attempt_ref=attempt_ref;self.operation_refs=tuple(operation_refs)
+        self.retry_allowed=False;self.external_call_attempted=False;self.reason_kind='preparation_unknown'
 
 
 @dataclass(frozen=True)

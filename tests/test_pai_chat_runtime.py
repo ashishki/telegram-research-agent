@@ -173,7 +173,8 @@ def test_cancel_after_model_response_preserves_charge_and_prevents_result_comple
     assert all(w['consumed']==1 for w in pai.root.registry.snapshot(pai.root.owner_ref)['windows'])
 
 
-def test_known_invalid_model_response_retains_typed_no_retry_even_if_accounting_fails(runtime):
+@pytest.mark.parametrize('mode',['invalid','accepted','accepted_settlement_loss'])
+def test_known_invalid_model_response_retains_typed_no_retry_even_if_accounting_fails(runtime,monkeypatch,mode):
     from prm.capabilities import AuthorizationRequest
     from prm.runtime.model_errors import ModelResponseInvalid
     from prm.runtime.model_attempts import ModelAttemptAlreadyRecorded
@@ -186,13 +187,39 @@ def test_known_invalid_model_response_retains_typed_no_retry_even_if_accounting_
     current,decision=client('invalid_reply_attempt')
     def failed_observer(*args):raise StorageError('synthetic accounting failure')
     current.usage_observer=failed_observer
-    kwargs={'prompt':'Synthetic invalid usage','system':'Answer this question.','max_tokens':80,'category':'chat','authorization':decision,
+    kwargs={'prompt':'Synthetic invalid usage' if mode=='invalid' else 'Synthetic accepted usage','system':'Answer this question.','max_tokens':80,'category':'chat','authorization':decision,
         'data_class':'user_provided','owner_ref':root.owner_ref,'connection_ref':'connection_fixture','resource_ref':'resource_dialogue'}
-    with pytest.raises(ModelResponseInvalid) as failure:current.complete_with_receipt(**kwargs)
-    assert not failure.value.retry_allowed and failure.value.operation_refs==('invalid_reply_attempt',)
-    assert failure.value.accounting_status=='unconfirmed'
+    if mode=='accepted_settlement_loss':
+        from prm.storage.policy import ScopeTransportUnknown
+        original=root.registry.execute_reserved_groups
+        def failed_settlement(*args,**kwargs):
+            original(*args,**kwargs);raise ScopeTransportUnknown(('invalid_reply_attempt',))
+        monkeypatch.setattr(root.registry,'execute_reserved_groups',failed_settlement)
+    if mode=='invalid':
+        with pytest.raises(ModelResponseInvalid) as failure:current.complete_with_receipt(**kwargs)
+        observed=failure.value
+    else:
+        observed=current.complete_with_receipt(**kwargs)
+        assert observed.delivery_outcome=='accepted' and observed.text and not observed.usage_recorded and observed.estimated_cost_usd is None
+    assert not observed.retry_allowed and observed.operation_refs==('invalid_reply_attempt',)
+    assert observed.accounting_status=='unconfirmed'
     replay,reserved=client('invalid_reply_fresh_reservation')
     try:
         with pytest.raises(ModelAttemptAlreadyRecorded):replay.complete_with_receipt(**dict(kwargs,authorization=reserved))
     finally:reserved.reservation.abandon_before_transport()
     assert len(requests)==1
+
+
+def test_model_preparation_unknown_is_distinct_from_provider_unknown(runtime,monkeypatch):
+    from prm.capabilities import AuthorizationRequest
+    from prm.storage.policy import ScopePreparationUnknown
+    root,requests,now=runtime;grant(root,now)
+    decision=root.registry.authorize_and_reserve(AuthorizationRequest(owner_ref=root.owner_ref,connection_ref='connection_fixture',capability='model.generate',
+        resource_ref='resource_dialogue',operation='model_egress',data_class='user_provided',provider_ref='provider_openai',purpose='answer.request',operation_ref='preparation_unknown_model'),upper_bound=1)
+    client=root.scoped_client(root.model_endpoint,groups=((decision,),),task_ref='preparation_unknown_task',attempt_ref=decision.operation_ref)
+    def unknown_prepare(*args,**kwargs):raise ScopePreparationUnknown((decision.operation_ref,))
+    monkeypatch.setattr(root.registry,'_commit_durable_transport',unknown_prepare)
+    with pytest.raises(ScopePreparationUnknown) as error:client.complete_with_receipt(prompt='Synthetic preflight',system='Answer.',max_tokens=80,category='chat',authorization=decision,
+        data_class='user_provided',owner_ref=root.owner_ref,connection_ref='connection_fixture',resource_ref='resource_dialogue')
+    assert not error.value.external_call_attempted and not error.value.retry_allowed and error.value.attempt_ref
+    assert not requests
