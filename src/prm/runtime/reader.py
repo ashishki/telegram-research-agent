@@ -52,7 +52,7 @@ class PrivateReportRuntime:
                     account=tx.conn.execute('SELECT status FROM pa_connections.accounts WHERE owner=%s AND id=%s',
                         (self.root.owner_ref,request.connection_ref)).fetchone()
                     if not account or account['status']!='connected':return None
-        key=hashlib.sha256((self.root.owner_ref+document.content_digest+format).encode()).hexdigest()
+        key=hashlib.sha256(('\x1f'.join((self.root.owner_ref,document.brief_id,str(document.version),document.content_digest,format))).encode()).hexdigest()
         path=self.path/(key+'.'+format)
         if not path.exists():
             with tempfile.TemporaryDirectory(prefix='pa-render-',dir=self.path) as temp:

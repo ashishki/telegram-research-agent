@@ -1,0 +1,141 @@
+{
+  "schema_version": 1,
+  "status": "failed_or_incomplete",
+  "call_number": 45,
+  "call_limit": 45,
+  "purpose": "phase_D_product",
+  "read_only": true,
+  "provider": "opencode_go",
+  "requested_model": "mimo-v2.6-pro",
+  "observed_model": null,
+  "requested_effort": "thinking_disabled",
+  "observed_effort": "unknown",
+  "head_sha": "273ab6b6b73c448f3e4918edece6c0d7e3ec429b",
+  "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+  "diff_sha256": "2584022005b17e07c6171045c158d2048044a60caa54a4cea2e450ed49a313c5",
+  "sources": [
+    {
+      "path": "src/prm/runtime/model.py",
+      "sha256": "76ecda296ecad2d6658b9479a09b3a42045349027f63f93c984e785e2da90df4",
+      "bytes": 8531
+    },
+    {
+      "path": "src/prm/runtime/archive.py",
+      "sha256": "9051d9804cce9a738df94d5ecc02073fdd32194da2256dd7b92ebe90ab3c8f6d",
+      "bytes": 3799
+    },
+    {
+      "path": "src/prm/runtime/web.py",
+      "sha256": "86a07764e5f27485d8b11b3d894043496330e2ddb47a53dcff6fd1c1aa3d4d42",
+      "bytes": 7136
+    },
+    {
+      "path": "src/prm/runtime/research.py",
+      "sha256": "2fb5a18d5ea54f8c91d5766840b438ef84f06452377c37e5e41e310f07401c5c",
+      "bytes": 17072
+    },
+    {
+      "path": "src/prm/runtime/brief.py",
+      "sha256": "3dc5a14aa684c432b7fc6e397aa1ba11428ce1a39f22149c733cad75e57ba962",
+      "bytes": 8184
+    },
+    {
+      "path": "src/prm/runtime/reader.py",
+      "sha256": "a934a3fd3cadf638860f266bb6b3085902496bad55e0d0d6658284e02a689e5b",
+      "bytes": 8795
+    },
+    {
+      "path": "src/prm/runtime/render.py",
+      "sha256": "273a4c571859036bbce87cbec417d700889637a2ac11b625922125ae31767902",
+      "bytes": 1491
+    },
+    {
+      "path": "src/prm/runtime/composition.py",
+      "sha256": "bbe74ae10414e6c43930eef0e52eb6fb25e4d7e58d674b9a7f34c91d118c59e3",
+      "bytes": 47842
+    },
+    {
+      "path": "src/prm/runtime/connector_summary.py",
+      "sha256": "b74241ed5b43d8d8edb1a39e70d184283ab057f4e06ef0f8985c9fa74ced5b0c",
+      "bytes": 3536
+    },
+    {
+      "path": "src/prm/runtime/network_guard.py",
+      "sha256": "5330d7fd43849569375c98b9c3b491a9f73e58d105894058529c243277c221eb",
+      "bytes": 430
+    },
+    {
+      "path": "src/prm/storage/briefs.py",
+      "sha256": "9ffd197b165487375ae0552efb9c4fb9ff8723cb354f1f163c7656103dff034d",
+      "bytes": 8921
+    },
+    {
+      "path": "src/prm/storage/artifacts.py",
+      "sha256": "fa2bdc99e661fb7973d35f9ca9ea3cb0cf6bcad10107a179483b9a5f285c719c",
+      "bytes": 1530
+    },
+    {
+      "path": "tests/test_pai_chat_runtime.py",
+      "sha256": "161789fde64868948daf32d129772b33cac90ac62be2ecb0944c7f78ed22dbad",
+      "bytes": 9523
+    },
+    {
+      "path": "tests/test_pai_archive_search.py",
+      "sha256": "94942b1bc068cb9a2c23d7c317c8483a3284382b6c78268fb2a792c2b833779d",
+      "bytes": 2607
+    },
+    {
+      "path": "tests/test_pai_web_github.py",
+      "sha256": "fcfa65f5c345e5fd6ca28eca6178f3310139c9fa6bff20bc3d7778ef922f1730",
+      "bytes": 2195
+    },
+    {
+      "path": "tests/test_pai_deep_research.py",
+      "sha256": "9110a5284fbba63fb60213b6c4a6002477af16602527b0236ed7327cf72cf9eb",
+      "bytes": 2325
+    },
+    {
+      "path": "tests/test_pai_brief_runtime.py",
+      "sha256": "9cf0d2178df33b97488c5f50ad672feccb7d96e3da1f936273a2970a35410456",
+      "bytes": 2003
+    },
+    {
+      "path": "tests/test_pai_report_runtime.py",
+      "sha256": "06f91275c2db829b4c60f03f9ab5e4345a167fc1d780fd368594973fc865677d",
+      "bytes": 2725
+    },
+    {
+      "path": ".playbook-artifacts/pai-integration-code-20261008.diff",
+      "sha256": "e2701156d5c4eca3dcf50bd83a31bf05b7007008421950345f386d769017ed3c",
+      "bytes": 26465
+    }
+  ],
+  "scope": "phase_D_product; supplied full current source/tests and explicitly labeled integration diff if present",
+  "input_sha256": "4efc33a0d40a2edaa72b3162393d539c1867f540c4115a80a07c5acab0ece9c6",
+  "input_bytes": 179861,
+  "output_token_cap": 16000,
+  "timeout_seconds": 900,
+  "workflow_receipt": false,
+  "human_authority": false,
+  "runner_path": ".playbook-artifacts/pai-review-as-needed.py",
+  "runner_sha256": "8306b7e250e58139ee08be8c58de615d3d6fe684f5a4726c091ce9eaf689d545",
+  "transport_path": "tools/mimo_code_review.py",
+  "transport_sha256": "b0ba01f2647f21c004e54d2b9840573b38ac43ea541e394fd61bdfa2c9705c75",
+  "command": ".venv-pai/bin/python .playbook-artifacts/pai-review-as-needed.py --call-number 45 --purpose phase_D_product",
+  "source_exclusions": [
+    "actual private corpus",
+    "live account payload",
+    "credentials",
+    "production configuration"
+  ],
+  "authority_exclusions": [
+    "human/workflow completion",
+    "live-account consent",
+    "production migration/deployment",
+    "product-provider spending"
+  ],
+  "request_body_sha256": "03b0eaf321a194900914193fe17e542a60957a56f0b5005dda629a41c2011be5",
+  "provider_call_attempted": true,
+  "error_type": "TimeoutError",
+  "duration_seconds": 900.103
+}

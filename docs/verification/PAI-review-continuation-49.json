@@ -1,0 +1,237 @@
+{
+  "schema_version": 1,
+  "status": "reviewed",
+  "call_number": 49,
+  "call_limit": 49,
+  "purpose": "phase_F_completeness",
+  "read_only": true,
+  "provider": "opencode_go",
+  "requested_model": "mimo-v2.6-pro",
+  "observed_model": "mimo-v2.6-pro",
+  "requested_effort": "thinking_disabled",
+  "observed_effort": "thinking_disabled",
+  "head_sha": "273ab6b6b73c448f3e4918edece6c0d7e3ec429b",
+  "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+  "diff_sha256": "2584022005b17e07c6171045c158d2048044a60caa54a4cea2e450ed49a313c5",
+  "sources": [
+    {
+      "path": "src/prm/runtime/memory.py",
+      "sha256": "747529ff2935be958f821f36e8750b34dd00ce2814a62aada1ec43650bc5e7b2",
+      "bytes": 7699
+    },
+    {
+      "path": "src/prm/runtime/deletion.py",
+      "sha256": "12ce6cf1397e7b67bc4f5b1f515bab9d870c3a4f26bf4e2a3709f94782315c04",
+      "bytes": 5678
+    },
+    {
+      "path": "src/prm/runtime/media.py",
+      "sha256": "418f38864fce9adc5957464641afcbfcd70922dc5ecbec56e9964afcf89c7a60",
+      "bytes": 10701
+    },
+    {
+      "path": "src/prm/runtime/media_download.py",
+      "sha256": "e76592c518518c554de2378ce1cd4dfb33fd9c35fafcf4763122acc00a212c4a",
+      "bytes": 2967
+    },
+    {
+      "path": "src/prm/runtime/media_extract.py",
+      "sha256": "65bdffd50dcc56efd6a378244499bb436ddb36f6f408269b730cbbfc6d8b15f2",
+      "bytes": 1971
+    },
+    {
+      "path": "src/prm/runtime/speech.py",
+      "sha256": "a9244bc94b07eb0e585c87ee30f274a25c3305e582c4e6a5a42045d30793c5fe",
+      "bytes": 4617
+    },
+    {
+      "path": "src/prm/runtime/vision.py",
+      "sha256": "b873cf98e91c577756d8c3aff394399bdb6bf76afb96e53b369317906cdadda3",
+      "bytes": 6183
+    },
+    {
+      "path": "src/prm/runtime/model_attempts.py",
+      "sha256": "5498d7273a349037dac1fcce150df5fb7328937910419240ce6e2b86a6882d87",
+      "bytes": 1588
+    },
+    {
+      "path": "src/prm/runtime/media_attempts.py",
+      "sha256": "e593ea338268c67ccd300653b1788a43d7ddef29ac2d7b17ee222f796db5deb4",
+      "bytes": 2759
+    },
+    {
+      "path": "src/prm/runtime/model_errors.py",
+      "sha256": "fcba5a68028b5c13624bf5a8ea0590a9a7eee235fb006207ab17a5cc61ab4bf3",
+      "bytes": 1818
+    },
+    {
+      "path": "src/prm/runtime/cost_cache.py",
+      "sha256": "a48fbcfa8594ad21cc8c7407c0b6585661b48674a80d93a0d171f76a611392b2",
+      "bytes": 8270
+    },
+    {
+      "path": "src/prm/runtime/operations.py",
+      "sha256": "49e29487dcfddbc89e43e004aa9a4eee5398995f7318f3368b2cb70c6a8177f0",
+      "bytes": 12325
+    },
+    {
+      "path": "src/prm/runtime/migration.py",
+      "sha256": "afd316b41955c7156b64ef2dc4218f87d34917482188e6cd95f468cb46bc0129",
+      "bytes": 18848
+    },
+    {
+      "path": "src/prm/runtime/release.py",
+      "sha256": "5c9f26f01df20023835c6db10c3aee2b4e2097707e575a5ec727e72b0b36a446",
+      "bytes": 1989
+    },
+    {
+      "path": "src/prm/runtime/evaluation.py",
+      "sha256": "a48d495a3c5d0997945ba1b5f6fbd096572b2ae79c3e03754bb91f3e470b29de",
+      "bytes": 3765
+    },
+    {
+      "path": "src/prm/runtime/profiles.py",
+      "sha256": "6019ce252d020575916e1a0f40ab74652324ba86f6e6ed2846889e3e37f6c5b8",
+      "bytes": 1600
+    },
+    {
+      "path": "src/prm/runtime/setup.py",
+      "sha256": "fdd5f469faa2b05f7fcf6c6aec6b319e6a68d8e7a28dad83aa1385844bfadbea",
+      "bytes": 1463
+    },
+    {
+      "path": "src/prm/storage/academic.py",
+      "sha256": "1543a4a5fa96f476694c4bb9efe0a861ba91fb09e53a74f271566b59e200af09",
+      "bytes": 1395
+    },
+    {
+      "path": "src/prm/runtime/__init__.py",
+      "sha256": "f26b44b369367a6b0165367b57e5afe98e354a3bc0a935f8c1afc41dea41c52a",
+      "bytes": 72
+    },
+    {
+      "path": "tests/test_pai_memory_runtime.py",
+      "sha256": "648435d04f97f12b5b8879bac033c7222f7df1807de4b3dbf32d2edfb596aefe",
+      "bytes": 3673
+    },
+    {
+      "path": "tests/test_pai_media_runtime.py",
+      "sha256": "16f11ed04a1ede6ca7c053fff0048ab0c10eda92b86675c7f4abd1acac23be42",
+      "bytes": 14153
+    },
+    {
+      "path": "tests/test_pai_cost_cache.py",
+      "sha256": "cc5ffb0d7c7f241a576e5488fb564e4acd9d2b425d88eccaf1dec7a169bd3208",
+      "bytes": 2830
+    },
+    {
+      "path": "tests/test_pai_operations_runtime.py",
+      "sha256": "ed887d6c7c447c3907fb6b56c871eb64316c3cccc7c2e2653855d3528c78aed5",
+      "bytes": 798
+    },
+    {
+      "path": "tests/test_pai_migration.py",
+      "sha256": "e9f9b9a7b34bd6424557d755533babe6ba7af7bedf7f14d636d0d1041f0389ba",
+      "bytes": 7126
+    },
+    {
+      "path": "tests/test_pai_load_recovery.py",
+      "sha256": "cc5e44463098879931c6960185d0dc492568ba4d403761adb10f3b1d6ddd58c5",
+      "bytes": 1354
+    }
+  ],
+  "scope": "phase_F_completeness; supplied full current source/tests and explicitly labeled integration diff if present",
+  "input_sha256": "8e2714d6b1ad1bff2585dfe486bfc4e909690e39186df0cedefb5e0630cbdf70",
+  "input_bytes": 137837,
+  "output_token_cap": 16000,
+  "timeout_seconds": 900,
+  "workflow_receipt": false,
+  "human_authority": false,
+  "runner_path": ".playbook-artifacts/pai-review-as-needed.py",
+  "runner_sha256": "8306b7e250e58139ee08be8c58de615d3d6fe684f5a4726c091ce9eaf689d545",
+  "transport_path": "tools/mimo_code_review.py",
+  "transport_sha256": "b0ba01f2647f21c004e54d2b9840573b38ac43ea541e394fd61bdfa2c9705c75",
+  "command": ".venv-pai/bin/python .playbook-artifacts/pai-review-as-needed.py --call-number 49 --purpose phase_F_completeness",
+  "source_exclusions": [
+    "actual private corpus",
+    "live account payload",
+    "credentials",
+    "production configuration"
+  ],
+  "authority_exclusions": [
+    "human/workflow completion",
+    "live-account consent",
+    "production migration/deployment",
+    "product-provider spending"
+  ],
+  "request_body_sha256": "46f325333358ce94215824f6aa3ddb8c9b6fa7aa658f92c7103f1b9c7cff1993",
+  "provider_call_attempted": true,
+  "usage": {
+    "prompt_tokens": 35705,
+    "completion_tokens": 1482,
+    "total_tokens": 37187,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    }
+  },
+  "finish_reason": "stop",
+  "response_sha256": "cc937b8b3ec44acce05df85a300cb183f662289850bed678e536f441c148af75",
+  "findings": {
+    "verdict": "FIX_P1_FIRST",
+    "findings": [
+      {
+        "severity": "P1",
+        "title": "Media answer can cite nonexistent page numbers that happen to exist in the visible page set, but cached/OCR page numbering is attacker-influenced and not re-verified against the source",
+        "file": "src/prm/runtime/media.py:78-82",
+        "issue": "When OCR runs, `extracted=self.ocr(asset,source)` replaces the page list without any validation that page numbers are positive integers, unique, or bounded, and later `question` computes `actual={page for page,body in extracted['pages']}` and only checks `cited<=actual`. A buggy or adversarial OCR adapter returning pages like `[[0,'x'],[-3,'y'],[999999999,'z']]` lets the model produce citations that pass validation, and the returned `page_refs` are unbounded integers with no relationship to the document.",
+        "fix": "Validate `extracted['pages']` after every producer (subprocess output and OCR): each entry must be a 2-element list `[int page, str text]`, pages strictly positive, unique, ascending, and <= the known page/asset bound; reject otherwise. Return only validated page refs.",
+        "confidence": "medium"
+      },
+      {
+        "severity": "P1",
+        "title": "Post-extraction bound is checked on file size before JSON parsing, and parsed payload structure is not validated",
+        "file": "src/prm/runtime/media.py:76-78",
+        "issue": "`out.stat().st_size>64000` bounds the raw JSON file, but `json.loads` result is used unchecked: `extracted['pages']` can be any type or contain non-string bodies, and if the extractor output lacks the 'pages' key a KeyError surfaces instead of a typed storage error. Combined with the OCR substitution path, no validation enforces the structure the citation check depends on.",
+        "fix": "After `json.loads`, require a dict with a required 'pages' key of bounded length (e.g. <= 32) whose entries are `[int,str]` pairs, otherwise raise `StorageError('extraction output malformed')` before any OCR substitution or caching.",
+        "confidence": "medium"
+      },
+      {
+        "severity": "P1",
+        "title": "OCR path returns unbound extraction result even when no authorization is granted for its content",
+        "file": "src/prm/runtime/media.py:78-81",
+        "issue": "When text-layer extraction yields only blank pages and `self.ocr` is provided, the code calls `self.ocr(asset,source)` unconditionally and returns or caches its output. If OCR invokes a remote provider (nothing in the supplied modules forbids that, since the adapter is injected), this sends user media to an external provider with no `AuthorizationRequest`, reservation, or accounting, unlike `extract`'s local vs egress distinction elsewhere. The comment on cache hits ('cache hits never substitute for model-egress consent') does not cover this path.",
+        "fix": "Restrict `self.ocr` to a local-only adapter interface that never performs network egress, or require an explicit `authorize_and_reserve` with a dedicated `media.ocr` capability/purpose before invoking OCR and record accounting; fail closed with `ocr_unavailable` when none is available.",
+        "confidence": "medium"
+      },
+      {
+        "severity": "P1",
+        "title": "Domain import reapplies deleted-object tombstones via delete_derived_in that may resurrect derived state created after the snapshot",
+        "file": "src/prm/runtime/migration.py:144-146",
+        "issue": "After replacing all domain tables with the source snapshot, `apply_domain_delta` runs `delete_derived_in` for every tombstone row. Because `delete_derived_in` cancels jobs, deletes conversation history, artifacts, cache entries and watch bindings matching those refs at import time, re-importing the same delta (as the repeated-import test exercises) is idempotent only where the derived data matches. However `delete_derived_in` also mutates `pa_memory.previews` and deletes object rows for descendants computed at import time; if the snapshot's dependency graph contains a descendant that the live target had legitimately re-created with a new version (same object_ref), that newer target state is silently deleted rather than surfaced as a conflict.",
+        "fix": "Before applying each tombstone, check for target-owned objects under that ref whose row data differs from what was tombstoned in the snapshot and raise a forward-fix conflict instead of deleting unconditionally; or restrict re-import tombstone reapplication to refs absent from the target object_versions table.",
+        "confidence": "low"
+      },
+      {
+        "severity": "P1",
+        "title": "Media download reservation is not tied to the request's ownership and can be triggered for another chat's file_ref",
+        "file": "src/prm/runtime/media_download.py:16-21",
+        "issue": "`download` validates `file_ref` only for length and authorizes against `self.resource_ref` set at construction time; there is no check that `file_ref` originated from the authenticated chat/user that owns `root.owner_ref`. A caller that forwards an arbitrary `file_id` can fetch any file Telegram exposes to the bot token, regardless of which owner/chat supplied it, and the bytes are then stored under the assistant's owner_ref.",
+        "fix": "Thread the authenticated chat/actor tuple through `download` and require it to match `root.owner_ref` (similar to `MemoryRuntime._owner`) before reserving, and record which chat/user supplied the `file_ref` in the resulting asset.",
+        "confidence": "medium"
+      }
+    ],
+    "not_verified": [
+      "Runtime behavior of `prm.storage.postgres` (PostgresStore/StateTransaction, `_object_lock`, `put`/`get` semantics) since that module is not in the supplied packet.",
+      "`prm.capabilities` reservation/grant enforcement and `authorize_and_reserve` semantics; assumed fail-closed but not source-verified here.",
+      "`llm.client` `LLMCompletionReceipt`/`LLMOutcomeUnknown` and `registry.execute_reserved` behavior.",
+      "`reader.PrivateReportRuntime.cleanup_deleted` and `WatchScheduler.complete_subject_in` implementations referenced from deletion/migration code.",
+      "Whether injected `ocr`/`vision`/`transcriber` adapters in non-test production wiring perform their own network egress or scope checks.",
+      "Whether `pa_jobs.jobs.payload` input_namespace/input_ref keys are always present as strings (deletion relies on `payload->>'input_namespace'` string equality)."
+    ],
+    "summary": "Overall this module set is carefully fail-closed: unknown/outcome-ambiguous media transports are fenced as non-retryable with durable model_attempt records, reservations are abandoned before transport on validation failures, unknown pricing stays NULL rather than zero, deletion applies owner-scoped tombstones plus artifact cleanup, and receipts/deltas are monotone against replays. The main remaining risks are around media extraction output validation and OCR substitution: extracted page structure and OCR-produced page numbering are trusted without schema checks, allowing bad citations and possibly mis-scoped egress through injected OCR adapters; migration also re-deletes descendant refs on repeated imports without conflict detection. None of these are P0 since they require an already-authorized owner-context or a faulty injected adapter to exploit, but they should be fixed before broadened use."
+  },
+  "duration_seconds": 43.123
+}

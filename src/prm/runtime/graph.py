@@ -43,6 +43,16 @@ class GraphRateLimited(StorageError):pass
 class GraphDeltaReset(StorageError):pass
 
 
+def _mail_metadata(row):
+    try:
+        sender=row.get('from',{}).get('emailAddress',{}).get('address','')
+        if not isinstance(sender,str):raise ValueError
+        moment=datetime.fromisoformat(row['receivedDateTime'].replace('Z','+00:00'))
+        if moment.tzinfo is None:raise ValueError
+        return sender,moment
+    except (ValueError,TypeError,KeyError,AttributeError):raise StorageError('mail metadata shape differs') from None
+
+
 class GraphTransport:
     def __init__(self,*,registry,connections,owner_ref,connection_ref,account_ref,upper_bound=None):
         if connections.store.target!=registry.store.target:raise StorageError('shared connection/policy backend required')
@@ -166,8 +176,7 @@ class GraphMailAdapter:
                     if not isinstance(row,dict) or not isinstance(row.get('id'),str):raise StorageError('invalid mail record')
                     deleted='@removed' in row;payload={key:row[key] for key in self.FIELDS if key in row};payload['scope_digest']=scope
                     if not deleted:
-                        address=row.get('from',{}).get('emailAddress',{}).get('address','');domain=address.rsplit('@',1)[-1].casefold()
-                        moment=datetime.fromisoformat(row['receivedDateTime'].replace('Z','+00:00'))
+                        address,moment=_mail_metadata(row);domain=address.rsplit('@',1)[-1].casefold()
                         if selection.sender_domains and domain not in selection.sender_domains:continue
                         if selection.since and moment<selection.since or selection.until and moment>=selection.until:continue
                     digest=hashlib.sha256(json.dumps(payload,sort_keys=True).encode()).hexdigest()
@@ -202,9 +211,8 @@ class GraphMailAdapter:
         if not isinstance(rows,list) or len(rows)>request.page_size:raise StorageError('mail page exceeds selected size')
         output=[]
         for row in rows:
-            address=row.get('from',{}).get('emailAddress',{}).get('address','');domain=address.rsplit('@',1)[-1].casefold()
+            address,moment=_mail_metadata(row);domain=address.rsplit('@',1)[-1].casefold()
             if selection.sender_domains and domain not in selection.sender_domains:continue
-            moment=datetime.fromisoformat(row['receivedDateTime'].replace('Z','+00:00'))
             if selection.since and moment<selection.since or selection.until and moment>=selection.until:continue
             output.append(MailMessage('message_'+hashlib.sha256(row['id'].encode()).hexdigest()[:32],
                 'thread_'+hashlib.sha256(row.get('conversationId',row['id']).encode()).hexdigest()[:32],moment,domain,row.get('subject','')[:240],row.get('subject','')[:400]))

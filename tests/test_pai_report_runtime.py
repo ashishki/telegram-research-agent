@@ -46,3 +46,25 @@ def test_network_block_keeps_ssl_importable_and_rejects_socket_io():
         capture_output=True,text=True,timeout=5)
     assert result.returncode!=0 and 'isolated processor network disabled' in result.stderr
     assert 'TypeError' not in result.stderr
+
+
+def test_equal_content_reports_keep_independent_artifact_deletion_lineage(pai):
+    from dataclasses import replace
+    from prm.runtime.deletion import delete_derived_in
+    document,state=stored_brief(pai)
+    other=replace(document,brief_id='brief_'+'a'*32)
+    response=pai.root.conversations.record_response('42',text='Second report',topic='')
+    pai.root.briefs.bind_visible(conversation_id=response.conversation_id,response_ref=response.object_refs[0].response_ref,document=other,
+        authenticated_chat_id='42',authenticated_actor_id='42',authenticated_owner_chat_id='42')
+    reader=PrivateReportRuntime(pai.root,artifact_root=pai.path/'separate_reports')
+    token=reader.issue_session(chat_id='42',actor_id='42',owner_chat_id='42')
+    for item in (document,other):
+        assert reader.artifact(token,brief_id=item.brief_id,version=item.version,format='html') is not None
+    with pai.root.queue.store.transaction() as tx:
+        rows=tx.conn.execute('SELECT key,parent_ref FROM pa_artifacts.files WHERE owner=%s',(pai.root.owner_ref,)).fetchall()
+    assert len(rows)==2 and len({row['parent_ref'] for row in rows})==2
+    # Removing one report's durable source must not reassign or delete its sibling.
+    with pai.root.queue.store.transaction() as tx:
+        delete_derived_in(tx,owner=pai.root.owner_ref,namespace='result',object_ref=pai.root.briefs._document_ref(document.brief_id))
+    assert reader.artifact(token,brief_id=document.brief_id,version=document.version,format='html') is None
+    assert reader.artifact(token,brief_id=other.brief_id,version=other.version,format='html') is not None

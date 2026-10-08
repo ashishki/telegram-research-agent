@@ -67,19 +67,49 @@ class MediaRuntime:
         request=AuthorizationRequest(owner_ref=self.root.owner_ref,connection_ref=None,capability='assistant.media_read',resource_ref=asset.media_ref,
             operation='read',data_class='user_provided',provider_ref='provider_local',purpose='media.extract')
         hit=cache.get(key=key,authorization_request=request)
-        if hit is not None:return hit
+        if hit is not None:return self._validated_pages(hit,maximum=1 if asset.kind=='image' else 32)
         with tempfile.TemporaryDirectory(prefix='extract-',dir=self.path) as temp:
             out=Path(temp)/'text.json';env={'PATH':os.environ.get('PATH','/usr/bin:/bin'),'LANG':'C.UTF-8','PYTHONPATH':str(Path(__file__).resolve().parents[2])}
             try:subprocess.run([sys.executable,'-m','prm.runtime.media_extract','--input',str(source),'--output',str(out),'--mime',asset.mime_type],
                 env=env,cwd=temp,check=True,timeout=12,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
             except Exception:raise StorageError('restricted extraction unavailable') from None
             if out.stat().st_size>64000:raise StorageError('extracted text exceeds bound')
-            extracted=json.loads(out.read_text())
+            try:extracted=self._validated_pages(json.loads(out.read_text()),maximum=1 if asset.kind=='image' else 32)
+            except (ValueError,TypeError,KeyError):raise StorageError('extraction output malformed') from None
+        known_pages=len(extracted['pages'])
         if not any(text.strip() for page,text in extracted['pages']):
             if self.ocr is None:return {'status':'ocr_unavailable','pages':extracted['pages']}
-            extracted=self.ocr(asset,source)
+            provider=getattr(self.ocr,'provider_ref',None);connection=getattr(self.ocr,'connection_ref',None)
+            upper=getattr(self.ocr,'upper_bound',None)
+            if not isinstance(provider,str) or not provider.startswith('provider_') or upper is None:
+                return {'status':'ocr_unavailable','pages':extracted['pages']}
+            decision=self.root.registry.authorize_and_reserve(AuthorizationRequest(owner_ref=self.root.owner_ref,connection_ref=connection,
+                capability='media.ocr',resource_ref=asset.media_ref,operation='read' if provider=='provider_local' else 'model_egress',
+                data_class='user_provided',provider_ref=provider,purpose='media.ocr',operation_ref='ocr_'+uuid.uuid4().hex),upper_bound=upper)
+            if not decision.allowed:return {'status':'ocr_unavailable','pages':extracted['pages']}
+            if provider!='provider_local':
+                from .model_attempts import prepare_model_attempt
+                try:prepare_model_attempt(self.root.queue.store,owner=self.root.owner_ref,task_ref=task_ref or asset.media_ref,
+                    purpose='media.ocr',operation_refs=(decision.operation_ref,),input_digest=asset.sha256)
+                except Exception:
+                    decision.reservation.abandon_before_transport();raise
+            extracted=self._validated_pages(self.root.registry.execute_reserved((decision.reservation,),lambda:self.ocr(asset,source)),maximum=known_pages)
         if self.root.registry.authorize(request).allowed:cache.put(key=key,kind='extraction',payload=extracted,dependencies=dependencies,ttl_seconds=1200)
         return extracted
+
+    @staticmethod
+    def _validated_pages(value,*,maximum):
+        if (not isinstance(value,dict) or not isinstance(value.get('pages'),list) or
+            not 1<=len(value['pages'])<=maximum or not isinstance(value.get('status'),str) or value['status'] not in {'extracted','ocr','ok'}):
+            raise StorageError('extraction output malformed')
+        previous=0;total=0
+        for page in value['pages']:
+            if (not isinstance(page,list) or len(page)!=2 or type(page[0])is not int or
+                not previous<page[0]<=maximum or not isinstance(page[1],str) or len(page[1])>8000):
+                raise StorageError('extraction output malformed')
+            previous=page[0];total+=len(page[1])
+        if total>48000:raise StorageError('extraction output exceeds bound')
+        return value
 
     def question(self,asset,question,*,request_ref):
         try:

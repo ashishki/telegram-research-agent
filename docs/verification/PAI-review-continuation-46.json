@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "status": "failed_or_incomplete",
+  "call_number": 46,
+  "call_limit": 46,
+  "purpose": "phase_D_search_model",
+  "read_only": true,
+  "provider": "opencode_go",
+  "requested_model": "mimo-v2.6-pro",
+  "observed_model": null,
+  "requested_effort": "thinking_disabled",
+  "observed_effort": "unknown",
+  "head_sha": "273ab6b6b73c448f3e4918edece6c0d7e3ec429b",
+  "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+  "diff_sha256": "2584022005b17e07c6171045c158d2048044a60caa54a4cea2e450ed49a313c5",
+  "sources": [
+    {
+      "path": "src/prm/runtime/model.py",
+      "sha256": "76ecda296ecad2d6658b9479a09b3a42045349027f63f93c984e785e2da90df4",
+      "bytes": 8531
+    },
+    {
+      "path": "src/prm/runtime/archive.py",
+      "sha256": "9051d9804cce9a738df94d5ecc02073fdd32194da2256dd7b92ebe90ab3c8f6d",
+      "bytes": 3799
+    },
+    {
+      "path": "src/prm/runtime/web.py",
+      "sha256": "86a07764e5f27485d8b11b3d894043496330e2ddb47a53dcff6fd1c1aa3d4d42",
+      "bytes": 7136
+    },
+    {
+      "path": "src/prm/runtime/research.py",
+      "sha256": "2fb5a18d5ea54f8c91d5766840b438ef84f06452377c37e5e41e310f07401c5c",
+      "bytes": 17072
+    },
+    {
+      "path": "src/prm/runtime/connector_summary.py",
+      "sha256": "b74241ed5b43d8d8edb1a39e70d184283ab057f4e06ef0f8985c9fa74ced5b0c",
+      "bytes": 3536
+    },
+    {
+      "path": "tests/test_pai_chat_runtime.py",
+      "sha256": "161789fde64868948daf32d129772b33cac90ac62be2ecb0944c7f78ed22dbad",
+      "bytes": 9523
+    },
+    {
+      "path": "tests/test_pai_archive_search.py",
+      "sha256": "94942b1bc068cb9a2c23d7c317c8483a3284382b6c78268fb2a792c2b833779d",
+      "bytes": 2607
+    },
+    {
+      "path": "tests/test_pai_web_github.py",
+      "sha256": "fcfa65f5c345e5fd6ca28eca6178f3310139c9fa6bff20bc3d7778ef922f1730",
+      "bytes": 2195
+    },
+    {
+      "path": "tests/test_pai_deep_research.py",
+      "sha256": "9110a5284fbba63fb60213b6c4a6002477af16602527b0236ed7327cf72cf9eb",
+      "bytes": 2325
+    }
+  ],
+  "scope": "phase_D_search_model; supplied full current source/tests and explicitly labeled integration diff if present",
+  "input_sha256": "8c7f887837abbd1e761f86f3d3ff0ea22cfc01685b603dae2b20b342116a7e9e",
+  "input_bytes": 63198,
+  "output_token_cap": 16000,
+  "timeout_seconds": 900,
+  "workflow_receipt": false,
+  "human_authority": false,
+  "runner_path": ".playbook-artifacts/pai-review-as-needed.py",
+  "runner_sha256": "8306b7e250e58139ee08be8c58de615d3d6fe684f5a4726c091ce9eaf689d545",
+  "transport_path": "tools/mimo_code_review.py",
+  "transport_sha256": "b0ba01f2647f21c004e54d2b9840573b38ac43ea541e394fd61bdfa2c9705c75",
+  "command": ".venv-pai/bin/python .playbook-artifacts/pai-review-as-needed.py --call-number 46 --purpose phase_D_search_model",
+  "source_exclusions": [
+    "actual private corpus",
+    "live account payload",
+    "credentials",
+    "production configuration"
+  ],
+  "authority_exclusions": [
+    "human/workflow completion",
+    "live-account consent",
+    "production migration/deployment",
+    "product-provider spending"
+  ],
+  "request_body_sha256": "b84f4e5c1d3ff85fd45c2411a1424f58d5e197d7c013f588fd726f5f3e43bdb2",
+  "provider_call_attempted": true,
+  "error_type": "TimeoutError",
+  "duration_seconds": 900.364
+}

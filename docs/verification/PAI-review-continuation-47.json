@@ -1,0 +1,136 @@
+{
+  "schema_version": 1,
+  "status": "reviewed",
+  "call_number": 47,
+  "call_limit": 47,
+  "purpose": "phase_D_brief_reader",
+  "read_only": true,
+  "provider": "opencode_go",
+  "requested_model": "mimo-v2.6-pro",
+  "observed_model": "mimo-v2.6-pro",
+  "requested_effort": "thinking_disabled",
+  "observed_effort": "thinking_disabled",
+  "head_sha": "273ab6b6b73c448f3e4918edece6c0d7e3ec429b",
+  "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+  "diff_sha256": "2584022005b17e07c6171045c158d2048044a60caa54a4cea2e450ed49a313c5",
+  "sources": [
+    {
+      "path": "src/prm/runtime/brief.py",
+      "sha256": "3dc5a14aa684c432b7fc6e397aa1ba11428ce1a39f22149c733cad75e57ba962",
+      "bytes": 8184
+    },
+    {
+      "path": "src/prm/runtime/reader.py",
+      "sha256": "a934a3fd3cadf638860f266bb6b3085902496bad55e0d0d6658284e02a689e5b",
+      "bytes": 8795
+    },
+    {
+      "path": "src/prm/runtime/render.py",
+      "sha256": "273a4c571859036bbce87cbec417d700889637a2ac11b625922125ae31767902",
+      "bytes": 1491
+    },
+    {
+      "path": "src/prm/runtime/network_guard.py",
+      "sha256": "5330d7fd43849569375c98b9c3b491a9f73e58d105894058529c243277c221eb",
+      "bytes": 430
+    },
+    {
+      "path": "src/prm/storage/briefs.py",
+      "sha256": "9ffd197b165487375ae0552efb9c4fb9ff8723cb354f1f163c7656103dff034d",
+      "bytes": 8921
+    },
+    {
+      "path": "src/prm/storage/artifacts.py",
+      "sha256": "fa2bdc99e661fb7973d35f9ca9ea3cb0cf6bcad10107a179483b9a5f285c719c",
+      "bytes": 1530
+    },
+    {
+      "path": "src/prm/runtime/composition.py",
+      "sha256": "bbe74ae10414e6c43930eef0e52eb6fb25e4d7e58d674b9a7f34c91d118c59e3",
+      "bytes": 47842
+    },
+    {
+      "path": "tests/test_pai_brief_runtime.py",
+      "sha256": "9cf0d2178df33b97488c5f50ad672feccb7d96e3da1f936273a2970a35410456",
+      "bytes": 2003
+    },
+    {
+      "path": "tests/test_pai_report_runtime.py",
+      "sha256": "06f91275c2db829b4c60f03f9ab5e4345a167fc1d780fd368594973fc865677d",
+      "bytes": 2725
+    },
+    {
+      "path": ".playbook-artifacts/pai-integration-code-20261008.diff",
+      "sha256": "e2701156d5c4eca3dcf50bd83a31bf05b7007008421950345f386d769017ed3c",
+      "bytes": 26465
+    }
+  ],
+  "scope": "phase_D_brief_reader; supplied full current source/tests and explicitly labeled integration diff if present",
+  "input_sha256": "2e639d6a47937ac9bf008ef58c04224c04d2ae5363394f17426795ade7fd706f",
+  "input_bytes": 118355,
+  "output_token_cap": 16000,
+  "timeout_seconds": 900,
+  "workflow_receipt": false,
+  "human_authority": false,
+  "runner_path": ".playbook-artifacts/pai-review-as-needed.py",
+  "runner_sha256": "8306b7e250e58139ee08be8c58de615d3d6fe684f5a4726c091ce9eaf689d545",
+  "transport_path": "tools/mimo_code_review.py",
+  "transport_sha256": "b0ba01f2647f21c004e54d2b9840573b38ac43ea541e394fd61bdfa2c9705c75",
+  "command": ".venv-pai/bin/python .playbook-artifacts/pai-review-as-needed.py --call-number 47 --purpose phase_D_brief_reader",
+  "source_exclusions": [
+    "actual private corpus",
+    "live account payload",
+    "credentials",
+    "production configuration"
+  ],
+  "authority_exclusions": [
+    "human/workflow completion",
+    "live-account consent",
+    "production migration/deployment",
+    "product-provider spending"
+  ],
+  "request_body_sha256": "305218396291009cca0a9405b1800a8ebd78af3146d70ec157ea177aa8bf3115",
+  "provider_call_attempted": true,
+  "usage": {
+    "prompt_tokens": 29666,
+    "completion_tokens": 542,
+    "total_tokens": 30208,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    }
+  },
+  "finish_reason": "stop",
+  "response_sha256": "58294f1ddd81bd119883e6446b9224ac3a2dbc0307d895115176f054b411c423",
+  "findings": {
+    "verdict": "FIX_P1_FIRST",
+    "findings": [
+      {
+        "severity": "P1",
+        "title": "Brief collection errors leave an unused reservation committed",
+        "file": "src/prm/runtime/brief.py:42",
+        "issue": "The bare `except Exception` around `execute_reserved` swallows collector failures after `authorize_and_reserve`, and no `abandon_before_transport` runs for the failed reservation. Unlike the editorial path's `finally`, a failed source collection can leave the reservation reserved/committed, consuming budget for work that never produced evidence.",
+        "fix": "Ensure every reserved decision is either settled after a successful transport or abandoned in an exception path (e.g. `finally`/except calling `abandon_before_transport`) before marking the source unavailable.",
+        "confidence": "medium"
+      },
+      {
+        "severity": "P1",
+        "title": "Reader artifact cache key ignores version, breaking immutable version isolation",
+        "file": "src/prm/runtime/reader.py:55",
+        "issue": "The artifact path key hashes only `owner_ref + content_digest + format`, not `brief_id`/`version`. A bound document's rendered body is cached and reused across requests by content digest; if the same content digest is ever re-bound under a different version or the DB row is superseded while the file remains, the pre-render/post-render existence and index checks can serve or resurrect content outside the requested immutable version lineage.",
+        "fix": "Include `brief_id` and `version` in the artifact key (or key strictly by the manifest storage digest including version) so each immutable version has its own isolated artifact and deletion/index state.",
+        "confidence": "medium"
+      }
+    ],
+    "not_verified": [
+      "Modules outside the supplied phase-D scope were not reviewed; the integration diff is context only and unchanged legacy code was not verified.",
+      "Behavior of `prm.storage.policy`, `execute_reserved`, `ScopedModelClient`, and registry settle semantics was inferred from call sites, not reviewed source.",
+      "No live runs were performed; only static review of supplied source/tests and hashes.",
+      "Subprocess render dependencies (WeasyPrint/report_exports) internals and network_guard bypass via C-level sockets were not fully verified."
+    ],
+    "summary": "The reviewed phase-D modules are broadly careful: owner/scope checks, bounded hooks and batches, format/allowlist enforcement, digests for immutable Brief versions, isolated rendering with network block and resource limits, and deletion-aware artifact indexing are present. Two reproducible medium-confidence P1s stand out: a swallowed collector exception can leak an un-abandoned reservation (contrary to the clean editorial `finally` pattern), and the report cache key omits brief_id/version despite serving version-addressed immutable documents. No P0 was found in the supplied scope; fix the P1s before shipping."
+  },
+  "duration_seconds": 73.057
+}

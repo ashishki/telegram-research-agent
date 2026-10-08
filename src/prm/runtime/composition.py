@@ -63,7 +63,7 @@ class AssistantRuntime:
             voice_resolver=self.resolve_voice if hasattr(self,'media') and hasattr(self,'media_downloader') else None)
     def resolve_voice(self,file_ref,lease):
         with self.queue.store.transaction() as tx:self.queue._fenced(tx,lease)
-        content=self.media_downloader.download(file_ref,kind='voice');asset=self.media.ingest(content=content,kind='voice',mime_type='audio/ogg')
+        content=self.media_downloader.download(file_ref,kind='voice',request_ref=lease.payload['input_ref']);asset=self.media.ingest(content=content,kind='voice',mime_type='audio/ogg')
         try:
             value=self.media.extract(asset,task_ref=lease.payload['input_ref'])
             if value['status']!='transcribed':raise StorageError('authorized transcription adapter unavailable')
@@ -72,7 +72,7 @@ class AssistantRuntime:
     def answer_media(self,body,*,request_ref,lease):
         if not hasattr(self,'media') or not hasattr(self,'media_downloader'):raise StorageError('media adapter unavailable')
         with self.queue.store.transaction() as tx:self.queue._fenced(tx,lease)
-        selection=body['media_input'];content=self.media_downloader.download(selection['file_ref'],kind=selection['kind'])
+        selection=body['media_input'];content=self.media_downloader.download(selection['file_ref'],kind=selection['kind'],request_ref=request_ref)
         asset=self.media.ingest(content=content,kind=selection['kind'],mime_type=selection['mime_type'])
         value=self.media.question(asset,selection['question'],request_ref=request_ref)
         from prm.contracts import AssistantResult

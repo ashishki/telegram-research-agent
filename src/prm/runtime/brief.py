@@ -40,6 +40,9 @@ class BriefRuntime:
                 evidence.extend(batch);coverage.append(CoverageSource(hook.source_ref,'checked'))
                 if batch:used_scopes.append(asdict(replace(hook.authorization_request,operation_ref=None)))
             except Exception:
+                # Only a still-unprepared reservation can be abandoned. A
+                # possibly processed collector retains its unknown fence/cost.
+                decision.reservation.abandon_before_transport()
                 coverage.append(CoverageSource(hook.source_ref,'unavailable','collection unavailable'))
         if not self.source_hooks:limits.append('selected_sources_unavailable')
         request=BriefBuildRequest(topic,window,tuple(evidence[:48]),self.root.owner_ref,tuple(coverage),tuple(limits),

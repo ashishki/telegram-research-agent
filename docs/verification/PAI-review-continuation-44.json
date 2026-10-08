@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "call_number": 44,
+  "status": "native_tooling_accepted",
+  "provider": "opencode_go",
+  "read_only": true,
+  "head_sha": "273ab6b6b73c448f3e4918edece6c0d7e3ec429b",
+  "native_result_path": ".playbook-artifacts/opencode-runs/opencode-665aa4890d9042458cfb5729035e5bc5/result.json",
+  "native_result_sha256": "5e5885d01817eadf88eb40f653fad1738e5d1da8d9efbc922b46dde7149e5513",
+  "report_sha256": "59dd631361668683096e937c87cf6c047d4e73cfc8537646efe0b20111688daa",
+  "verdict": "ADVISORY",
+  "requested_model": "mimo-v2.6-pro",
+  "observed_model": "mimo-v2.6-pro",
+  "requested_effort": "thinking_disabled",
+  "observed_effort": "thinking_disabled",
+  "usage": {
+    "completion_tokens": 905,
+    "prompt_tokens": 32402,
+    "total_tokens": 33307
+  },
+  "human_authority": false,
+  "native_tooling_receipt": true,
+  "design_approval_record": false
+}

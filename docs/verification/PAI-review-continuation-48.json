@@ -1,0 +1,159 @@
+{
+  "schema_version": 1,
+  "status": "reviewed",
+  "call_number": 48,
+  "call_limit": 48,
+  "purpose": "phase_E_sources",
+  "read_only": true,
+  "provider": "opencode_go",
+  "requested_model": "mimo-v2.6-pro",
+  "observed_model": "mimo-v2.6-pro",
+  "requested_effort": "thinking_disabled",
+  "observed_effort": "thinking_disabled",
+  "head_sha": "273ab6b6b73c448f3e4918edece6c0d7e3ec429b",
+  "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+  "diff_sha256": "2584022005b17e07c6171045c158d2048044a60caa54a4cea2e450ed49a313c5",
+  "sources": [
+    {
+      "path": "src/prm/runtime/connections.py",
+      "sha256": "942996b79d409674b79f46d75925e3d2e150fc5a2afc714d5e73ab13c235835f",
+      "bytes": 20203
+    },
+    {
+      "path": "src/prm/runtime/graph.py",
+      "sha256": "881ff4a92756ab8a6592bf1e5c3df422e5dd8a272cabf65f6740a495401df6f9",
+      "bytes": 28398
+    },
+    {
+      "path": "src/prm/runtime/schedule.py",
+      "sha256": "9028c8c672fec19c57497b5e15e98c26d52f6455a1ca6e9b435172037bd2ea4b",
+      "bytes": 8739
+    },
+    {
+      "path": "src/prm/runtime/academic.py",
+      "sha256": "f97eec3f4e4fd9f5ed8e007bac1a02a7ca494b4530635023d672a04e39b8b0a1",
+      "bytes": 17843
+    },
+    {
+      "path": "src/prm/runtime/actions.py",
+      "sha256": "d346ed47015c33ee0174ccf8e424f3048f42a068a9cd11071d4e3c7516500aa3",
+      "bytes": 16086
+    },
+    {
+      "path": "src/prm/storage/actions.py",
+      "sha256": "d1ba42ff532386cfe2aed5101353eb6090b09f28b65891c8284a37ffa6e59b29",
+      "bytes": 15054
+    },
+    {
+      "path": "src/prm/runtime/deletion.py",
+      "sha256": "12ce6cf1397e7b67bc4f5b1f515bab9d870c3a4f26bf4e2a3709f94782315c04",
+      "bytes": 5678
+    },
+    {
+      "path": "tests/test_pai_review_recovery.py",
+      "sha256": "4904f5ab9958d4e6ddb4b51b3372bb6cbb319d4cbf80c67ca3a375542572b91e",
+      "bytes": 14739
+    },
+    {
+      "path": "tests/test_pai_connections.py",
+      "sha256": "84e44c520069593985551627577e57f288e694af9282d3c269515eb808494a1c",
+      "bytes": 1244
+    },
+    {
+      "path": "tests/test_pai_graph_mail.py",
+      "sha256": "7254ebd795f6868e207602a5f15438f8b7f56c59184e4dd6bd91d17753488106",
+      "bytes": 1224
+    },
+    {
+      "path": "tests/test_pai_schedule_runtime.py",
+      "sha256": "487460e373017f0d340ecd9cc19c68b20cf64e40c4a9eaa1e503a51a964c3fb3",
+      "bytes": 2158
+    },
+    {
+      "path": "tests/test_pai_academic_runtime.py",
+      "sha256": "838104e23a1469812671a731332342f882f8c4ab56d5cbd26dd27c69f4ca559f",
+      "bytes": 2419
+    },
+    {
+      "path": "tests/test_pai_action_runtime.py",
+      "sha256": "55c5878c8c3617a2475b7d51b215ff190d4d8915a2ccab7fcf7adbac0e37d02d",
+      "bytes": 2696
+    }
+  ],
+  "scope": "phase_E_sources; supplied full current source/tests and explicitly labeled integration diff if present",
+  "input_sha256": "679c8fdea22a783afe1350e7ffde95a3d3c700a51034107746d2f0bb95869d4b",
+  "input_bytes": 147877,
+  "output_token_cap": 16000,
+  "timeout_seconds": 900,
+  "workflow_receipt": false,
+  "human_authority": false,
+  "runner_path": ".playbook-artifacts/pai-review-as-needed.py",
+  "runner_sha256": "8306b7e250e58139ee08be8c58de615d3d6fe684f5a4726c091ce9eaf689d545",
+  "transport_path": "tools/mimo_code_review.py",
+  "transport_sha256": "b0ba01f2647f21c004e54d2b9840573b38ac43ea541e394fd61bdfa2c9705c75",
+  "command": ".venv-pai/bin/python .playbook-artifacts/pai-review-as-needed.py --call-number 48 --purpose phase_E_sources",
+  "source_exclusions": [
+    "actual private corpus",
+    "live account payload",
+    "credentials",
+    "production configuration"
+  ],
+  "authority_exclusions": [
+    "human/workflow completion",
+    "live-account consent",
+    "production migration/deployment",
+    "product-provider spending"
+  ],
+  "request_body_sha256": "f734f805fa807553d7726191120278e36f4e5950929a68d650faa5ce3dbff4f4",
+  "provider_call_attempted": true,
+  "usage": {
+    "prompt_tokens": 36447,
+    "completion_tokens": 753,
+    "total_tokens": 37200,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    }
+  },
+  "finish_reason": "stop",
+  "response_sha256": "913575bdc8ea5dd9ce1a6c73aa8fdfe77ee1b3c5bfad980f65cc4cfa94794fa3",
+  "findings": {
+    "verdict": "FIX_P1_FIRST",
+    "findings": [
+      {
+        "severity": "P1",
+        "title": "Cursor token is user-supplied and replayable across selections without any one-use binding",
+        "file": "src/prm/runtime/graph.py:195-219",
+        "issue": "Mail/Canvas cursor refs are deterministic hashes of (owner+connection+nextLink) and the stored record is never consumed or version-fenced at use. `store.get(...,version=1)` is passed as an expected-version argument but the code ignores its result semantics, so any prior cursor remains permanently valid and can be replayed indefinitely (and across hosts) to traverse source pages.",
+        "fix": "Bind cursors to the originating operation_ref/selection digest and consume (delete or version-increment) them on first use; reject a cursor whose stored expected_version or one-use marker already advanced.",
+        "confidence": "high"
+      },
+      {
+        "severity": "P1",
+        "title": "cleanup_retired compares cleanup records against the wrong table/state and can retain or delete wrong refs",
+        "file": "src/prm/runtime/connections.py:236-246",
+        "issue": "cleanup_retired only skips a secret_ref if it is currently the `accounts.secret_ref`; but `accounts` rows are keyed by owner/id and the query `SELECT 1 FROM pa_connections.accounts WHERE secret_ref=%s` ignores owner entirely. A secret_ref belonging to a different owner's account therefore prevents deletion forever (bounded batch stalls), and `_queue_retirement` also queues the *new* secret for deletion relying on this global check.",
+        "fix": "Scope the active-secret check to the requesting owner and ensure cleanup is owner-partitioned; keep a durable 'active' flag on the cleanup record rather than inferring liveness from a global accounts scan.",
+        "confidence": "medium"
+      },
+      {
+        "severity": "P2",
+        "title": "GraphMailAdapter.sync does not fence scope/selection against reuse of stored payload keys",
+        "file": "src/prm/runtime/graph.py:173-180",
+        "issue": "Payload keys are copied from arbitrary provider rows (`{key:row[key] for key in self.FIELDS if key in row}`) without checking that `from`/`receivedDateTime` are structurally valid for all rows; a malformed `receivedDateTime` raises an uncaught ValueError (not StorageError), aborting mid-transaction after partial page handling and leaking a raw parser error path.",
+        "fix": "Validate/normalize each row's date and nested from-address types and raise StorageError on shape mismatch before inserting.",
+        "confidence": "medium"
+      }
+    ],
+    "not_verified": [
+      "Full pa_runtime/pa_memory storage layer used by deletion lineage recursion and version locking (not in packet).",
+      "Registry `authorize_and_reserve`/`execute_reserved` semantics and the `abandon_before_transport` behavior (referenced but not supplied).",
+      "DeliveryExecutor execute/reconcile implementations referenced by ActionRuntime.",
+      "pa_schedule/scheduler and pa_academic schema DDL referenced by deletion/academic code."
+    ],
+    "summary": "The reviewed modules are broadly fail-closed: token refresh commits a durable fence before network I/O with retry_allowed=False, action attempts are precommitted and non-replayable across restarts, unknown outcomes are never zeroed or auto-retried, and media/write grants cannot be widened to read or other providers. However, cursor continuation tokens are deterministic, non-expiring, and never consumed, permitting indefinite replay of a previously authorized page stream (P1), and credential cleanup's active-secret check is global rather than owner-scoped, letting one owner's active ref block or shift another owner's retirement batch (P1). Both are concrete, reproducible paths in the supplied source; with no P0 present, the verdict is FIX_P1_FIRST."
+  },
+  "duration_seconds": 41.183
+}

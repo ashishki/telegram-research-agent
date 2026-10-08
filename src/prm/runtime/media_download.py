@@ -13,8 +13,18 @@ class TelegramMediaDownloader:
     def __init__(self,root,*,token,resource_ref,upper_bound,origin='https://api.telegram.org'):
         if origin!='https://api.telegram.org' or not token or '\n' in token or '\r' in token:raise StorageError('explicit Telegram media connection required')
         self.root,self._token,self.resource_ref,self.upper_bound,self.origin=root,token,resource_ref,upper_bound,origin
-    def download(self,file_ref,*,kind):
+    def download(self,file_ref,*,kind,request_ref=None):
         if not isinstance(file_ref,str) or not 0<len(file_ref)<=512:raise StorageError('bounded inbound file ref required')
+        item=self.root.queue.store.get(self.root.owner_ref,'conversation',request_ref) if isinstance(request_ref,str) else None
+        if item is None:raise CapabilityDenied('download requires the authenticated owner input')
+        from prm.briefs import brief_owner_ref_from_authenticated_private_tuple
+        body=item.payload
+        if brief_owner_ref_from_authenticated_private_tuple(body.get('chat_id'),body.get('actor_id'),body.get('owner_chat_id'))!=self.root.owner_ref:
+            raise CapabilityDenied('media input owner differs')
+        selected=body.get('media_input',{})
+        if (body.get('voice_ref') if kind=='voice' else selected.get('file_ref'))!=file_ref:
+            raise CapabilityDenied('media file differs from authenticated input')
+        if kind!='voice' and selected.get('kind')!=kind:raise CapabilityDenied('media kind differs from input')
         decision=self.root.registry.authorize_and_reserve(AuthorizationRequest(owner_ref=self.root.owner_ref,connection_ref=None,
             capability='media.voice_download' if kind=='voice' else 'media.file_download',resource_ref=self.resource_ref,operation='read',data_class='user_provided',
             provider_ref='provider_telegram',purpose='voice.transcription' if kind=='voice' else 'media.download',operation_ref='download_'+uuid.uuid4().hex),upper_bound=self.upper_bound)

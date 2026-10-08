@@ -206,3 +206,46 @@ def test_media_runtime_preserves_accepted_result_when_accounting_is_unconfirmed(
     assert result['accounting_status']=='unconfirmed'
     assert len(pai.requests)==1
     assert all(window['consumed']==1 for window in pai.root.registry.snapshot(pai.root.owner_ref)['windows'])
+
+
+@pytest.mark.parametrize('pages',[
+    [[0,'bad']], [[-1,'bad']], [[33,'bad']], [[True,'bad']], [[1,{}]],
+    [[1,'first'],[1,'duplicate']], [[2,'second'],[1,'first']], 'not-pages', []])
+def test_extraction_page_shape_and_numbering_are_rejected(pages):
+    with pytest.raises(StorageError,match='extraction output malformed'):
+        MediaRuntime._validated_pages({'status':'extracted','pages':pages},maximum=32)
+
+
+def test_ocr_plain_callable_cannot_receive_media_without_its_dedicated_scope(pai,monkeypatch):
+    import struct,zlib
+    def chunk(kind,data):return struct.pack('!I',len(data))+kind+data+struct.pack('!I',zlib.crc32(kind+data))
+    image=b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('!IIBBBBB',1,1,8,6,0,0,0))+chunk(b'IDAT',zlib.compress(b'\x00\xff\xff\xff\xff'))+chunk(b'IEND',b'')
+    calls=[];runtime=MediaRuntime(pai.root,temporary_root=pai.path/'ocr_scope',ocr=lambda *args:calls.append(args))
+    asset=runtime.ingest(content=image,kind='image',mime_type='image/png')
+    assert runtime.extract(asset)['status']=='ocr_unavailable' and calls==[]
+    class Ocr:
+        provider_ref='provider_openai';connection_ref='connection_fixture';upper_bound=1
+        def __call__(self,*args):calls.append(args);return {'status':'ocr','pages':[[1,'Synthetic OCR text.']]}
+    runtime.ocr=Ocr()
+    assert runtime.extract(asset)['status']=='ocr_unavailable' and calls==[]
+    from tests.pai_runtime_fixtures import allow
+    allow(pai,'media.ocr',asset.media_ref,'user_provided','media.ocr')
+    assert runtime.extract(asset,task_ref='ocr_owned_task')['pages']==[[1,'Synthetic OCR text.']]
+    assert len(calls)==1
+    from prm.runtime.model_attempts import ModelAttemptAlreadyRecorded
+    with pytest.raises(ModelAttemptAlreadyRecorded):runtime.extract(asset,task_ref='ocr_owned_task')
+    assert len(calls)==1
+
+
+def test_download_rejects_foreign_or_unbound_input_before_any_transport(pai):
+    from prm.runtime.media_download import TelegramMediaDownloader
+    from prm.capabilities import CapabilityDenied
+    adapter=TelegramMediaDownloader(pai.root,token='synthetic_download',resource_ref='resource_input',upper_bound=0)
+    with pytest.raises(CapabilityDenied,match='authenticated owner input'):adapter.download('synthetic_file',kind='image')
+    pai.root.queue.store.put(pai.root.owner_ref,'conversation','download_foreign',{'chat_id':'42','actor_id':'99','owner_chat_id':'42',
+        'media_input':{'file_ref':'synthetic_file','kind':'image'}},expected_version=0)
+    with pytest.raises(CapabilityDenied,match='owner differs'):adapter.download('synthetic_file',kind='image',request_ref='download_foreign')
+    pai.root.queue.store.put(pai.root.owner_ref,'conversation','download_owned',{'chat_id':'42','actor_id':'42','owner_chat_id':'42',
+        'media_input':{'file_ref':'synthetic_file','kind':'image'}},expected_version=0)
+    with pytest.raises(CapabilityDenied,match='differs from authenticated'):adapter.download('other_file',kind='image',request_ref='download_owned')
+    assert pai.requests==[] and pai.root.registry.snapshot(pai.root.owner_ref)['operations']==[]
