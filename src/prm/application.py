@@ -1110,6 +1110,7 @@ class PersonalResearchAssistant:
     ) -> AssistantResult:
         safe_context = assemble_safe_dialogue_context(conversation, request.query)
         from prm.runtime.model import RuntimeModelAccess
+        from prm.runtime.model_errors import ModelAccountingUnconfirmed
         model_access = request.model_access
         if model_access is None:
             return AssistantResult(
@@ -1168,6 +1169,9 @@ class PersonalResearchAssistant:
             answer = _clean_model_answer(getattr(receipt, "text", ""))
             if not answer:
                 raise ValueError("empty model answer")
+        except ModelAccountingUnconfirmed as exc:
+            receipt=exc.receipt
+            answer=_clean_model_answer(receipt.text)
         except LLMOutcomeUnknown:
             return self._finish_chat_request(request, request_id, AssistantResult(
                 interaction_id=str(context.get("interaction_id") or ""),
@@ -1214,6 +1218,7 @@ class PersonalResearchAssistant:
                 "safe_context": {"omitted_state": list(safe_context.omitted_state)},
                 "model_call_attempted": True,
                 "write_performed": False,
+                **({"accounting_status": "unconfirmed"} if getattr(receipt, "accounting_status", None) == "unconfirmed" else {}),
             },
             operator_context=context,
             route=route,

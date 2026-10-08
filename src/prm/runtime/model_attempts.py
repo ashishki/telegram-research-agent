@@ -28,3 +28,16 @@ def prepare_model_attempt(store,*,owner,task_ref,purpose,operation_refs,input_di
             tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',
                 (owner,'conversation',task_ref,'conversation',reference))
     return reference
+
+
+def record_accounting_unconfirmed(store,*,owner,receipt):
+    """Persist bounded accounting metadata without copying the model's text."""
+    with store.transaction() as tx:
+        lineage_lock(tx.conn,owner)
+        item=tx.get(owner,'conversation',receipt.attempt_ref)
+        if item is None or tuple(item.payload['operation_refs'])!=receipt.operation_refs:
+            raise StorageError('model accounting fence unavailable')
+        payload={**item.payload,'provider_outcome':'accepted','accounting_status':'unconfirmed',
+            'model':receipt.model,'input_tokens':receipt.input_tokens,'output_tokens':receipt.output_tokens,
+            'usage_recorded':False,'estimated_cost_usd':None}
+        if payload!=item.payload:tx.put(owner,'conversation',receipt.attempt_ref,payload,expected_version=item.version)

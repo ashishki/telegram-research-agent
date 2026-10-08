@@ -11,7 +11,7 @@ from llm.client import LLMCompletionReceipt, LLMOutcomeUnknown
 from prm.capabilities import CapabilityDenied, AuthorizationDecision
 from prm.storage.policy import DurableCapabilityRegistry,ScopePreparationUnknown
 from prm.storage.postgres import StorageError
-from .model_errors import ModelResponseInvalid,ModelAccountingReceipt,ModelPreparationUnknown
+from .model_errors import ModelResponseInvalid,ModelAccountingReceipt,ModelPreparationUnknown,ModelAccountingUnconfirmed
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -141,8 +141,7 @@ class ScopedModelClient:
             text,usage=self.registry.execute_reserved_groups(reservations,checked_transport)
         except CapabilityDenied:raise
         except ScopePreparationUnknown as error:
-            error.attempt_ref=self.attempt_ref;error.external_call_attempted=False
-            raise
+            raise ScopePreparationUnknown(error.operation_refs,attempt_ref=self.attempt_ref) from None
         except Exception:
             if accepted_reply is not None:
                 # The reply was positively observed even if final settlement
@@ -172,6 +171,10 @@ class ScopedModelClient:
             try:self.usage_observer(receipt,normalized,self.groups)
             except Exception:accounting_unconfirmed=True
         if accounting_unconfirmed:
-            return ModelAccountingReceipt(**{item.name:getattr(receipt,item.name) for item in fields(LLMCompletionReceipt)},
+            from .model_attempts import record_accounting_unconfirmed
+            unconfirmed=ModelAccountingReceipt(**{item.name:getattr(receipt,item.name) for item in fields(LLMCompletionReceipt)},
                 attempt_ref=self.attempt_ref,operation_refs=operations)
+            try:record_accounting_unconfirmed(self.registry.store,owner=owner_ref,receipt=unconfirmed)
+            except Exception:raise ModelAccountingUnconfirmed(unconfirmed) from None
+            return unconfirmed
         return receipt

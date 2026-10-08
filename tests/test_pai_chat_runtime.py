@@ -201,6 +201,9 @@ def test_known_invalid_model_response_retains_typed_no_retry_even_if_accounting_
     else:
         observed=current.complete_with_receipt(**kwargs)
         assert observed.delivery_outcome=='accepted' and observed.text and not observed.usage_recorded and observed.estimated_cost_usd is None
+        durable=root.registry.store.get(root.owner_ref,'conversation',observed.attempt_ref)
+        assert durable.payload['accounting_status']=='unconfirmed' and durable.payload['provider_outcome']=='accepted'
+        assert durable.payload['estimated_cost_usd'] is None and 'text' not in durable.payload
     assert not observed.retry_allowed and observed.operation_refs==('invalid_reply_attempt',)
     assert observed.accounting_status=='unconfirmed'
     replay,reserved=client('invalid_reply_fresh_reservation')
@@ -223,3 +226,18 @@ def test_model_preparation_unknown_is_distinct_from_provider_unknown(runtime,mon
         data_class='user_provided',owner_ref=root.owner_ref,connection_ref='connection_fixture',resource_ref='resource_dialogue')
     assert not error.value.external_call_attempted and not error.value.retry_allowed and error.value.attempt_ref
     assert not requests
+
+
+@pytest.mark.parametrize('marker_failure',[False,True])
+def test_accepted_unconfirmed_accounting_survives_application_result_storage(pai,monkeypatch,marker_failure):
+    from prm.runtime.cost_cache import CostCacheRuntime
+    from tests.pai_runtime_fixtures import allow,request
+    allow(pai,'model.generate','resource_dialogue','user_provided','answer.request')
+    def failed(*args,**kwargs):raise OSError('synthetic accounting failure')
+    monkeypatch.setattr(CostCacheRuntime,'record',failed)
+    if marker_failure:
+        from prm.runtime import model_attempts
+        monkeypatch.setattr(model_attempts,'record_accounting_unconfirmed',failed)
+    ack,result=request(pai,9401,'/chat Synthetic accepted response with accounting failure')
+    assert result['status']=='ok' and result['text'] and result['payload']['accounting_status']=='unconfirmed'
+    assert len([row for row in pai.requests if row[0]=='model'])==1

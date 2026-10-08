@@ -92,9 +92,10 @@ def _decode(row,now):
 
 class ScopePreparationUnknown(StorageError):
     """Preparation may have committed; the bound operations cannot be retried."""
-    def __init__(self,operation_refs):
+    def __init__(self,operation_refs,*,attempt_ref=None):
         super().__init__('compound authorization preparation is unknown; do not retry')
         self.operation_refs=tuple(operation_refs);self.retry_allowed=False
+        self.attempt_ref=attempt_ref;self.external_call_attempted=False
 
 
 class ScopeTransportUnknown(StorageError):
