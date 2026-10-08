@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "status": "reviewed",
+  "call_number": 36,
+  "call_limit": 36,
+  "purpose": "phase_B_findings_recheck",
+  "read_only": true,
+  "provider": "opencode_go",
+  "requested_model": "mimo-v2.6-pro",
+  "observed_model": "mimo-v2.6-pro",
+  "requested_effort": "thinking_disabled",
+  "observed_effort": "thinking_disabled",
+  "head_sha": "cf3c00b7ffe4fac5e772d9b42bc445a299aa6a98",
+  "base_sha": "465503dc0545ddeb0eb2cb51dbf401c0cd3fb187",
+  "diff_sha256": "dab511cb1f70c14d625d1b00c6ec830add7466c93bde3d7518707169053405ec",
+  "sources": [
+    {
+      "path": "src/prm/storage/policy.py",
+      "sha256": "6e16889bdd9f889daf7ced9c447e2e7c514a623c9d4958bdd9fd1f246a9bb4c2",
+      "bytes": 30184
+    },
+    {
+      "path": "src/prm/storage/actions.py",
+      "sha256": "d1ba42ff532386cfe2aed5101353eb6090b09f28b65891c8284a37ffa6e59b29",
+      "bytes": 15054
+    },
+    {
+      "path": "src/prm/capabilities.py",
+      "sha256": "eb9a853d54b36bd1719e9b0ad026833d2cb270b0e3e8d39dd09401eb28f80362",
+      "bytes": 53351
+    },
+    {
+      "path": "src/prm/confirmed_actions.py",
+      "sha256": "aa933b7af329bca26c7c81a50ef324608a3cf0d8d0ada322ac25d34574dc8d3a",
+      "bytes": 16470
+    },
+    {
+      "path": "tests/test_pai_durable_policy.py",
+      "sha256": "c14d1924f7583027c278ec24bd2d257404c6188bf8ae5b2c53d5cba8d4b1af22",
+      "bytes": 17766
+    },
+    {
+      "path": "tests/test_pai_durable_actions.py",
+      "sha256": "18acbd49cdb9db2becf011588b91c84bdfcedcb2ca23bf4c119d6c003e4a4a37",
+      "bytes": 10766
+    },
+    {
+      "path": "docs/verification/PAI-review-continuation-35.json",
+      "sha256": "be0714d7d068a812cf5047776946243aa8630dcc14e8efdd3ef19d85cc59b9a6",
+      "bytes": 8037
+    },
+    {
+      "path": "docs/verification/PAI-review-35-response.md",
+      "sha256": "1863d70a1b35c04dedfbee345e874cdab36642e44d0c0eab883243cd8712a657",
+      "bytes": 3235
+    }
+  ],
+  "scope": "phase_B_findings_recheck; supplied full current source/tests and explicitly labeled integration diff if present",
+  "input_sha256": "3911da8b3fbc1d71522b63e2cf25c26571f2d098149a8d4aa8c68cbdab2deaf7",
+  "input_bytes": 172477,
+  "output_token_cap": 16000,
+  "timeout_seconds": 900,
+  "workflow_receipt": false,
+  "human_authority": false,
+  "runner_path": ".playbook-artifacts/pai-review-as-needed.py",
+  "runner_sha256": "8306b7e250e58139ee08be8c58de615d3d6fe684f5a4726c091ce9eaf689d545",
+  "transport_path": "tools/mimo_code_review.py",
+  "transport_sha256": "2ba3cbf032166616aa2eeba61f654308379b32d228e98f389f2099a02679262f",
+  "command": ".venv-pai/bin/python .playbook-artifacts/pai-review-as-needed.py --call-number 36 --purpose phase_B_findings_recheck",
+  "source_exclusions": [
+    "actual private corpus",
+    "live account payload",
+    "credentials",
+    "production configuration"
+  ],
+  "authority_exclusions": [
+    "human/workflow completion",
+    "live-account consent",
+    "production migration/deployment",
+    "product-provider spending"
+  ],
+  "request_body_sha256": "508d39c9f1e07997b850058603085f85dfc8dd8d12b1e673389838dc280d13ce",
+  "provider_call_attempted": true,
+  "usage": {
+    "prompt_tokens": 47159,
+    "completion_tokens": 545,
+    "total_tokens": 47704,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    }
+  },
+  "finish_reason": "stop",
+  "response_sha256": "e8795c45f49d5bd829d7f6c98ddc87f708a3490c119d3f47c6e7bb91a3d83570",
+  "findings": {
+    "verdict": "SHIP_OK",
+    "findings": [
+      {
+        "severity": "P2",
+        "title": "settle() does not bind the settlement owner/operation to the member grant scope before relaxing an unknown",
+        "file": "src/prm/storage/policy.py:272-293",
+        "issue": "settle() validates only the operation row and window ledger; a caller holding the owner can call settle(owner, ref, outcome='unknown', actual=0) on a fence that was never actually invoked (e.g. the no-HTTP compound preparation case), releasing the conservative reserved/unknown charge to zero without any provider evidence. The fence (state='unknown') does persist, so the operation cannot be replayed, matching the documented conservative-but-reconcilable contract, so this is not an allow or retry defect.",
+        "fix": "Document that actual settlement is governed by the reconciliation path and must be bound to provider evidence, or add an explicit reconciliation receipt requirement. No fail-open behavior was found.",
+        "confidence": "low"
+      }
+    ],
+    "not_verified": [
+      "src/prm/storage/postgres.py, src/prm/storage/testing.py and any files referenced but not supplied in this packet",
+      "tests/test_pai_action_runtime.py and tests/test_assistant_actions.py cited in the response log but not supplied",
+      "Full runtime/adapter call sites that construct grants and reservations (only the supplied modules were examined)",
+      "Whether any omitted legacy capability/confirmation definitions exist beyond the supplied capabilities.py and confirmed_actions.py, which appear complete for the reviewed hashes"
+    ],
+    "summary": "All three prior P1 allegations are resolved in the current code: replace_grant now requires an unrevoked target row (policy.py:160-164) so a revoked grant identity cannot be revived at a higher revision and reauthorization needs a new grant_id, verified by test_revoke_then_replace_cannot_restore_the_same_grant_identity; saved confirmations are checksum-verified on load with exact proposal/owner/version/digest/time/expiry binding and clamp (actions.py:55-79), missing or changed checksums fail closed with a new-preview instruction rather than repairing an approval, and one-use consumption is enforced via consumed=true plus the attempt fence; compound no-HTTP preparation is deliberately non-replayable and the concrete counterexample (test_compound_no_http_reconciles_actual_zero_without_clearing_fence) shows actual=0 settlement releases the conservative charge while preserving the unknown fence, so the #35 claim of irrecoverable cost or allowed I/O is not supported. No P0 or P1 executable defects remain; the single P2 note is informational about the trust model of settle() and does not alter fail-closed or one-use guarantees."
+  },
+  "duration_seconds": 36.961
+}

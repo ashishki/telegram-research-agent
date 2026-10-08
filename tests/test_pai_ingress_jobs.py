@@ -57,6 +57,19 @@ def test_enqueue_failure_rolls_back_inbox_and_never_acknowledges(sandbox):
     assert current.receive(update(21)).job_id
 
 
+@pytest.mark.parametrize('media',[
+    {'document':{'file_id':'','mime_type':'application/pdf'}},
+    {'photo':[{'file_id':''}]},
+])
+def test_empty_media_reference_is_denied_before_persistence(sandbox,media):
+    current=ingress(sandbox,'empty_media_'+('document' if 'document' in media else 'photo'))
+    with pytest.raises(StorageError,match='bounded inbound media reference'):
+        current.receive(update(909,'',**media))
+    with current.queue.store.transaction() as tx:
+        count=tx.conn.execute('SELECT count(*) AS n FROM pa_runtime.object_heads WHERE owner=%s',(current.owner_ref,)).fetchone()['n']
+    assert count==0 and current.queue.claim(owner=current.owner_ref) is None
+
+
 @pytest.mark.parametrize('changes', [
     {'from': {'id': 43}}, {'chat': {'id': -10042, 'type': 'group'}},
     {'chat': {'id': 43, 'type': 'private'}}, {'chat': {'id': 42, 'type': 'group'}},

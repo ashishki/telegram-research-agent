@@ -1,0 +1,143 @@
+{
+  "schema_version": 1,
+  "status": "reviewed",
+  "call_number": 37,
+  "call_limit": 37,
+  "purpose": "phase_C_ingress_delivery",
+  "read_only": true,
+  "provider": "opencode_go",
+  "requested_model": "mimo-v2.6-pro",
+  "observed_model": "mimo-v2.6-pro",
+  "requested_effort": "thinking_disabled",
+  "observed_effort": "thinking_disabled",
+  "head_sha": "cf3c00b7ffe4fac5e772d9b42bc445a299aa6a98",
+  "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+  "diff_sha256": "a21f0eb2b9e2fba5b733b9edc8bddb3ca60fb9dc1e2356301341add7567f52df",
+  "sources": [
+    {
+      "path": "src/prm/runtime/ingress.py",
+      "sha256": "78542f54d82e2c411c397b3ee7bca7940a15ae457a3829ebba405f46418181a4",
+      "bytes": 17352
+    },
+    {
+      "path": "src/prm/runtime/scheduler.py",
+      "sha256": "8d6fcaeaf5b5c6f9f366e916d4afd3aa4a4ecef9a4049ca278f77edf894d757a",
+      "bytes": 24943
+    },
+    {
+      "path": "src/prm/runtime/delivery.py",
+      "sha256": "1ae07e1a169b5fef752b8f218b1bf70b0f00033392270486a57e8395ff0a57b5",
+      "bytes": 26080
+    },
+    {
+      "path": "src/prm/runtime/transports.py",
+      "sha256": "52d2486f5ebeae0f78f57e1d18ea39da5ae380c1b519e93816f17d624b9f6c26",
+      "bytes": 2854
+    },
+    {
+      "path": "src/prm/runtime/service.py",
+      "sha256": "f132f2f97fbc571e503d1df46849112f7e153ddbca63446834dec56b9632ea6a",
+      "bytes": 3355
+    },
+    {
+      "path": "src/prm/runtime/worker.py",
+      "sha256": "09b054d75ad76b09f9e42f118fda66a88f59c0198cc50684e6307d24613f6d45",
+      "bytes": 1017
+    },
+    {
+      "path": "src/prm/runtime/watch.py",
+      "sha256": "b51a1505039293ca8481e11f24c0f3f9a613187c1193b1c5bf863a88bbd58f58",
+      "bytes": 4183
+    },
+    {
+      "path": "tests/test_pai_ingress_jobs.py",
+      "sha256": "226c34f0780efb77a8cba9522e765bf6a01bbcf1b199214837543202dc599240",
+      "bytes": 9575
+    },
+    {
+      "path": "tests/test_pai_scheduler.py",
+      "sha256": "d6771833f95abe416df57bc682bf73f4a5c47840d27204a53065bdd37d3c7701",
+      "bytes": 15429
+    },
+    {
+      "path": "tests/test_pai_delivery.py",
+      "sha256": "123fbd8b7102eeeeee41bbf3e0de0a6c73517571fca8b7a66c09f60852943b56",
+      "bytes": 22466
+    }
+  ],
+  "scope": "phase_C_ingress_delivery; supplied full current source/tests and explicitly labeled integration diff if present",
+  "input_sha256": "f36ad51f09ddb8467e54358e33f3349fc478356713cb2422a839793d1831907c",
+  "input_bytes": 139614,
+  "output_token_cap": 16000,
+  "timeout_seconds": 900,
+  "workflow_receipt": false,
+  "human_authority": false,
+  "runner_path": ".playbook-artifacts/pai-review-as-needed.py",
+  "runner_sha256": "8306b7e250e58139ee08be8c58de615d3d6fe684f5a4726c091ce9eaf689d545",
+  "transport_path": "tools/mimo_code_review.py",
+  "transport_sha256": "2ba3cbf032166616aa2eeba61f654308379b32d228e98f389f2099a02679262f",
+  "command": ".venv-pai/bin/python .playbook-artifacts/pai-review-as-needed.py --call-number 37 --purpose phase_C_ingress_delivery",
+  "source_exclusions": [
+    "actual private corpus",
+    "live account payload",
+    "credentials",
+    "production configuration"
+  ],
+  "authority_exclusions": [
+    "human/workflow completion",
+    "live-account consent",
+    "production migration/deployment",
+    "product-provider spending"
+  ],
+  "request_body_sha256": "b39e66000ce0cb7b8f1a1a52b4dfed5eb8a3e26ee4f06841ac6bec11a8be9629",
+  "provider_call_attempted": true,
+  "usage": {
+    "prompt_tokens": 36113,
+    "completion_tokens": 734,
+    "total_tokens": 36847,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    }
+  },
+  "finish_reason": "stop",
+  "response_sha256": "c615428586a2a78601823fd16842f146efaf4b9bb97ffef4a14f8bd8449af872",
+  "findings": {
+    "verdict": "FIX_P1_FIRST",
+    "findings": [
+      {
+        "severity": "P1",
+        "title": "Watch delivery authorization/policy check occurs outside the delivery lock and is never revalidated through the transport scope",
+        "file": "src/prm/runtime/delivery.py:218",
+        "issue": "deliver_watch builds the AuthorizationRequest from the notification's data_class captured outside any lock, then only _guard_watch is re-run at transport time. _guard_watch checks lifecycle/quiet hours/quota but never _source_current or a re-run of registry._decision for the delivery grant, so a revocation occurring after the pre-commit reservation commit but before/while the sender runs does not fail closed: the effect still proceeds and is recorded as sent.",
+        "fix": "Inside the transport scope lock, re-run the final delivery decision for every class and re-check _source_current (or hold a FOR SHARE grant lock that spans the sender), raising CapabilityDenied/leaving the attempt unknown before any transport call if any grant is no longer allowed.",
+        "confidence": "medium"
+      },
+      {
+        "severity": "P2",
+        "title": "Media file_id minimum-length bound is not enforced (only upper bound)",
+        "file": "src/prm/runtime/ingress.py:72",
+        "issue": "For document/photo intake the code checks len(selected['file_id'])>512 but never checks non-emptiness, unlike the voice path which requires 0 < len(file_ref). An empty file_id passes intake validation and is persisted and queued.",
+        "fix": "Apply the same 0 < len(selected['file_id']) <= 512 bound (and reject empty/non-str) before constructing media_input.",
+        "confidence": "high"
+      },
+      {
+        "severity": "P2",
+        "title": "watch.py archive collector uses wall-clock datetime.now despite the scheduler fixture clock, breaking deterministic scheduling tests",
+        "file": "src/prm/runtime/watch.py:54",
+        "issue": "wire_archive_watch.collect computes now=datetime.now(timezone.utc) while the scheduler/collection code path is driven by scheduler.clock; with a fixture clock the produced due_at values can be far in the past or future relative to the guarded active window, making behavior non-deterministic and not testable per project rules.",
+        "fix": "Derive 'now' from the scheduler's clock (or pass the current guard timestamp into the collector) so collected notifications are deterministic and aligned with subscription expiry checks.",
+        "confidence": "medium"
+      }
+    ],
+    "not_verified": [
+      "prm/storage/jobs.py, policy.py, watch_jobs.py, actions.py, deletion.py and bot/* integration are not in the supplied packet; queue fencing, grant reservation semantics, and PAI-09 delivery attempt gating could not be independently verified.",
+      "Runtime behavior against real PostgreSQL was not executed; conclusions are from static source review of the supplied modules and tests.",
+      "Whether _decision/authorize_and_reserve internally re-checks grants under the transport transaction (which would downgrade finding 1) is outside the supplied sources."
+    ],
+    "summary": "Static review of the supplied C_ingress_delivery modules and tests found no P0: intake dedup/owner scoping, one-use versioned confirmations, coalesced scheduler advancement, unknown-outcome no-retry, and chunked aggregate fencing are implemented with clear fail-closed paths and are meaningfully tested. One P1 remains: watch delivery never revalidates policy inside the final transport scope (unlike answer delivery, which runs _source_current), so a revocation racing the send can still produce an actual effect after authorization was withdrawn. Two smaller P2s cover an unbounded-empty media file_id and non-deterministic wall-clock use in the archive watch collector. Fix the watch delivery revalidation before ship."
+  },
+  "duration_seconds": 27.695
+}

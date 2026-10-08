@@ -133,10 +133,14 @@ class DeliveryExecutor:
                 raise CapabilityDenied('owner-bound notification required')
             subrow = tx.conn.execute('SELECT payload FROM pa_schedule.schedules WHERE owner=%s AND id=%s', (owner, note['schedule_id'])).fetchone()
             sub = _subscription_from_payload(subrow['payload'])
-            notification = _notification_from_payload(note['payload'])
+            stored=dict(note['payload']);source_scopes=stored.pop('source_scopes',None)
+            if not isinstance(source_scopes,list) or not 1<=len(source_scopes)<=16:
+                raise CapabilityDenied('notification source authority missing; recollection required')
+            notification = _notification_from_payload(stored)
             payload = {'text': render_watch_notification(notification), 'schedule_id': note['schedule_id'],
                        'data_class':notification.data_class,
-                       'revision': note['revision'], 'notification_digest': _canonical(note['payload'])[1]}
+                       'revision': note['revision'], 'notification_digest': _canonical(note['payload'])[1],
+                       'source_scopes':source_scopes}
         return self._deliver(owner=owner, delivery_id='watch_' + notification_id, kind='watch', source_ref=notification_id,
             destination_ref=sub.destination_ref, payload=payload, upper_bound=upper_bound)
 
@@ -238,11 +242,14 @@ class DeliveryExecutor:
                     current=tx.get(owner,'result',payload['result_ref'],version=1)
                     if current is None or current.digest!=payload['result_digest']:raise CapabilityDenied('answer deleted or changed before delivery')
                 if kind == 'watch':
+                    # Collection locks source grants before the subscription;
+                    # use the same order while retaining both through sender.
+                    self._source_current(tx,owner,payload)
                     self._guard_watch(tx, owner, source_ref, payload, destination_ref, delivery_id=delivery_id)
                 if effect_lease is not None:
                     from prm.storage.jobs import JobQueue
                     JobQueue(self.store.target)._fenced(tx, effect_lease)
-                self._source_current(tx,owner,payload)
+                if kind!='watch':self._source_current(tx,owner,payload)
                 row = tx.conn.execute('SELECT * FROM pa_delivery.attempts WHERE owner=%s AND id=%s FOR UPDATE', (owner, delivery_id)).fetchone()
                 if row['status'] != 'unknown' or row['digest'] != digest:
                     raise CapabilityDenied('attempt already settled or changed')

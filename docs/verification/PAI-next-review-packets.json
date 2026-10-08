@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "status": "phase_B_fixes_verified_recheck_pending",
-  "current_approved_call_cap": 35,
-  "calls_consumed_including_failures": 35,
+  "status": "phase_C_fixes_verified_recheck_pending",
+  "current_approved_call_cap": 37,
+  "calls_consumed_including_failures": 37,
   "proposed_total_cap": 34,
   "new_calls_maximum": 3,
   "third_call": "only if an actual new finding needs independent recheck",
@@ -852,6 +852,84 @@
       ],
       "instructions": "Fresh independent resolution of the three phase-B review #35 P1 findings, against complete current durable policy/actions, previously omitted legacy capability/confirmation definitions, and executable cases. Verify revoked grant identities cannot be revived by a higher revision; reauthorization needs a new explicit grant identity. Verify the saved confirmation checksum, exact proposal/owner/version/digest/time/expiry binding, expiry clamp and one-use replay guards. Missing/changed checksum intentionally fails closed with new-preview instruction, not automatic repair of an approval. The checksum is integrity evidence, NOT a substitute for owner approval or protection against a fully privileged DB adversary. Compound no-HTTP preparation is deliberately conservative and non-replayable: actual zero can settle via existing reconciliation without resetting its fence; do not require resetting potentially processed operations. Read the concrete counterexample and decide whether #35 claim of irrecoverable cost/allowed I/O is supported. Return a consistent verdict and only actual executable defects; no human/governed/live approval.",
       "source_bytes": 154863
+    },
+    {
+      "purpose": "phase_C_findings_recheck",
+      "base_sha": "cf3c00b",
+      "sources": [
+        {
+          "path": "src/prm/runtime/ingress.py",
+          "sha256": "2494628b7675f5e0cf57b5dda0fc667954a3cdfdccfcdb063a117de1d42b6594",
+          "bytes": 17359
+        },
+        {
+          "path": "src/prm/runtime/scheduler.py",
+          "sha256": "c94de1fafc6bfc35f79b516379b3c1c42f9e8fa68bed4590d05ce2d2c576df87",
+          "bytes": 25153
+        },
+        {
+          "path": "src/prm/runtime/delivery.py",
+          "sha256": "fc64753b86c0c010cff232005ef49bbfe038049a96b1f04b10bf50d04d66989b",
+          "bytes": 26632
+        },
+        {
+          "path": "src/prm/runtime/transports.py",
+          "sha256": "52d2486f5ebeae0f78f57e1d18ea39da5ae380c1b519e93816f17d624b9f6c26",
+          "bytes": 2854
+        },
+        {
+          "path": "src/prm/runtime/service.py",
+          "sha256": "f132f2f97fbc571e503d1df46849112f7e153ddbca63446834dec56b9632ea6a",
+          "bytes": 3355
+        },
+        {
+          "path": "src/prm/runtime/worker.py",
+          "sha256": "09b054d75ad76b09f9e42f118fda66a88f59c0198cc50684e6307d24613f6d45",
+          "bytes": 1017
+        },
+        {
+          "path": "src/prm/runtime/watch.py",
+          "sha256": "22c3482dd9ed2ed8de9f96fdffe227281fa7f2472e75b3522a52302468128f4c",
+          "bytes": 4116
+        },
+        {
+          "path": "tests/test_pai_ingress_jobs.py",
+          "sha256": "3327f2a41541ddff64f1942119fdfafce5bb5bd78b5228170fbf4adcaecf56dc",
+          "bytes": 10267
+        },
+        {
+          "path": "tests/test_pai_scheduler.py",
+          "sha256": "d6771833f95abe416df57bc682bf73f4a5c47840d27204a53065bdd37d3c7701",
+          "bytes": 15429
+        },
+        {
+          "path": "tests/test_pai_delivery.py",
+          "sha256": "5b0e044cdf1b5bc9aa97e8ae727c2c4da8e2578e3783556c9be6a2e1666d9680",
+          "bytes": 26762
+        },
+        {
+          "path": "src/prm/storage/policy.py",
+          "sha256": "6e16889bdd9f889daf7ced9c447e2e7c514a623c9d4958bdd9fd1f246a9bb4c2",
+          "bytes": 30184
+        },
+        {
+          "path": "tests/test_pai_watch_wiring.py",
+          "sha256": "a498ad8ef5c8ee7cf183b5482e300d9a6499b2ff80e1d1fc281f2d44a6d3a5b1",
+          "bytes": 2283
+        },
+        {
+          "path": "docs/verification/PAI-review-continuation-37.json",
+          "sha256": "af948514d7c51ddd35f287d10218ee1acb350758539761003381b5184e7c980a",
+          "bytes": 7663
+        },
+        {
+          "path": "docs/verification/PAI-review-37-response.md",
+          "sha256": "00f3409f7ef0a7c95a928cedaf5990ff36592148bb64c599e158e148f658c987",
+          "bytes": 3898
+        }
+      ],
+      "instructions": "Fresh independent recheck of review #37 with previously omitted FULL policy source. Resolve delivery-grant revocation allegations against execute_reserved_groups final locks and the post-preparation revoke counterexample. Verify new durable notification source_scopes and final source-grant/connection checks apply to Watch before sender, missing legacy origin requires recollection, and source locks precede subscription locks as tested. Notification codec receives declared fields only; full stored payload digest includes source authority. Check real injected/default DB clock wiring, empty media rejection, no blind retries, and all relevant changed code/tests. Response text is evidence, never approval. No P0/P1 => SHIP_OK, P1 only => FIX_P1_FIRST, any P0 => STOP_SHIP. No private/live provider, governed role or human acceptance is inferred.",
+      "source_bytes": 176972
     }
   ],
   "authority_exclusions": [

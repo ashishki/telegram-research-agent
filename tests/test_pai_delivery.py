@@ -162,6 +162,78 @@ def test_revoke_winning_before_final_send_and_foreground_scope_separation(case, 
     with pytest.raises(CapabilityDenied): executor.deliver_watch(owner=sub.owner_ref, notification_id=notification, upper_bound=1)
 
 
+def test_watch_delivery_revoke_after_preparation_blocks_sender_and_replay(case,monkeypatch):
+    scheduler,registry,sub,clock,actor=case
+    grants(case);notification=pending_watch(case)[0];calls=[]
+    prepare=registry._commit_durable_transport
+    def prepare_then_revoke(reservations,**kwargs):
+        result=prepare(reservations,**kwargs)
+        registry.revoke_grant('grant_watch',owner_ref=sub.owner_ref)
+        return result
+    monkeypatch.setattr(registry,'_commit_durable_transport',prepare_then_revoke)
+    executor=DeliveryExecutor(scheduler.queue.store.target,registry=registry,sender=lambda *args:calls.append(args))
+    first=executor.deliver_watch(owner=sub.owner_ref,notification_id=notification,upper_bound=1)
+    assert first['status']=='unknown' and calls==[]
+    assert executor.deliver_watch(owner=sub.owner_ref,notification_id=notification,upper_bound=1)['attempt_ref']==first['attempt_ref']
+    assert calls==[]
+
+
+def test_watch_source_revoke_after_collection_prevents_delivery(case):
+    scheduler,registry,sub,clock,actor=case
+    grants(case);notification=pending_watch(case)[0]
+    registry.revoke_grant('grant_watch_'+actor['chat_id'],owner_ref=sub.owner_ref)
+    calls=[];executor=DeliveryExecutor(scheduler.queue.store.target,registry=registry,sender=lambda *args:calls.append(args))
+    result=executor.deliver_watch(owner=sub.owner_ref,notification_id=notification,upper_bound=1)
+    assert result['status']=='unknown' and calls==[]
+
+
+def test_legacy_watch_notification_without_origin_scope_requires_recollection(case):
+    scheduler,registry,sub,clock,actor=case
+    grants(case);notification=pending_watch(case)[0]
+    with scheduler.queue.store.transaction() as tx:
+        tx.conn.execute("UPDATE pa_schedule.notifications SET payload=payload-'source_scopes' WHERE owner=%s AND id=%s",(sub.owner_ref,notification))
+    calls=[];executor=DeliveryExecutor(scheduler.queue.store.target,registry=registry,sender=lambda *args:calls.append(args))
+    with pytest.raises(CapabilityDenied,match='recollection required'):
+        executor.deliver_watch(owner=sub.owner_ref,notification_id=notification,upper_bound=1)
+    assert calls==[]
+
+
+def test_watch_source_lock_is_taken_before_subscription_lock(case,monkeypatch):
+    scheduler,registry,sub,clock,actor=case
+    grants(case);notification=pending_watch(case)[0]
+    hold,source_locked,release,source_entered=Event(),Event(),Event(),Event()
+    errors=[];results=[]
+    def lock_source():
+        try:
+            assert hold.wait(timeout=5)
+            with scheduler.queue.store.transaction() as tx:
+                tx.conn.execute('SELECT grant_id FROM pa_policy.grants WHERE owner=%s AND grant_id=%s FOR UPDATE',(sub.owner_ref,'grant_watch_'+actor['chat_id']))
+                source_locked.set();assert release.wait(timeout=5)
+        except Exception as error:errors.append(error);source_locked.set()
+    holder=Thread(target=lock_source);holder.start()
+    prepare=registry._commit_durable_transport
+    def prepare_then_hold(group,**kwargs):
+        result=prepare(group,**kwargs);hold.set();assert source_locked.wait(timeout=5);return result
+    monkeypatch.setattr(registry,'_commit_durable_transport',prepare_then_hold)
+    executor=DeliveryExecutor(scheduler.queue.store.target,registry=registry,sender=lambda *args:TransportReceipt('synthetic_lock_order'))
+    source_current=executor._source_current
+    def inspect_source(*args):source_entered.set();return source_current(*args)
+    monkeypatch.setattr(executor,'_source_current',inspect_source)
+    def dispatch():
+        try:results.append(executor.deliver_watch(owner=sub.owner_ref,notification_id=notification,upper_bound=1))
+        except Exception as error:errors.append(error)
+    sender=Thread(target=dispatch);sender.start()
+    try:
+        assert source_entered.wait(timeout=5)
+        with scheduler.queue.store.transaction() as tx:
+            tx.conn.execute("SET LOCAL lock_timeout='500ms'")
+            tx.conn.execute('SELECT id FROM pa_schedule.schedules WHERE owner=%s AND id=%s FOR UPDATE',(sub.owner_ref,sub.subscription_id))
+    finally:
+        release.set();holder.join(timeout=5);sender.join(timeout=5)
+    assert not holder.is_alive() and not sender.is_alive() and not errors
+    assert results[0]['status']=='sent'
+
+
 def test_persistent_watch_cap_blocks_other_effect_even_after_restart(case):
     scheduler, registry, sub, clock, actor = case
     grants(case); first, second = pending_watch(case, total=2, cap=1)

@@ -69,7 +69,7 @@ class TelegramJobIngress:
         elif message.get('document') or message.get('photo'):
             document=message.get('document');photo=(message.get('photo') or [])[-1] if message.get('photo') else None
             selected=document or photo
-            if not isinstance(selected,dict) or not isinstance(selected.get('file_id'),str) or len(selected['file_id'])>512:
+            if not isinstance(selected,dict) or not isinstance(selected.get('file_id'),str) or not 0<len(selected['file_id'])<=512:
                 raise StorageError('bounded inbound media reference required')
             kind='document' if document else 'image';mime=document.get('mime_type','') if document else 'image/jpeg'
             if mime not in {'application/pdf','image/png','image/jpeg'}:raise StorageError('media MIME not allowlisted')

@@ -204,6 +204,7 @@ TEST_TIERS = {
             'tests/test_pai_scheduler.py',
             'tests/test_pai_storage.py',
             'tests/test_pai_web_github.py',
+            'tests/test_pai_watch_wiring.py',
             'tests/test_pai_workers.py',
         ), env=(("PYTHONPATH", "src"),)),),
     ),

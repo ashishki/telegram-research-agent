@@ -1,7 +1,7 @@
 """Explicit PostgreSQL Watch scheduler and bounded collection worker."""
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, replace, asdict
 from datetime import datetime, timedelta, timezone
 import hashlib
 import uuid
@@ -284,7 +284,7 @@ class WatchCollectionWorker:
         # subscription, matching the future shared effect executor lock order.
         item = queue.store.get(lease.owner, 'conversation', lease.payload['input_ref'], version=lease.payload['input_version'])
         sub = _subscription_from_payload(item.payload)
-        notifications = []
+        notifications = [];source_scopes={}
         for index, source in enumerate(sub.source_refs):
             queue.checkpoint(lease, {'stage': 'collecting', 'source_number': index})
             decision = self.registry.authorize_and_reserve(self.scheduler.collection_request(sub, source,
@@ -305,6 +305,7 @@ class WatchCollectionWorker:
                         raise StorageError('collection scope connection lost')
                     return result
             collected = self.registry.execute_reserved((decision.reservation,), transport)
+            source_scopes[source]=asdict(replace(decision.reservation._request,operation_ref=None))
             if not isinstance(collected, (tuple, list)) or len(collected) > 32:
                 raise StorageError('bounded notification batch required')
             for notification in collected:
@@ -335,9 +336,10 @@ class WatchCollectionWorker:
                 conn.execute("UPDATE pa_schedule.notifications SET status='cancelled' WHERE owner=%s AND schedule_id=%s AND subject_ref=%s AND fingerprint<>%s AND status='queued'",
                              (lease.owner, sub.subscription_id, note.subject_ref, note.evidence_fingerprint))
                 due = _deadline_stage_due_at(note, note.delivery_stage) if note.delivery_stage.startswith('deadline:') else note.due_at
+                payload={**_notification_payload(note),'source_scopes':[source_scopes[note.source_ref]]}
                 conn.execute("INSERT INTO pa_schedule.notifications VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,'queued') ON CONFLICT DO NOTHING",
                     (lease.owner, key, sub.subscription_id, sub.consent_revision, note.subject_ref, note.event_identity,
-                     note.evidence_fingerprint, Jsonb(_notification_payload(note)), due))
+                     note.evidence_fingerprint, Jsonb(payload), due))
                 conn.execute('INSERT INTO pa_schedule.baselines VALUES(%s,%s,%s) ON CONFLICT(owner,event_ref) DO UPDATE SET fingerprint=excluded.fingerprint',
                              (lease.owner, note.event_identity, note.evidence_fingerprint))
                 count += 1

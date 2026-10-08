@@ -324,3 +324,21 @@ compound no-HTTP/actual-zero counterexample retains its fence. Focused fixes:
 32 passed in 45.90 s, zero skips/failures. Receipt/response: review-35 files.
 Next #36 fresh actual-finding recheck with complete legacy capability/action
 definitions. Necessary reviews are owner-authorized as needed; 35 consumed.
+
+Review #36 reserved/attempted, 36 consumed under ongoing scoped authority including failures.
+Purpose: phase_B_findings_recheck; source HEAD cf3c00b7ffe4fac5e772d9b42bc445a299aa6a98. No automatic retry.
+
+Review #37 reserved/attempted, 37 consumed under ongoing scoped authority including failures.
+Purpose: phase_C_ingress_delivery; source HEAD cf3c00b7ffe4fac5e772d9b42bc445a299aa6a98. No automatic retry.
+
+# 2026-10-08 foundation closure and Watch source follow-through
+
+#36 SHIP_OK independently resolves #35 P1 allegations; low-confidence P2
+settlement trust note retained. #37 phase C FIX_P1_FIRST; final delivery-grant
+revalidation already existed, with new real post-preparation revoke proof.
+An adjacent missing Watch source-origin scope was fixed; source-before-
+subscription lock order, empty media refs and scheduler clock wiring verified.
+46 initial and 35 final scoped cases passed, zero skips/failures; response
+PAI-review-37-response.md. Focused-prm: 652 passed in 132.56 s on pre-C-fix
+source. 37 paid calls consumed; next bounded independent recheck #38 under
+ongoing authority, then D/E/F. No formal/human/live acceptance manufactured.
