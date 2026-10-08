@@ -251,14 +251,15 @@ class GraphMailAdapter:
         decision=self.transport.registry.authorize_and_reserve(scope,upper_bound=self.transport.upper_bound)
         if not decision.allowed:raise CapabilityDenied(decision.reason)
         value,_=self.transport.request(decision,path='/v1.0/me/mailFolders/'+quote(selection.folders[0],safe='')+'/messages/'+quote(message_ref,safe='')+'?'+urlencode({'$select':'id,subject,body,from,receivedDateTime,parentFolderId,conversationId,webLink'}))
-        received=datetime.fromisoformat(value['receivedDateTime'].replace('Z','+00:00'))
-        sender=value.get('from',{}).get('emailAddress',{}).get('address','')
+        sender,received=_mail_metadata(value)
         if (value.get('id')!=message_ref or value.get('parentFolderId') not in selection.folders or
             selection.sender_domains and sender.rsplit('@',1)[-1].casefold() not in selection.sender_domains or
             selection.since and received<selection.since or selection.until and received>=selection.until):raise CapabilityDenied('message is outside the selected source scope')
-        text=value.get('body',{}).get('content','')
-        if not isinstance(text,str):raise StorageError('bounded message body required')
-        if value.get('body',{}).get('contentType','').casefold()=='html':
+        body=value.get('body',{})
+        if not isinstance(body,dict):raise StorageError('bounded message body required')
+        text=body.get('content','');content_type=body.get('contentType','')
+        if not isinstance(text,str) or not isinstance(content_type,str):raise StorageError('bounded message body required')
+        if content_type.casefold()=='html':
             class PlainText(HTMLParser):
                 def __init__(self):super().__init__();self.fragments=[];self.hidden=0
                 def handle_starttag(self,tag,attrs):

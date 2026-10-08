@@ -41,8 +41,24 @@ def test_reused_mail_cursor_still_requires_exact_selection_and_current_grant(pai
     assert len(pai.requests)==before
 
 
-@pytest.mark.parametrize('row',[{'receivedDateTime':'not-a-date'},{'receivedDateTime':'2026-01-01T12:00:00'},{'from':[],'receivedDateTime':'2026-01-01T12:00:00Z'}])
+@pytest.mark.parametrize('row',[{'receivedDateTime':'not-a-date'},{'receivedDateTime':'2026-01-01T12:00:00'},{'from':[],'receivedDateTime':'2026-01-01T12:00:00Z'},{'from':None,'receivedDateTime':'2026-01-01T12:00:00Z'}])
 def test_malformed_mail_metadata_raises_typed_storage_error(row):
     from prm.runtime.graph import _mail_metadata
     from prm.storage.postgres import StorageError
     with pytest.raises(StorageError,match='mail metadata shape differs'):_mail_metadata(row)
+
+
+@pytest.mark.parametrize('changed',[{'receivedDateTime':'invalid'},{'from':None},{'body':None},{'body':{'contentType':[]}}])
+def test_selected_mail_body_malformed_provider_shape_is_typed(pai,monkeypatch,changed):
+    from prm.storage.postgres import StorageError
+    manager,transport,actor=graph(pai)
+    selection=MailScopeSelection('provider_microsoft_graph','resource_selected_mail',folders=('inbox',))
+    allow(pai,'assistant.mail_read',selection.resource_ref,'private_connector_metadata','mail.read',provider='provider_microsoft_graph',connection=transport.connection_ref,operation='read')
+    adapter=GraphMailAdapter(transport);adapter.sync(selection)
+    message=adapter.summary(selection)['items'][0]['id']
+    allow(pai,'assistant.mail_read',message,'private_connector_content','mail.read',provider='provider_microsoft_graph',connection=transport.connection_ref,operation='read')
+    original=transport.request
+    def malformed(*args,**kwargs):
+        value,retry=original(*args,**kwargs);return {**value,**changed},retry
+    monkeypatch.setattr(transport,'request',malformed)
+    with pytest.raises(StorageError):adapter.read_message(selection,message)
