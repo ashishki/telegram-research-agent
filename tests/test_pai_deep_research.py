@@ -35,3 +35,5 @@ def test_interrupted_prepared_step_is_not_read_again(pai):
     result=root.queue.store.get(root.owner_ref,'result',worker.run_once())
     assert 'source_outcome_unknown' in result.payload['gaps'][0]
     assert result.payload['tool_calls']==1
+    saved=root.queue.store.get(root.owner_ref,'result',ref)
+    assert saved.version==2 and saved.payload['status']=='source_outcome_unknown'

@@ -105,6 +105,7 @@ class GitHubReadProvider:
                 if len(raw)>128000:raise StorageError('GitHub content exceeds bound')
                 items.append({'path':path,'text':raw.decode('utf-8')[:12000],
                     'source_url':'https://github.com/'+repository_ref+'/blob/'+sha+'/'+path,'blob_sha':document.get('sha')})
+            except (CapabilityDenied,StorageError):raise
             except Exception:gaps.append('unavailable:'+path)
         return {'repository_ref':repository_ref,'requested_ref':self.ref,'observed_ref':sha,'ref':sha,'items':items,'gaps':gaps,
                 'status':'partial' if gaps else 'read','read_only':True}

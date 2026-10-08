@@ -133,11 +133,39 @@ def test_local_payload_validation_creates_no_model_fence_and_can_be_corrected(pa
         'data_class':'user_provided','owner_ref':root.owner_ref,'connection_ref':'connection_fixture','resource_ref':'resource_dialogue'}
     bad=root.scoped_client(root.model_endpoint,groups=((decision,),),task_ref='local_validation_task',attempt_ref='local_validation_fixture',history=({'role':'assistant','content':{}},))
     with pytest.raises(StorageError,match='invalid bounded history'):bad.complete_with_receipt(**kwargs)
+    fixed=root.scoped_client(root.model_endpoint,groups=((decision,),),task_ref='local_validation_task',attempt_ref='local_validation_fixture')
+    for limit in (0,True,16001):
+        with pytest.raises(StorageError,match='bounded model output limit'):fixed.complete_with_receipt(**dict(kwargs,max_tokens=limit))
     with root.queue.store.transaction() as tx:
         count=tx.conn.execute("SELECT count(*) AS n FROM pa_runtime.object_heads WHERE owner=%s AND object_id LIKE 'model_attempt_%%'",(root.owner_ref,)).fetchone()['n']
     assert count==0 and not pai.requests
     current=next(row for row in root.registry.snapshot(root.owner_ref)['operations'] if row['ref']=='local_validation_fixture')
     assert current['state']=='reserved'
-    fixed=root.scoped_client(root.model_endpoint,groups=((decision,),),task_ref='local_validation_task',attempt_ref='local_validation_fixture')
     assert fixed.complete_with_receipt(**kwargs).delivery_outcome=='accepted'
     assert len([row for row in pai.requests if row[0]=='model'])==1
+
+
+def test_separate_explicit_chat_requests_may_repeat_content_with_separate_accounting(runtime):
+    root,requests,now=runtime;grant(root,now)
+    for index in (71,72):assert turn(root,index,'/chat тот же явный вопрос')['status']=='ok'
+    assert len(requests)==2
+    operations=root.registry.snapshot(root.owner_ref)['operations']
+    assert len({row['ref'] for row in operations if row['state']=='accepted'})==2
+
+
+def test_cancel_after_model_response_preserves_charge_and_prevents_result_completion(pai,monkeypatch):
+    from tests.pai_runtime_fixtures import allow
+    allow(pai,'model.generate','resource_dialogue','user_provided','answer.request')
+    ack=pai.root.ingress.receive({'update_id':9301,'message':{'from':{'id':42},'chat':{'id':42,'type':'private'},'text':'/chat Synthetic cancellation question'}})
+    original=pai.root.registry.execute_reserved_groups
+    def cancel_after_response(*args,**kwargs):
+        result=original(*args,**kwargs)
+        assert pai.root.queue.cancel(owner=pai.root.owner_ref,job_id=ack.job_id)
+        return result
+    monkeypatch.setattr(pai.root.registry,'execute_reserved_groups',cancel_after_response)
+    from prm.storage.postgres import StateConflict
+    with pytest.raises(StateConflict):pai.root.worker().run_once()
+    state=pai.root.queue.status(owner=pai.root.owner_ref,job_id=ack.job_id)
+    assert state['status']=='cancelled' and not state['result_ref']
+    assert len([row for row in pai.requests if row[0]=='model'])==1
+    assert all(w['consumed']==1 for w in pai.root.registry.snapshot(pai.root.owner_ref)['windows'])

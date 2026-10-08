@@ -75,9 +75,13 @@ class ScopedModelClient:
             or connection_ref!=endpoint.connection_ref or owner_ref!=authorization.owner_ref
             or resource_ref!=authorization.resource_ref or data_class!='user_provided'):
             raise CapabilityDenied('configured model differs from sealed access')
+        if type(max_tokens)is not int or not 1<=max_tokens<=16000:
+            raise StorageError('bounded model output limit required')
+        if any(not isinstance(value,str) or len(value)>48000 for value in (prompt,system)):
+            raise StorageError('model request exceeds bounded scope')
         messages=[{'role':'system','content':system}]
         for item in self.history:
-            if item['role'] not in {'user','assistant'} or not isinstance(item['content'],str):
+            if item['role'] not in {'user','assistant'} or not isinstance(item['content'],str) or len(item['content'])>48000:
                 raise StorageError('invalid bounded history')
             messages.append(dict(item))
         messages.append({'role':'user','content':prompt})

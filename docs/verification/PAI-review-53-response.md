@@ -1,0 +1,5 @@
+# Review 53 — divergent target write versus incoming deletion
+
+A target restored from an older baseline can legitimately write a newer version before receiving the source tombstone. Unlike already-tombstoned recreation, this case is reachable. Added a real isolated PostgreSQL counterexample and a pre-replacement conflict guard: an incoming tombstone whose identity is still live in the frozen target blocks atomic import with a forward-fix StorageError. The tombstone has no pre-deletion digest, so even an unchanged live target requires explicit reconciliation rather than guessed equality. Already retained target tombstones remain monotone; repeated import tests still pass.
+
+migration-conflict-final.log preserves an initial nonexistent test-node selection (zero tests, not PASS). Corrected actual command: PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/run_pai_acceptance.py -q -x tests/test_pai_migration.py tests/test_pai_memory_runtime.py. Result: 8 passed in 42.39 s, zero skips/failures. Independent recheck remains required.

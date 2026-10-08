@@ -36,3 +36,22 @@ def test_github_ref_and_paths_are_exact_and_revocation_denies(pai,monkeypatch):
     count=len(calls)
     with pytest.raises(CapabilityDenied):provider.read_repository_context('owner/repository')
     assert len(calls)==count
+
+
+def test_github_revocation_between_commit_and_content_is_not_hidden_as_partial(pai,monkeypatch):
+    from prm.runtime import web
+    grant=allow(pai,'github.repository_context','owner/repository','public','project.context',provider='provider_github',connection=None,operation='read')
+    calls=[]
+    def http(url,**kwargs):
+        calls.append(url)
+        return {'content_type':'application/json','body':json.dumps({'sha':'a'*40}).encode()}
+    monkeypatch.setattr(web,'_https_get',http)
+    original=pai.root.registry.execute_reserved
+    def revoke_after_read(*args,**kwargs):
+        result=original(*args,**kwargs)
+        pai.root.registry.revoke_grant(grant.grant_id,owner_ref=pai.root.owner_ref)
+        return result
+    monkeypatch.setattr(pai.root.registry,'execute_reserved',revoke_after_read)
+    provider=GitHubReadProvider(registry=pai.root.registry,owner_ref=pai.root.owner_ref,repository_ref='owner/repository',ref='main',upper_bound=0)
+    with pytest.raises(CapabilityDenied):provider.read_repository_context('owner/repository')
+    assert len(calls)==1

@@ -51,7 +51,7 @@ class LocalArchiveReader:
                  'title':row['content'].splitlines()[0][:180] if row['content'] else 'Материал архива',
                  'support_span':row['content'][:1200],'posted_at':row['posted_at'],'first_discovered_at':row['ingested_at'],
                  'local_archive_provenance':True,'source_version':hashlib.sha256(row['content'].encode()).hexdigest(),
-                 'importance':'medium'} for row in rows]
+                 'importance':'medium'} for row in rows if isinstance(row['content'],str) and row['content'].strip()]
 
 
 class DurableResearchWorker:
@@ -93,7 +93,12 @@ class DurableResearchWorker:
                 # An interrupted prepared read has an unknown outcome. Retain
                 # it without issuing a second paid request after restart.
                 value=dict(cached.payload)
-                if value['status']=='read_prepared':value['status']='source_outcome_unknown'
+                if value['status']=='read_prepared':
+                    value['status']='source_outcome_unknown'
+                    with queue.store.transaction() as tx:
+                        from .deletion import lineage_lock
+                        lineage_lock(tx.conn,lease.owner);queue._fenced(tx,lease)
+                        tx.put(lease.owner,'result',ref,value,expected_version=cached.version)
                 completed.append(value);calls+=value['tool_calls'];continue
             maximum=1
             if step['source']=='public':maximum=1+root.public_web_bounds.max_fetches if root.public_web_bounds else 1

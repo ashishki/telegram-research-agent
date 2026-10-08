@@ -80,6 +80,13 @@ def apply_domain_delta(target,delta,*,expected_target_manifest):
                 _identity(row['owner'],row['namespace'],row['object_id'])
                 if row['schema_version']!=1 or _canonical(row['payload'])[1]!=row['digest']:
                     raise StorageError('corrupted immutable object blocks domain transfer')
+            # A tombstone contains no pre-deletion version/digest. Thus an
+            # incoming deletion cannot prove that a live target object is the
+            # same old object rather than a divergent write after restore.
+            # Require an explicit forward fix instead of silently erasing it.
+            for row in tables['pa_memory.tombstones']['rows']:
+                if StateTransaction(conn).get(row['owner'],row['namespace'],row['object_ref']) is not None:
+                    raise StorageError('incoming deletion conflicts with live target object; forward fix required')
             # Missing or less conservative source fences never erase target effects.
             for schema,table in LEDGERS:
                 item=tables[schema+'.'+table];keys=tuple(item['keys']);source={tuple(row[key] for key in keys):row for row in item['rows']}

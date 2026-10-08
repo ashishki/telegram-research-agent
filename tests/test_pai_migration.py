@@ -91,3 +91,23 @@ def test_repeated_domain_import_keeps_target_tombstones_terminal_jobs_and_cleane
         row=tx.conn.execute('SELECT deleted,cleanup_pending,root_digest FROM pa_artifacts.files WHERE owner=%s',(root.owner_ref,)).fetchone()
     assert row['deleted'] and not row['cleanup_pending']
     assert row['root_digest']==sha256(str(directory.resolve()).encode()).hexdigest()
+
+
+def test_source_tombstone_conflicting_with_post_restore_target_write_blocks_atomic_import(pai):
+    import pytest
+    from prm.runtime.migration import export_domain_delta,apply_domain_delta,state_manifest
+    from prm.storage.postgres import PostgresStore,StorageError
+    actor={'chat_id':'42','actor_id':'42','owner_chat_id':'42'}
+    source=pai.root.queue.store;ref='memory_divergent_restore'
+    source.put(pai.root.owner_ref,'memory',ref,{'text':'baseline'},expected_version=0)
+    pai.ops.kill_switch();OperationsRuntime(pai.pg.migrator).backup(destination=pai.path/'divergent_baseline')
+    target=pai.pg.empty_database('pa_test_divergent_import')
+    restore_bundle(bundle=pai.path/'divergent_baseline',target=target,artifact_root=pai.path/'divergent_artifacts')
+    restored=PostgresStore(pai.pg.target(target.database,'pa_test_app'))
+    restored.put(pai.root.owner_ref,'memory',ref,{'text':'new target version'},expected_version=1)
+    MemoryRuntime(pai.root).forget(ref,**actor)
+    delta=export_domain_delta(pai.pg.migrator);before=state_manifest(target)
+    with pytest.raises(StorageError,match='incoming deletion conflicts'):
+        apply_domain_delta(target,delta,expected_target_manifest=before)
+    assert state_manifest(target)==before
+    assert restored.get(pai.root.owner_ref,'memory',ref).payload['text']=='new target version'
