@@ -158,9 +158,10 @@ class DurableCapabilityRegistry(CapabilityRegistry):
         with self.store.transaction() as tx:
             _check_schema(tx.conn);doc=_grant_document(grant,self._now(tx.conn))
             row=tx.conn.execute('''UPDATE pa_policy.grants SET revision=%s,document=%s
-                WHERE owner=%s AND grant_id=%s AND revision<%s RETURNING grant_id''',
+                WHERE owner=%s AND grant_id=%s AND revision<%s
+                  AND document->'validity'->>'revoked_at' IS NULL RETURNING grant_id''',
                 (grant.revision,Jsonb(doc),grant.owner_ref,grant.grant_id,grant.revision)).fetchone()
-            if row is None:raise StateConflict('grant replacement must increase current revision')
+            if row is None:raise StateConflict('grant replacement requires a higher revision of an unrevoked grant; reauthorization needs a new grant identity')
     def revoke_grant(self,grant_ref,*,owner_ref,revoked_at=None):
         if revoked_at is not None:raise StorageError('revocation uses database time')
         with self.store.transaction() as tx:

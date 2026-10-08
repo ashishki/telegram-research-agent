@@ -1,7 +1,7 @@
 """Durable exact confirmations and pre-dispatch attempt fences."""
 from __future__ import annotations
 from dataclasses import asdict,replace
-from datetime import datetime
+from datetime import datetime,timedelta
 import hashlib
 import json
 from psycopg.types.json import Jsonb
@@ -54,6 +54,9 @@ def _proposal(payload):
 
 def _confirmation(payload):
     data=dict(payload)
+    stored_digest=data.pop('confirmation_digest',None)
+    if not isinstance(stored_digest,str) or _canonical(data)[1]!=stored_digest:
+        raise StorageError('confirmation integrity mismatch; a new preview is required')
     for name in ('confirmed_at','expires_at'):data[name]=datetime.fromisoformat(data[name])
     return ActionConfirmation(**data)
 
@@ -61,7 +64,19 @@ def _confirmation(payload):
 def _encode_confirmation(value):
     result=asdict(value)
     for name in ('confirmed_at','expires_at'):result[name]=getattr(value,name).isoformat()
+    result['confirmation_digest']=_canonical(result)[1]
     return result
+
+
+def _bound_confirmation(payload,proposal,*,owner,now):
+    value=_confirmation(payload)
+    if (type(value.consumed)is not bool or value.consumed or
+        not proposal.created_at<=value.confirmed_at<=now or value.expires_at<=now):
+        raise CapabilityDenied('saved confirmation is expired or not current')
+    expected=confirm_action(proposal,owner_ref=owner,actor_ref=owner,now=value.confirmed_at).confirmation
+    expected=replace(expected,expires_at=min(expected.expires_at,proposal.expires_at))
+    if value!=expected:raise CapabilityDenied('saved confirmation does not bind the exact proposal and expiry')
+    return value
 
 
 def _encode_receipt(value):
@@ -104,12 +119,13 @@ class DurableActionStore:
             if not row or row['status']!='prepared':raise CapabilityDenied('proposal is not currently confirmable')
             proposal=_proposal(row['payload']);now=conn.execute('SELECT clock_timestamp() AS now').fetchone()['now']
             action=confirm_action(proposal,owner_ref=self.owner_ref,actor_ref=actor_ref,now=now)
+            action=replace(action,confirmation=replace(action.confirmation,expires_at=min(action.confirmation.expires_at,proposal.expires_at)))
             saved=conn.execute('''INSERT INTO pa_actions.confirmations(owner,key,proposal_ref,payload) VALUES(%s,%s,%s,%s)
                 ON CONFLICT DO NOTHING RETURNING key''',(self.owner_ref,action.idempotency_key,proposal_ref,Jsonb(_encode_confirmation(action.confirmation)))).fetchone()
             if not saved:
                 old=conn.execute('SELECT payload,consumed FROM pa_actions.confirmations WHERE owner=%s AND key=%s',(self.owner_ref,action.idempotency_key)).fetchone()
                 if old['consumed']:raise CapabilityDenied('confirmation has already been consumed')
-                action=replace(action,confirmation=_confirmation(old['payload']))
+                action=replace(action,confirmation=_bound_confirmation(old['payload'],proposal,owner=self.owner_ref,now=now))
             return action
     def cancel(self,proposal_ref):
         with self.store.transaction() as tx:
@@ -163,7 +179,7 @@ class DurableActionStore:
             confirmation=conn.execute('SELECT * FROM pa_actions.confirmations WHERE owner=%s AND key=%s FOR UPDATE',(self.owner_ref,action.idempotency_key)).fetchone()
             moment=conn.execute('SELECT clock_timestamp() AS now').fetchone()['now']
             if (not row or row['version']!=proposal.version or row['digest']!=proposal.digest or row['payload']!=proposal.to_payload() or row['status']!='prepared'
-                or not confirmation or confirmation['consumed'] or _confirmation(confirmation['payload'])!=action.confirmation
+                or not confirmation or confirmation['consumed'] or _bound_confirmation(confirmation['payload'],proposal,owner=self.owner_ref,now=moment)!=action.confirmation
                 or action.consume(now=moment) is None):
                 existing=conn.execute('SELECT receipt FROM pa_actions.attempts WHERE owner=%s AND key=%s',(self.owner_ref,action.idempotency_key)).fetchone()
                 if existing:return _receipt(existing['receipt'])

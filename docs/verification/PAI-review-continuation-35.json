@@ -1,0 +1,158 @@
+{
+  "schema_version": 1,
+  "status": "reviewed",
+  "call_number": 35,
+  "call_limit": 35,
+  "purpose": "phase_B_foundation",
+  "read_only": true,
+  "provider": "opencode_go",
+  "requested_model": "mimo-v2.6-pro",
+  "observed_model": "mimo-v2.6-pro",
+  "requested_effort": "thinking_disabled",
+  "observed_effort": "thinking_disabled",
+  "head_sha": "465503dc0545ddeb0eb2cb51dbf401c0cd3fb187",
+  "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+  "diff_sha256": "97b7ea065098725fee2fd3c1da27c6261dd733ecc5290c23ac2a6c1f7fd989ac",
+  "sources": [
+    {
+      "path": "src/prm/storage/postgres.py",
+      "sha256": "8675c30ac28400d584adfeadb2c03e69a298c2782aa6221ac3432a92a1366017",
+      "bytes": 12453
+    },
+    {
+      "path": "src/prm/storage/policy.py",
+      "sha256": "5775f2d3d8dada6f95021aa9783eb51cb095ebda307c33462bdb87453c31baed",
+      "bytes": 30056
+    },
+    {
+      "path": "src/prm/storage/actions.py",
+      "sha256": "6f1738970ab681dcc264c8739122085e0ae8a66ed8423b2a1553fe535650f74f",
+      "bytes": 13893
+    },
+    {
+      "path": "src/prm/storage/conversations.py",
+      "sha256": "a009d9cc7af9bac52868703d11553ebbe7bcabe79cb5c2c1f2499865b229bffb",
+      "bytes": 13098
+    },
+    {
+      "path": "src/prm/storage/jobs.py",
+      "sha256": "539b441477e31952a7607621822d454b8df60ede19432d6a4b0bc3473c83df66",
+      "bytes": 15386
+    },
+    {
+      "path": "src/prm/storage/testing.py",
+      "sha256": "0b2103af3a4c2f6c3bcfa512daf42bb441beda70caac3d0afd69aa93dc7d9819",
+      "bytes": 4755
+    },
+    {
+      "path": "src/prm/storage/__main__.py",
+      "sha256": "ac2265f0064d3bed39c8efac0b3cb2f866a83437303f98c459eac05d4c407b7e",
+      "bytes": 1163
+    },
+    {
+      "path": "src/prm/storage/__init__.py",
+      "sha256": "f4c547e9cd20231b41cf676e0d63a7be0d2a57172b137ab426f54c8da95f7b93",
+      "bytes": 282
+    },
+    {
+      "path": "tests/test_pai_storage.py",
+      "sha256": "e273e9040e8354ed8eb020a270e1edb1777be6e236c2935e077e136d24e9ba7a",
+      "bytes": 7363
+    },
+    {
+      "path": "tests/test_pai_durable_policy.py",
+      "sha256": "fba8afae7c33fc41d98da79086d1f2e87bdee36c33ad9910678a4dbed4ff061c",
+      "bytes": 15770
+    },
+    {
+      "path": "tests/test_pai_durable_actions.py",
+      "sha256": "3d4885fc7c1ff7b750d805561d19a26fe6b72f0503f9eb1be0b67c80a0905048",
+      "bytes": 8037
+    },
+    {
+      "path": "tests/test_pai_durable_conversation.py",
+      "sha256": "9d91ca664536bb873b60a3d21497b7837cfa4a2e1278587accceb969dd5decc6",
+      "bytes": 6154
+    },
+    {
+      "path": "tests/test_pai_workers.py",
+      "sha256": "3bf1b7e86e9a77d170b5451c1f7cb10df4b384c8ff630159aef4a2014fb7d3b6",
+      "bytes": 7435
+    }
+  ],
+  "scope": "phase_B_foundation; supplied full current source/tests and explicitly labeled integration diff if present",
+  "input_sha256": "a4eb9006918d90932c69547432f22970a5ebd30d705df4a3eb22b0a2e7a26b2c",
+  "input_bytes": 149065,
+  "output_token_cap": 16000,
+  "timeout_seconds": 900,
+  "workflow_receipt": false,
+  "human_authority": false,
+  "runner_path": ".playbook-artifacts/pai-review-as-needed.py",
+  "runner_sha256": "8306b7e250e58139ee08be8c58de615d3d6fe684f5a4726c091ce9eaf689d545",
+  "transport_path": "tools/mimo_code_review.py",
+  "transport_sha256": "2ba3cbf032166616aa2eeba61f654308379b32d228e98f389f2099a02679262f",
+  "command": ".venv-pai/bin/python .playbook-artifacts/pai-review-as-needed.py --call-number 35 --purpose phase_B_foundation",
+  "source_exclusions": [
+    "actual private corpus",
+    "live account payload",
+    "credentials",
+    "production configuration"
+  ],
+  "authority_exclusions": [
+    "human/workflow completion",
+    "live-account consent",
+    "production migration/deployment",
+    "product-provider spending"
+  ],
+  "request_body_sha256": "b61a822a3fcafdac5f9bf71669ddc04c892df8e294624cbe845440cdeba7f771",
+  "provider_call_attempted": true,
+  "usage": {
+    "prompt_tokens": 39633,
+    "completion_tokens": 693,
+    "total_tokens": 40326,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    }
+  },
+  "finish_reason": "stop",
+  "response_sha256": "bc0a33ca8db3aed6bf7ca6d10bf6d49d20da832f698910459d015033f9a1cd3f",
+  "findings": {
+    "verdict": "FIX_P1_FIRST",
+    "findings": [
+      {
+        "severity": "P1",
+        "title": "Revoke-then-replace resurrects a revoked grant as active",
+        "file": "src/prm/storage/policy.py:156-172",
+        "issue": "revoke_grant only increments the stored revision and writes revoked_at in the document; replace_grant then accepts any grant with revision<grant.revision and rewrites the document without carrying revoked_at forward. After revocation, a stale in-memory grant with a higher revision is re-registered as 'active', so an authorization that must be denied becomes allowed.",
+        "fix": "Persist revocation as an irreversible terminal state (e.g. revoked flag/column checked before any replacement) or reject replacement once revoked_at is set; add a test that revoke followed by replace_grant keeps the grant non-authorizable.",
+        "confidence": "high"
+      },
+      {
+        "severity": "P1",
+        "title": "Persisted ActionConfirmation lacks expiry binding and validation",
+        "file": "src/prm/storage/actions.py:55-64",
+        "issue": "_confirmation blindly reconstructs ActionConfirmation from stored JSON without validating digest/actor/expires_at bounds or matching the persisted confirmation against the proposal timestamp. Combined with confirm()'s idempotency-key reuse (an existing unconsumed row is returned even if its payload belongs to an older/different proposal state), a confirmation replayed after the intended one-use binding has changed can still satisfy action.consume(now) because expiry is taken solely from attacker-influenced stored fields.",
+        "fix": "Validate confirmation expiry and payload integrity on load, bind the stored confirmation to the exact proposal digest/version at insert, and refuse reuse of an idempotency key whose confirmation was produced for a different proposal state; add regression tests.",
+        "confidence": "medium"
+      },
+      {
+        "severity": "P1",
+        "title": "Two-phase compound reservation allows an allow to proceed after a scope-group denial",
+        "file": "src/prm/storage/policy.py:335-377",
+        "issue": "execute_reserved_groups commits each group to 'prepared' before the final authorization pass; if the second group is denied at the final check, the first group is settled 'unknown' but the exception is re-raised as ScopeTransportUnknown only when transport_started is true, otherwise as ScopePreparationUnknown. The caller sees a non-retryable error but the durable 'prepared' fence leaves windows reserved and call-counts incremented while no transport ran, effectively consuming budget for an operation that never occurred and preventing normal reconciliation.",
+        "fix": "Distinguish pre-transport denials (rollback/abandon all prepared groups and refund reservations) from post-transport unknowns; only mark 'prepared'/charge call-counts immediately before the actual I/O point or provide an explicit reconciliation path for the untouched case.",
+        "confidence": "medium"
+      }
+    ],
+    "not_verified": [
+      "src/prm/capabilities.py and src/prm/confirmed_actions.py implementations (only referenced)",
+      "the public integration diff (phase D) and any unchanged legacy modules",
+      "production/live data paths and real external providers"
+    ],
+    "summary": "Most durability, fencing, and fail-closed paths are solid and well-tested, but three P1 defects undermine core safety invariants: revocation is not irreversible under grant replacement, confirmation persistence/replay validation is incomplete, and compound scope preparation can consume durable budget without any transport having occurred when a later scope is denied. These should be fixed before SHIP_OK; no P0 was found."
+  },
+  "duration_seconds": 33.791
+}

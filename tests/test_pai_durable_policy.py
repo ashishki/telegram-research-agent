@@ -261,3 +261,35 @@ def test_compound_post_invocation_denial_is_unknown_with_non_replayable_refs(san
     assert all(row['reserved']==0 and row['consumed']==4 for row in snapshot['windows'])
     assert not reg.authorize_and_reserve(request(grant,'compound_unknown_first'),upper_bound=2).allowed
     assert not reg.authorize_and_reserve(request(grant,'compound_unknown_second'),upper_bound=2).allowed
+
+
+def test_revoke_then_replace_cannot_restore_the_same_grant_identity(sandbox):
+    reg,grant=registry(sandbox,'terminal_revocation')
+    reg.revoke_grant(grant.grant_id,owner_ref=grant.owner_ref)
+    with pytest.raises(StateConflict,match='unrevoked grant'):
+        reg.replace_grant(replace(grant,revision=grant.revision+2))
+    assert not reg.authorize_and_reserve(request(grant,'terminal_revoked_attempt'),upper_bound=1).allowed
+    new_grant=replace(grant,grant_id='grant_explicit_new_authorization',revision=1)
+    reg.register_grant(new_grant)
+    assert reg.authorize_and_reserve(request(new_grant,'explicit_new_authorization'),upper_bound=1).allowed
+
+
+def test_compound_no_http_reconciles_actual_zero_without_clearing_fence(sandbox,monkeypatch):
+    from prm.storage.policy import ScopePreparationUnknown
+    reg,grant=registry(sandbox,'compound_zero_reconciliation')
+    first=reg.authorize_and_reserve(request(grant,'untouched_first'),upper_bound=2)
+    second=reg.authorize_and_reserve(request(grant,'untouched_second'),upper_bound=2)
+    prepare=reg._commit_durable_transport
+    def denied(group,*,strict=False):
+        return False if group[0].operation_ref=='untouched_second' else prepare(group,strict=strict)
+    monkeypatch.setattr(reg,'_commit_durable_transport',denied)
+    calls=[]
+    with pytest.raises(ScopePreparationUnknown) as failure:
+        reg.execute_reserved_groups(((first.reservation,),(second.reservation,)),lambda:calls.append(True))
+    assert calls==[] and not failure.value.retry_allowed
+    reg.settle(grant.owner_ref,'untouched_first',outcome='unknown',actual=0)
+    snapshot=reg.snapshot(grant.owner_ref)
+    assert all(row['reserved']==0 and row['consumed']==0 for row in snapshot['windows'])
+    attempted=next(row for row in snapshot['operations'] if row['ref']=='untouched_first')
+    assert attempted['state']=='unknown' and attempted['actual']==0
+    assert not reg.authorize_and_reserve(request(grant,'untouched_first'),upper_bound=2).allowed

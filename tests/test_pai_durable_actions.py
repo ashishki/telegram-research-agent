@@ -121,3 +121,42 @@ def test_expired_confirmation_proposal_never_calls_provider(sandbox,tmp_path):
     path=tmp_path/'effect.txt'
     with pytest.raises(CapabilityDenied):execute_action(action,request=request(reg,grant,'operation_expired'),executor=FakeExecutor(path),store=store,now=datetime.now(timezone.utc))
     assert not path.exists()
+
+
+def test_saved_confirmation_tampering_and_foreign_binding_cannot_execute(sandbox,tmp_path):
+    from prm.storage.actions import _encode_confirmation
+    from prm.storage.postgres import StorageError
+    from psycopg.types.json import Jsonb
+    reg,grant,store,action=setup(sandbox,'confirmation_corruption');path=tmp_path/'effect.txt'
+    forged=_encode_confirmation(action.confirmation)
+    forged['expires_at']=(action.confirmation.expires_at+timedelta(minutes=1)).isoformat()
+    with store.store.transaction() as tx:
+        tx.conn.execute('UPDATE pa_actions.confirmations SET payload=%s WHERE owner=%s AND key=%s',(Jsonb(forged),grant.owner_ref,action.idempotency_key))
+    with pytest.raises(StorageError,match='confirmation integrity mismatch'):
+        store.confirm(action.proposal.proposal_ref,actor_ref=grant.owner_ref)
+    with pytest.raises(StorageError,match='confirmation integrity mismatch'):
+        execute_action(action,request=request(reg,grant,'corrupt_confirmation'),executor=FakeExecutor(path),store=store,now=datetime.now(timezone.utc))
+    # Even a valid checksum cannot make another actor's record an approval.
+    foreign=_encode_confirmation(replace(action.confirmation,actor_ref='owner_foreign'))
+    with store.store.transaction() as tx:
+        tx.conn.execute('UPDATE pa_actions.confirmations SET payload=%s WHERE owner=%s AND key=%s',(Jsonb(foreign),grant.owner_ref,action.idempotency_key))
+    with pytest.raises(CapabilityDenied,match='exact proposal'):
+        store.confirm(action.proposal.proposal_ref,actor_ref=grant.owner_ref)
+    assert not path.exists() and store.all()==()
+
+
+def test_saved_confirmation_expiry_is_clamped_to_proposal_and_not_reused(sandbox):
+    from prm.storage.actions import _encode_confirmation
+    from psycopg.types.json import Jsonb
+    reg,grant,store,action=setup(sandbox,'saved_confirmation_expiry')
+    now=datetime.now(timezone.utc)
+    soon=replace(action.proposal,version=2,expires_at=now+timedelta(seconds=45))
+    store.register(soon,expected_version=1)
+    confirmed=store.confirm(soon.proposal_ref,actor_ref=grant.owner_ref)
+    assert confirmed.confirmation.expires_at==soon.expires_at
+    assert store.confirm(soon.proposal_ref,actor_ref=grant.owner_ref)==confirmed
+    expired=replace(confirmed.confirmation,confirmed_at=now-timedelta(minutes=6),expires_at=now-timedelta(minutes=1))
+    with store.store.transaction() as tx:
+        tx.conn.execute('UPDATE pa_actions.confirmations SET payload=%s WHERE owner=%s AND key=%s',(Jsonb(_encode_confirmation(expired)),grant.owner_ref,confirmed.idempotency_key))
+    with pytest.raises(CapabilityDenied,match='expired or not current'):
+        store.confirm(soon.proposal_ref,actor_ref=grant.owner_ref)

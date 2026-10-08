@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "status": "critical_recheck_34_ship_ok_remaining_accumulated_source_reviews_prepared",
-  "current_approved_call_cap": 34,
-  "calls_consumed_including_failures": 34,
+  "status": "phase_B_fixes_verified_recheck_pending",
+  "current_approved_call_cap": 35,
+  "calls_consumed_including_failures": 35,
   "proposed_total_cap": 34,
   "new_calls_maximum": 3,
   "third_call": "only if an actual new finding needs independent recheck",
@@ -804,6 +804,54 @@
       ],
       "instructions": "Independent accumulated phase F_completeness code review of the supplied full current modules/tests. This is fresh source review following prior phase attempts that failed/incompletely returned, and is not a claimed governed Role Runner or human approval receipt. Review safety/fail-closed behavior, scope/owner/versions, idempotency/no blind replay, cancellation/recovery/deletion, input bounds/privacy and meaningful test adequacy relevant to these files. Existing synthetic tests and earlier scoped rechecks are evidence only. Report only reproducible defects with concrete execution paths; do not infer authorization from private content or invent missing human acceptance as a code defect. Check cross-file interactions among supplied sources. The public integration diff is included only in phase D and does not imply full review of unchanged legacy files. Actual production, paid product-provider and private/live data are not exercised. No P0/P1 => SHIP_OK, P1 only => FIX_P1_FIRST, any P0 => STOP_SHIP.",
       "source_bytes": 125642
+    },
+    {
+      "purpose": "phase_B_findings_recheck",
+      "base_sha": "465503dc0545ddeb0eb2cb51dbf401c0cd3fb187",
+      "sources": [
+        {
+          "path": "src/prm/storage/policy.py",
+          "sha256": "6e16889bdd9f889daf7ced9c447e2e7c514a623c9d4958bdd9fd1f246a9bb4c2",
+          "bytes": 30184
+        },
+        {
+          "path": "src/prm/storage/actions.py",
+          "sha256": "d1ba42ff532386cfe2aed5101353eb6090b09f28b65891c8284a37ffa6e59b29",
+          "bytes": 15054
+        },
+        {
+          "path": "src/prm/capabilities.py",
+          "sha256": "eb9a853d54b36bd1719e9b0ad026833d2cb270b0e3e8d39dd09401eb28f80362",
+          "bytes": 53351
+        },
+        {
+          "path": "src/prm/confirmed_actions.py",
+          "sha256": "aa933b7af329bca26c7c81a50ef324608a3cf0d8d0ada322ac25d34574dc8d3a",
+          "bytes": 16470
+        },
+        {
+          "path": "tests/test_pai_durable_policy.py",
+          "sha256": "c14d1924f7583027c278ec24bd2d257404c6188bf8ae5b2c53d5cba8d4b1af22",
+          "bytes": 17766
+        },
+        {
+          "path": "tests/test_pai_durable_actions.py",
+          "sha256": "18acbd49cdb9db2becf011588b91c84bdfcedcb2ca23bf4c119d6c003e4a4a37",
+          "bytes": 10766
+        },
+        {
+          "path": "docs/verification/PAI-review-continuation-35.json",
+          "sha256": "be0714d7d068a812cf5047776946243aa8630dcc14e8efdd3ef19d85cc59b9a6",
+          "bytes": 8037
+        },
+        {
+          "path": "docs/verification/PAI-review-35-response.md",
+          "sha256": "1863d70a1b35c04dedfbee345e874cdab36642e44d0c0eab883243cd8712a657",
+          "bytes": 3235
+        }
+      ],
+      "instructions": "Fresh independent resolution of the three phase-B review #35 P1 findings, against complete current durable policy/actions, previously omitted legacy capability/confirmation definitions, and executable cases. Verify revoked grant identities cannot be revived by a higher revision; reauthorization needs a new explicit grant identity. Verify the saved confirmation checksum, exact proposal/owner/version/digest/time/expiry binding, expiry clamp and one-use replay guards. Missing/changed checksum intentionally fails closed with new-preview instruction, not automatic repair of an approval. The checksum is integrity evidence, NOT a substitute for owner approval or protection against a fully privileged DB adversary. Compound no-HTTP preparation is deliberately conservative and non-replayable: actual zero can settle via existing reconciliation without resetting its fence; do not require resetting potentially processed operations. Read the concrete counterexample and decide whether #35 claim of irrecoverable cost/allowed I/O is supported. Return a consistent verdict and only actual executable defects; no human/governed/live approval.",
+      "source_bytes": 154863
     }
   ],
   "authority_exclusions": [

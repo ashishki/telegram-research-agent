@@ -309,3 +309,18 @@ Prepared source hashes and the pinned playbook entrypoint were verified.
 
 Review #34 reserved/attempted, 34/34 consumed including failures.
 Purpose: review_33_resolution; source HEAD b29c496b5fb00d91a1d913e5877b5760d9ec6d3b. No automatic retry.
+
+Review #35 reserved/attempted, 35 consumed under ongoing scoped authority including failures.
+Purpose: phase_B_foundation; source HEAD 465503dc0545ddeb0eb2cb51dbf401c0cd3fb187. No automatic retry.
+
+# 2026-10-08 final tier snapshot and phase-B findings
+
+On unchanged 465503d (runtime 1b09d5a), pai-complete: 259 passed in 883.59 s,
+zero skips/failures and complete strict requirement/scenario binding. This
+precedes the phase-B fixes and is not relabeled as later-source verification.
+Call #35 returned valid FIX_P1_FIRST with three foundation allegations. Grant
+replacement and saved-confirmation persistence were strengthened; a real
+compound no-HTTP/actual-zero counterexample retains its fence. Focused fixes:
+32 passed in 45.90 s, zero skips/failures. Receipt/response: review-35 files.
+Next #36 fresh actual-finding recheck with complete legacy capability/action
+definitions. Necessary reviews are owner-authorized as needed; 35 consumed.
