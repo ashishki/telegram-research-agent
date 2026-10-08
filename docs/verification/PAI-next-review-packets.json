@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "status": "phase_C_delivery_fixes_verified_recheck_pending",
-  "current_approved_call_cap": 41,
-  "calls_consumed_including_failures": 41,
+  "current_approved_call_cap": 43,
+  "calls_consumed_including_failures": 42,
   "proposed_total_cap": 34,
   "new_calls_maximum": 3,
   "third_call": "only if an actual new finding needs independent recheck",
@@ -1125,5 +1125,10 @@
     "status": "allocated_not_invoked",
     "purpose": "native independent tooling audit after explicit thinking-mode maintenance",
     "command": ".venv-pai/bin/python tools/run_codex_role.py run --provider opencode-go --root . --task PAI-00 --feature-id PAI --role program_design_review --tooling-review --thinking-disabled --allow-provider-egress --call-cap 1 --output-token-cap 16000 --timeout-seconds 900"
+  },
+  "native_tooling_recheck_allocation": {
+    "call_number": 43,
+    "status": "allocated",
+    "purpose": "genuine native re-audit of schema/section provenance fixes; no design record consumption before accepted verdict"
   }
 }

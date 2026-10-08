@@ -394,3 +394,14 @@ retained, trust gate stays closed. Parser/provider schema alignment and exact
 rendered-section provenance strengthened; 81 final tests passed in 3.67 s.
 Response files record actual claims, fixes and existing negative drift cases;
 no self-approval, human design or live authority is inferred. 41 consumed.
+
+Review #42 reserved/attempted, 42 consumed under ongoing scoped authority including failures.
+Purpose: cancel_actual_source_resolution; source HEAD a25a04a610a0fbbe814ec31c1f8088768085390e. No automatic retry.
+
+# 2026-10-08 tooling re-audit allocation
+
+#42 focused cancel-code resolution in flight; source frozen at a25a04a.
+Allocate #43 actual native tooling re-audit of schema/provenance fixes under
+ongoing authority. 81 final tooling tests passed; critical sources and HEAD
+stay unchanged while the native call runs. The original #41 STOP remains
+closed to downstream design consumption until genuine independent resolution.
