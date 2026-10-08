@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "status": "local_runtime_synthetic_verified_formal_review_pending",
-  "candidate_head": "5d6d0f2f45005e2638683dc08340fa2a7bc5a907",
+  "candidate_head": "e1c86ef5fd73937fa936d96be43fa477f036345c",
   "runtime_change_commit": "caf97a7",
   "canonical_matrix_ref": "docs/design/PAI.requirements.json",
   "canonical_matrix_sha256": "32d8dbbc05cb690887a37ba3cc63f5510108b0bc785ef7ea118330363e5a5ee7",
@@ -1712,14 +1712,14 @@
     "program_design_review": "pending_native_complete_aggregation",
     "product_design_review": "pending_native_complete_aggregation",
     "slice_test_critic_privacy_maintainability": "non-Codex governed adapter/receipts remain pending; advisory source rechecks are not substituted",
-    "tooling": "native76 STOP sole EOF allegation; original committed function and current native pipeline deny all exact cases; current EOF order clarified; fresh native77 required, not self-closed"
+    "tooling": "native77 STOP at e1c86ef; actual packet contains aggregate publication; real pinned-consumer publication/altered-part cases pass; independent model-selection decision pending, no implementer override"
   },
   "live_provider_evidence": false,
   "human_design_approval": false,
   "human_visual_usefulness_acceptance": false,
   "production_deployment": false,
   "remaining_gates": [
-    "Close genuine native tooling audit and all-four-group program/product design sets; runtime320/focused678/retrofit150 and latest scoped120 passed at named snapshots.",
+    "Reviewer-selection decision in PAI-reviewer-change-proposal.md; then fresh accepted tooling audit and all-four-group program/product sets. Runtime320/focused678/retrofit150 and scoped122 passed at named snapshots.",
     "Preserve any native STOP/P0/P1 until corrected and independently rechecked.",
     "Exact hash-bound owner design decision through the pinned workflow; unsupported governed acceptance roles remain separate.",
     "PAI-27 exact source/account/provider/operation/private-egress/budget canary scope and actual observations.",
@@ -1730,7 +1730,7 @@
   "source_boundary_closure": "Latest media budget/cancel #68 SHIP_OK; other unchanged runtime source closures as recorded.",
   "changed_files": {
     "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
-    "head_sha": "5d6d0f2f45005e2638683dc08340fa2a7bc5a907",
+    "head_sha": "e1c86ef5fd73937fa936d96be43fa477f036345c",
     "paths": [
       ".gitignore",
       ".playbook/instruction_manifest.json",
@@ -1801,6 +1801,7 @@
       "docs/verification/PAI-native-tooling-66-response.md",
       "docs/verification/PAI-native-tooling-69-response.md",
       "docs/verification/PAI-native-tooling-74-response.md",
+      "docs/verification/PAI-native76-eof-reproducer.py",
       "docs/verification/PAI-next-review-packets.json",
       "docs/verification/PAI-phase-c-review-failure.json",
       "docs/verification/PAI-phase-d-review-24.json",
@@ -1877,6 +1878,8 @@
       "docs/verification/PAI-review-continuation-72.json",
       "docs/verification/PAI-review-continuation-73.json",
       "docs/verification/PAI-review-continuation-74.json",
+      "docs/verification/PAI-review-continuation-75.json",
+      "docs/verification/PAI-review-continuation-76.json",
       "docs/verification/PAI-review-continuation.json",
       "docs/verification/PAI-synthetic-requirement-evidence-20261007.json",
       "docs/verification/PAI-tooling-maintenance-packet.md",
@@ -2009,14 +2012,15 @@
     "log_sha256": "64c737456d76f8973e7dbc9c16a56f2e8e10fa12899cb63fdc87f774033902b0"
   },
   "tooling_tests": {
-    "source_snapshot": "final post76 code before commit",
-    "result": "120 passed in 6.24 s",
-    "log_path": ".playbook-artifacts/pai-validation-20261008/tooling-77-final.log",
-    "log_sha256": "48bcff31126a1093f0313762b407076bdc1087b0ece07314e3558799ca6879af"
+    "source_snapshot": "e1c86ef plus real-pinned-consumer cases and final scope/proposal registration",
+    "result": "122 passed in 8.65 s",
+    "log_path": ".playbook-artifacts/pai-validation-20261008/tooling-handoff-final.log",
+    "log_sha256": "62a583a4149c8791d6c468922d868663f39a3d47df670a805f724cab9422caf3"
   },
   "last_scoped_push": {
     "head_sha": "5d6d0f2f45005e2638683dc08340fa2a7bc5a907",
     "branch": "docs/personal-assistant-blueprint-playbook-20260918",
     "status": "observed_success"
-  }
+  },
+  "review_protocol_proposal": "docs/verification/PAI-reviewer-change-proposal.md"
 }

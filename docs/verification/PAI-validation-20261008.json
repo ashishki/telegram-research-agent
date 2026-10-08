@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "date": "2026-10-08",
-  "status": "runtime320_focused678_tooling120_native76_STOP_independent_recheck_required",
+  "status": "runtime320_focused678_tooling122_native77_STOP_review_protocol_pending",
   "runtime_head": "caf97a7",
   "checks": [
     {
@@ -453,10 +453,26 @@
     {
       "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python -m pytest -q tests/test_opencode_role_review.py tests/test_pai_acceptance_guard.py tests/test_playbook_bridge.py tests/test_pai_plan.py",
       "result": "120 passed in 6.24 s",
-      "source_snapshot": "final post76 code/tests/factual packet/reproducer registration before commit",
+      "source_snapshot": "e1c86ef code/tests/factual packet/reproducer, tested identical bytes before commit",
       "exit_code": 0,
       "log_path": ".playbook-artifacts/pai-validation-20261008/tooling-77-final.log",
       "log_sha256": "48bcff31126a1093f0313762b407076bdc1087b0ece07314e3558799ca6879af"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python -m pytest -q tests/test_opencode_role_review.py tests/test_pai_acceptance_guard.py tests/test_playbook_bridge.py tests/test_pai_plan.py",
+      "result": "122 passed in 7.91 s",
+      "source_snapshot": "e1c86ef plus real-pinned-consumer positive/negative aggregate cases; before proposal registration",
+      "exit_code": 0,
+      "log_path": ".playbook-artifacts/pai-validation-20261008/tooling-77-consumer.log",
+      "log_sha256": "efcb642a6c3a7b3a397cd7ba1f03435fcf82fd40d8d37e6cf49761bce44e748a"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python -m pytest -q tests/test_opencode_role_review.py tests/test_pai_acceptance_guard.py tests/test_playbook_bridge.py tests/test_pai_plan.py",
+      "result": "122 passed in 8.65 s",
+      "source_snapshot": "e1c86ef plus real-pinned-consumer cases and final scope/proposal registration, prior to evidence commit",
+      "exit_code": 0,
+      "log_path": ".playbook-artifacts/pai-validation-20261008/tooling-handoff-final.log",
+      "log_sha256": "62a583a4149c8791d6c468922d868663f39a3d47df670a805f724cab9422caf3"
     }
   ],
   "source_notes": "Tests preceded the named source commits; intermediate worktree observations are not projected onto later changes. Whole tier precedes foundation/Watch/delivery fixes. No full historical pytest.",
@@ -464,5 +480,7 @@
   "human_acceptance": false,
   "services_timers_enabled": false,
   "candidate_documentation_head": "1473004",
-  "latest_tooling_head": "5d6d0f2f45005e2638683dc08340fa2a7bc5a907"
+  "latest_tooling_head": "e1c86ef5fd73937fa936d96be43fa477f036345c",
+  "reviewed_commit": "e1c86ef5fd73937fa936d96be43fa477f036345c",
+  "review_status": "native77_STOP_factual_publication_contradiction_not_self_closed"
 }

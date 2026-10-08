@@ -492,3 +492,7 @@ Native75 attempted/consumed at5d6d0f2; TimeoutError901.164s, no valid verdict/ob
 Native tooling review #76 reserved under ongoing authority at c4b689b03c5fc38070e87e57e85543c68b58e90d; one bounded request, thinking_disabled, no automatic retry.
 
 Native76 STOP sole EOF allegation preserved. Exact original c4b689b function executed on BytesIO EOF: empty, completeJSON and completeJSON+stop all denied, wire0/222/321, no returned verdict. Current terminal check moved before counting; three native transport/execute cases emit failure only, no design writer. Final scoped120passed6.24s; native77 explicitly allocated thinking-disabled fresh independent recheck. 76 calls consumed, allocation85 includes eight future design parts78..85.
+
+Native tooling review #77 reserved under ongoing authority at e1c86ef5fd73937fa936d96be43fa477f036345c; one bounded request, thinking_disabled, no automatic retry.
+
+Native77 STOP at e1c86ef preserved, sole missing-aggregation P0 contradicted by actual packet containing aggregate write and real pinned consumer call. Two genuine pinned-writer/parser fixture cases verify four-part publication and altered-part denial; final scoped122passed8.65s. No implementer override, no design consumption. 77 calls consumed; future allocated parts blocked. Concrete GLM-5.3 reviewer selection proposal prepared under unchanged provider/input/output/time/exclusion limits; current Mimo-only policy/guard unchanged, no new model call. Owner decision required by current REVIEW_POLICY model selection, not another count-cap permission.

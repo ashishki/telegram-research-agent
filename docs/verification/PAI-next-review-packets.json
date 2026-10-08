@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "status": "native76_STOP_exact_eof_reproduced_denied_native77_allocated",
+  "status": "native77_STOP_factual_contradiction_pending_review_protocol_decision",
   "current_approved_call_cap": 85,
-  "calls_consumed_including_failures": 76,
+  "calls_consumed_including_failures": 77,
   "proposed_total_cap": 34,
   "new_calls_maximum": 3,
   "third_call": "only if an actual new finding needs independent recheck",
@@ -1897,49 +1897,49 @@
       "call_number": 78,
       "role": "program_design_review",
       "slice_group": "foundation",
-      "status": "allocated_not_invoked"
+      "status": "blocked_current_tooling_gate_not_invoked"
     },
     {
       "call_number": 79,
       "role": "program_design_review",
       "slice_group": "product",
-      "status": "allocated_not_invoked"
+      "status": "blocked_current_tooling_gate_not_invoked"
     },
     {
       "call_number": 80,
       "role": "program_design_review",
       "slice_group": "sources",
-      "status": "allocated_not_invoked"
+      "status": "blocked_current_tooling_gate_not_invoked"
     },
     {
       "call_number": 81,
       "role": "program_design_review",
       "slice_group": "completeness",
-      "status": "allocated_not_invoked"
+      "status": "blocked_current_tooling_gate_not_invoked"
     },
     {
       "call_number": 82,
       "role": "product_design_review",
       "slice_group": "foundation",
-      "status": "allocated_not_invoked"
+      "status": "blocked_current_tooling_gate_not_invoked"
     },
     {
       "call_number": 83,
       "role": "product_design_review",
       "slice_group": "product",
-      "status": "allocated_not_invoked"
+      "status": "blocked_current_tooling_gate_not_invoked"
     },
     {
       "call_number": 84,
       "role": "product_design_review",
       "slice_group": "sources",
-      "status": "allocated_not_invoked"
+      "status": "blocked_current_tooling_gate_not_invoked"
     },
     {
       "call_number": 85,
       "role": "product_design_review",
       "slice_group": "completeness",
-      "status": "allocated_not_invoked"
+      "status": "blocked_current_tooling_gate_not_invoked"
     }
   ],
   "native_tooling_recheck_66": {
@@ -2002,9 +2002,10 @@
   },
   "native_tooling_recheck_77": {
     "call_number": 77,
-    "status": "allocated_not_invoked",
+    "status": "native_tooling_completed",
     "purpose": "fresh independent current-source recheck of sole native76 EOF allegation with committed original-function reproduction and native publication negatives",
     "output_cap": 16000,
     "timeout": 900
-  }
+  },
+  "pending_review_protocol_decision": "docs/verification/PAI-reviewer-change-proposal.md"
 }

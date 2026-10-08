@@ -869,3 +869,42 @@ def test_exact_eof_after_complete_json_cannot_publish_native_review(tmp_path,mon
     failure=json.loads(next((tmp_path/'.playbook-artifacts/opencode-runs').glob('*/failure.json')).read_text())
     assert failure['status']=='no_valid_verdict' and failure['provider_outcome']=='unknown'
     assert failure['stream_state']['terminal_event']=='eof' and records==[]
+
+
+@pytest.mark.parametrize('altered',[False,True])
+def test_four_phase_finalizer_publishes_through_real_pinned_consumer(tmp_path,monkeypatch,altered):
+    import finalize_opencode_design_reviews as complete
+    args,calls,_=setup_run(tmp_path,monkeypatch)
+    from playbook import verified_upstream,ROOT
+    sys.path.insert(0,str(verified_upstream(ROOT)/'tools'))
+    import feature_design_lib
+    import approve_feature_design
+    workflow=SimpleNamespace(validate_task_feature_slice_binding=lambda *a,**kw:None,git_commit=lambda root:'a'*40)
+    design={'schema_version':'playbook.feature_design.v1','feature_id':'F','status':'draft',
+        'planning_depth':'compact_design','risk_level':'high','brief_ref':'docs/PROJECT_BRIEF.md',
+        'architecture_refs':[],'approval_policy':'human_required','slices':[{'slice_id':f'PAI-{n:02}'} for n in range(32)]}
+    folder=tmp_path/'docs/design';folder.mkdir(parents=True)
+    (folder/'F.md').write_text('# Synthetic complete-phase design\n')
+    (folder/'F.design.json').write_text(json.dumps(design))
+    manifest=[{'path':p.relative_to(tmp_path).as_posix(),'sha256':review.digest(p.read_bytes()),'bytes':len(p.read_bytes())} for p in (folder/'F.md',folder/'F.design.json')]
+    monkeypatch.setattr(review,'prepare_packet',lambda *args:('synthetic complete packet',manifest,design))
+    modules=lambda root:(feature_design_lib,workflow,approve_feature_design)
+    monkeypatch.setattr(review,'pinned_modules',modules);monkeypatch.setattr(complete,'pinned_modules',modules)
+    for group in review.REVIEW_GROUPS:
+        args.slice_group=group;assert review.execute(args)==0
+    results=sorted((tmp_path/'.playbook-artifacts/opencode-runs').glob('*/result.json'))
+    record_path=approve_feature_design.design_review_record_path(tmp_path,'F',args.role)
+    assert len(results)==4 and not record_path.exists()
+    if altered:
+        results[0].parent.joinpath('report.md').write_text('altered phase report')
+        with pytest.raises(review.ReviewBlocked,match='phase report hash changed'):
+            complete.finalize(tmp_path,'F',args.role,results)
+        assert not record_path.exists() and not (tmp_path/'.playbook-artifacts/opencode-complete').exists()
+    else:
+        assert complete.finalize(tmp_path,'F',args.role,results)==0
+        parsed=approve_feature_design.parse_design_review_record(root=tmp_path,feature_id='F',role=args.role,current_design=design,required=True)
+        assert parsed['verdict']=='ADVISORY'
+        record=json.loads(record_path.read_text())
+        assert record['reviewer_binding'].startswith('opencode_go_complete:') and 'approved_by' not in record
+        aggregate=json.loads((tmp_path/record['reviewer_binding'].split(':',1)[1]).read_text())
+        assert len(aggregate['parts'])==4 and len(aggregate['coverage']['slices'])==32
