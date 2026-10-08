@@ -117,6 +117,9 @@ def pinned_modules(root: Path):
     import feature_design_lib
     import feature_workflow
     import approve_feature_design
+    for module,name in ((feature_design_lib,'feature_design_lib'),(feature_workflow,'feature_workflow'),(approve_feature_design,'approve_feature_design')):
+        if Path(module.__file__).resolve()!=(upstream/'tools'/f'{name}.py').resolve():
+            raise ReviewBlocked('pinned gate module import path differs')
     return feature_design_lib, feature_workflow, approve_feature_design
 
 
@@ -319,6 +322,8 @@ def execute(args):
     if not key:
         raise ReviewBlocked("no provider credentials")
     before_hashes = lib.design_hashes(root, design)
+    gate_modules=[{'path':str(Path(module.__file__).resolve()),
+                   'sha256':digest(Path(module.__file__).read_bytes())} for module in (lib,workflow,approval) if hasattr(module,'__file__')]
     head = workflow.git_commit(root)
     run_id = "opencode-" + uuid.uuid4().hex
     run_dir = root / ".playbook-artifacts" / "opencode-runs" / run_id
@@ -378,6 +383,8 @@ def execute(args):
         raise
     if workflow.git_commit(root) != head:
         raise ReviewBlocked("reviewed HEAD changed during execution")
+    if any(digest(Path(item['path']).read_bytes())!=item['sha256'] for item in gate_modules):
+        raise ReviewBlocked('pinned gate module changed during review')
     for item in manifest:
         if digest((root / item["path"]).read_bytes()) != item["sha256"]:
             raise ReviewBlocked("reviewed document changed during execution")
@@ -411,6 +418,7 @@ def execute(args):
             raw_usage['completion_tokens_details']['reasoning_tokens']==0 else "unknown",
         "generated_at": datetime.now(timezone.utc).isoformat(), "read_only": True,
         "input_sha256": digest(packet.encode()), "documents": manifest,
+        "pinned_gate_modules":gate_modules,
         "design_hashes": before_hashes, "report_sha256": digest(report.read_bytes()),
         "verdict": verdict["verdict"], "call_cap": 1, "output_token_cap": output_cap,
         "transport": "sse",

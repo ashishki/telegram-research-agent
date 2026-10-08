@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "status": "phase_C_delivery_fixes_verified_recheck_pending",
-  "current_approved_call_cap": 43,
-  "calls_consumed_including_failures": 42,
+  "current_approved_call_cap": 44,
+  "calls_consumed_including_failures": 43,
   "proposed_total_cap": 34,
   "new_calls_maximum": 3,
   "third_call": "only if an actual new finding needs independent recheck",
@@ -1130,5 +1130,10 @@
     "call_number": 43,
     "status": "allocated",
     "purpose": "genuine native re-audit of schema/section provenance fixes; no design record consumption before accepted verdict"
+  },
+  "native_tooling_recheck_44": {
+    "call_number": 44,
+    "status": "allocated",
+    "purpose": "native re-audit including real STOP consumer and imported gate provenance checks"
   }
 }

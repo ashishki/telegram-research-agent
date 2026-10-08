@@ -227,11 +227,23 @@ def test_real_pinned_design_record_accepts_non_codex_binding_and_rejects_drift(t
     record = json.loads(approve_feature_design.design_review_record_path(tmp_path, "F", args.role).read_text())
     assert record["reviewer_binding"].startswith("opencode_go:")
     assert "approved_by" not in record
+    record_path=approve_feature_design.design_review_record_path(tmp_path,'F',args.role)
+    original_record=record_path.read_text()
+    record_path.write_text(json.dumps({**record,'verdict':'STOP_SHIP'}))
+    with pytest.raises(approve_feature_design.ApprovalError,match='STOP_SHIP review blocks approval'):
+        approve_feature_design.parse_design_review_record(root=tmp_path,feature_id='F',role=args.role,current_design=design,required=True)
+    record_path.write_text(original_record)
     (folder / "F.md").write_text("# Changed synthetic design\n")
     with pytest.raises(approve_feature_design.ApprovalError, match="Markdown changed"):
         approve_feature_design.parse_design_review_record(
             root=tmp_path, feature_id="F", role=args.role, current_design=design, required=True,
         )
+
+
+def test_cached_gate_module_from_another_path_is_rejected(tmp_path,monkeypatch):
+    monkeypatch.setattr(review,'verified_upstream',lambda root:tmp_path)
+    with pytest.raises(review.ReviewBlocked,match='pinned gate module import path differs'):
+        review.pinned_modules(tmp_path)
 
 
 def test_redirect_and_oversized_provider_response_are_denied(monkeypatch):

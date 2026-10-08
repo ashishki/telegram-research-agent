@@ -405,3 +405,13 @@ Allocate #43 actual native tooling re-audit of schema/provenance fixes under
 ongoing authority. 81 final tooling tests passed; critical sources and HEAD
 stay unchanged while the native call runs. The original #41 STOP remains
 closed to downstream design consumption until genuine independent resolution.
+
+# 2026-10-08 cancel closure and native gate provenance
+
+#42 SHIP_OK independently resolves #40 cancel allegation against exact code
+and two real races; C no longer has that alleged P1. #43 native tooling STOP
+preserved; consumer STOP rejection and fixed diagnostics have actual source/
+test counterexamples. Imported gate paths/hashes strengthened. Final related
+82 passed in 3.93 s, zero skips. Response PAI-tooling-review-43-response.md.
+43 calls consumed; #44 allocated for actual native audit under ongoing authority.
+No design/role gate is unlocked until a genuine accepted audit matches hashes.
