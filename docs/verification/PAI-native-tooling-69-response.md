@@ -13,3 +13,13 @@ mimo_code_review.main already bounds endpoint/model/range/input before credentia
 Strict acceptance invokes a fixed explicit pytest command, owns a fresh temporary JUnit path, disables plugin autoload in required argv/environment and rejects empty/skip/failure/duplicate/wrong-module/missing69/scenario nodes. Extra required regression tests are permitted. Trusted tests/runner can observe failures; malicious root-owned tests can replace arbitrary local artifacts/commands, an external witness threat not solved by another local report. Real subprocess and negative XML cases prove the enforced boundary; no live/human proof is inferred.
 
 Fresh native recheck is required. This response resolves facts and strengthens actual checks; it does not self-issue acceptance or discard STOP reports.
+
+## Review70 factual resolution and additional guards
+
+render_codex_exec_prompt.py and render_slice_context.py are pinned renderer proxies; neither imports mimo_code_review nor calls any transport. They are now included verbatim in the narrow audit source inventory so the reviewer can verify the claim directly.
+
+The immutable upstream.lock.json and exact development dependency requirements are now in TOOLING_REFS. verified_upstream already compares lock/index/checkout/full clean-worktree and forbids altered templates; imported modules are exact-path/hash-bound. Runtime Python/executable/jsonschema/PyYAML/pytest versions are recorded, checked for during-call drift and required to match before audit consumption. No dependency install or pin upgrade was performed.
+
+Extended limits now REQUIRE the existing owner-authorization record before key lookup: provider/model, ongoing owner message and per-call max900/16000. Its exact artifact/hash/authority is recorded. A missing/out-of-scope record blocks before credentials/HTTP, proven by a negative test. This is the existing genuine ongoing review authority, not a manufactured human design approval or signed remote token.
+
+Actual tests use the real pinned generic consumer to reject role swapping, STOP and stale Markdown, plus actual phase/finalizer code to reject partial/tooling scope, changed packet/manifest and contradictory rehashed reports. Demanding tests that already exist is resolved by the supplied source, not by duplicating their implementation. All trust/attestation limitations remain explicit.

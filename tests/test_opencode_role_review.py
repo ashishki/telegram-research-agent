@@ -45,6 +45,9 @@ def test_invalid_identity_or_verdict_cannot_be_published(change):
 def setup_run(tmp_path, monkeypatch, *, planning_block=False):
     doc = tmp_path / "design.md"
     doc.write_text("synthetic review input")
+    budget=tmp_path/'docs/verification/PAI-next-review-packets.json';budget.parent.mkdir(parents=True,exist_ok=True)
+    budget.write_text(json.dumps({'ongoing_review_budget_authority':{'owner_message':'synthetic authorized scope'},'provider':'opencode_go','model':'mimo-v2.6-pro',
+        'per_call_timeout_seconds_maximum':900,'per_call_output_tokens_maximum':16000}))
     design = {"feature_id": "F", "slices": []}
     manifest = [{"path": "design.md", "sha256": review.digest(doc.read_bytes()), "bytes": len(doc.read_bytes())}]
     monkeypatch.setattr(review, "prepare_packet", lambda *args: ("synthetic packet", manifest, design))
@@ -604,6 +607,7 @@ def test_real_tooling_gate_rejects_changed_source_and_verdict_disagreement(tmp_p
                'read_only': True, 'requested_model': 'mimo-v2.6-pro', 'observed_model': 'mimo-v2.6-pro',
                'verdict': 'ADVISORY', 'documents': manifest, 'report_sha256': fresh.digest(report.read_bytes())}
     payload['pinned_gate_modules']=[{'path':str(module_file),'sha256':fresh.digest(module_file.read_bytes())}]
+    payload['runtime_dependencies']=fresh.runtime_dependencies()
     result = run / 'result.json'
     def write():
         result.write_text(json.dumps(payload))
@@ -765,3 +769,10 @@ def test_tooling_scope_cannot_be_promoted_to_complete_design(tmp_path,monkeypatc
     monkeypatch.setattr(complete,'pinned_modules',review.pinned_modules)
     with pytest.raises(review.ReviewBlocked,match='identity/scope'):complete.finalize(tmp_path,'F',args.role,results)
     assert records==[]
+
+
+def test_extended_review_limits_require_record_before_key_or_http(tmp_path,monkeypatch):
+    args,calls,records=setup_run(tmp_path,monkeypatch);args.timeout_seconds=900
+    (tmp_path/'docs/verification/PAI-next-review-packets.json').unlink()
+    with pytest.raises(review.ReviewBlocked,match='extended review authority'):review.execute(args)
+    assert calls==[] and records==[]

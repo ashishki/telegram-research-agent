@@ -13,6 +13,7 @@ import re
 import sys
 import uuid
 import subprocess
+from importlib.metadata import version
 from collections import Counter
 
 from playbook import ROOT, verified_upstream
@@ -55,6 +56,8 @@ PACKET_REFS = (
     "docs/design/PAI.requirements.json",
 )
 TOOLING_REFS = (
+    '.playbook/upstream.lock.json', 'requirements-playbook.txt',
+    'tools/render_codex_exec_prompt.py', 'tools/render_slice_context.py',
     "docs/REVIEW_POLICY.md", "tools/playbook.py", "tools/run_codex_role.py",
     "tools/opencode_role_review.py", "tools/mimo_code_review.py", "tools/check_pai_plan.py",
     "tools/finalize_opencode_design_reviews.py", "tools/run_pai_acceptance.py",
@@ -93,6 +96,25 @@ def read_review_source(path: Path) -> bytes:
 
 def digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def runtime_dependencies():
+    return {'python':sys.version,'executable':sys.executable,
+        **{name:version(name) for name in ('jsonschema','PyYAML','pytest')}}
+
+
+def extended_review_authority(root,args,output_cap):
+    if args.timeout_seconds<=300 and output_cap<=8000:return None
+    path=root/'docs/verification/PAI-next-review-packets.json'
+    try:
+        raw=path.read_bytes();record=json.loads(raw)
+        if (not record.get('ongoing_review_budget_authority',{}).get('owner_message')
+            or record.get('provider')!='opencode_go' or record.get('model')!='mimo-v2.6-pro'
+            or args.timeout_seconds>record.get('per_call_timeout_seconds_maximum',0)
+            or output_cap>record.get('per_call_output_tokens_maximum',0)):
+            raise ReviewBlocked('extended review authority missing or outside scope')
+        return {'path':str(path.relative_to(root)),'sha256':digest(raw),'authority':record['ongoing_review_budget_authority']}
+    except (OSError,ValueError,TypeError):raise ReviewBlocked('extended review authority missing or outside scope') from None
 
 
 def factor_json(document):
@@ -157,6 +179,7 @@ def require_tooling_audit(root: Path) -> str:
             raw = path.read_bytes()
             if path.with_suffix(".json.sha256").read_text().strip() != digest(raw): continue
             result = json.loads(raw)
+            if result.get('runtime_dependencies')!=runtime_dependencies():continue
             actual_modules=[{'path':str(Path(m.__file__).resolve()),'sha256':digest(Path(m.__file__).read_bytes())}
                 for m in pinned_modules(root) if hasattr(m,'__file__')]
             if result.get('pinned_gate_modules')!=actual_modules:continue
@@ -347,6 +370,8 @@ def execute(args):
     tooling_audit_ref = None if tooling_review else require_tooling_audit(root)
     output_cap = getattr(args, "output_token_cap", 8000)
     if output_cap not in (8000, 16000): raise ReviewBlocked("unsupported review output cap")
+    authority=extended_review_authority(root,args,output_cap)
+    dependencies=runtime_dependencies()
     if workflow.git_commit(root)!=head:raise ReviewBlocked('review HEAD changed during preparation')
     verify_packet_snapshot(root,head,manifest)
     # No credential lookup before planning/scope/budget checks.
@@ -415,6 +440,7 @@ def execute(args):
         raise
     if workflow.git_commit(root) != head:
         raise ReviewBlocked("reviewed HEAD changed during execution")
+    if runtime_dependencies()!=dependencies:raise ReviewBlocked('review runtime dependencies changed')
     if any(digest(Path(item['path']).read_bytes())!=item['sha256'] for item in gate_modules):
         raise ReviewBlocked('pinned gate module changed during review')
     for item in manifest:
@@ -445,6 +471,7 @@ def execute(args):
         "requested_model": args.model, "observed_model": response["model"],
         "identity_semantics": "provider-reported metadata over TLS; no signed model attestation",
         "source_snapshot": "captured committed HEAD; unrelated dirty files allowed, dirty inputs denied",
+        "extended_review_authority":authority,"runtime_dependencies":dependencies,
         "requested_effort": request_evidence['requested_effort'],
         "observed_effort": "thinking_disabled" if getattr(args,'thinking_disabled',False) and
             isinstance(raw_usage,dict) and isinstance(raw_usage.get('completion_tokens_details'),dict) and
