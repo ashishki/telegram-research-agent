@@ -98,7 +98,7 @@ class ScopedModelClient:
         self.input_digest=digest
         self.attempt_ref=prepare_model_attempt(self.registry.store,owner=owner_ref,task_ref=self.task_ref or operations[0],
             purpose=self.groups[0][0].purpose,operation_refs=operations,input_digest=digest)
-        started=time.monotonic();http_attempted=False
+        started=time.monotonic();http_attempted=False;known_reply_error=None
         def transport():
             nonlocal http_attempted
             if self.guard:self.guard()
@@ -130,27 +130,27 @@ class ScopedModelClient:
                 entry=usage.get(detail,{})
                 if not isinstance(entry,dict) or type(entry.get(key,0))is not int or not 0<=entry.get(key,0)<=usage[total]:raise ModelResponseInvalid()
             return text,usage
+        def checked_transport():
+            nonlocal known_reply_error
+            try:return transport()
+            except ModelResponseInvalid as error:
+                known_reply_error=error;raise
         try:
             reservations=tuple(tuple(decision.reservation for decision in group) for group in self.groups)
-            text,usage=self.registry.execute_reserved_groups(reservations,transport)
+            text,usage=self.registry.execute_reserved_groups(reservations,checked_transport)
         except CapabilityDenied:raise
-        except ModelResponseInvalid as error:
-            error.operation_refs=operations;error.attempt_ref=self.attempt_ref
-            if self.usage_observer:
-                invalid=LLMCompletionReceipt(text='',model=endpoint.model,input_tokens=0,output_tokens=0,estimated_cost_usd=None,
-                    duration_ms=int((time.monotonic()-started)*1000),attempts=1,usage_recorded=False,
-                    external_call_attempted=http_attempted,delivery_outcome='unknown')
-                try:self.usage_observer(invalid,{'input':None,'cached_input':None,'cache_write':None,'output':None,'reasoning':None,'semantics':'invalid_provider_response'},self.groups)
-                except Exception:error.accounting_status='unconfirmed'
-            raise error from None
         except Exception:
             unknown=LLMCompletionReceipt(text='',model=endpoint.model,input_tokens=0,output_tokens=0,
                 estimated_cost_usd=None,duration_ms=int((time.monotonic()-started)*1000),attempts=1,usage_recorded=False,
                 external_call_attempted=http_attempted,delivery_outcome='unknown')
-            if self.usage_observer:
-                self.usage_observer(unknown,{'input':None,'cached_input':None,'cache_write':None,'output':None,'reasoning':None,'semantics':'unknown_outcome'},self.groups)
-            error=LLMOutcomeUnknown(unknown)
+            # Compound execution may wrap the original validation error. Keep
+            # the positively observed invalid reply independent of that wrapper.
+            error=known_reply_error or LLMOutcomeUnknown(unknown)
             error.operation_refs=operations;error.attempt_ref=self.attempt_ref;error.retry_allowed=False
+            if self.usage_observer:
+                try:self.usage_observer(unknown,{'input':None,'cached_input':None,'cache_write':None,'output':None,'reasoning':None,
+                    'semantics':'invalid_provider_response' if known_reply_error else 'unknown_outcome'},self.groups)
+                except Exception:error.accounting_status='unconfirmed'
             raise error from None
         receipt=LLMCompletionReceipt(text=text,model=endpoint.model,input_tokens=usage['prompt_tokens'],
             output_tokens=usage['completion_tokens'],estimated_cost_usd=None,duration_ms=int((time.monotonic()-started)*1000),
