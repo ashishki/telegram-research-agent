@@ -469,7 +469,7 @@
     {
       "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python -m pytest -q tests/test_opencode_role_review.py tests/test_pai_acceptance_guard.py tests/test_playbook_bridge.py tests/test_pai_plan.py",
       "result": "122 passed in 8.65 s",
-      "source_snapshot": "e1c86ef plus real-pinned-consumer cases and final scope/proposal registration, prior to evidence commit",
+      "source_snapshot": "ea9d36acc7a53a49e3c228956661927ac2a5c68f code/tests/registered scope, identical tested bytes before commit",
       "exit_code": 0,
       "log_path": ".playbook-artifacts/pai-validation-20261008/tooling-handoff-final.log",
       "log_sha256": "62a583a4149c8791d6c468922d868663f39a3d47df670a805f724cab9422caf3"
@@ -479,8 +479,16 @@
   "live_provider_product": false,
   "human_acceptance": false,
   "services_timers_enabled": false,
-  "candidate_documentation_head": "1473004",
-  "latest_tooling_head": "e1c86ef5fd73937fa936d96be43fa477f036345c",
+  "candidate_documentation_head": "ea9d36acc7a53a49e3c228956661927ac2a5c68f",
+  "latest_tooling_head": "ea9d36acc7a53a49e3c228956661927ac2a5c68f",
   "reviewed_commit": "e1c86ef5fd73937fa936d96be43fa477f036345c",
-  "review_status": "native77_STOP_factual_publication_contradiction_not_self_closed"
+  "review_status": "native77_STOP_factual_publication_contradiction_not_self_closed",
+  "final_code_publication": {
+    "command": "git push origin HEAD",
+    "exit_code": 0,
+    "source_commit": "ea9d36acc7a53a49e3c228956661927ac2a5c68f",
+    "branch": "docs/personal-assistant-blueprint-playbook-20260918",
+    "observed_remote_range": "5d6d0f2..ea9d36a",
+    "later_changes": "publication receipt documentation only; no code/test/policy changes"
+  }
 }
