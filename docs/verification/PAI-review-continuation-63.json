@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "status": "reviewed",
+  "call_number": 63,
+  "call_limit": 63,
+  "purpose": "model_62_actual_findings_recheck",
+  "read_only": true,
+  "provider": "opencode_go",
+  "requested_model": "mimo-v2.6-pro",
+  "observed_model": "mimo-v2.6-pro",
+  "requested_effort": "thinking_disabled",
+  "observed_effort": "thinking_disabled",
+  "head_sha": "d20da79ba57438a79845a9425c2ebf7a8488520a",
+  "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+  "diff_sha256": "e3ac68ec0c6e14b0a984e7be54163b4399e70aee5046397a7f5a155130394bec",
+  "sources": [
+    {
+      "path": "src/prm/runtime/model.py",
+      "sha256": "60b83d2c16d180be509d165b610f5fa3c4cdaaf837a06dc8aeb7f67901e18858",
+      "bytes": 11170
+    },
+    {
+      "path": "src/prm/runtime/model_errors.py",
+      "sha256": "23dae54f6ade891078c0b7e948e525aee8e612531d441172593007a99431019d",
+      "bytes": 2474
+    },
+    {
+      "path": "src/prm/runtime/model_attempts.py",
+      "sha256": "b37904d8cc23673c1b93f06d97205fd14849832ca06358ba37a38f52ff0c084a",
+      "bytes": 2080
+    },
+    {
+      "path": "src/prm/storage/policy.py",
+      "sha256": "6e16889bdd9f889daf7ced9c447e2e7c514a623c9d4958bdd9fd1f246a9bb4c2",
+      "bytes": 30184
+    },
+    {
+      "path": "tests/test_pai_chat_runtime.py",
+      "sha256": "8cc2ffda6a80e067bf67a29712feabcc4fc5664c878c012501026c0ad1dfc399",
+      "bytes": 15661
+    },
+    {
+      "path": "docs/verification/PAI-review-continuation-62.json",
+      "sha256": "21a96d9b98ca026f281ed97169708049e6c994f0f7e941bc37a0841509e98023",
+      "bytes": 8603
+    }
+  ],
+  "scope": "model_62_actual_findings_recheck; supplied full current source/tests and explicitly labeled integration diff if present",
+  "input_sha256": "27f1e4ca457d21bde726cd0dbc1bad29aed3074cac105977472882577dbd20e7",
+  "input_bytes": 77828,
+  "output_token_cap": 16000,
+  "timeout_seconds": 900,
+  "workflow_receipt": false,
+  "human_authority": false,
+  "runner_path": ".playbook-artifacts/pai-review-as-needed.py",
+  "runner_sha256": "8306b7e250e58139ee08be8c58de615d3d6fe684f5a4726c091ce9eaf689d545",
+  "transport_path": "tools/mimo_code_review.py",
+  "transport_sha256": "b0ba01f2647f21c004e54d2b9840573b38ac43ea541e394fd61bdfa2c9705c75",
+  "command": ".venv-pai/bin/python .playbook-artifacts/pai-review-as-needed.py --call-number 63 --purpose model_62_actual_findings_recheck",
+  "source_exclusions": [
+    "actual private corpus",
+    "live account payload",
+    "credentials",
+    "production configuration"
+  ],
+  "authority_exclusions": [
+    "human/workflow completion",
+    "live-account consent",
+    "production migration/deployment",
+    "product-provider spending"
+  ],
+  "request_body_sha256": "70f92b13cd68233b2fb2421a5978a2e3e9e7d15ec4b2cbec6c3cf676f51db960",
+  "provider_call_attempted": true,
+  "usage": {
+    "prompt_tokens": 20496,
+    "completion_tokens": 822,
+    "total_tokens": 21318,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    }
+  },
+  "finish_reason": "stop",
+  "response_sha256": "e2c97222072c018b6881f1d694e49e6b2790d109319a9ea8290482bc207e6da3",
+  "findings": {
+    "verdict": "FIX_P1_FIRST",
+    "findings": [
+      {
+        "severity": "P1",
+        "title": "Success-path usage observer failure returns accounting receipt without persisting unconfirmed accounting status",
+        "file": "src/prm/runtime/model.py:165-176",
+        "issue": "When usage_observer raises after an accepted transport, the code now returns a frozen ModelAccountingReceipt with usage_recorded=False, cost None and accounting_status='unconfirmed' (as claimed), but the exception is swallowed silently and nothing records the accounting failure durably; a caller that drops the returned object loses the fact that accounting is unconfirmed while the operation was already settled accepted with charged upper_bound. This keeps the reply and non-retry semantics but leaves accounting unconfirmed only in-memory.",
+        "fix": "Persist an accounting-unconfirmed marker or durable accounting attempt record keyed by attempt_ref/operation_refs before returning, and surface the observer failure through a typed non-retryable accounting exception or receipt field that survives process boundaries.",
+        "confidence": "medium"
+      },
+      {
+        "severity": "P1",
+        "title": "Accepted settlement loss path discards typed transport error and returns accepted receipt even when the settled outcome may be unknown",
+        "file": "src/prm/runtime/model.py:146-176",
+        "issue": "If execute_reserved_groups raises after accepted_reply was observed (e.g. settlement loss wrapped as ScopeTransportUnknown), the code converts it into an accepted receipt with accounting_status='unconfirmed' and retry_allowed=False on the returned object. However ModelAccountingReceipt is a plain frozen dataclass; if a caller checks delivery_outcome/usage_recorded only, it may treat the call as fully settled despite policy settling possibly left as unknown, and no durable marker distinguishes accepted-with-unconfirmed-accounting from accepted-and-settled.",
+        "fix": "Make the accounting-unconfirmed outcome explicit and durable (status field persisted or exception carrying receipt), and ensure downstream result reporting distinguishes accepted-but-unconfirmed from normal accepted.",
+        "confidence": "medium"
+      },
+      {
+        "severity": "P1",
+        "title": "Preparation-unknown path assigns error attributes to ScopePreparationUnknown without guaranteeing type for callers",
+        "file": "src/prm/runtime/model.py:143-145",
+        "issue": "ScopePreparationUnknown is re-raised after mutation of attempt_ref/external_call_attempted=False, preserving the class and no-retry semantics as claimed. But the class definition in policy.py does not declare these fields, so any serialized/logged copy of the exception loses external_call_attempted and attempt_ref, risking classification drift in reporting.",
+        "fix": "Extend ScopePreparationUnknown (or a typed wrapper) with attempt_ref/external_call_attempted as constructor fields so serialization and downstream handling cannot drop them.",
+        "confidence": "medium"
+      }
+    ],
+    "not_verified": [
+      "Behavior of llm/client LLMCompletionReceipt/LLMOutcomeUnknown subclasses and downstream consumers of ModelAccountingReceipt fields is not in the packet.",
+      "The documented 11 real-HTTP tests (invalid/accepted/accepted_settlement_loss/preparation unknown) were described but not re-executed in this review.",
+      "Concurrency/locking behavior of lineage_lock, store transactions and execute_reserved_groups under real Postgres is not in the packet.",
+      "Code outside the five supplied files (composition/runtime callers, reporting of accounting_status) is omitted and not reviewed."
+    ],
+    "summary": "The #62 P1s are largely addressed in control code: ScopePreparationUnknown is preserved with non-retry refs and external_call_attempted=False, other pre-HTTP failures become distinct ModelPreparationUnknown without resetting the fence, and a positively observed reply survives later settlement/observer failures via a frozen ModelAccountingReceipt carrying the actual accepted text/model/tokens with usage_recorded=False, cost None, accounting_status='unconfirmed', exact refs and retry_allowed=False. Known invalid responses remain separately typed with no-retry even when the usage observer fails. Remaining P1s concern durability/classification of accounting-unconfirmed and accepted-settlement-loss outcomes and typed serialization of preparation-unknown fields; these are fail-closed for retry but weaken accounting honesty and reporting, so fix before ship."
+  },
+  "duration_seconds": 26.664
+}

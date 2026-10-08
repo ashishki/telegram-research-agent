@@ -1,89 +1,66 @@
-# Current handoff — #34 SHIP_OK; remaining accumulated source review/testing
+# Current handoff — source rechecks closed; final local candidate verification
 
 2026-10-08. Assigned branch: docs/personal-assistant-blueprint-playbook-20260918.
-Owner authorized finishing implementation, then testing/review, and confirmed
-“делай, разрешаю” after the implementation handoff. ADR-015 sequencing honored.
-Do not restart upfront permission loops, historical tasks or reviewer frameworks.
+Owner authorized completing safe local PAI implementation, then tests/reviews.
+Latest owner instruction “разврешаю увеличивать по потребности” grants ongoing
+necessary public-code/synthetic Mimo reviews/rechecks. Do not ask each time a
+numerical cap is reached. Account/live/private-egress/product-spend/production,
+services/timers/release and exact human design acceptance remain separate.
 
-Whole-tier source: 761ffd2. Test/response commit: 5c5e7db. Exact final evidence:
-docs/verification/PAI-verification-20261007.md and PAI-validation-20261007.json.
-Required pai-complete: 233 passed in 706.20 s, zero skips/failures; all 69 exact
-named requirements and ten scenarios enforced. Latest focused-prm: 652 passed
-in 107.54 s; retrofit 150 passed; bridge 16 passed; MAT and plan checks passed.
-These are synthetic/local observations, not actual-provider or human evidence.
-Do not repeat broad passing tiers without a new change/failure/concern.
+Runtime source: baaf3a2. Latest independent Mimo #64 on that commit returned
+SHIP_OK and resolves every #63 P1. Earlier phase closures: foundation #36,
+Ingress/Watch/delivery/cancel #42, Brief/Reader #50, selected source/connection
+#51/#54, media #52, migration #57, research/GitHub #61. Model rechecks #60..64
+include real counterexamples; #60 static SHIP_OK was superseded by a genuine
+compound/observer test failure, then independently rechecked after correction.
+No missing or disputed P1 is self-closed. P2 availability/advisories remain.
 
-Initial 20 whole-run failures were fixed; native isolated PDF rendering and
-existing designed HTML/paginated PDF are now connected. Mimo #28/#29 findings
-led to durable logical model-task fences across reconstructed clients/modalities,
-explicit compound preparation-unknown errors, monotone tombstone/artifact/job
-transfer and idempotent settlement, plus typed provider-error outcomes. Passing
-tests never authorize resetting a fence after a possibly processed/billable call.
+Recent fixes preserve authenticated media input/file/kind, typed bounded page
+output and dedicated OCR consent/attempt fencing; report identity/version/deletion
+lineage; malformed selected-mail body metadata; atomic refusal of incoming deletion
+versus live restored target state; durable unknown prepared research reads and
+truthful possible-call counts; accepted model replies despite accounting failure.
+Accounting-unconfirmed metadata is durable without copying model text; the chat
+result retains the status and accepted answer. Lost accounting-marker writes
+carry typed accepted receipts and do not authorize replay. Unknown or prepared
+operations are never reset/refunded as guessed known failure.
 
-Independent Mimo #31 on e492ca6 resolves the two #30 allegations against the
-counterexamples, but returns FIX_P1_FIRST for a new media error-boundary P1
-and vision input-bound P2. Local fixes: docs/verification/PAI-review-31-response.md;
-12 media cases and 7 model/cost/settlement regressions passed, zero skips.
-Review #32 on 832f9f3 returned complete JSON with P0 findings but FIX_P1_FIRST;
-the enforced consistency check rejects it as a valid verdict. Its unedited
-candidate/receipt are preserved in PAI-review-32-candidate.json and
-PAI-review-continuation-32.json. Concrete fixes/counterexamples (including a
-newly reproduced body-reader AttributeError) are in PAI-review-32-response.md:
-19 source/recovery cases, 5 refresh/cleanup cases, 38 policy/action/media
-regressions, and 6 final Graph-guard cases passed at their documented snapshots.
-Mimo #33 on f28f51f independently resolves #31's P1/P2 and says the #32 P0
-allegations do not hold on the fixed source. Its valid FIX_P1_FIRST retains one
-new P1: a known accepted media reply with failed accounting must not be called
-an unknown transport. Local follow-through preserves an accepted typed receipt
-and actual result through MediaRuntime, with accounting unconfirmed and no
-retry. Compound post-invocation errors now carry typed non-replay refs (P2).
-Evidence: PAI-review-33-response.md; final affected tier 38 passed in 145.07 s,
-zero skips/failures. Stale tier expectations and an invalid PNG fixture failure
-were reproduced/preserved/fixed. New recovery cases are registered in pai-complete.
-Current code commits awaiting final recheck include non-retryable media errors,
-selected-message body reads, boolean policy denial, exact scope changes,
-durable token retirement/refresh fences, bounded calendar actions and typed
-coverage. Fresh review #34 on b29c496 returned valid SHIP_OK with no findings,
-independently resolving #33 P1/P2. Latest runtime fix source: 1b09d5a.
-Receipt: PAI-review-continuation-34.json. Current pai-complete is running after
-the latest code/verifier changes; preserve its actual result, do not assume PASS.
-Scoped advisory reviews are not
-Deep Review/Role Runner/human approval receipts; accumulated phase/role coverage
-remains pending. Requested/observed model and effort, hashes and scopes are in
-PAI-critical-boundaries-recheck-28/29/30.json. Thinking disabled and strict JSON
-schema produced usable reports; earlier incomplete attempts stay preserved.
+Exact dated results/commands/failures: docs/verification/PAI-validation-20261008.json.
+Earlier broad tiers 299/308 passed but runtime mutations occurred during their
+execution; they must not be claimed as a frozen final candidate. Final source
+must run pai-complete on unchanged code/tests, enforcing all 69 binding case names
+and ten scenarios. Focused-prm 663 and retrofit 150 passed at their named snapshots;
+rerun after the final application-boundary change. No full historical pytest.
+Use .venv-pai/bin/python and PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1.
 
-Paid review count: 34 consumed INCLUDING failures. On 2026-10-07 the owner
-answered “разрешаю, делай дотконца” to the explicit 30-to-33 extension proposal.
-On 2026-10-08 the owner added “разврешаю увеличивать по потребности”: ongoing
-budget increases for necessary reviews/rechecks in the existing local PAI scope
-are now authorized. Allocate/log each fresh bounded request and count failures;
-do not restart a permission loop at 34/35/etc. Same provider/model/input exclusions
-and 16000 output / 900 s per call. No model substitution or live/product/production
-authority is inferred. Prepared packets: PAI-next-review-packets.json.
-The initial no-credential command stopped before provider I/O, preserving
-30/33. Owner then explicitly directed lookup to Georgia-Community-Navigator;
-its secrets/openrouter_api_key was used ONLY at the authorized OpenCode Go
-endpoint, which confirmed mimo-v2.6-pro. Do not print/copy the credential.
-Next: accumulated phase B..F source reviews in bounded sequential packets,
-then any actual-finding fixes/rechecks and final local evidence. Code review
-packets include actual modules/tests; phase D includes the labeled integration
-diff since 8faee4. Governed tooling/design/role gates stay separate.
-Runner: .playbook-artifacts/pai-review-as-needed.py. Before each request verify
-its packet hashes and advance its logged allocation under the ongoing authority.
-Next command after allocating #35:
-OPENCODE_API_KEY_FILE=/srv/openclaw-you/workspace/Georgia-Community-Navigator/secrets/openrouter_api_key .venv-pai/bin/python .playbook-artifacts/pai-review-as-needed.py --call-number 35 --purpose phase_B_foundation
-Public code and synthetic evidence
-only; no private corpus, tokens or account payloads to reviewers.
+Native tooling audit #44 ADVISORY is accepted and still verifies through the
+real require_tooling_audit gate. Its immutable result is
+.playbook-artifacts/opencode-runs/opencode-665aa4890d9042458cfb5729035e5bc5/result.json.
+Critical tooling/policy hashes are unchanged. Native program/product design reviews
+are prepared in four complete slice groups per role, all below 200000 bytes;
+the unsplit packet exceeds the bound and must not be silently truncated. Actual
+native phases and the existing finalizer are required for genuine design records.
+Keep HEAD, all packet documents and gate sources unchanged across a four-phase
+set and finalization. Never manufacture role/Codex/human receipts from advisory
+code reviews. Unsupported non-Codex slice/Test Critic/privacy/maintainability
+integration and human acceptance stay explicit remaining gates.
 
-Formal PA/PAI design states stay review_required/draft/planned. Playbook readiness
-still reports 51 TASK_DESIGN_APPROVAL_REQUIRED errors. No approval fields were
-forged. PAI-27..29 have draft access/cutover/pilot packets; exact live account,
-institution/private-egress, production migration/deployment and owner acceptance
-remain separate. PAI-30/31 triggers unmeasured. No services/timers were enabled.
+64 provider review calls consumed, INCLUDING failures. Allocated #65..72 under
+ongoing authority: program then product, foundation/product/sources/completeness.
+One fresh bounded request per number; failures count; no automatic retries or
+model substitution. Required model mimo-v2.6-pro, thinking disabled, strict JSON,
+16000 output/900 s. Key lookup already owner-authorized at
+Georgia-Community-Navigator/secrets/openrouter_api_key: never print/copy the value.
+Runner for each native phase: .playbook-artifacts/pai-native-design-once.py.
+Next command after freezing the source/evidence handoff commit:
+.venv-pai/bin/python .playbook-artifacts/pai-native-design-once.py --call-number 65 --role program_design_review --group foundation
+Advisory source runner: .playbook-artifacts/pai-review-as-needed.py; verify source
+hashes and log allocation before any genuinely needed fresh call.
 
-Use .venv-pai/bin/python (psycopg 3.3.6; verified crypto wheel lock). Do not read
-.env/production DSNs or alter another user's work/master. Preserve excluded UTD
-report/Astra prompt. Scoped commits/push remain authorized. The existing goal
-was resumed by the owner but its API exposes an older blocked status and no
-resume operation; do not create a duplicate or declare the unfinished goal done.
+Do not mark draft/review_required/planned design/tasks approved or complete.
+PAI-27/28/29 contain concrete draft access/cutover/pilot packets; no canary,
+production migration/deploy or human usefulness/visual pilot was performed.
+PAI-30/31 measured triggers remain unobserved. Preserve excluded UTD/Astra files,
+other user work, master and live configuration. Scoped branch commit/push remains
+authorized. The old goal API has blocked status/no resume operation; no duplicate
+goal or false whole-programme completion.

@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "status": "phase_C_delivery_fixes_verified_recheck_pending",
-  "current_approved_call_cap": 44,
-  "calls_consumed_including_failures": 43,
+  "status": "B_F_source_rechecks_closed_native_design_and_final_validation_pending",
+  "current_approved_call_cap": 72,
+  "calls_consumed_including_failures": 64,
   "proposed_total_cap": 34,
   "new_calls_maximum": 3,
   "third_call": "only if an actual new finding needs independent recheck",
@@ -630,8 +630,8 @@
         },
         {
           "path": "src/prm/storage/actions.py",
-          "sha256": "6f1738970ab681dcc264c8739122085e0ae8a66ed8423b2a1553fe535650f74f",
-          "bytes": 13893
+          "sha256": "d1ba42ff532386cfe2aed5101353eb6090b09f28b65891c8284a37ffa6e59b29",
+          "bytes": 15054
         },
         {
           "path": "src/prm/runtime/deletion.py",
@@ -670,7 +670,7 @@
         }
       ],
       "instructions": "Independent accumulated phase E_sources code review of the supplied full current modules/tests. This is fresh source review following prior phase attempts that failed/incompletely returned, and is not a claimed governed Role Runner or human approval receipt. Review safety/fail-closed behavior, scope/owner/versions, idempotency/no blind replay, cancellation/recovery/deletion, input bounds/privacy and meaningful test adequacy relevant to these files. Existing synthetic tests and earlier scoped rechecks are evidence only. Report only reproducible defects with concrete execution paths; do not infer authorization from private content or invent missing human acceptance as a code defect. Check cross-file interactions among supplied sources. The public integration diff is included only in phase D and does not imply full review of unchanged legacy files. Actual production, paid product-provider and private/live data are not exercised. No P0/P1 => SHIP_OK, P1 only => FIX_P1_FIRST, any P0 => STOP_SHIP.",
-      "source_bytes": 135320
+      "source_bytes": 136481
     },
     {
       "purpose": "phase_F_completeness",
@@ -1084,6 +1084,723 @@
       ],
       "instructions": "Focused independent factual resolution of review #40 P1 only. Read ACTUAL control code: both callback and warning condition use current attempts > 0 from the post-cancel status, not the old state. Two real PostgreSQL counterexamples include claim after status snapshot and claim STRICTLY before the real cancel UPDATE. Determine independently whether #40 allegation matches these exact supplied statements; quote the actual current condition if reporting a defect, and give an executable failure. Do not copy stale line references/claims from the prior report. No runtime fix or human approval is inferred from assertions. Consistent SHIP_OK if no P0/P1; other scope limitations remain separate.",
       "source_bytes": 56202
+    },
+    {
+      "purpose": "phase_D_search_model",
+      "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+      "sources": [
+        {
+          "path": "src/prm/runtime/model.py",
+          "sha256": "76ecda296ecad2d6658b9479a09b3a42045349027f63f93c984e785e2da90df4",
+          "bytes": 8531
+        },
+        {
+          "path": "src/prm/runtime/archive.py",
+          "sha256": "9051d9804cce9a738df94d5ecc02073fdd32194da2256dd7b92ebe90ab3c8f6d",
+          "bytes": 3799
+        },
+        {
+          "path": "src/prm/runtime/web.py",
+          "sha256": "86a07764e5f27485d8b11b3d894043496330e2ddb47a53dcff6fd1c1aa3d4d42",
+          "bytes": 7136
+        },
+        {
+          "path": "src/prm/runtime/research.py",
+          "sha256": "2fb5a18d5ea54f8c91d5766840b438ef84f06452377c37e5e41e310f07401c5c",
+          "bytes": 17072
+        },
+        {
+          "path": "src/prm/runtime/connector_summary.py",
+          "sha256": "b74241ed5b43d8d8edb1a39e70d184283ab057f4e06ef0f8985c9fa74ced5b0c",
+          "bytes": 3536
+        },
+        {
+          "path": "tests/test_pai_chat_runtime.py",
+          "sha256": "161789fde64868948daf32d129772b33cac90ac62be2ecb0944c7f78ed22dbad",
+          "bytes": 9523
+        },
+        {
+          "path": "tests/test_pai_archive_search.py",
+          "sha256": "94942b1bc068cb9a2c23d7c317c8483a3284382b6c78268fb2a792c2b833779d",
+          "bytes": 2607
+        },
+        {
+          "path": "tests/test_pai_web_github.py",
+          "sha256": "fcfa65f5c345e5fd6ca28eca6178f3310139c9fa6bff20bc3d7778ef922f1730",
+          "bytes": 2195
+        },
+        {
+          "path": "tests/test_pai_deep_research.py",
+          "sha256": "9110a5284fbba63fb60213b6c4a6002477af16602527b0236ed7327cf72cf9eb",
+          "bytes": 2325
+        }
+      ],
+      "instructions": "Fresh bounded phase-D source review in a smaller declared scope after an earlier larger attempt timed out (no verdict). Review supplied complete modules/tests, scope/owner/source provenance, no unapproved model/web egress, context/attempt/budget fences, cancellation and honest missing evidence. For reports/readers: immutable versions, source identity, deletion/private access, HTML/PDF rendering/network isolation and full report preservation. The labeled integration diff is only context for changed legacy integration; do not claim unchanged legacy review. Report reproducible P0/P1 defects with executable paths and consistent verdict, no style blocks, no formal/human/live acceptance.",
+      "source_bytes": 56724
+    },
+    {
+      "purpose": "phase_D_brief_reader",
+      "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+      "sources": [
+        {
+          "path": "src/prm/runtime/brief.py",
+          "sha256": "3dc5a14aa684c432b7fc6e397aa1ba11428ce1a39f22149c733cad75e57ba962",
+          "bytes": 8184
+        },
+        {
+          "path": "src/prm/runtime/reader.py",
+          "sha256": "a934a3fd3cadf638860f266bb6b3085902496bad55e0d0d6658284e02a689e5b",
+          "bytes": 8795
+        },
+        {
+          "path": "src/prm/runtime/render.py",
+          "sha256": "273a4c571859036bbce87cbec417d700889637a2ac11b625922125ae31767902",
+          "bytes": 1491
+        },
+        {
+          "path": "src/prm/runtime/network_guard.py",
+          "sha256": "5330d7fd43849569375c98b9c3b491a9f73e58d105894058529c243277c221eb",
+          "bytes": 430
+        },
+        {
+          "path": "src/prm/storage/briefs.py",
+          "sha256": "9ffd197b165487375ae0552efb9c4fb9ff8723cb354f1f163c7656103dff034d",
+          "bytes": 8921
+        },
+        {
+          "path": "src/prm/storage/artifacts.py",
+          "sha256": "fa2bdc99e661fb7973d35f9ca9ea3cb0cf6bcad10107a179483b9a5f285c719c",
+          "bytes": 1530
+        },
+        {
+          "path": "src/prm/runtime/composition.py",
+          "sha256": "bbe74ae10414e6c43930eef0e52eb6fb25e4d7e58d674b9a7f34c91d118c59e3",
+          "bytes": 47842
+        },
+        {
+          "path": "tests/test_pai_brief_runtime.py",
+          "sha256": "9cf0d2178df33b97488c5f50ad672feccb7d96e3da1f936273a2970a35410456",
+          "bytes": 2003
+        },
+        {
+          "path": "tests/test_pai_report_runtime.py",
+          "sha256": "06f91275c2db829b4c60f03f9ab5e4345a167fc1d780fd368594973fc865677d",
+          "bytes": 2725
+        },
+        {
+          "path": ".playbook-artifacts/pai-integration-code-20261008.diff",
+          "sha256": "e2701156d5c4eca3dcf50bd83a31bf05b7007008421950345f386d769017ed3c",
+          "bytes": 26465
+        }
+      ],
+      "instructions": "Fresh bounded phase-D source review in a smaller declared scope after an earlier larger attempt timed out (no verdict). Review supplied complete modules/tests, scope/owner/source provenance, no unapproved model/web egress, context/attempt/budget fences, cancellation and honest missing evidence. For reports/readers: immutable versions, source identity, deletion/private access, HTML/PDF rendering/network isolation and full report preservation. The labeled integration diff is only context for changed legacy integration; do not claim unchanged legacy review. Report reproducible P0/P1 defects with executable paths and consistent verdict, no style blocks, no formal/human/live acceptance.",
+      "source_bytes": 108386
+    },
+    {
+      "purpose": "brief_reader_47_recheck",
+      "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+      "sources": [
+        {
+          "path": "src/prm/runtime/brief.py",
+          "sha256": "b028ea61bed3dcb8ba700e1c226f21be21df1a60026790e005877b1357173351",
+          "bytes": 8401
+        },
+        {
+          "path": "src/prm/runtime/reader.py",
+          "sha256": "5962c88d5ffac519313478b742997235361b731752b7700cd3a15c57ad6d5e8d",
+          "bytes": 8850
+        },
+        {
+          "path": "src/prm/storage/policy.py",
+          "sha256": "6e16889bdd9f889daf7ced9c447e2e7c514a623c9d4958bdd9fd1f246a9bb4c2",
+          "bytes": 30184
+        },
+        {
+          "path": "src/prm/storage/briefs.py",
+          "sha256": "9ffd197b165487375ae0552efb9c4fb9ff8723cb354f1f163c7656103dff034d",
+          "bytes": 8921
+        },
+        {
+          "path": "src/prm/runtime/deletion.py",
+          "sha256": "12ce6cf1397e7b67bc4f5b1f515bab9d870c3a4f26bf4e2a3709f94782315c04",
+          "bytes": 5678
+        },
+        {
+          "path": "tests/test_pai_brief_runtime.py",
+          "sha256": "c61aaf25f4f9ceeafa3a71e7180a399ef6b91ec6b435695dd1f0b4d1856afb36",
+          "bytes": 4659
+        },
+        {
+          "path": "tests/test_pai_report_runtime.py",
+          "sha256": "3cf4d90c7906113faddf169c102c8005376b411ef828d1370cca65c7ef800331",
+          "bytes": 4349
+        },
+        {
+          "path": "docs/verification/PAI-review-continuation-47.json",
+          "sha256": "5a70934306ed0e1cc60a1257a37164b7ca681bc8acaf007876cf4cd5cbd618e5",
+          "bytes": 6792
+        }
+      ],
+      "source_bytes": 77834,
+      "instructions": "Review #47 P1 fixes: reservations must release only before any transport/preparation, unknown attempt charges stay fenced/conservative and may reconcile known actual later; reader artifacts bind exact immutable brief identity/version and deletion lineage. Full registry accounting included, do not presume failed collection had no transport. Recheck all cited findings independently against actual supplied code. No self-issued or human/workflow/live approval. Use consistent SHIP_OK if no P0/P1, FIX_P1_FIRST for P1, STOP_SHIP for any P0. Report concrete executable defects, not inferred absent dependencies."
+    },
+    {
+      "purpose": "sources_48_recheck",
+      "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+      "sources": [
+        {
+          "path": "src/prm/runtime/connections.py",
+          "sha256": "942996b79d409674b79f46d75925e3d2e150fc5a2afc714d5e73ab13c235835f",
+          "bytes": 20203
+        },
+        {
+          "path": "src/prm/runtime/graph.py",
+          "sha256": "64cf5946451f93e2392cbb670851252aa7d655c28d00104219a68c41ffa1bca5",
+          "bytes": 28590
+        },
+        {
+          "path": "src/prm/runtime/academic.py",
+          "sha256": "f97eec3f4e4fd9f5ed8e007bac1a02a7ca494b4530635023d672a04e39b8b0a1",
+          "bytes": 17843
+        },
+        {
+          "path": "src/prm/storage/policy.py",
+          "sha256": "6e16889bdd9f889daf7ced9c447e2e7c514a623c9d4958bdd9fd1f246a9bb4c2",
+          "bytes": 30184
+        },
+        {
+          "path": "tests/test_pai_connections.py",
+          "sha256": "46074a94d01895f6e00ba2e7306ffd8a2ada314fd22b51920881c13e85dc327e",
+          "bytes": 2109
+        },
+        {
+          "path": "tests/test_pai_graph_mail.py",
+          "sha256": "bb757fdafe0c7c03396d6a762bc95842d729fc8b9c1d9c39496d88a8e0f31b4d",
+          "bytes": 3344
+        },
+        {
+          "path": "docs/verification/PAI-review-continuation-48.json",
+          "sha256": "49c00c10b26408e7980c6e974b25f5b744ddc214cdfda2682c5d85468990d99f",
+          "bytes": 8150
+        }
+      ],
+      "source_bytes": 110423,
+      "instructions": "Resolve #48 cursor and credential cleanup findings independently. Read-only pagination is not one-use write confirmation: verify actual owner/connection/selection/host binding and fresh current authorization before each call. Global active-secret check intentionally prevents deleting ANY active token; supplied counterexample demonstrates different-owner active ref under corrupted retirement pointer. Review malformed date/from typing fix. No unsafe suggested reset/deletion without demonstrated defect. Recheck all cited findings independently against actual supplied code. No self-issued or human/workflow/live approval. Use consistent SHIP_OK if no P0/P1, FIX_P1_FIRST for P1, STOP_SHIP for any P0. Report concrete executable defects, not inferred absent dependencies."
+    },
+    {
+      "purpose": "media_49_recheck",
+      "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+      "sources": [
+        {
+          "path": "src/prm/runtime/media.py",
+          "sha256": "6e81884b3bca3d4ad5323b6c833d5f2aa4d3a48e45acd05c8f0a2708daed8cc1",
+          "bytes": 13233
+        },
+        {
+          "path": "src/prm/runtime/media_download.py",
+          "sha256": "ab8006bb79ed6eb79bf9dac2b7144a00130b81f51c374b456480f40f3c3e8337",
+          "bytes": 3861
+        },
+        {
+          "path": "src/prm/runtime/media_extract.py",
+          "sha256": "65bdffd50dcc56efd6a378244499bb436ddb36f6f408269b730cbbfc6d8b15f2",
+          "bytes": 1971
+        },
+        {
+          "path": "src/prm/runtime/model_attempts.py",
+          "sha256": "5498d7273a349037dac1fcce150df5fb7328937910419240ce6e2b86a6882d87",
+          "bytes": 1588
+        },
+        {
+          "path": "src/prm/runtime/model_errors.py",
+          "sha256": "fcba5a68028b5c13624bf5a8ea0590a9a7eee235fb006207ab17a5cc61ab4bf3",
+          "bytes": 1818
+        },
+        {
+          "path": "src/prm/storage/policy.py",
+          "sha256": "6e16889bdd9f889daf7ced9c447e2e7c514a623c9d4958bdd9fd1f246a9bb4c2",
+          "bytes": 30184
+        },
+        {
+          "path": "tests/test_pai_media_runtime.py",
+          "sha256": "23c05e93b5313314e8d9e4311e2bd445219aeed636ed05d932747c2ddbe61f1a",
+          "bytes": 17250
+        },
+        {
+          "path": "docs/verification/PAI-review-continuation-49.json",
+          "sha256": "b5ac0e6ab0f0cb72b9f28b2c139cb3786e59002972d32d055da339f4b8dc88ba",
+          "bytes": 13671
+        }
+      ],
+      "source_bytes": 83576,
+      "instructions": "Resolve #49 media findings only; migration assessed separately. Validate local/cache/OCR page shape/citation bounds, dedicated OCR identity/grant/budget and attempt fencing, and durable authenticated download input/exact selected file and kind. Runtime composition passes request_ref from fenced input_ref. Preserve accepted/unconfirmed and unknown no-retry distinctions; do not suggest automatic reset. Recheck all cited findings independently against actual supplied code. No self-issued or human/workflow/live approval. Use consistent SHIP_OK if no P0/P1, FIX_P1_FIRST for P1, STOP_SHIP for any P0. Report concrete executable defects, not inferred absent dependencies."
+    },
+    {
+      "purpose": "migration_49_recheck",
+      "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+      "sources": [
+        {
+          "path": "src/prm/runtime/migration.py",
+          "sha256": "afd316b41955c7156b64ef2dc4218f87d34917482188e6cd95f468cb46bc0129",
+          "bytes": 18848
+        },
+        {
+          "path": "src/prm/runtime/deletion.py",
+          "sha256": "12ce6cf1397e7b67bc4f5b1f515bab9d870c3a4f26bf4e2a3709f94782315c04",
+          "bytes": 5678
+        },
+        {
+          "path": "src/prm/storage/postgres.py",
+          "sha256": "8675c30ac28400d584adfeadb2c03e69a298c2782aa6221ac3432a92a1366017",
+          "bytes": 12453
+        },
+        {
+          "path": "tests/test_pai_migration.py",
+          "sha256": "e9f9b9a7b34bd6424557d755533babe6ba7af7bedf7f14d636d0d1041f0389ba",
+          "bytes": 7126
+        },
+        {
+          "path": "tests/test_pai_memory_runtime.py",
+          "sha256": "648435d04f97f12b5b8879bac033c7222f7df1807de4b3dbf32d2edfb596aefe",
+          "bytes": 3673
+        },
+        {
+          "path": "docs/verification/PAI-review-continuation-49.json",
+          "sha256": "b5ac0e6ab0f0cb72b9f28b2c139cb3786e59002972d32d055da339f4b8dc88ba",
+          "bytes": 13671
+        }
+      ],
+      "source_bytes": 61449,
+      "instructions": "Resolve #49 migration finding only with full underlying storage included. Verify whether put allows a tombstoned object identity to be legitimately recreated. Preserve deletion monotonicity and refusal to resurrect on import. Only call this P1 if an actual reachable permitted newer object is silently erased; supply executable path, not hypothetical violation of storage invariants. Recheck all cited findings independently against actual supplied code. No self-issued or human/workflow/live approval. Use consistent SHIP_OK if no P0/P1, FIX_P1_FIRST for P1, STOP_SHIP for any P0. Report concrete executable defects, not inferred absent dependencies."
+    },
+    {
+      "purpose": "search_archive_model_small",
+      "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+      "sources": [
+        {
+          "path": "src/prm/runtime/archive.py",
+          "sha256": "9051d9804cce9a738df94d5ecc02073fdd32194da2256dd7b92ebe90ab3c8f6d",
+          "bytes": 3799
+        },
+        {
+          "path": "src/prm/runtime/model.py",
+          "sha256": "76ecda296ecad2d6658b9479a09b3a42045349027f63f93c984e785e2da90df4",
+          "bytes": 8531
+        },
+        {
+          "path": "src/prm/runtime/model_attempts.py",
+          "sha256": "5498d7273a349037dac1fcce150df5fb7328937910419240ce6e2b86a6882d87",
+          "bytes": 1588
+        },
+        {
+          "path": "tests/test_pai_archive_search.py",
+          "sha256": "94942b1bc068cb9a2c23d7c317c8483a3284382b6c78268fb2a792c2b833779d",
+          "bytes": 2607
+        },
+        {
+          "path": "tests/test_pai_chat_runtime.py",
+          "sha256": "161789fde64868948daf32d129772b33cac90ac62be2ecb0944c7f78ed22dbad",
+          "bytes": 9523
+        }
+      ],
+      "source_bytes": 26048,
+      "instructions": "Fresh narrower independent source review after #45/#46 timeout, not replay of a possibly billable product task. Only supplied modules are reviewed; registry already independently reviewed #36. Examine actual Chat/Search/source attribution/context and grant boundaries, durable no-replay/cancellation, and honest unavailable outcomes. Strict consistent SHIP_OK/FIX_P1_FIRST/STOP_SHIP. Report only executable correctness/security defects and explicitly name unreviewed dependencies. No role/human/live approval."
+    },
+    {
+      "purpose": "search_web_research_small",
+      "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+      "sources": [
+        {
+          "path": "src/prm/runtime/web.py",
+          "sha256": "86a07764e5f27485d8b11b3d894043496330e2ddb47a53dcff6fd1c1aa3d4d42",
+          "bytes": 7136
+        },
+        {
+          "path": "src/prm/runtime/research.py",
+          "sha256": "2fb5a18d5ea54f8c91d5766840b438ef84f06452377c37e5e41e310f07401c5c",
+          "bytes": 17072
+        },
+        {
+          "path": "src/prm/runtime/connector_summary.py",
+          "sha256": "b74241ed5b43d8d8edb1a39e70d184283ab057f4e06ef0f8985c9fa74ced5b0c",
+          "bytes": 3536
+        },
+        {
+          "path": "tests/test_pai_web_github.py",
+          "sha256": "fcfa65f5c345e5fd6ca28eca6178f3310139c9fa6bff20bc3d7778ef922f1730",
+          "bytes": 2195
+        },
+        {
+          "path": "tests/test_pai_deep_research.py",
+          "sha256": "9110a5284fbba63fb60213b6c4a6002477af16602527b0236ed7327cf72cf9eb",
+          "bytes": 2325
+        }
+      ],
+      "source_bytes": 32264,
+      "instructions": "Fresh narrower independent source review after #45/#46 timeout, not replay of a possibly billable product task. Only supplied modules are reviewed; registry already independently reviewed #36. Examine actual Chat/Search/source attribution/context and grant boundaries, durable no-replay/cancellation, and honest unavailable outcomes. Strict consistent SHIP_OK/FIX_P1_FIRST/STOP_SHIP. Report only executable correctness/security defects and explicitly name unreviewed dependencies. No role/human/live approval."
+    },
+    {
+      "purpose": "mail_body_51_recheck",
+      "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+      "sources": [
+        {
+          "path": "src/prm/runtime/graph.py",
+          "sha256": "cb8d8e9bb60c603a2cdbbc01c0cc8c269c5ac0eeb48fcadb59b368fcd6058c72",
+          "bytes": 28623
+        },
+        {
+          "path": "src/prm/storage/postgres.py",
+          "sha256": "8675c30ac28400d584adfeadb2c03e69a298c2782aa6221ac3432a92a1366017",
+          "bytes": 12453
+        },
+        {
+          "path": "tests/test_pai_graph_mail.py",
+          "sha256": "f49a20644c9c521349cdb23f12c21b8bc511fb864864bf04536b6fa7cf192af9",
+          "bytes": 4570
+        },
+        {
+          "path": "tests/pai_runtime_fixtures.py",
+          "sha256": "9fea5d1aa9e60f0b338638072ed5cd73c9b19ed825fc2e72b4c01cf032e6ed1d",
+          "bytes": 10375
+        },
+        {
+          "path": "docs/verification/PAI-review-continuation-51.json",
+          "sha256": "89741823ba9149003271e2e5f62e3873af47300be5c9af729aed84f852bbff73",
+          "bytes": 8009
+        }
+      ],
+      "source_bytes": 64030,
+      "instructions": "Focused independent recheck of #51 only remaining P1 in selected mail body metadata. Actual read_message now uses _mail_metadata and validates body/contentType. Full postgres immutable-version semantics and actual HTTP fixtures included to resolve prior not_verified; cursors are authorized readonly pagination, version=1 selects recorded version not CAS. Four executable synthetic malformed body/date/from cases must yield typed StorageError. No P0/P1=>SHIP_OK; other scope limitations separate. No human/workflow/live approval."
+    },
+    {
+      "purpose": "migration_53_recheck",
+      "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+      "sources": [
+        {
+          "path": "src/prm/runtime/migration.py",
+          "sha256": "d128cc2b42b8743ab52df1f0f35e721916495c60ccca91f04176258c01d9a1a2",
+          "bytes": 19441
+        },
+        {
+          "path": "src/prm/runtime/deletion.py",
+          "sha256": "12ce6cf1397e7b67bc4f5b1f515bab9d870c3a4f26bf4e2a3709f94782315c04",
+          "bytes": 5678
+        },
+        {
+          "path": "src/prm/storage/postgres.py",
+          "sha256": "8675c30ac28400d584adfeadb2c03e69a298c2782aa6221ac3432a92a1366017",
+          "bytes": 12453
+        },
+        {
+          "path": "tests/test_pai_migration.py",
+          "sha256": "b18ceea5a52cbb7c88f789b363364676408b2809debc180543d7f24fd71f0f55",
+          "bytes": 8481
+        },
+        {
+          "path": "docs/verification/PAI-review-continuation-53.json",
+          "sha256": "244cf9ef8f0cb6e721ccac86475a7464b2c62157f9b1344da78d0df2bf9dd4a3",
+          "bytes": 5704
+        }
+      ],
+      "source_bytes": 51757,
+      "instructions": "Recheck #53 incoming deletion versus divergent live target. New guard refuses incoming tombstones with still-live target identities BEFORE any replacement, under all-table locks; tombstone has no digest to prove even baseline equality so requires forward fix. New test recreates concrete restored-target version2, source deletes baseline, imports with exact current manifest and requires atomic conflict/no erasure. Retained target tombstones still apply after replacement and cannot reset deletion. Do not require weaker monotonicity. Resolve all preceding findings independently, actual code and executable tests. Consistent verdict no P0/P1 SHIP_OK, P1 FIX_P1_FIRST, P0 STOP_SHIP. No human/role/live approval."
+    },
+    {
+      "purpose": "model_55_recheck",
+      "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+      "sources": [
+        {
+          "path": "src/prm/runtime/model.py",
+          "sha256": "6dfbcb4de16bcbbf7cb06b7dbbd7cdb192fac5e996f27a59f1a307c3ce0944fa",
+          "bytes": 8860
+        },
+        {
+          "path": "src/prm/runtime/model_attempts.py",
+          "sha256": "5498d7273a349037dac1fcce150df5fb7328937910419240ce6e2b86a6882d87",
+          "bytes": 1588
+        },
+        {
+          "path": "src/prm/runtime/archive.py",
+          "sha256": "9051d9804cce9a738df94d5ecc02073fdd32194da2256dd7b92ebe90ab3c8f6d",
+          "bytes": 3799
+        },
+        {
+          "path": "src/prm/runtime/composition.py",
+          "sha256": "4945017b942e64edc6e1d5265594dbf0a77760da1faa6a27d9eaa63cd474f7b9",
+          "bytes": 47905
+        },
+        {
+          "path": "src/prm/runtime/ingress.py",
+          "sha256": "ae119826e01c05f27ef2305f10acb61cd27cd992ee7f739178b1ec07e9517e36",
+          "bytes": 17603
+        },
+        {
+          "path": "src/prm/storage/jobs.py",
+          "sha256": "539b441477e31952a7607621822d454b8df60ede19432d6a4b0bc3473c83df66",
+          "bytes": 15386
+        },
+        {
+          "path": "tests/test_pai_chat_runtime.py",
+          "sha256": "8f2d2a64eb5f2ca2fd9983092f8d4ff81838b0c201d2de79b6353b1bbef4d7c9",
+          "bytes": 11291
+        },
+        {
+          "path": "docs/verification/PAI-review-continuation-55.json",
+          "sha256": "7c7e774f1788e58641fdb4e6d21c316cc8d95fcf208fd28d344d049f13c7d4ec",
+          "bytes": 9271
+        }
+      ],
+      "source_bytes": 115703,
+      "instructions": "Resolve #55 against actual caller/worker/queue provided. Same logical task/purpose always denies all replays, even divergent input bodies/new reservations. Distinct authenticated input refs are explicit NEW tasks, allowed to ask same text; global content dedup would wrongly deny ordinary user requests. Runtime task_context binds nested model calls to authenticated current task. Cancellation after an accepted provider reply cannot undo cost; composition guard after assistant.answer and queue.complete prevent late durable result/delivery. New real HTTP counterexample cancels after provider reply, expects StateConflict/no result_ref and retained charge. Pretransport output/history bounds are strengthened. Do not assert automatic retries unless an executable path exists. Resolve all preceding findings independently, actual code and executable tests. Consistent verdict no P0/P1 SHIP_OK, P1 FIX_P1_FIRST, P0 STOP_SHIP. No human/role/live approval."
+    },
+    {
+      "purpose": "research_56_recheck",
+      "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+      "sources": [
+        {
+          "path": "src/prm/runtime/web.py",
+          "sha256": "967c7083ff6e758fdd68e08fb195eb79c35ed9b216822bc503ebfc25b252be4e",
+          "bytes": 7193
+        },
+        {
+          "path": "src/prm/runtime/research.py",
+          "sha256": "bbce01991c3342de63802d69915cfc1e17252688fdd96e41027f6de98e187421",
+          "bytes": 17448
+        },
+        {
+          "path": "src/prm/public_web.py",
+          "sha256": "b5d5884f92bd455a3f2f5560003502c3bc8e3b06a585ab17aca1d4353dab3648",
+          "bytes": 28810
+        },
+        {
+          "path": "src/assistant/claim_ledger.py",
+          "sha256": "c9c6343e3803d09f4d99a93b2e6c4eb8f33ebd438de7f55a4c8457aea9958820",
+          "bytes": 25870
+        },
+        {
+          "path": "src/prm/storage/policy.py",
+          "sha256": "6e16889bdd9f889daf7ced9c447e2e7c514a623c9d4958bdd9fd1f246a9bb4c2",
+          "bytes": 30184
+        },
+        {
+          "path": "src/prm/storage/jobs.py",
+          "sha256": "539b441477e31952a7607621822d454b8df60ede19432d6a4b0bc3473c83df66",
+          "bytes": 15386
+        },
+        {
+          "path": "tests/test_pai_web_github.py",
+          "sha256": "d264b61360d8c78fb941e70007f1178a398f90469e0dfd7894462ce5c9f98817",
+          "bytes": 3273
+        },
+        {
+          "path": "tests/test_pai_deep_research.py",
+          "sha256": "b6d97fa5af8ecee5675362f0db8680f3a954cf308163820f8ef7040f55b1c7f2",
+          "bytes": 2467
+        },
+        {
+          "path": "docs/verification/PAI-review-continuation-56.json",
+          "sha256": "2cd1ce1447c5bc6c31b62cc9b4341ea1aeac911efe6e4383346b65535809f670",
+          "bytes": 8283
+        }
+      ],
+      "source_bytes": 138914,
+      "instructions": "Resolve #56: GitHub now propagates authorization/StorageError including cancelled lease/path/size violations; interrupted source read durably becomes source_outcome_unknown before continuing while retaining conservative possible tool-call usage, never re-read/refund. Missing/invalid/blank window content skipped, canonical full-content hash preserved. Public_web, claim_ledger, jobs and durable registry supplied as requested; unreviewed dependencies belong in not_verified, not P1 unless actual executable defect. Recheck all prior actual findings and new boundary defects only, no stylistic blocks. Resolve all preceding findings independently, actual code and executable tests. Consistent verdict no P0/P1 SHIP_OK, P1 FIX_P1_FIRST, P0 STOP_SHIP. No human/role/live approval."
+    },
+    {
+      "purpose": "model_58_recheck",
+      "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+      "sources": [
+        {
+          "path": "src/prm/runtime/model.py",
+          "sha256": "f78c1f09ed2c003de9660df17fd50af38be7486ea33d716888e9beb45e7302e1",
+          "bytes": 10378
+        },
+        {
+          "path": "src/prm/runtime/model_attempts.py",
+          "sha256": "b37904d8cc23673c1b93f06d97205fd14849832ca06358ba37a38f52ff0c084a",
+          "bytes": 2080
+        },
+        {
+          "path": "src/prm/runtime/model_errors.py",
+          "sha256": "fcba5a68028b5c13624bf5a8ea0590a9a7eee235fb006207ab17a5cc61ab4bf3",
+          "bytes": 1818
+        },
+        {
+          "path": "src/prm/storage/policy.py",
+          "sha256": "6e16889bdd9f889daf7ced9c447e2e7c514a623c9d4958bdd9fd1f246a9bb4c2",
+          "bytes": 30184
+        },
+        {
+          "path": "tests/test_pai_chat_runtime.py",
+          "sha256": "d6cce1984a7416a36d4160b7008e37e2a23daf2abcbb25a2b1dda6f22e78770d",
+          "bytes": 13476
+        },
+        {
+          "path": "docs/verification/PAI-review-continuation-58.json",
+          "sha256": "8b2ceb6f39cc3e253a10392ef49ea2655bfe08610daebd6493fdce124111b14b",
+          "bytes": 8626
+        }
+      ],
+      "source_bytes": 66562,
+      "instructions": "Recheck #58 concrete replay audit and known-invalid-reply findings. Digests are validated and both same-object/reconstructed-client reuse expose recorded/requested/input_changed while denying ALL replays. Known malformed reply raises typed nonretryable ModelResponseInvalid with attempt/operation refs; accounting observer failure cannot mask it. Reserved cost remains unknown conservative, NOT zero/refundable. Nested cached/reasoning token shape and count bounds checked. Real HTTP invalid usage test also fails accounting and verifies typed failure plus no second HTTP. Earlier cancellation/new explicit repeated-question concerns were resolved #58 with actual guard tests; do not require global content dedup or undoing incurred charges. Independently resolve EVERY cited P1 against actual code. Consistent verdict SHIP_OK without P0/P1; no formal/human/live approval."
+    },
+    {
+      "purpose": "research_59_recheck",
+      "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+      "sources": [
+        {
+          "path": "src/prm/runtime/web.py",
+          "sha256": "8321fde1730ad18d8e97918e9bcf0f954295bfd9b2dadb4e098d88699ec55e91",
+          "bytes": 7401
+        },
+        {
+          "path": "src/prm/runtime/research.py",
+          "sha256": "3e14d20030213aa50464ee88f26ab94a8a6a02b5e1adbc9297c7156c43472177",
+          "bytes": 17638
+        },
+        {
+          "path": "tests/test_pai_web_github.py",
+          "sha256": "3f8e879e7b3d2fd678de263900c44d778bc7dc94f495d834c83260eea2ecba89",
+          "bytes": 4253
+        },
+        {
+          "path": "tests/test_pai_deep_research.py",
+          "sha256": "fbe9c2074deb9db08f4fd6540ab61d49d8e3a9aa28ddc0555c742e89209aa164",
+          "bytes": 2589
+        },
+        {
+          "path": "docs/verification/PAI-review-continuation-59.json",
+          "sha256": "3f5abb8afdf84ca070da6d72c3e3968ede3614d1250c52a0223694e04c7fb2d9",
+          "bytes": 8164
+        }
+      ],
+      "source_bytes": 40045,
+      "instructions": "Focused factual recheck of #59 source metadata/accounting P1s only. The old missing-size default was 128001>128000 (reject, not allow); new validation explicitly requires bounded nonnegative integer size and 40hex blob SHA. Missing/malformed metadata raises StorageError. Research now labels tool_calls conservative_upper_bound and separately unknown_tool_calls; retaining possible usage against finite cap is intentional safety, not untruthful measured count. Unknown interrupted work is durably marked and never re-read or refunded. Canonical full-source hash MUST NOT be truncated; content filter runs before expression. Other dependencies already independently reviewed or remain not_verified; only report real executable P0/P1 bugs. Independently resolve EVERY cited P1 against actual code. Consistent verdict SHIP_OK without P0/P1; no formal/human/live approval."
+    },
+    {
+      "purpose": "model_compound_actual_failure_recheck",
+      "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+      "sources": [
+        {
+          "path": "src/prm/runtime/model.py",
+          "sha256": "1d4568754e25beb5b754443efcab5dece7039c989dd0fa0769f4d2528d239db3",
+          "bytes": 10171
+        },
+        {
+          "path": "src/prm/runtime/model_attempts.py",
+          "sha256": "b37904d8cc23673c1b93f06d97205fd14849832ca06358ba37a38f52ff0c084a",
+          "bytes": 2080
+        },
+        {
+          "path": "src/prm/runtime/model_errors.py",
+          "sha256": "fcba5a68028b5c13624bf5a8ea0590a9a7eee235fb006207ab17a5cc61ab4bf3",
+          "bytes": 1818
+        },
+        {
+          "path": "src/prm/storage/policy.py",
+          "sha256": "6e16889bdd9f889daf7ced9c447e2e7c514a623c9d4958bdd9fd1f246a9bb4c2",
+          "bytes": 30184
+        },
+        {
+          "path": "tests/test_pai_chat_runtime.py",
+          "sha256": "d6cce1984a7416a36d4160b7008e37e2a23daf2abcbb25a2b1dda6f22e78770d",
+          "bytes": 13476
+        },
+        {
+          "path": "docs/verification/PAI-review-60-response.md",
+          "sha256": "9497ca432e83fd8817a2ed85e40c9de9b84a8a780418dd150d779b9e8136e97d",
+          "bytes": 1156
+        }
+      ],
+      "source_bytes": 58885,
+      "instructions": "Recheck real reproduced compound ModelResponseInvalid/accounting masking failure AFTER #60 static SHIP_OK, independently. execute_reserved_groups wraps transport exceptions as ScopeTransportUnknown; checked_transport now retains only positively observed invalid reply before wrapper. The generic handler uses that typed nonretryable original, otherwise LLMOutcomeUnknown, attaches refs, and observer failure only marks accounting unconfirmed. 8 corrected actual HTTP tests passed in 82.92s including known-invalid/failed-accounting case. Preserve fences and conservative unknown spend, never treat invalid billable reply as safe to retry/refund. Diagnostic digest bounds/input_changed apply identical and divergent denied replay. Report reproducible P0/P1 paths, consistent verdict; no human/role/live approval."
+    },
+    {
+      "purpose": "model_62_actual_findings_recheck",
+      "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+      "sources": [
+        {
+          "path": "src/prm/runtime/model.py",
+          "sha256": "60b83d2c16d180be509d165b610f5fa3c4cdaaf837a06dc8aeb7f67901e18858",
+          "bytes": 11170
+        },
+        {
+          "path": "src/prm/runtime/model_errors.py",
+          "sha256": "23dae54f6ade891078c0b7e948e525aee8e612531d441172593007a99431019d",
+          "bytes": 2474
+        },
+        {
+          "path": "src/prm/runtime/model_attempts.py",
+          "sha256": "b37904d8cc23673c1b93f06d97205fd14849832ca06358ba37a38f52ff0c084a",
+          "bytes": 2080
+        },
+        {
+          "path": "src/prm/storage/policy.py",
+          "sha256": "6e16889bdd9f889daf7ced9c447e2e7c514a623c9d4958bdd9fd1f246a9bb4c2",
+          "bytes": 30184
+        },
+        {
+          "path": "tests/test_pai_chat_runtime.py",
+          "sha256": "8cc2ffda6a80e067bf67a29712feabcc4fc5664c878c012501026c0ad1dfc399",
+          "bytes": 15661
+        },
+        {
+          "path": "docs/verification/PAI-review-continuation-62.json",
+          "sha256": "21a96d9b98ca026f281ed97169708049e6c994f0f7e941bc37a0841509e98023",
+          "bytes": 8603
+        }
+      ],
+      "source_bytes": 70172,
+      "instructions": "Focused independent resolution of #62 actual P1s. ScopePreparationUnknown is preserved with nonretry refs/external_call_attempted=False; other pre-HTTP errors become distinct ModelPreparationUnknown, no fence reset. Positively observed valid transport tuple survives later compound settlement loss and observer failure via frozen ModelAccountingReceipt containing actual accepted text/model/tokens, usage_recordedFalse/costNone/accounting_statusunconfirmed/exact refs/retryFalse. Return of receipt preserves output for existing callers rather than claiming unknown or retryable transport. Known invalid remains separate; no usage observer failure masks no-retry. Real HTTP tests parameterized invalid/accepted/accepted_settlement_loss and preparation unknown: 11 passed in82.60s. Resolve EACH #62 P1 independently with actual control code; any remaining P0/P1 requires executable trigger. Consistent SHIP_OK/FIX_P1_FIRST/STOP_SHIP; no role/human/live approval; P2 stylistic advice is not P1."
+    },
+    {
+      "purpose": "model_63_durable_accounting_recheck",
+      "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+      "sources": [
+        {
+          "path": "src/prm/runtime/model.py",
+          "sha256": "a61bfa17163dd9e73b1d28ec4a08d78a23abe93aa44908a2406fc9b25cad9461",
+          "bytes": 11493
+        },
+        {
+          "path": "src/prm/runtime/model_attempts.py",
+          "sha256": "d3049e9550f0b0539c4152d3c6334e615d16622da083d8b436c4550e732355e6",
+          "bytes": 2901
+        },
+        {
+          "path": "src/prm/runtime/model_errors.py",
+          "sha256": "975173e762808dc75ce4d3ae45b851b48830d16cf1a5ac6e886b9a7c1d275670",
+          "bytes": 2837
+        },
+        {
+          "path": "src/prm/storage/policy.py",
+          "sha256": "9723e8aaffd3fa5b34cd8c3abfe6e70bfc65a17b87a939dfcd065887b5c57a7e",
+          "bytes": 30275
+        },
+        {
+          "path": "tests/test_pai_chat_runtime.py",
+          "sha256": "9e77f9e730d4263063e313da154266086f90acea80f520a3fc69e97b040c1734",
+          "bytes": 16893
+        },
+        {
+          "path": "src/prm/application.py",
+          "sha256": "c89773ccdfc5b4be9e403d8468178a952d38c29dfb7b23dc92ecd5d9ffa19d95",
+          "bytes": 86773,
+          "line_ranges": [
+            [
+              1103,
+              1230
+            ]
+          ]
+        },
+        {
+          "path": "docs/verification/PAI-review-continuation-63.json",
+          "sha256": "c32ebec32ae4fcfaf98a99734e6dfc37da94cf142583b00f8e9dca15a3d346df",
+          "bytes": 7797
+        }
+      ],
+      "source_bytes": 158969,
+      "instructions": "Resolve every #63 P1 independently against current sources. record_accounting_unconfirmed persists exact bounded accepted/accounting-status/usage-missing metadata in existing durable owner model attempt without model text; underlying policy operations already persist actual=None and conservative charges. ModelAccountingReceipt remains known accepted with explicit unconfirmed accounting/ref/retryfalse, not a claim of fully settled billing. If marker write also fails, typed ModelAccountingUnconfirmed carries accepted receipt; supplied Chat caller catches it and persists actual answer/accounting_status in normal fenced result. Existing callers may inspect accepted text without asserting price, so do not equate delivery_outcome accepted with billing settled. ScopePreparationUnknown now declares attempt_ref/external_call_attempted at constructor; client constructs preserved type. Actual tests 28 passed96.67s plus2 marker recovery13.07s with real HTTP/isolated PG. Application source is an explicit original-line-number excerpt, other supplied sources complete; no claimed review of omitted legacy application. Consistent SHIP_OK if no actual P0/P1, otherwise executable counterexample. No human/workflow/live approval."
     }
   ],
   "authority_exclusions": [
@@ -1135,5 +1852,55 @@
     "call_number": 44,
     "status": "allocated",
     "purpose": "native re-audit including real STOP consumer and imported gate provenance checks"
-  }
+  },
+  "native_design_allocations": [
+    {
+      "call_number": 65,
+      "role": "program_design_review",
+      "slice_group": "foundation",
+      "status": "allocated_not_invoked"
+    },
+    {
+      "call_number": 66,
+      "role": "program_design_review",
+      "slice_group": "product",
+      "status": "allocated_not_invoked"
+    },
+    {
+      "call_number": 67,
+      "role": "program_design_review",
+      "slice_group": "sources",
+      "status": "allocated_not_invoked"
+    },
+    {
+      "call_number": 68,
+      "role": "program_design_review",
+      "slice_group": "completeness",
+      "status": "allocated_not_invoked"
+    },
+    {
+      "call_number": 69,
+      "role": "product_design_review",
+      "slice_group": "foundation",
+      "status": "allocated_not_invoked"
+    },
+    {
+      "call_number": 70,
+      "role": "product_design_review",
+      "slice_group": "product",
+      "status": "allocated_not_invoked"
+    },
+    {
+      "call_number": 71,
+      "role": "product_design_review",
+      "slice_group": "sources",
+      "status": "allocated_not_invoked"
+    },
+    {
+      "call_number": 72,
+      "role": "product_design_review",
+      "slice_group": "completeness",
+      "status": "allocated_not_invoked"
+    }
+  ]
 }

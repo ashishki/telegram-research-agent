@@ -1,0 +1,146 @@
+{
+  "schema_version": 1,
+  "status": "reviewed",
+  "call_number": 58,
+  "call_limit": 58,
+  "purpose": "model_55_recheck",
+  "read_only": true,
+  "provider": "opencode_go",
+  "requested_model": "mimo-v2.6-pro",
+  "observed_model": "mimo-v2.6-pro",
+  "requested_effort": "thinking_disabled",
+  "observed_effort": "thinking_disabled",
+  "head_sha": "cffa5ce2565d3a6dd2a7152624c01b3e1347e553",
+  "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+  "diff_sha256": "bcc154d87ff9fd4a52364e764047ea758602ad6b02345a7e6308d80ca7ebd667",
+  "sources": [
+    {
+      "path": "src/prm/runtime/model.py",
+      "sha256": "6dfbcb4de16bcbbf7cb06b7dbbd7cdb192fac5e996f27a59f1a307c3ce0944fa",
+      "bytes": 8860
+    },
+    {
+      "path": "src/prm/runtime/model_attempts.py",
+      "sha256": "5498d7273a349037dac1fcce150df5fb7328937910419240ce6e2b86a6882d87",
+      "bytes": 1588
+    },
+    {
+      "path": "src/prm/runtime/archive.py",
+      "sha256": "9051d9804cce9a738df94d5ecc02073fdd32194da2256dd7b92ebe90ab3c8f6d",
+      "bytes": 3799
+    },
+    {
+      "path": "src/prm/runtime/composition.py",
+      "sha256": "4945017b942e64edc6e1d5265594dbf0a77760da1faa6a27d9eaa63cd474f7b9",
+      "bytes": 47905
+    },
+    {
+      "path": "src/prm/runtime/ingress.py",
+      "sha256": "ae119826e01c05f27ef2305f10acb61cd27cd992ee7f739178b1ec07e9517e36",
+      "bytes": 17603
+    },
+    {
+      "path": "src/prm/storage/jobs.py",
+      "sha256": "539b441477e31952a7607621822d454b8df60ede19432d6a4b0bc3473c83df66",
+      "bytes": 15386
+    },
+    {
+      "path": "tests/test_pai_chat_runtime.py",
+      "sha256": "8f2d2a64eb5f2ca2fd9983092f8d4ff81838b0c201d2de79b6353b1bbef4d7c9",
+      "bytes": 11291
+    },
+    {
+      "path": "docs/verification/PAI-review-continuation-55.json",
+      "sha256": "7c7e774f1788e58641fdb4e6d21c316cc8d95fcf208fd28d344d049f13c7d4ec",
+      "bytes": 9271
+    }
+  ],
+  "scope": "model_55_recheck; supplied full current source/tests and explicitly labeled integration diff if present",
+  "input_sha256": "a1004fedf2b9559b48e22a538089b9d50cc57a30e7feb5ff58a1dfc2f055fc23",
+  "input_bytes": 125738,
+  "output_token_cap": 16000,
+  "timeout_seconds": 900,
+  "workflow_receipt": false,
+  "human_authority": false,
+  "runner_path": ".playbook-artifacts/pai-review-as-needed.py",
+  "runner_sha256": "8306b7e250e58139ee08be8c58de615d3d6fe684f5a4726c091ce9eaf689d545",
+  "transport_path": "tools/mimo_code_review.py",
+  "transport_sha256": "b0ba01f2647f21c004e54d2b9840573b38ac43ea541e394fd61bdfa2c9705c75",
+  "command": ".venv-pai/bin/python .playbook-artifacts/pai-review-as-needed.py --call-number 58 --purpose model_55_recheck",
+  "source_exclusions": [
+    "actual private corpus",
+    "live account payload",
+    "credentials",
+    "production configuration"
+  ],
+  "authority_exclusions": [
+    "human/workflow completion",
+    "live-account consent",
+    "production migration/deployment",
+    "product-provider spending"
+  ],
+  "request_body_sha256": "d8aa3c02d4412e3c499d23b5920eaf8dd7016fa2f5c774283997b0e07654aded",
+  "provider_call_attempted": true,
+  "usage": {
+    "prompt_tokens": 31416,
+    "completion_tokens": 922,
+    "total_tokens": 32338,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    }
+  },
+  "finish_reason": "stop",
+  "response_sha256": "afe7ead3d4bb3413a49c1e4cf8f47916a1df81b7d34ed37c3d245c0b9bf4dbb8",
+  "findings": {
+    "verdict": "FIX_P1_FIRST",
+    "findings": [
+      {
+        "severity": "P1",
+        "title": "prepare_model_attempt fence does not compare stored input_digest",
+        "file": "src/prm/runtime/model_attempts.py:19",
+        "issue": "On reuse the stored record's input_digest is never compared to the new one before raising ModelAttemptAlreadyRecorded, so divergent bodies under the same task_ref+purpose are indistinguishable from identical replays in error reporting/diagnostics. The deny is still fail-closed (any replay is rejected), but the contract's one-use version-bound/identity accounting cannot be audited.",
+        "fix": "On reuse, load old payload and compare input_digest to the caller's digest; attach both digests to ModelAttemptAlreadyRecorded so divergence is explicit and testable while still denying all replays.",
+        "confidence": "medium"
+      },
+      {
+        "severity": "P1",
+        "title": "ScopedModelClient swallows arbitrary transport exceptions as unknown-outcome, including pre-send local bugs",
+        "file": "src/prm/runtime/model.py:122-134",
+        "issue": "The generic `except Exception` around `execute_reserved_groups` converts every non-CapabilityDenied failure (including purely local StorageError from response validation, JSON decode, or usage parsing after the response was actually received) into LLMOutcomeUnknown with external_call_attempted=http_attempted. This is correct for genuinely ambiguous outcomes, but deterministic post-receipt validation failures (bad content-type, invalid finish_reason, non-int usage) are conflated with ambiguous unknowns and permanently poison the task fence even though the provider response is fully known and no retry risk exists.",
+        "fix": "Distinguish deterministic post-receipt validation/storage errors (e.g. a dedicated exception type raised after `response.read` completes) from genuinely ambiguous transport failures; only convert the latter to LLMOutcomeUnknown and keep retry_allowed=False for ambiguous ones.",
+        "confidence": "medium"
+      },
+      {
+        "severity": "P2",
+        "title": "prepare_model_attempt writes unbounded input_digest without validation",
+        "file": "src/prm/runtime/model_attempts.py:20",
+        "issue": "input_digest is stored as provided and never checked against the expected 64-hex pattern used elsewhere for job input digests, so a malformed digest could enter durable state and later comparisons (if added) would misbehave.",
+        "fix": "Validate input_digest matches `[a-f0-9]{64}` before writing, consistent with JobQueue payload checks.",
+        "confidence": "medium"
+      },
+      {
+        "severity": "P2",
+        "title": "usage observer normalization trusts provider-supplied usage subfields without bounds",
+        "file": "src/prm/runtime/model.py:138-141",
+        "issue": "prompt_tokens_details.cached_tokens and completion_tokens_details.reasoning_tokens are read via chained .get without type/bounds checks; a non-int or negative value would flow into CostCacheRuntime and settlement accounting, potentially corrupting cost attribution.",
+        "fix": "Validate cached_tokens and reasoning_tokens are ints within the same 0..1000000 bound used for prompt/completion tokens before passing to the observer.",
+        "confidence": "medium"
+      }
+    ],
+    "not_verified": [
+      "prm.capabilities / AuthorizationDecision semantics and reservation abandon_before_transport behavior",
+      "prm.storage.policy execute_reserved_groups / settle / set of reservations and grant scope enforcement",
+      "prm.storage.conversations, deletion.lineage_lock internals",
+      "llm.client LLMCompletionReceipt / LLMOutcomeUnknown contract details",
+      "PersonalResearchAssistant and service handlers referenced from composition",
+      "CostCacheRuntime record/settlement accounting and unknown-pricing handling",
+      "Archive context/synthesis transport classes and citation logic",
+      "Actual executable test runs; only the supplied test source was read"
+    ],
+    "summary": "The supplied modules enforce strict fail-closed scoping: identity-bound endpoints with redirect denial, per-purpose/per-data-class reservations, a durable one-use attempt fence keyed on task_ref+purpose that denies all replays (including divergent bodies and fresh reservations), bounded pre-transport input/history/output sizes, and an explicit unknown-outcome path that sets retry_allowed=False. The cancellation counterexample in tests confirms StateConflict with no result_ref and retained charge, and composition/queue/worker paths route nested calls through task_context. Remaining gaps are non-P0: input_digest is stored but never compared on fence reuse, generic exception handling conflates deterministic post-receipt validation failures with genuinely ambiguous unknown outcomes (both are safely denied but only one truly risks a replay), and usage subfields lack type/bounds validation before cost accounting. None of these can turn a denial into an allow or cross provider/purpose boundaries, but they weaken auditability and accounting precision, so FIX_P1_FIRST."
+  },
+  "duration_seconds": 44.272
+}

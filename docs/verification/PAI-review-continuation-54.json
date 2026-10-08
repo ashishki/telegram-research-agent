@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "status": "reviewed",
+  "call_number": 54,
+  "call_limit": 54,
+  "purpose": "mail_body_51_recheck",
+  "read_only": true,
+  "provider": "opencode_go",
+  "requested_model": "mimo-v2.6-pro",
+  "observed_model": "mimo-v2.6-pro",
+  "requested_effort": "thinking_disabled",
+  "observed_effort": "thinking_disabled",
+  "head_sha": "d605110bef5fd3605329a797b62af9f5315d4f98",
+  "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+  "diff_sha256": "0ab5474255b0d8bec253a9362d7598237f04b7e532105d4bc93a3c415d2badeb",
+  "sources": [
+    {
+      "path": "src/prm/runtime/graph.py",
+      "sha256": "cb8d8e9bb60c603a2cdbbc01c0cc8c269c5ac0eeb48fcadb59b368fcd6058c72",
+      "bytes": 28623
+    },
+    {
+      "path": "src/prm/storage/postgres.py",
+      "sha256": "8675c30ac28400d584adfeadb2c03e69a298c2782aa6221ac3432a92a1366017",
+      "bytes": 12453
+    },
+    {
+      "path": "tests/test_pai_graph_mail.py",
+      "sha256": "f49a20644c9c521349cdb23f12c21b8bc511fb864864bf04536b6fa7cf192af9",
+      "bytes": 4570
+    },
+    {
+      "path": "tests/pai_runtime_fixtures.py",
+      "sha256": "9fea5d1aa9e60f0b338638072ed5cd73c9b19ed825fc2e72b4c01cf032e6ed1d",
+      "bytes": 10375
+    },
+    {
+      "path": "docs/verification/PAI-review-continuation-51.json",
+      "sha256": "89741823ba9149003271e2e5f62e3873af47300be5c9af729aed84f852bbff73",
+      "bytes": 8009
+    }
+  ],
+  "scope": "mail_body_51_recheck; supplied full current source/tests and explicitly labeled integration diff if present",
+  "input_sha256": "09316ee7d15263de09da90cb56f7616b7b579ae7b531fcc2c5b04560692d688e",
+  "input_bytes": 70399,
+  "output_token_cap": 16000,
+  "timeout_seconds": 900,
+  "workflow_receipt": false,
+  "human_authority": false,
+  "runner_path": ".playbook-artifacts/pai-review-as-needed.py",
+  "runner_sha256": "8306b7e250e58139ee08be8c58de615d3d6fe684f5a4726c091ce9eaf689d545",
+  "transport_path": "tools/mimo_code_review.py",
+  "transport_sha256": "b0ba01f2647f21c004e54d2b9840573b38ac43ea541e394fd61bdfa2c9705c75",
+  "command": ".venv-pai/bin/python .playbook-artifacts/pai-review-as-needed.py --call-number 54 --purpose mail_body_51_recheck",
+  "source_exclusions": [
+    "actual private corpus",
+    "live account payload",
+    "credentials",
+    "production configuration"
+  ],
+  "authority_exclusions": [
+    "human/workflow completion",
+    "live-account consent",
+    "production migration/deployment",
+    "product-provider spending"
+  ],
+  "request_body_sha256": "cde130c4796339e94b0331012b28c76ebcf8822922df9b5bb2df954a56e4f8a6",
+  "provider_call_attempted": true,
+  "usage": {
+    "prompt_tokens": 18715,
+    "completion_tokens": 686,
+    "total_tokens": 19401,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    }
+  },
+  "finish_reason": "stop",
+  "response_sha256": "569e77103cb10fe014a02790011ef5dd2003e90cc6be2e498da37e0b5bc1ba8a",
+  "findings": {
+    "verdict": "SHIP_OK",
+    "findings": [
+      {
+        "severity": "P2",
+        "title": "Stored mail cursor is read at fixed version=1 with no expiry or consumption",
+        "file": "src/prm/runtime/graph.py:205",
+        "issue": "fetch_page persists and re-reads an opaque continuation record (conversation/cursor_xxx) via get(...,version=1) and only compares payload equality, so the same ref stays valid indefinitely and can be replayed across requests for the same owner/scope/connection. This is read-only pagination, not one-use write confirmation, and each use still requires a fresh grant and reservation, so it is not a fail-open authorization bypass.",
+        "fix": "Add an explicit expiry timestamp or consume-on-read version fence for stored cursors, and validate the retrieved object's actual version explicitly rather than passing version=1 as a filter. Keep the existing per-call owner/scope/connection/authorization checks as the primary guard.",
+        "confidence": "high"
+      }
+    ],
+    "not_verified": [
+      "src/prm/capabilities.py and src/prm/runtime/connections.py were not supplied in this packet; authorize_and_reserve, execute_reserved/execute_prepared, revoke semantics and the OAuth credential/refresh path were reviewed only through their call sites in the provided sources.",
+      "src/prm/mail_connector.py, src/prm/schedule_connectors.py and src/prm/briefs.py were not supplied; MailScopeSelection/MailFetchRequest field validation and require_mail_read_access semantics are inferred from usage only.",
+      "The GraphTransport origin, vault.get secret_ref binding and pa_connections DDL are outside the packet; only the row-level status/account_ref/expiry FOR UPDATE guard at graph.py:80-104 was verified.",
+      "Full Postgres immutability of pa_runtime.object_versions (no UPDATE/DELETE grants to pa_test_app) is confirmed at the grant level, but actual enforcement under concurrent writers was not executed here.",
+      "The four executable synthetic malformed cases were traced statically (tests/test_pai_graph_mail.py:44-48 and :51-64 against graph.py:_mail_metadata and read_message) but not run in this review."
+    ],
+    "summary": "Focused recheck of the remaining #51 P1 is resolved: read_message now routes both provider date and nested from parsing through _mail_metadata (graph.py:254) and validates body/contentType types (258-261), so the four malformed shapes ('receivedDateTime' invalid/naive, from None or []) raise typed StorageError rather than raw ValueError/AttributeError; the naive-datetime case is explicitly rejected at graph.py:51 and is covered by the parametrized test. Fail-closed behavior holds on the reviewed paths: _guarded_http converts all non-HTTP exceptions to StorageError 'transport outcome unknown' without retry, read grants cannot perform writes (graph.py:70-71), and mail cursors are strictly bound to owner/scope/connection with a fresh authorization each call. Supplied Postgres DDL and grants confirm immutable version rows (SELECT/INSERT only) and that version=1 is a recorded-version selector, not a CAS, which matches the stated semantics. No P0/P1 in the reviewed packet, so verdict is SHIP_OK; scope limits (unreviewed capabilities/connections/mail_connector modules) are recorded separately and do not change the focused decision."
+  },
+  "duration_seconds": 36.532
+}

@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "status": "reviewed",
+  "call_number": 53,
+  "call_limit": 53,
+  "purpose": "migration_49_recheck",
+  "read_only": true,
+  "provider": "opencode_go",
+  "requested_model": "mimo-v2.6-pro",
+  "observed_model": "mimo-v2.6-pro",
+  "requested_effort": "thinking_disabled",
+  "observed_effort": "thinking_disabled",
+  "head_sha": "a613d57b971656705e155cd01c373251e78423e4",
+  "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+  "diff_sha256": "b335a6b88dc999f6366f9594eb7c2436da12af784b7bb53bd98cb49a17b03830",
+  "sources": [
+    {
+      "path": "src/prm/runtime/migration.py",
+      "sha256": "afd316b41955c7156b64ef2dc4218f87d34917482188e6cd95f468cb46bc0129",
+      "bytes": 18848
+    },
+    {
+      "path": "src/prm/runtime/deletion.py",
+      "sha256": "12ce6cf1397e7b67bc4f5b1f515bab9d870c3a4f26bf4e2a3709f94782315c04",
+      "bytes": 5678
+    },
+    {
+      "path": "src/prm/storage/postgres.py",
+      "sha256": "8675c30ac28400d584adfeadb2c03e69a298c2782aa6221ac3432a92a1366017",
+      "bytes": 12453
+    },
+    {
+      "path": "tests/test_pai_migration.py",
+      "sha256": "e9f9b9a7b34bd6424557d755533babe6ba7af7bedf7f14d636d0d1041f0389ba",
+      "bytes": 7126
+    },
+    {
+      "path": "tests/test_pai_memory_runtime.py",
+      "sha256": "648435d04f97f12b5b8879bac033c7222f7df1807de4b3dbf32d2edfb596aefe",
+      "bytes": 3673
+    },
+    {
+      "path": "docs/verification/PAI-review-continuation-49.json",
+      "sha256": "b5ac0e6ab0f0cb72b9f28b2c139cb3786e59002972d32d055da339f4b8dc88ba",
+      "bytes": 13671
+    }
+  ],
+  "scope": "migration_49_recheck; supplied full current source/tests and explicitly labeled integration diff if present",
+  "input_sha256": "f2480cdf123ea51eea9198ebfdb372656b1d94a98a5da90ea5d09b67aaed9b69",
+  "input_bytes": 68086,
+  "output_token_cap": 16000,
+  "timeout_seconds": 900,
+  "workflow_receipt": false,
+  "human_authority": false,
+  "runner_path": ".playbook-artifacts/pai-review-as-needed.py",
+  "runner_sha256": "8306b7e250e58139ee08be8c58de615d3d6fe684f5a4726c091ce9eaf689d545",
+  "transport_path": "tools/mimo_code_review.py",
+  "transport_sha256": "b0ba01f2647f21c004e54d2b9840573b38ac43ea541e394fd61bdfa2c9705c75",
+  "command": ".venv-pai/bin/python .playbook-artifacts/pai-review-as-needed.py --call-number 53 --purpose migration_49_recheck",
+  "source_exclusions": [
+    "actual private corpus",
+    "live account payload",
+    "credentials",
+    "production configuration"
+  ],
+  "authority_exclusions": [
+    "human/workflow completion",
+    "live-account consent",
+    "production migration/deployment",
+    "product-provider spending"
+  ],
+  "request_body_sha256": "3e644ab730d574c1b9711a5ff353ea64a172bf7e4b7d6cebcedbe38dbbaee66d",
+  "provider_call_attempted": true,
+  "usage": {
+    "prompt_tokens": 19363,
+    "completion_tokens": 472,
+    "total_tokens": 19835,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    }
+  },
+  "finish_reason": "stop",
+  "response_sha256": "928c6bc16c90e4ee981ea2ad4a67014049ce307a700eacd1ce1a1310c983ee37",
+  "findings": {
+    "verdict": "FIX_P1_FIRST",
+    "findings": [
+      {
+        "severity": "P1",
+        "title": "Re-import can silently erase a legitimately recreated newer object version because tombstones are reapplied without version check",
+        "file": "src/prm/runtime/migration.py:144-146",
+        "issue": "apply_domain_delta replaces all tables with the source snapshot, then unconditionally runs delete_derived_in for every tombstone row, which deletes pa_runtime.object_heads/object_versions for that ref (deletion.py:53-54) with no comparison to any version created after the snapshot. put() allows legitimate recreation of an identity that was previously deleted in an older snapshot as long as the current tombstone is absent from the target's restored state (postgres.py:171 checks only the current tombstone table), so a target writer that legitimately recreated the ref post-restore is silently erased by a later re-import of an older delta containing the tombstone.",
+        "fix": "Before applying each tombstone during import, compare the target's current object head/version to the source snapshot and raise a forward-fix StorageError if the target holds a different, newer object row for that ref; alternatively make put() refuse recreation for any ref ever tombstoned so the scenario becomes unreachable.",
+        "confidence": "medium"
+      }
+    ],
+    "not_verified": [
+      "Full pa_jobs/pa_schedule/pa_conversation table schemas and their foreign-key ordering assumptions in DOMAIN_TABLES (referenced from operations.py, not supplied).",
+      "prm.runtime.operations.restore_bundle and OperationsRuntime.backup implementations.",
+      "Whether every legitimate recreation path uses StateTransaction.put() rather than direct SQL that bypasses the tombstone check.",
+      "Concurrency behavior of _state_manifest vs concurrent writers during the external state_manifest() call used for expected_target_manifest."
+    ],
+    "summary": "Overall the migration/deletion/storage code is strongly fail-closed: unknown outcomes are never auto-retried, consumed confirmations are monotone, budget spend cannot be refunded, terminal jobs are preserved, and corrupted object payloads block the whole import atomically. The single concrete P1 is the deletion-monotonicity gap where apply_domain_delta reapplies source tombstones after table replacement, deleting any newer object version a target legitimately recreated via put() after an earlier restore, without surfacing a conflict. No P0 found; single P1 requires FIX_P1_FIRST."
+  },
+  "duration_seconds": 31.206
+}

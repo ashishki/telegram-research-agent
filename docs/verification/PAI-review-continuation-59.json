@@ -1,0 +1,143 @@
+{
+  "schema_version": 1,
+  "status": "reviewed",
+  "call_number": 59,
+  "call_limit": 59,
+  "purpose": "research_56_recheck",
+  "read_only": true,
+  "provider": "opencode_go",
+  "requested_model": "mimo-v2.6-pro",
+  "observed_model": "mimo-v2.6-pro",
+  "requested_effort": "thinking_disabled",
+  "observed_effort": "thinking_disabled",
+  "head_sha": "cffa5ce2565d3a6dd2a7152624c01b3e1347e553",
+  "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+  "diff_sha256": "bcc154d87ff9fd4a52364e764047ea758602ad6b02345a7e6308d80ca7ebd667",
+  "sources": [
+    {
+      "path": "src/prm/runtime/web.py",
+      "sha256": "967c7083ff6e758fdd68e08fb195eb79c35ed9b216822bc503ebfc25b252be4e",
+      "bytes": 7193
+    },
+    {
+      "path": "src/prm/runtime/research.py",
+      "sha256": "bbce01991c3342de63802d69915cfc1e17252688fdd96e41027f6de98e187421",
+      "bytes": 17448
+    },
+    {
+      "path": "src/prm/public_web.py",
+      "sha256": "b5d5884f92bd455a3f2f5560003502c3bc8e3b06a585ab17aca1d4353dab3648",
+      "bytes": 28810
+    },
+    {
+      "path": "src/assistant/claim_ledger.py",
+      "sha256": "c9c6343e3803d09f4d99a93b2e6c4eb8f33ebd438de7f55a4c8457aea9958820",
+      "bytes": 25870
+    },
+    {
+      "path": "src/prm/storage/policy.py",
+      "sha256": "6e16889bdd9f889daf7ced9c447e2e7c514a623c9d4958bdd9fd1f246a9bb4c2",
+      "bytes": 30184
+    },
+    {
+      "path": "src/prm/storage/jobs.py",
+      "sha256": "539b441477e31952a7607621822d454b8df60ede19432d6a4b0bc3473c83df66",
+      "bytes": 15386
+    },
+    {
+      "path": "tests/test_pai_web_github.py",
+      "sha256": "d264b61360d8c78fb941e70007f1178a398f90469e0dfd7894462ce5c9f98817",
+      "bytes": 3273
+    },
+    {
+      "path": "tests/test_pai_deep_research.py",
+      "sha256": "b6d97fa5af8ecee5675362f0db8680f3a954cf308163820f8ef7040f55b1c7f2",
+      "bytes": 2467
+    },
+    {
+      "path": "docs/verification/PAI-review-continuation-56.json",
+      "sha256": "2cd1ce1447c5bc6c31b62cc9b4341ea1aeac911efe6e4383346b65535809f670",
+      "bytes": 8283
+    }
+  ],
+  "scope": "research_56_recheck; supplied full current source/tests and explicitly labeled integration diff if present",
+  "input_sha256": "aba1189e25c170263e6c87358a4b691aa266003cb62a6e537235f8db5dde0855",
+  "input_bytes": 153478,
+  "output_token_cap": 16000,
+  "timeout_seconds": 900,
+  "workflow_receipt": false,
+  "human_authority": false,
+  "runner_path": ".playbook-artifacts/pai-review-as-needed.py",
+  "runner_sha256": "8306b7e250e58139ee08be8c58de615d3d6fe684f5a4726c091ce9eaf689d545",
+  "transport_path": "tools/mimo_code_review.py",
+  "transport_sha256": "b0ba01f2647f21c004e54d2b9840573b38ac43ea541e394fd61bdfa2c9705c75",
+  "command": ".venv-pai/bin/python .playbook-artifacts/pai-review-as-needed.py --call-number 59 --purpose research_56_recheck",
+  "source_exclusions": [
+    "actual private corpus",
+    "live account payload",
+    "credentials",
+    "production configuration"
+  ],
+  "authority_exclusions": [
+    "human/workflow completion",
+    "live-account consent",
+    "production migration/deployment",
+    "product-provider spending"
+  ],
+  "request_body_sha256": "c1a3d2537618e64514f28c01045cceb7379e3655878138c61b6367f4d62dbc55",
+  "provider_call_attempted": true,
+  "usage": {
+    "prompt_tokens": 42188,
+    "completion_tokens": 878,
+    "total_tokens": 43066,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    }
+  },
+  "finish_reason": "stop",
+  "response_sha256": "1b438d704f8ca046dcccdf3c9ad2d6fa77748c7149dc9df7fdb271f06a4a5170",
+  "findings": {
+    "verdict": "FIX_P1_FIRST",
+    "findings": [
+      {
+        "severity": "P1",
+        "title": "Base64/size check uses document['size'] default bypass and unvalidated blob_sha crosses content trust boundary",
+        "file": "src/prm/runtime/web.py:102",
+        "issue": "`document.get('size',128001)>128000` means a missing size field silently passes validation instead of failing closed on unknown size, and `blob_sha` is taken from `document.get('sha')` without validating it is a 40-hex string, so unvalidated/malformed source content metadata propagates into returned evidence alongside the enforced bounds.",
+        "fix": "Reject documents lacking a valid integer size within the bound (treat unknown as violation), and validate blob_sha shape or omit it rather than passing arbitrary provider data through.",
+        "confidence": "medium"
+      },
+      {
+        "severity": "P1",
+        "title": "Interrupted prepared step retains reserved tool_calls as consumed, overcounting budget for work that may never have occurred",
+        "file": "src/prm/runtime/research.py:102",
+        "issue": "When a cached 'read_prepared' step is rewritten to 'source_outcome_unknown', `calls += value['tool_calls']` charges the full reserved maximum as used even though the transport may never have executed (or executed partially). This is conservative for paid usage (never refund/re-read) but can starve later legitimate steps of their tool-call budget in the same run purely from an interrupted reservation.",
+        "fix": "Track possible-usage separately from definitely-consumed tool calls, or continue the conservative no-refund charge but document/expose it as possible rather than actual usage so budget accounting is truthful.",
+        "confidence": "medium"
+      },
+      {
+        "severity": "P2",
+        "title": "window_evidence row iteration can still raise on None content despite supplied guard",
+        "file": "src/prm/runtime/research.py:54",
+        "issue": "The comprehension filter `if isinstance(row['content'],str) and row['content'].strip()` is evaluated after the expression, but Python evaluates the expression only when the condition holds for comprehension, so this specific None-content crash is actually mitigated; however `row['content'].splitlines()[0]` on a non-empty single-line string is fine, so no executable defect remains here beyond unbounded `row['content']` hashing/size with no cap on content length before hashing the full column.",
+        "fix": "Bound the content length used for source_version hashing (e.g. hash only up to a fixed cap) to avoid unbounded memory/CPU on oversized archive rows.",
+        "confidence": "low"
+      }
+    ],
+    "not_verified": [
+      "prm.capabilities (CapabilityRegistry, decode_capability_grant_document, BudgetReservation, _openai_compound_member_kind) - grant/authorization internals relied on throughout, previously reviewed externally (#36) but not in this packet",
+      "prm.storage.postgres (PostgresStore, StorageError, StateConflict, _canonical) - transaction/put/get semantics relied on for idempotency and fencing",
+      "prm.runtime.deletion lineage_lock - called for concurrency fencing",
+      "prm.runtime.cost_cache CostCacheRuntime - archive cache read/write path",
+      "db.archive_search.search_telegram_archive - actual archive query implementation",
+      "prm.runtime.model ScopedModelClient.complete_with_receipt - model egress/receipt semantics",
+      "tests/pai_runtime_fixtures - fixture registry/grant helpers; not executable test of module behavior under review",
+      "prm.storage.policy / prm.storage.jobs internals beyond supplied excerpts (execute_reserved_groups, settle, claim fencing cross-module ordering)"
+    ],
+    "summary": "This round re-checks prior findings: the two prior P1s around GitHub exception swallowing (web.py:108) and non-durable read_prepared rewrite (research.py:95) are now resolved in the supplied source via explicit re-raise of CapabilityDenied/StorageError and immediate tx.put persistence of source_outcome_unknown before continuing, matching #56. The remaining items are lower-severity boundary/accounting concerns (unknown-size default bypass and unvalidated blob_sha in GitHub content handling, possible-vs-actual tool-call accounting for interrupted steps, and unbounded archive content hashing) plus unreviewed dependencies that belong in not_verified per instructions. No P0 defect found; one or more P1 boundary/accounting issues remain, so verdict is FIX_P1_FIRST."
+  },
+  "duration_seconds": 56.853
+}

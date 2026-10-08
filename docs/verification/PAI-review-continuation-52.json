@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "status": "reviewed",
+  "call_number": 52,
+  "call_limit": 52,
+  "purpose": "media_49_recheck",
+  "read_only": true,
+  "provider": "opencode_go",
+  "requested_model": "mimo-v2.6-pro",
+  "observed_model": "mimo-v2.6-pro",
+  "requested_effort": "thinking_disabled",
+  "observed_effort": "thinking_disabled",
+  "head_sha": "a613d57b971656705e155cd01c373251e78423e4",
+  "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+  "diff_sha256": "b335a6b88dc999f6366f9594eb7c2436da12af784b7bb53bd98cb49a17b03830",
+  "sources": [
+    {
+      "path": "src/prm/runtime/media.py",
+      "sha256": "6e81884b3bca3d4ad5323b6c833d5f2aa4d3a48e45acd05c8f0a2708daed8cc1",
+      "bytes": 13233
+    },
+    {
+      "path": "src/prm/runtime/media_download.py",
+      "sha256": "ab8006bb79ed6eb79bf9dac2b7144a00130b81f51c374b456480f40f3c3e8337",
+      "bytes": 3861
+    },
+    {
+      "path": "src/prm/runtime/media_extract.py",
+      "sha256": "65bdffd50dcc56efd6a378244499bb436ddb36f6f408269b730cbbfc6d8b15f2",
+      "bytes": 1971
+    },
+    {
+      "path": "src/prm/runtime/model_attempts.py",
+      "sha256": "5498d7273a349037dac1fcce150df5fb7328937910419240ce6e2b86a6882d87",
+      "bytes": 1588
+    },
+    {
+      "path": "src/prm/runtime/model_errors.py",
+      "sha256": "fcba5a68028b5c13624bf5a8ea0590a9a7eee235fb006207ab17a5cc61ab4bf3",
+      "bytes": 1818
+    },
+    {
+      "path": "src/prm/storage/policy.py",
+      "sha256": "6e16889bdd9f889daf7ced9c447e2e7c514a623c9d4958bdd9fd1f246a9bb4c2",
+      "bytes": 30184
+    },
+    {
+      "path": "tests/test_pai_media_runtime.py",
+      "sha256": "23c05e93b5313314e8d9e4311e2bd445219aeed636ed05d932747c2ddbe61f1a",
+      "bytes": 17250
+    },
+    {
+      "path": "docs/verification/PAI-review-continuation-49.json",
+      "sha256": "b5ac0e6ab0f0cb72b9f28b2c139cb3786e59002972d32d055da339f4b8dc88ba",
+      "bytes": 13671
+    }
+  ],
+  "scope": "media_49_recheck; supplied full current source/tests and explicitly labeled integration diff if present",
+  "input_sha256": "96e0bc9c5dc0a84dfe07a7ca3baef88cc5480e5ffb4719b92b8264c397bbcd17",
+  "input_bytes": 92011,
+  "output_token_cap": 16000,
+  "timeout_seconds": 900,
+  "workflow_receipt": false,
+  "human_authority": false,
+  "runner_path": ".playbook-artifacts/pai-review-as-needed.py",
+  "runner_sha256": "8306b7e250e58139ee08be8c58de615d3d6fe684f5a4726c091ce9eaf689d545",
+  "transport_path": "tools/mimo_code_review.py",
+  "transport_sha256": "b0ba01f2647f21c004e54d2b9840573b38ac43ea541e394fd61bdfa2c9705c75",
+  "command": ".venv-pai/bin/python .playbook-artifacts/pai-review-as-needed.py --call-number 52 --purpose media_49_recheck",
+  "source_exclusions": [
+    "actual private corpus",
+    "live account payload",
+    "credentials",
+    "production configuration"
+  ],
+  "authority_exclusions": [
+    "human/workflow completion",
+    "live-account consent",
+    "production migration/deployment",
+    "product-provider spending"
+  ],
+  "request_body_sha256": "f02c03b9050fcdb480817588b34f451f76160f12651669a8b825461987854cd7",
+  "provider_call_attempted": true,
+  "usage": {
+    "prompt_tokens": 25774,
+    "completion_tokens": 459,
+    "total_tokens": 26233,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    }
+  },
+  "finish_reason": "stop",
+  "response_sha256": "1f77be8ee3f7bbe29c9a4a5e97fed6f687849e41701ede35f3aa85dc97ace0c4",
+  "findings": {
+    "verdict": "SHIP_OK",
+    "findings": [],
+    "not_verified": [
+      "prm.capabilities / CapabilityRegistry sealing and authorize semantics were not in the packet; enforcement of resource_ref/provider_ref/purpose matching in the referenced grant document was assumed.",
+      "prm.storage.postgres internals (transaction/put/get locking semantics, digest computation, lineage_lock behavior) were not supplied.",
+      "llm.client LLMOutcomeUnknown/ScopedModelClient.complete_with_receipt behavior, including whether receipt.text is bounded and whether unknown outcomes are re-raised rather than retried.",
+      "Injected production OCR/vision/transcriber adapters (whether they perform network egress, record accounting, or enforce their own resource scopes) were not supplied.",
+      "Whether brief_owner_ref_from_authenticated_private_tuple correctly encodes owner identity and rejects ambiguous actor/owner tuples.",
+      "CostCacheRuntime.get/put/key semantics (whether cache keys bind owner scope, whether put re-validates authorization) were not supplied.",
+      "Test fixture pai_runtime_fixtures.allow grant construction (whether grants bind exact resource_refs/purposes and are never auto-issued) was not supplied."
+    ],
+    "summary": "The supplied packet resolves the previously reported #49 media findings: OCR now requires a dedicated media.ocr AuthorizationRequest via authorize_and_reserve with provider/connection/upper_bound validation and fail-closed ocr_unavailable, attempt fencing through prepare_model_attempt before transport with abandon_before_transport on pre-transport failure, and a bounded retry fence that returns ModelAttemptAlreadyRecorded; extraction output is now validated through _validated_pages at both the subprocess and OCR boundaries with strict page shape, strict ascending numbering, per-page and total bounds; the download path requires a durable authenticated input row (request_ref) with owner tuple verification and exact file_ref/kind matching against the recorded media_input before any transport, with both reservations abandoned and no transport on mismatch. Live OCR substitution cannot occur without the dedicated scope; citations are restricted to validated actual page numbers and cited subset enforcement; one-use version-bound transcript revision uses expected_version and raises StateConflict on mismatch; accepted-but-accounting-unconfirmed results are preserved with retry_allowed=False and do not get reset. No remaining P0 or P1 concrete defects were found in the supplied code; remaining uncertainties concern unsupplied dependencies and adapter wiring, listed in not_verified."
+  },
+  "duration_seconds": 12.594
+}

@@ -1,0 +1,137 @@
+{
+  "schema_version": 1,
+  "status": "reviewed",
+  "call_number": 56,
+  "call_limit": 56,
+  "purpose": "search_web_research_small",
+  "read_only": true,
+  "provider": "opencode_go",
+  "requested_model": "mimo-v2.6-pro",
+  "observed_model": "mimo-v2.6-pro",
+  "requested_effort": "thinking_disabled",
+  "observed_effort": "thinking_disabled",
+  "head_sha": "d605110bef5fd3605329a797b62af9f5315d4f98",
+  "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+  "diff_sha256": "0ab5474255b0d8bec253a9362d7598237f04b7e532105d4bc93a3c415d2badeb",
+  "sources": [
+    {
+      "path": "src/prm/runtime/web.py",
+      "sha256": "86a07764e5f27485d8b11b3d894043496330e2ddb47a53dcff6fd1c1aa3d4d42",
+      "bytes": 7136
+    },
+    {
+      "path": "src/prm/runtime/research.py",
+      "sha256": "2fb5a18d5ea54f8c91d5766840b438ef84f06452377c37e5e41e310f07401c5c",
+      "bytes": 17072
+    },
+    {
+      "path": "src/prm/runtime/connector_summary.py",
+      "sha256": "b74241ed5b43d8d8edb1a39e70d184283ab057f4e06ef0f8985c9fa74ced5b0c",
+      "bytes": 3536
+    },
+    {
+      "path": "tests/test_pai_web_github.py",
+      "sha256": "fcfa65f5c345e5fd6ca28eca6178f3310139c9fa6bff20bc3d7778ef922f1730",
+      "bytes": 2195
+    },
+    {
+      "path": "tests/test_pai_deep_research.py",
+      "sha256": "9110a5284fbba63fb60213b6c4a6002477af16602527b0236ed7327cf72cf9eb",
+      "bytes": 2325
+    }
+  ],
+  "scope": "search_web_research_small; supplied full current source/tests and explicitly labeled integration diff if present",
+  "input_sha256": "6539558ecbbfe766110a986f4a2ec4f57e34f2748231e5cc1b0acc8d562c7877",
+  "input_bytes": 36585,
+  "output_token_cap": 16000,
+  "timeout_seconds": 900,
+  "workflow_receipt": false,
+  "human_authority": false,
+  "runner_path": ".playbook-artifacts/pai-review-as-needed.py",
+  "runner_sha256": "8306b7e250e58139ee08be8c58de615d3d6fe684f5a4726c091ce9eaf689d545",
+  "transport_path": "tools/mimo_code_review.py",
+  "transport_sha256": "b0ba01f2647f21c004e54d2b9840573b38ac43ea541e394fd61bdfa2c9705c75",
+  "command": ".venv-pai/bin/python .playbook-artifacts/pai-review-as-needed.py --call-number 56 --purpose search_web_research_small",
+  "source_exclusions": [
+    "actual private corpus",
+    "live account payload",
+    "credentials",
+    "production configuration"
+  ],
+  "authority_exclusions": [
+    "human/workflow completion",
+    "live-account consent",
+    "production migration/deployment",
+    "product-provider spending"
+  ],
+  "request_body_sha256": "dca7f49a50562460a8d4c6db1df3afea7b3896e5eb4c9bddbe918e72154911e3",
+  "provider_call_attempted": true,
+  "usage": {
+    "prompt_tokens": 9340,
+    "completion_tokens": 1038,
+    "total_tokens": 10378,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    }
+  },
+  "finish_reason": "stop",
+  "response_sha256": "f161303f1437b33fcf996e4a438e108aa2a2669dab120fafdec4618d9557912f",
+  "findings": {
+    "verdict": "FIX_P1_FIRST",
+    "findings": [
+      {
+        "severity": "P1",
+        "title": "Bare except in GitHub content read swallows auth/cancellation errors and converts denial to silent partial",
+        "file": "src/prm/runtime/web.py:108",
+        "issue": "The per-path `except Exception` catches CapabilityDenied raised by the guard/fenced lease or reservation errors inside `read()` and replaces them with a generic 'unavailable:PATH' gap, so a revoked grant or cancellation mid-run yields a successful-looking partial result rather than a fail-closed denial. It also silently degrades genuinely malformed/cross-path content (e.g. document['path'] mismatch, size bounds) to a gap instead of surfacing the error.",
+        "fix": "Re-raise CapabilityDenied/StateConflict/cancellation errors (or catch only expected transport/decode errors) and keep a narrow try/except around base64/utf-8 decoding only. Content-scope violations should raise, not be recorded as an availability gap.",
+        "confidence": "high"
+      },
+      {
+        "severity": "P1",
+        "title": "Cached read_prepared outcome is never converted to source_outcome_unknown persistently and tool_calls counted for unused work",
+        "file": "src/prm/runtime/research.py:95",
+        "issue": "On restart the code mutates the cached payload in-memory (`value['status']='source_outcome_unknown'`) but writes it back only via the later `tx.put(...expected_version=1)` inside `_gather`, which is skipped for this step (it is not in `pending`). The durable record therefore remains 'read_prepared', so a later run of the same job repeats the same mutation again while still charging `calls` as if the read occurred. This undermines the durable no-replay guarantee the code comment claims.",
+        "fix": "Persist the 'source_outcome_unknown' rewrite immediately (e.g. `tx.put(...,expected_version=1)`) before continuing, and do not add its tool_calls to the consumed budget as though work happened, or record a separate 'consumed' counter.",
+        "confidence": "high"
+      },
+      {
+        "severity": "P1",
+        "title": "Unhandled Base64/Unicode errors in archive window evidence and search snippets leak raw content or crash worker",
+        "file": "src/prm/runtime/research.py:51",
+        "issue": "`row['content'].splitlines()[0]` and slicing assume content is a str; if content is None/bytes the row build raises and aborts the whole research run, and no size bound is enforced before hashing the full content. This can also fail closed inconsistently (exception escapes the worker).",
+        "fix": "Guard content type/None, truncate before hashing, and convert non-str content safely (e.g. decode or skip) so window evidence never raises.",
+        "confidence": "medium"
+      },
+      {
+        "severity": "P1",
+        "title": "Unreviewed dependencies: public web/claim-registry/queue internals not covered",
+        "file": "src/prm/runtime/research.py:12",
+        "issue": "Correctness of reservation abandonment, guard fencing, `execute_public_web_research`, and `verify_answer_against_evidence` is relied on but not included in the supplied source, so fail-closed behavior across those boundaries is unverified. The registry was previously reviewed (#36) but the public_web/model/claim_ledger modules are not in this packet.",
+        "fix": "Confirm those modules independently or restrict claims about end-to-end fail-closed behavior to what is shown here.",
+        "confidence": "high"
+      },
+      {
+        "severity": "P2",
+        "title": "Fixed 8s GitHub timeout and 128KB bound not tied to caller-provided upper bounds",
+        "file": "src/prm/runtime/web.py:90",
+        "issue": "GitHub reads use hard-coded timeout/size limits instead of the same `PublicWebBounds`/upper_bound policy used elsewhere, so policy changes to bounds won't apply here; not a direct security bypass but an inconsistency in enforcement.",
+        "fix": "Route GitHub timeouts/max bytes through the same bounded policy object and enforce consistently.",
+        "confidence": "medium"
+      }
+    ],
+    "not_verified": [
+      "prm.public_web (HttpPublicWebProvider, _https_get, execute_public_web_research, PublicWebBounds)",
+      "prm.capabilities registry execute_prepared/execute_reserved and reservation abandon semantics (only #36 reviewed externally)",
+      "assistant.claim_ledger.verify_against_evidence",
+      "prm.runtime.model ScopedModelClient/complete_with_receipt",
+      "prm.storage.jobs queue claim/checkpoint/complete and _fenced semantics",
+      "tests/pai_runtime_fixtures and any media allowlist/cancellation modules"
+    ],
+    "summary": "Overall the code shows good fail-closed instincts (denial pre-reservation, prepared-read no-replay, gaps surfaced, unknown outcomes not retried), but two P1 defects undermine that: GitHub read errors are swallowed by a blanket exception handler so a mid-run revocation/cancellation becomes an apparently successful partial result, and the interrupted read_prepared case is never durably rewritten to source_outcome_unknown despite the comment claiming so. Given the unverified public_web/claim-ledger/queue dependencies, this is not a clean SHIP_OK; fix the exception-handling and durable-status issues first."
+  },
+  "duration_seconds": 50.068
+}

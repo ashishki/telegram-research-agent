@@ -1,0 +1,132 @@
+{
+  "schema_version": 1,
+  "status": "reviewed",
+  "call_number": 62,
+  "call_limit": 62,
+  "purpose": "model_compound_actual_failure_recheck",
+  "read_only": true,
+  "provider": "opencode_go",
+  "requested_model": "mimo-v2.6-pro",
+  "observed_model": "mimo-v2.6-pro",
+  "requested_effort": "thinking_disabled",
+  "observed_effort": "thinking_disabled",
+  "head_sha": "4554922c8f910b317d366f629f6d86aed52bff71",
+  "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+  "diff_sha256": "7293572966c6ba628706b7ca6e540fbf2b449207b343affa9ab7594b731bc087",
+  "sources": [
+    {
+      "path": "src/prm/runtime/model.py",
+      "sha256": "1d4568754e25beb5b754443efcab5dece7039c989dd0fa0769f4d2528d239db3",
+      "bytes": 10171
+    },
+    {
+      "path": "src/prm/runtime/model_attempts.py",
+      "sha256": "b37904d8cc23673c1b93f06d97205fd14849832ca06358ba37a38f52ff0c084a",
+      "bytes": 2080
+    },
+    {
+      "path": "src/prm/runtime/model_errors.py",
+      "sha256": "fcba5a68028b5c13624bf5a8ea0590a9a7eee235fb006207ab17a5cc61ab4bf3",
+      "bytes": 1818
+    },
+    {
+      "path": "src/prm/storage/policy.py",
+      "sha256": "6e16889bdd9f889daf7ced9c447e2e7c514a623c9d4958bdd9fd1f246a9bb4c2",
+      "bytes": 30184
+    },
+    {
+      "path": "tests/test_pai_chat_runtime.py",
+      "sha256": "d6cce1984a7416a36d4160b7008e37e2a23daf2abcbb25a2b1dda6f22e78770d",
+      "bytes": 13476
+    },
+    {
+      "path": "docs/verification/PAI-review-60-response.md",
+      "sha256": "9497ca432e83fd8817a2ed85e40c9de9b84a8a780418dd150d779b9e8136e97d",
+      "bytes": 1156
+    }
+  ],
+  "scope": "model_compound_actual_failure_recheck; supplied full current source/tests and explicitly labeled integration diff if present",
+  "input_sha256": "639b1427b371f9d4c5dd32eacc5a755f3016b4d6a9b6937fd7be4a5170e75ffa",
+  "input_bytes": 65555,
+  "output_token_cap": 16000,
+  "timeout_seconds": 900,
+  "workflow_receipt": false,
+  "human_authority": false,
+  "runner_path": ".playbook-artifacts/pai-review-as-needed.py",
+  "runner_sha256": "8306b7e250e58139ee08be8c58de615d3d6fe684f5a4726c091ce9eaf689d545",
+  "transport_path": "tools/mimo_code_review.py",
+  "transport_sha256": "b0ba01f2647f21c004e54d2b9840573b38ac43ea541e394fd61bdfa2c9705c75",
+  "command": ".venv-pai/bin/python .playbook-artifacts/pai-review-as-needed.py --call-number 62 --purpose model_compound_actual_failure_recheck",
+  "source_exclusions": [
+    "actual private corpus",
+    "live account payload",
+    "credentials",
+    "production configuration"
+  ],
+  "authority_exclusions": [
+    "human/workflow completion",
+    "live-account consent",
+    "production migration/deployment",
+    "product-provider spending"
+  ],
+  "request_body_sha256": "5b53c8eaf9cbd794a70502c73eb97f7bb6e6dd6fabe1ee26f45b9185abd0ac35",
+  "provider_call_attempted": true,
+  "usage": {
+    "prompt_tokens": 16664,
+    "completion_tokens": 999,
+    "total_tokens": 17663,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    }
+  },
+  "finish_reason": "stop",
+  "response_sha256": "3a809313bf2fbe69735758dbdc34b69152446875633be554aa7857edf826429f",
+  "findings": {
+    "verdict": "FIX_P1_FIRST",
+    "findings": [
+      {
+        "severity": "P1",
+        "title": "Generic exception handler swallows and re-raises as LLMOutcomeUnknown any pre-transport failure, including grant/scope validation errors other than CapabilityDenied",
+        "file": "src/prm/runtime/model.py:141-154",
+        "issue": "complete_with_receipt only re-raises CapabilityDenied unchanged; every other exception raised inside execute_reserved_groups (e.g. a local scope/binding validation StorageError before any I/O, or a ScopePreparationUnknown from the compound wrapper) is converted into LLMOutcomeUnknown with external_call_attempted possibly false and retry_allowed=False. That is conservative for retry, but it loses typed preparation/invalid input classification and can label a never-attempted call as an unknown provider outcome with a durable model_attempt fence already created, permanently fencing a task that never reached the transport.",
+        "fix": "Distinguish pre-transport failures (no I/O occurred) from transport outcomes: re-raise ScopePreparationUnknown/StorageError validation errors unchanged, and only wrap failures where http_attempted is true into LLMOutcomeUnknown. Keep the ModelResponseInvalid fast path as-is.",
+        "confidence": "medium"
+      },
+      {
+        "severity": "P1",
+        "title": "usage_observer failure on successful call raises and is not marked unconfirmed, yet receipt already claims accepted usage",
+        "file": "src/prm/runtime/model.py:158-163",
+        "issue": "After a successful transport the usage_observer call is not wrapped; if it raises (the failure mode the #60 patch guards on the error path) the exception propagates raw while the durable operations are already settled as accepted and the logical model_attempt fence is created. Callers see a raw accounting error with no receipt/refs, indistinguishable from a local failure, and cannot tell that the model call actually succeeded and must not be retried.",
+        "fix": "Wrap the success-path observer call and attach operation_refs/attempt_ref with accounting_status='unconfirmed' (non-retryable) rather than raising raw, mirroring the error path behavior.",
+        "confidence": "high"
+      },
+      {
+        "severity": "P2",
+        "title": "ModelAttemptAlreadyRecorded/ModelResponseInvalid error attribute injection is untyped and mutable",
+        "file": "src/prm/runtime/model.py:148-153",
+        "issue": "operation_refs/attempt_ref/retry_allowed/accounting_status are set as ad-hoc attributes on ModelResponseInvalid (frozen dataclass instance but not the attribute set) and on LLMOutcomeUnknown; nothing guarantees accounting_status exists for all downstream consumers, and the same mutable instance is re-raised with attributes added after construction. This is brittle but does not currently turn unknown into allow.",
+        "fix": "Define explicit typed exception classes carrying operation_refs, attempt_ref, retry_allowed and accounting_status at construction.",
+        "confidence": "medium"
+      },
+      {
+        "severity": "P2",
+        "title": "ModelEndpoint does not validate the endpoint URL path or reject whitespace-only model/token edge cases consistently",
+        "file": "src/prm/runtime/model.py:32-45",
+        "issue": "Validation allows any path and any token string without spaces/newlines, and permits an empty token for synthetic_http only; for non-synthetic endpoints it requires a non-empty token but does not reject tokens containing other control characters. This is bounded and does not cause an allow escalation.",
+        "fix": "Reject control characters in token and enforce a bounded, allowlisted path shape for the endpoint.",
+        "confidence": "low"
+      }
+    ],
+    "not_verified": [
+      "Behavior of llm/client LLMOutcomeUnknown and prm/runtime/composition callers is not in the packet; assertions about their handling of injected attributes/unknowns are unverified.",
+      "Source for registry.execute_reserved_groups wrapping behavior in this exact revision is present but the documented 8 corrected HTTP tests were not re-run by this review.",
+      "The dependency/lineage lock path (deletion.lineage_lock, postgres store transactions) is not in the packet; concurrency under real Postgres locking was not verified.",
+      "Any code outside the five supplied files (e.g. how accounting_status is consumed in reporting) is omitted and not reviewed."
+    ],
+    "summary": "The #60 accounting-masking defect appears correctly addressed: checked_transport now retains only a positively observed ModelResponseInvalid before the compound wrapper, and the error path re-raises that typed non-retryable failure with fence refs even if the usage observer fails, while other transport failures remain LLMOutcomeUnknown with conservative unknown spend and no blind retry/refund. The known-invalid + failed-accounting test path is consistent with the described fix and preserves the one-use fence. Remaining P1s are adjacent correctness gaps: any non-CapabilityDenied pre-transport error is mislabeled as an unknown provider outcome after a durable fence is created, and a success-path usage_observer failure propagates raw despite the call having succeeded and settled as accepted; both are fail-closed for retry but degrade classification and accounting honesty, so fix before ship."
+  },
+  "duration_seconds": 63.545
+}

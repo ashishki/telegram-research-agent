@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "status": "reviewed",
+  "call_number": 50,
+  "call_limit": 50,
+  "purpose": "brief_reader_47_recheck",
+  "read_only": true,
+  "provider": "opencode_go",
+  "requested_model": "mimo-v2.6-pro",
+  "observed_model": "mimo-v2.6-pro",
+  "requested_effort": "thinking_disabled",
+  "observed_effort": "thinking_disabled",
+  "head_sha": "a613d57b971656705e155cd01c373251e78423e4",
+  "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+  "diff_sha256": "b335a6b88dc999f6366f9594eb7c2436da12af784b7bb53bd98cb49a17b03830",
+  "sources": [
+    {
+      "path": "src/prm/runtime/brief.py",
+      "sha256": "b028ea61bed3dcb8ba700e1c226f21be21df1a60026790e005877b1357173351",
+      "bytes": 8401
+    },
+    {
+      "path": "src/prm/runtime/reader.py",
+      "sha256": "5962c88d5ffac519313478b742997235361b731752b7700cd3a15c57ad6d5e8d",
+      "bytes": 8850
+    },
+    {
+      "path": "src/prm/storage/policy.py",
+      "sha256": "6e16889bdd9f889daf7ced9c447e2e7c514a623c9d4958bdd9fd1f246a9bb4c2",
+      "bytes": 30184
+    },
+    {
+      "path": "src/prm/storage/briefs.py",
+      "sha256": "9ffd197b165487375ae0552efb9c4fb9ff8723cb354f1f163c7656103dff034d",
+      "bytes": 8921
+    },
+    {
+      "path": "src/prm/runtime/deletion.py",
+      "sha256": "12ce6cf1397e7b67bc4f5b1f515bab9d870c3a4f26bf4e2a3709f94782315c04",
+      "bytes": 5678
+    },
+    {
+      "path": "tests/test_pai_brief_runtime.py",
+      "sha256": "c61aaf25f4f9ceeafa3a71e7180a399ef6b91ec6b435695dd1f0b4d1856afb36",
+      "bytes": 4659
+    },
+    {
+      "path": "tests/test_pai_report_runtime.py",
+      "sha256": "3cf4d90c7906113faddf169c102c8005376b411ef828d1370cca65c7ef800331",
+      "bytes": 4349
+    },
+    {
+      "path": "docs/verification/PAI-review-continuation-47.json",
+      "sha256": "5a70934306ed0e1cc60a1257a37164b7ca681bc8acaf007876cf4cd5cbd618e5",
+      "bytes": 6792
+    }
+  ],
+  "scope": "brief_reader_47_recheck; supplied full current source/tests and explicitly labeled integration diff if present",
+  "input_sha256": "b218244bc114559c433c6217603b794a5507b2dd1e9150afdf4b682ea349be7a",
+  "input_bytes": 85434,
+  "output_token_cap": 16000,
+  "timeout_seconds": 900,
+  "workflow_receipt": false,
+  "human_authority": false,
+  "runner_path": ".playbook-artifacts/pai-review-as-needed.py",
+  "runner_sha256": "8306b7e250e58139ee08be8c58de615d3d6fe684f5a4726c091ce9eaf689d545",
+  "transport_path": "tools/mimo_code_review.py",
+  "transport_sha256": "b0ba01f2647f21c004e54d2b9840573b38ac43ea541e394fd61bdfa2c9705c75",
+  "command": ".venv-pai/bin/python .playbook-artifacts/pai-review-as-needed.py --call-number 50 --purpose brief_reader_47_recheck",
+  "source_exclusions": [
+    "actual private corpus",
+    "live account payload",
+    "credentials",
+    "production configuration"
+  ],
+  "authority_exclusions": [
+    "human/workflow completion",
+    "live-account consent",
+    "production migration/deployment",
+    "product-provider spending"
+  ],
+  "request_body_sha256": "89920084254da6b7a6f627063a79f1066c620a269dc0e71c45e96bbd3f578506",
+  "provider_call_attempted": true,
+  "usage": {
+    "prompt_tokens": 22705,
+    "completion_tokens": 258,
+    "total_tokens": 22963,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    }
+  },
+  "finish_reason": "stop",
+  "response_sha256": "4e9a70ffbe2d714d6ccba97aacf0bf7833d132f115489b4e84e3f16f72f4db9a",
+  "findings": {
+    "verdict": "SHIP_OK",
+    "findings": [],
+    "not_verified": [
+      "Only the supplied excerpts (with their given hashes) were reviewed; the remainder of each file and referenced modules like ScopedModelClient, render.py, network_guard.py, artifacts.py, and composition.py were not provided.",
+      "Runtime behavior (actual Postgres semantics, subprocess rendering, network guard at C level) was not executed; review is static over supplied code and tests."
+    ],
+    "summary": "Rechecking against current supplied code, the previously cited P1s are resolved: brief.py's failure path now calls reservation.abandon_before_transport() only for unprepared reservations while preserving unknown fences and conservative charges after transport (lines 42-46), with an independent test covering reconciliation; reader.py's artifact cache key now includes owner, brief_id, version, content_digest and format (line 55), with deletion lineage and per-brief parent indexing verified under the lineage lock, and an independent test confirms equal-content reports keep isolated artifacts. Budget accounting, one-use versioned bindings, scope checks, format allowlists, and fail-closed authorizations are consistent with project rules in the reviewed excerpts; no P0 or P1 executable defects remain, so this is SHIP_OK on the supplied packet only."
+  },
+  "duration_seconds": 17.004
+}

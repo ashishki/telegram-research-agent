@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "status": "reviewed",
+  "call_number": 57,
+  "call_limit": 57,
+  "purpose": "migration_53_recheck",
+  "read_only": true,
+  "provider": "opencode_go",
+  "requested_model": "mimo-v2.6-pro",
+  "observed_model": "mimo-v2.6-pro",
+  "requested_effort": "thinking_disabled",
+  "observed_effort": "thinking_disabled",
+  "head_sha": "cffa5ce2565d3a6dd2a7152624c01b3e1347e553",
+  "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+  "diff_sha256": "bcc154d87ff9fd4a52364e764047ea758602ad6b02345a7e6308d80ca7ebd667",
+  "sources": [
+    {
+      "path": "src/prm/runtime/migration.py",
+      "sha256": "d128cc2b42b8743ab52df1f0f35e721916495c60ccca91f04176258c01d9a1a2",
+      "bytes": 19441
+    },
+    {
+      "path": "src/prm/runtime/deletion.py",
+      "sha256": "12ce6cf1397e7b67bc4f5b1f515bab9d870c3a4f26bf4e2a3709f94782315c04",
+      "bytes": 5678
+    },
+    {
+      "path": "src/prm/storage/postgres.py",
+      "sha256": "8675c30ac28400d584adfeadb2c03e69a298c2782aa6221ac3432a92a1366017",
+      "bytes": 12453
+    },
+    {
+      "path": "tests/test_pai_migration.py",
+      "sha256": "b18ceea5a52cbb7c88f789b363364676408b2809debc180543d7f24fd71f0f55",
+      "bytes": 8481
+    },
+    {
+      "path": "docs/verification/PAI-review-continuation-53.json",
+      "sha256": "244cf9ef8f0cb6e721ccac86475a7464b2c62157f9b1344da78d0df2bf9dd4a3",
+      "bytes": 5704
+    }
+  ],
+  "scope": "migration_53_recheck; supplied full current source/tests and explicitly labeled integration diff if present",
+  "input_sha256": "55ce506033bde11a9c23aceb69e04a2efcece0087b6ff9dac4e85495f35fc859",
+  "input_bytes": 57612,
+  "output_token_cap": 16000,
+  "timeout_seconds": 900,
+  "workflow_receipt": false,
+  "human_authority": false,
+  "runner_path": ".playbook-artifacts/pai-review-as-needed.py",
+  "runner_sha256": "8306b7e250e58139ee08be8c58de615d3d6fe684f5a4726c091ce9eaf689d545",
+  "transport_path": "tools/mimo_code_review.py",
+  "transport_sha256": "b0ba01f2647f21c004e54d2b9840573b38ac43ea541e394fd61bdfa2c9705c75",
+  "command": ".venv-pai/bin/python .playbook-artifacts/pai-review-as-needed.py --call-number 57 --purpose migration_53_recheck",
+  "source_exclusions": [
+    "actual private corpus",
+    "live account payload",
+    "credentials",
+    "production configuration"
+  ],
+  "authority_exclusions": [
+    "human/workflow completion",
+    "live-account consent",
+    "production migration/deployment",
+    "product-provider spending"
+  ],
+  "request_body_sha256": "211df1dae736cca1962498901faf40b7843df69113a80f8651a46987f94d9768",
+  "provider_call_attempted": true,
+  "usage": {
+    "prompt_tokens": 15458,
+    "completion_tokens": 392,
+    "total_tokens": 15850,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    }
+  },
+  "finish_reason": "stop",
+  "response_sha256": "89239bbc62b7809f94d21142209374ea39cb708fdfa4ed11615c4d5ddfb18831",
+  "findings": {
+    "verdict": "SHIP_OK",
+    "findings": [],
+    "not_verified": [
+      "Full pa_jobs/pa_schedule/pa_conversation table schemas and FK ordering assumptions in DOMAIN_TABLES (referenced from operations.py, not supplied).",
+      "prm.runtime.operations.restore_bundle and OperationsRuntime.backup implementations (referenced, not supplied).",
+      "Whether every legitimate recreation path uses StateTransaction.put() rather than direct SQL that bypasses the tombstone check.",
+      "Concurrency behavior of _state_manifest vs concurrent writers during the external state_manifest() call used for expected_target_manifest (mitigated by the in-transaction recheck at migration.py:78).",
+      "Whether any residual non-tombstone ledger could allow cross-purpose grant reuse; reviewed code is limited to supplied migration/deletion/postgres sources."
+    ],
+    "summary": "Recheck of #53 confirms the incoming-deletion defect is fixed correctly and fail-closed: apply_domain_delta now refuses any incoming tombstone that still has a live target identity (migration.py:87-89) before any table replacement, while locks on all domain tables plus the manifest recheck at line 78 are taken first, and the tombstone's lack of a pre-deletion digest is explicitly reasoned about so no baseline-equality guess is made. The new test (tests/test_pai_migration.py:96-113) recreates a concrete restored target at version 2, deletes only in the source baseline, imports with the exact current manifest, and asserts the conflict and no-erasure state. Retained target tombstones still apply after replacement via delete_derived_in and cannot be reset by re-import (test_repeated_domain_import...). Deletion is itself bounded (128-node graph, lineage advisory lock), integrity-checks payloads before destructive writes, and scrubbed notifications/artifacts preserve privacy. Unknown pricing/confirmations remain monotone and un-retried; no P0 or P1 remains."
+  },
+  "duration_seconds": 23.121
+}

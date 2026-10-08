@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "status": "reviewed",
+  "call_number": 60,
+  "call_limit": 60,
+  "purpose": "model_58_recheck",
+  "read_only": true,
+  "provider": "opencode_go",
+  "requested_model": "mimo-v2.6-pro",
+  "observed_model": "mimo-v2.6-pro",
+  "requested_effort": "thinking_disabled",
+  "observed_effort": "thinking_disabled",
+  "head_sha": "1991c28064614d176f4fa28f13ef81b8e29e5cd1",
+  "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+  "diff_sha256": "49e0f56d2ecc0139f3001694f6d8952c297810bb2d8f79ffd817c910f9ce5019",
+  "sources": [
+    {
+      "path": "src/prm/runtime/model.py",
+      "sha256": "f78c1f09ed2c003de9660df17fd50af38be7486ea33d716888e9beb45e7302e1",
+      "bytes": 10378
+    },
+    {
+      "path": "src/prm/runtime/model_attempts.py",
+      "sha256": "b37904d8cc23673c1b93f06d97205fd14849832ca06358ba37a38f52ff0c084a",
+      "bytes": 2080
+    },
+    {
+      "path": "src/prm/runtime/model_errors.py",
+      "sha256": "fcba5a68028b5c13624bf5a8ea0590a9a7eee235fb006207ab17a5cc61ab4bf3",
+      "bytes": 1818
+    },
+    {
+      "path": "src/prm/storage/policy.py",
+      "sha256": "6e16889bdd9f889daf7ced9c447e2e7c514a623c9d4958bdd9fd1f246a9bb4c2",
+      "bytes": 30184
+    },
+    {
+      "path": "tests/test_pai_chat_runtime.py",
+      "sha256": "d6cce1984a7416a36d4160b7008e37e2a23daf2abcbb25a2b1dda6f22e78770d",
+      "bytes": 13476
+    },
+    {
+      "path": "docs/verification/PAI-review-continuation-58.json",
+      "sha256": "8b2ceb6f39cc3e253a10392ef49ea2655bfe08610daebd6493fdce124111b14b",
+      "bytes": 8626
+    }
+  ],
+  "scope": "model_58_recheck; supplied full current source/tests and explicitly labeled integration diff if present",
+  "input_sha256": "5ab1f798a252e8ec14e4c771e1612c1f7f932b30cc79c5819d541e0718843ab1",
+  "input_bytes": 73900,
+  "output_token_cap": 16000,
+  "timeout_seconds": 900,
+  "workflow_receipt": false,
+  "human_authority": false,
+  "runner_path": ".playbook-artifacts/pai-review-as-needed.py",
+  "runner_sha256": "8306b7e250e58139ee08be8c58de615d3d6fe684f5a4726c091ce9eaf689d545",
+  "transport_path": "tools/mimo_code_review.py",
+  "transport_sha256": "b0ba01f2647f21c004e54d2b9840573b38ac43ea541e394fd61bdfa2c9705c75",
+  "command": ".venv-pai/bin/python .playbook-artifacts/pai-review-as-needed.py --call-number 60 --purpose model_58_recheck",
+  "source_exclusions": [
+    "actual private corpus",
+    "live account payload",
+    "credentials",
+    "production configuration"
+  ],
+  "authority_exclusions": [
+    "human/workflow completion",
+    "live-account consent",
+    "production migration/deployment",
+    "product-provider spending"
+  ],
+  "request_body_sha256": "2bdc179e0d4dc2d6fcbc1aeace33f3b18f0ec3971e1cb0ce9696fc2c90366ecb",
+  "provider_call_attempted": true,
+  "usage": {
+    "prompt_tokens": 19700,
+    "completion_tokens": 256,
+    "total_tokens": 19956,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    }
+  },
+  "finish_reason": "stop",
+  "response_sha256": "89875cf62c22d49ae2a46d92acd2365e7b3f28e67bc6abecb056417c4dcfb26a",
+  "findings": {
+    "verdict": "SHIP_OK",
+    "findings": [],
+    "not_verified": [
+      "prm.capabilities and llm.client contracts beyond the cited call sites",
+      "Actual execution of the supplied tests (only source read)",
+      "Composition/queue/worker paths outside the supplied sources",
+      "CostCacheRuntime settlement internals"
+    ],
+    "summary": "Recheck of the cited #58 findings against the current sources shows all four are resolved in code: prepare_model_attempt validates task_ref bounds and 64-hex input_digest and attaches recorded/requested digests on reuse while denying every replay (same-object and fresh-reservation), deterministic post-receipt validation failures are now typed ModelResponseInvalid with attempt/operation refs and retry_allowed=False even when the accounting observer raises (accounting_status='unconfirmed' is recorded and the typed error is re-raised), usage nested cached/reasoning details are type- and bound-checked (0..usage total) before observation, and the real-HTTP test covers invalid usage, typed failure, accounting failure and exactly one request. Unknown outcomes set retry_allowed=False with no blind retry, reserved cost stays unknown/conservative rather than zero, and scoped grants, endpoint/credential binding, bounded inputs and one-use fences remain fail-closed. No P0 or P1 findings."
+  },
+  "duration_seconds": 14.339
+}

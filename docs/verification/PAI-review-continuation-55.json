@@ -1,0 +1,134 @@
+{
+  "schema_version": 1,
+  "status": "reviewed",
+  "call_number": 55,
+  "call_limit": 55,
+  "purpose": "search_archive_model_small",
+  "read_only": true,
+  "provider": "opencode_go",
+  "requested_model": "mimo-v2.6-pro",
+  "observed_model": "mimo-v2.6-pro",
+  "requested_effort": "thinking_disabled",
+  "observed_effort": "thinking_disabled",
+  "head_sha": "d605110bef5fd3605329a797b62af9f5315d4f98",
+  "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+  "diff_sha256": "0ab5474255b0d8bec253a9362d7598237f04b7e532105d4bc93a3c415d2badeb",
+  "sources": [
+    {
+      "path": "src/prm/runtime/archive.py",
+      "sha256": "9051d9804cce9a738df94d5ecc02073fdd32194da2256dd7b92ebe90ab3c8f6d",
+      "bytes": 3799
+    },
+    {
+      "path": "src/prm/runtime/model.py",
+      "sha256": "76ecda296ecad2d6658b9479a09b3a42045349027f63f93c984e785e2da90df4",
+      "bytes": 8531
+    },
+    {
+      "path": "src/prm/runtime/model_attempts.py",
+      "sha256": "5498d7273a349037dac1fcce150df5fb7328937910419240ce6e2b86a6882d87",
+      "bytes": 1588
+    },
+    {
+      "path": "tests/test_pai_archive_search.py",
+      "sha256": "94942b1bc068cb9a2c23d7c317c8483a3284382b6c78268fb2a792c2b833779d",
+      "bytes": 2607
+    },
+    {
+      "path": "tests/test_pai_chat_runtime.py",
+      "sha256": "161789fde64868948daf32d129772b33cac90ac62be2ecb0944c7f78ed22dbad",
+      "bytes": 9523
+    }
+  ],
+  "scope": "search_archive_model_small; supplied full current source/tests and explicitly labeled integration diff if present",
+  "input_sha256": "0e34bd56d65305b9d710db504202f3daabef099d267b002ca16ab40cac636b6c",
+  "input_bytes": 30063,
+  "output_token_cap": 16000,
+  "timeout_seconds": 900,
+  "workflow_receipt": false,
+  "human_authority": false,
+  "runner_path": ".playbook-artifacts/pai-review-as-needed.py",
+  "runner_sha256": "8306b7e250e58139ee08be8c58de615d3d6fe684f5a4726c091ce9eaf689d545",
+  "transport_path": "tools/mimo_code_review.py",
+  "transport_sha256": "b0ba01f2647f21c004e54d2b9840573b38ac43ea541e394fd61bdfa2c9705c75",
+  "command": ".venv-pai/bin/python .playbook-artifacts/pai-review-as-needed.py --call-number 55 --purpose search_archive_model_small",
+  "source_exclusions": [
+    "actual private corpus",
+    "live account payload",
+    "credentials",
+    "production configuration"
+  ],
+  "authority_exclusions": [
+    "human/workflow completion",
+    "live-account consent",
+    "production migration/deployment",
+    "product-provider spending"
+  ],
+  "request_body_sha256": "29da458a3c6b723f72daac9227066b4b4ee074f451bb501e556c21cb8a2d67da",
+  "provider_call_attempted": true,
+  "usage": {
+    "prompt_tokens": 7610,
+    "completion_tokens": 1178,
+    "total_tokens": 8788,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    }
+  },
+  "finish_reason": "stop",
+  "response_sha256": "68682861dccca12b7db05bc48c1884a3aca2e62867a17dad18c15ad0a017e54f",
+  "findings": {
+    "verdict": "FIX_P1_FIRST",
+    "findings": [
+      {
+        "severity": "P1",
+        "title": "Unknown outcomes are classified as retryable-unavailable for archive transport",
+        "file": "src/prm/runtime/archive.py:39-40",
+        "issue": "A post-send StorageError/JSON/timeout after the HTTP body has begun (e.g. response validation failure) is caught by the generic `except Exception` at line 40 and re-raised as ArchiveSynthesisTransportUnavailable, but `ScopedModelClient.complete_with_receipt` only converts errors to LLMOutcomeUnknown when it wraps transport internally. Here `client.complete_with_receipt` already raises LLMOutcomeUnknown for unknowns (line 39 handles that correctly), but other exceptions that occur after `http_attempted=True` inside model.py's transport are already converted to LLMOutcomeUnknown before leaving the client, so line 40 in practice only sees pre-HTTP/local failures - acceptable. However, if `ArchiveSynthesisReceipt` construction or the final return raises after a successful model call, it is not the issue. The real gap: the fence is only in `prepare_model_attempt`, keyed by `task_ref+purpose`; `RuntimeArchiveTransport` passes `task_ref=self.request_ref`, so two different archive questions for the same request_ref share one attempt fence (acceptable), but a retried call with a different `request_ref` for the same underlying provider operation will egress again since operation_ref derives from `request_ref+binding_digest` and is not fenced across request_refs. Meanwhile the durable attempt record stores `input_digest` but never compares it on reuse.",
+        "fix": "Store and compare input_digest on ModelAttemptAlreadyRecorded to distinguish identical-retry from divergent-replay, and fence on the provider operation_ref in addition to task_ref so distinct request_ref values cannot replay the same archive content.",
+        "confidence": "medium"
+      },
+      {
+        "severity": "P1",
+        "title": "Cancellation/deadline handling not visible; guard only checked pre-send",
+        "file": "src/prm/runtime/model.py:96",
+        "issue": "The guard is invoked once immediately before building the request inside `transport()`, which is called under `execute_reserved_groups`. If cancellation occurs after the guard check but before/during `response.read`, the call still proceeds and the durable attempt is already recorded, so a cancelled task cannot be resumed and the spend is not prevented. The project requires durable no-replay/cancellation; there is no second guard check before recording usage or returning.",
+        "fix": "Invoke the guard again after response receipt and before returning the receipt/usage, and record cancellation state durably so a cancelled attempt is not silently completed.",
+        "confidence": "medium"
+      },
+      {
+        "severity": "P2",
+        "title": "max_tokens unvalidated against provider bounds",
+        "file": "src/prm/runtime/archive.py:37",
+        "issue": "`max_tokens=1000` is passed straight through to `complete_with_receipt` with no validation or clamping; `ScopedModelClient` does not check max_tokens either, only body size. A caller with a larger value could exceed intended cost bounds (though usage is capped at 1,000,000 tokens in validation).",
+        "fix": "Validate `max_tokens` is an int within an explicit bounded range in `complete_with_receipt` before building the request body.",
+        "confidence": "medium"
+      },
+      {
+        "severity": "P2",
+        "title": "History content-length not individually bounded before body assembly",
+        "file": "src/prm/runtime/model.py:79-82",
+        "issue": "History items are copied with only role/content-type validation; individual content size is not bounded until the whole body exceeds 48000 bytes, which is enforced after JSON serialization. This is fail-closed overall but allows large string allocations before rejection.",
+        "fix": "Bound each history item's content length explicitly during validation.",
+        "confidence": "low"
+      }
+    ],
+    "not_verified": [
+      "prm.capabilities (AuthorizationDecision, CapabilityDenied, AuthorizationRequest semantics)",
+      "prm.storage.policy (DurableCapabilityRegistry, authorize_and_reserve, execute_reserved_groups, revoke_grant)",
+      "prm.storage.postgres (transaction, StorageError)",
+      "llm.client (LLMCompletionReceipt, LLMOutcomeUnknown)",
+      "prm.archive_context and prm.archive_synthesis_transport (ArchiveEvidenceContext, receipts, outcome classes)",
+      "prm.runtime.composition.AssistantRuntime, scoped_client construction, ingress/worker/queue, history_for_model",
+      "prm.runtime.deletion.lineage_lock",
+      "prm.synthesis.synthesize_archive_response (citations, unknown-pricing handling, cancellation mapping)",
+      "tests.pai_runtime_fixtures (pai, allow, request) and tests/test_prm_synthesis fixtures (_archive_payload, _archive_evidence)",
+      "Provider policy, budget windows, and registry grant/revoke/replay semantics (not supplied)",
+      "Actual Chat/Search source-attribution and context-grant boundary logic (composition/synthesis not supplied)"
+    ],
+    "summary": "Within the supplied archive/model/model-attempt modules the transport enforces immutable provenance, explicit paired grants (query + separate context scope for non-OpenAI providers), redirect denial, body/response bounds, and a durable one-shot attempt fence keyed on task_ref+purpose that forbids automatic retry after unknown outcomes, and the provided tests exercise real HTTP, revocation, provider-scoped group separation, and unknown-outcome no-replay. However, the attempt fence stores input_digest without ever comparing it on reuse, so a divergent retry under a different request_ref can replay the same provider content, and cancellation is only checked once pre-send so a cancelled task may complete and spend, both inconsistent with durable no-replay/cancellation requirements. Additional smaller gaps are unvalidated max_tokens and late body-size enforcement. Because several core modules (capabilities registry, composition, synthesis, deletion, fixtures) were not supplied, grant-boundary, citation, and unknown-pricing behavior could not be independently verified."
+  },
+  "duration_seconds": 22.917
+}

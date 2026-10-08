@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "date": "2026-10-08",
-  "status": "in_progress_independent_phase_reviews_pending",
-  "runtime_head": "43e174b2db00686c69d2cbbb38bbdfcc3e37b7b1",
+  "status": "source_rechecks_closed_frozen_final_validation_pending",
+  "runtime_head": "baaf3a2",
   "checks": [
     {
       "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/test_tiers.py pai-complete",
@@ -93,6 +93,184 @@
       "exit_code": 1,
       "log_path": ".playbook-artifacts/pai-validation-20261008/cancel-facts-aggregate.log",
       "log_sha256": "fb7b54604b645d8565484cb65c418b2fb152d2be26ae16a9cd4eb6a6fb830845"
+    },
+    {
+      "command": null,
+      "result": "7 passed in 33.74 s",
+      "source_snapshot": "pre-a613d57 runtime worktree; focused D/E/F fixes",
+      "exit_code": 0,
+      "log_path": ".playbook-artifacts/pai-validation-20261008/brief-reservation-fixes.log",
+      "log_sha256": "6dcbaa4ad0e19280afb63e567f9c2c4f346615352d906740038b34fe6ba122af",
+      "command_note": "Exact legacy scoped argv was not retained; keep log/result as bounded observation, not an invented command. Superseded by later explicit module checks."
+    },
+    {
+      "command": null,
+      "result": "19 passed in 62.11 s",
+      "source_snapshot": "pre-a613d57 runtime worktree; focused D/E/F fixes",
+      "exit_code": 0,
+      "log_path": ".playbook-artifacts/pai-validation-20261008/source-cursor-metadata.log",
+      "log_sha256": "6036bafad0a7b51437851f16b912778a200765e893463339d4e86a4f12424ac5",
+      "command_note": "Exact legacy scoped argv was not retained; keep log/result as bounded observation, not an invented command. Superseded by later explicit module checks."
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/run_pai_acceptance.py -q -x tests/test_pai_connections.py tests/test_pai_graph_mail.py tests/test_pai_migration.py tests/test_pai_memory_runtime.py",
+      "result": "15 passed in 53.11 s",
+      "source_snapshot": "pre-a613d57 runtime worktree; focused D/E/F fixes",
+      "exit_code": 0,
+      "log_path": ".playbook-artifacts/pai-validation-20261008/source-cleanup-delete-proof.log",
+      "log_sha256": "4c022d137b21e7b996c7965eeb1f25e39ceafd3fc7cb21afc55b2afd9926a3d9"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/run_pai_acceptance.py -q -x tests/test_pai_report_runtime.py tests/test_pai_media_runtime.py",
+      "result": "29 passed in 81.94 s",
+      "source_snapshot": "a613d57",
+      "exit_code": 0,
+      "log_path": ".playbook-artifacts/pai-validation-20261008/report-media-lineage-final.log",
+      "log_sha256": "b112fdb37d6b1ae3f8c5791e7b49c9c4580064f6bf9c70a4e3a0ab68a9d8c9dd"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/run_pai_acceptance.py -q -x tests/test_pai_graph_mail.py",
+      "result": "10 passed in 27.43 s",
+      "source_snapshot": "d605110",
+      "exit_code": 0,
+      "log_path": ".playbook-artifacts/pai-validation-20261008/mail-body-shape-final.log",
+      "log_sha256": "4befba72cced14887ea455694cc6977873f6cb532d6ea0edda04edc2abfe3675"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/run_pai_acceptance.py -q -x tests/test_pai_migration.py tests/test_pai_memory_runtime.py tests/test_pai_requirements.py::test_requirement_store_04",
+      "result": "missing requested test node; zero tests; not acceptance",
+      "source_snapshot": "cffa5ce precursor worktree",
+      "exit_code": 4,
+      "log_path": ".playbook-artifacts/pai-validation-20261008/migration-conflict-final.log",
+      "log_sha256": "8c22868654e149043bc1a3b37a3086ee55e6ccae10052c860b00579389d31988"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/run_pai_acceptance.py -q -x tests/test_pai_migration.py tests/test_pai_memory_runtime.py",
+      "result": "8 passed in 42.39 s",
+      "source_snapshot": "cffa5ce precursor worktree",
+      "exit_code": 0,
+      "log_path": ".playbook-artifacts/pai-validation-20261008/migration-conflict-corrected.log",
+      "log_sha256": "15b6385f328c5fbf984ee177ac53705e8532df40b95b104b21a09aa1df1ed2f4"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/run_pai_acceptance.py -q -x tests/test_pai_chat_runtime.py",
+      "result": "1 failed, 6 passed in 63.08 s; erroneous None expectation corrected",
+      "source_snapshot": "cffa5ce precursor worktree",
+      "exit_code": 1,
+      "log_path": ".playbook-artifacts/pai-validation-20261008/model-cancel-replay-final.log",
+      "log_sha256": "4c9acb2f742545d7b060031e2a5d4dadd590f76b47be57d25ac677b8a0bc6e81"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/run_pai_acceptance.py -q -x tests/test_pai_chat_runtime.py",
+      "result": "7 passed in 64.58 s",
+      "source_snapshot": "cffa5ce precursor worktree",
+      "exit_code": 0,
+      "log_path": ".playbook-artifacts/pai-validation-20261008/model-cancel-replay-corrected.log",
+      "log_sha256": "2ff7f52e724196d7de5dd898b3e753148591f44c093cfec5844370ea539eabe3"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/run_pai_acceptance.py -q -x tests/test_pai_web_github.py tests/test_pai_deep_research.py",
+      "result": "1 failed, 2 passed in 12.43 s; fixture revoked grant inside locked transport; corrected after transaction",
+      "source_snapshot": "cffa5ce precursor worktree",
+      "exit_code": 1,
+      "log_path": ".playbook-artifacts/pai-validation-20261008/research-github-final.log",
+      "log_sha256": "60f1bff95ee25f4e35e3c8b28f9f6e6b23eeb9bf0103d6286bbf65d7ee1d1948"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/run_pai_acceptance.py -q -x tests/test_pai_web_github.py tests/test_pai_deep_research.py tests/test_pai_chat_runtime.py",
+      "result": "13 passed in 71.25 s",
+      "source_snapshot": "cffa5ce",
+      "exit_code": 0,
+      "log_path": ".playbook-artifacts/pai-validation-20261008/search-fixes-final.log",
+      "log_sha256": "f684044d89e954629cfad2eff4a42f2b0a0dbf15f093f77b0a58d8c75c284c0d"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/run_pai_acceptance.py -q -x tests/test_pai_web_github.py tests/test_pai_deep_research.py tests/test_pai_chat_runtime.py::test_known_invalid_model_response_retains_typed_no_retry_even_if_accounting_fails",
+      "result": "1 failed, 10 passed in 54.82 s; real compound wrapper/observer masking reproduced",
+      "source_snapshot": "1991c28 precursor worktree",
+      "exit_code": 1,
+      "log_path": ".playbook-artifacts/pai-validation-20261008/known-reply-source-metadata-final.log",
+      "log_sha256": "6e95d17cda5d20d17a5a584b28feb4bec0bf8ea6afcb6f151985ba6eb79edfdf"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/run_pai_acceptance.py -q -x tests/test_pai_chat_runtime.py tests/test_pai_media_runtime.py",
+      "result": "32 passed in 163.99 s; new invalid-response case added after collection is not covered by this run",
+      "source_snapshot": "1991c28 precursor worktree",
+      "exit_code": 0,
+      "log_path": ".playbook-artifacts/pai-validation-20261008/model-known-invalid-final.log",
+      "log_sha256": "4ee8a33f958329f47a88758c4c9b32520f6fb5b571bc7b7ad90979746c389d66"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/run_pai_acceptance.py -q -x tests/test_pai_chat_runtime.py",
+      "result": "8 passed in 82.92 s",
+      "source_snapshot": "4554922 precursor worktree",
+      "exit_code": 0,
+      "log_path": ".playbook-artifacts/pai-validation-20261008/model-compound-known-reply-final.log",
+      "log_sha256": "b38a06840e448ac1a9b97ca276e70d5cdeb0bddcdb022a735245e485ceb6a005"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/run_pai_acceptance.py -q -x tests/test_pai_chat_runtime.py",
+      "result": "11 passed in 82.60 s",
+      "source_snapshot": "d20da79 precursor worktree",
+      "exit_code": 0,
+      "log_path": ".playbook-artifacts/pai-validation-20261008/model-accepted-preparation-final.log",
+      "log_sha256": "15c605b960f6ac52a9082eeee0d93e418df0ebb23a44b5bb347fb7d44e97d34e"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/test_tiers.py focused-prm",
+      "result": "663 passed in 120.66 s",
+      "source_snapshot": "a613d57; started before d605110 runtime patch",
+      "exit_code": 0,
+      "log_path": ".playbook-artifacts/pai-validation-20261008/focused-prm-final.log",
+      "log_sha256": "dac3aa1c9a4d832a44f3ce8264e811553c81f3344df59fcf1fe59fb488b71f82"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/test_tiers.py retrofit-boundaries",
+      "result": "150 passed in 11.15 s",
+      "source_snapshot": "cffa5ce",
+      "exit_code": 0,
+      "log_path": ".playbook-artifacts/pai-validation-20261008/retrofit-boundaries-final.log",
+      "log_sha256": "0e156ad251389060eb452c65525607fb6c6aff65813a7930a58f760b49d3230d"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/test_tiers.py pai-complete",
+      "result": "299 passed in 924.37 s; all 69 named requirements and 10 scenarios enforced",
+      "source_snapshot": "d605110 invocation; runtime/test mutations occurred during run; superseded by frozen final run",
+      "exit_code": 0,
+      "log_path": ".playbook-artifacts/pai-validation-20261008/pai-complete-final.log",
+      "log_sha256": "4d790c0ecc1f30b1fe0efe8619d4a7a79850a1bb360bca40e301e0af995578c1"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/test_tiers.py pai-complete",
+      "result": "1 failed, 94 passed in 326.51 s; deliberately interrupted after known invalid-response failure",
+      "source_snapshot": "1991c28 invocation; superseded by corrected source",
+      "exit_code": 2,
+      "log_path": ".playbook-artifacts/pai-validation-20261008/pai-complete-1991c28.log",
+      "log_sha256": "72f9ac3b272e323851e7bdf514fb1f103b381d963f041eefa386be5fba693820"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/run_pai_acceptance.py -q -x tests/test_pai_chat_runtime.py tests/test_pai_durable_policy.py",
+      "result": "28 passed in 96.67 s",
+      "source_snapshot": "baaf3a2 precursor worktree",
+      "exit_code": 0,
+      "log_path": ".playbook-artifacts/pai-validation-20261008/model-durable-accounting-final.log",
+      "log_sha256": "84d94beb34cebbe811edc47edbb88e2467da1f26d8e49b30dc9931ad74be8b52"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/run_pai_acceptance.py -q -x tests/test_pai_chat_runtime.py::test_accepted_unconfirmed_accounting_survives_application_result_storage",
+      "result": "2 passed in 13.07 s",
+      "source_snapshot": "baaf3a2 precursor worktree",
+      "exit_code": 0,
+      "log_path": ".playbook-artifacts/pai-validation-20261008/model-accounting-marker-recovery.log",
+      "log_sha256": "30071e53115dc66d0fa9c277a8c470bacfff7462a1e404b5e26e4c1b3950ca7a"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/test_tiers.py pai-complete",
+      "result": "308 passed in 934.90 s; all 69 binding requirements/10 scenarios enforced",
+      "source_snapshot": "4554922 invocation; code mutations during run, superseded by frozen final candidate",
+      "exit_code": 0,
+      "log_path": ".playbook-artifacts/pai-validation-20261008/pai-complete-4554922.log",
+      "log_sha256": "2165f7d27b2f02b99fe024269c050a4fc2f2805e0401932a54faab4f65497108"
     }
   ],
   "source_notes": "Tests preceded the named source commits; intermediate worktree observations are not projected onto later changes. Whole tier precedes foundation/Watch/delivery fixes. No full historical pytest.",

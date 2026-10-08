@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "status": "reviewed",
+  "call_number": 61,
+  "call_limit": 61,
+  "purpose": "research_59_recheck",
+  "read_only": true,
+  "provider": "opencode_go",
+  "requested_model": "mimo-v2.6-pro",
+  "observed_model": "mimo-v2.6-pro",
+  "requested_effort": "thinking_disabled",
+  "observed_effort": "thinking_disabled",
+  "head_sha": "1991c28064614d176f4fa28f13ef81b8e29e5cd1",
+  "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+  "diff_sha256": "49e0f56d2ecc0139f3001694f6d8952c297810bb2d8f79ffd817c910f9ce5019",
+  "sources": [
+    {
+      "path": "src/prm/runtime/web.py",
+      "sha256": "8321fde1730ad18d8e97918e9bcf0f954295bfd9b2dadb4e098d88699ec55e91",
+      "bytes": 7401
+    },
+    {
+      "path": "src/prm/runtime/research.py",
+      "sha256": "3e14d20030213aa50464ee88f26ab94a8a6a02b5e1adbc9297c7156c43472177",
+      "bytes": 17638
+    },
+    {
+      "path": "tests/test_pai_web_github.py",
+      "sha256": "3f8e879e7b3d2fd678de263900c44d778bc7dc94f495d834c83260eea2ecba89",
+      "bytes": 4253
+    },
+    {
+      "path": "tests/test_pai_deep_research.py",
+      "sha256": "fbe9c2074deb9db08f4fd6540ab61d49d8e3a9aa28ddc0555c742e89209aa164",
+      "bytes": 2589
+    },
+    {
+      "path": "docs/verification/PAI-review-continuation-59.json",
+      "sha256": "3f5abb8afdf84ca070da6d72c3e3968ede3614d1250c52a0223694e04c7fb2d9",
+      "bytes": 8164
+    }
+  ],
+  "scope": "research_59_recheck; supplied full current source/tests and explicitly labeled integration diff if present",
+  "input_sha256": "ba05a5ad2eba1db3da38f352c20f4deaf6018cff7ace2bf148ff3057c0b870d5",
+  "input_bytes": 45376,
+  "output_token_cap": 16000,
+  "timeout_seconds": 900,
+  "workflow_receipt": false,
+  "human_authority": false,
+  "runner_path": ".playbook-artifacts/pai-review-as-needed.py",
+  "runner_sha256": "8306b7e250e58139ee08be8c58de615d3d6fe684f5a4726c091ce9eaf689d545",
+  "transport_path": "tools/mimo_code_review.py",
+  "transport_sha256": "b0ba01f2647f21c004e54d2b9840573b38ac43ea541e394fd61bdfa2c9705c75",
+  "command": ".venv-pai/bin/python .playbook-artifacts/pai-review-as-needed.py --call-number 61 --purpose research_59_recheck",
+  "source_exclusions": [
+    "actual private corpus",
+    "live account payload",
+    "credentials",
+    "production configuration"
+  ],
+  "authority_exclusions": [
+    "human/workflow completion",
+    "live-account consent",
+    "production migration/deployment",
+    "product-provider spending"
+  ],
+  "request_body_sha256": "b0129407fb120ee986d77760b329f633497beee2360bbdb1d1460a2a6bad2299",
+  "provider_call_attempted": true,
+  "usage": {
+    "prompt_tokens": 12652,
+    "completion_tokens": 530,
+    "total_tokens": 13182,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    }
+  },
+  "finish_reason": "stop",
+  "response_sha256": "32c7a796307c2964da3510825f0dd9d9b7df3ea01231ff3dea3c8a6f879440e7",
+  "findings": {
+    "verdict": "SHIP_OK",
+    "findings": [
+      {
+        "severity": "P2",
+        "title": "Cancelled before write result still emits source_unavailable rather than explicit gap for unstarted step",
+        "file": "src/prm/runtime/research.py:167",
+        "issue": "A broad `except Exception` marks any gather failure as source_unavailable, including a capability denial or fencing/cancellation that occurs before transport; this is fail-closed (no allow, no re-read) but conflates denied/unknown with unavailable in the reported gap text.",
+        "fix": "Preserve a distinct denied/cancelled/unknown gap label while keeping no-retry and no-refund behavior.",
+        "confidence": "low"
+      }
+    ],
+    "not_verified": [
+      "prm.capabilities (grant decode, BudgetReservation, authorize_and_reserve/execute_reserved/execute_prepared semantics) - relied on throughout but not supplied",
+      "prm.storage.postgres (PostgresStore transactions, put/get versioning, clock_timestamp) - relied on for idempotency/fencing but not supplied",
+      "prm.storage.jobs (JobQueue claim/checkpoint/complete/cancel, _fenced) - relied on for lease/deadline behavior but not supplied",
+      "prm.public_web (_https_get, _validate_https_url, PublicWebBounds, execute_public_web_research) - HTTP/validation and fetch orchestration not supplied",
+      "prm.runtime.model ScopedModelClient.complete_with_receipt and assistant.claim_ledger.verify_answer_against_evidence - model receipt and claim verification semantics not supplied",
+      "prm.runtime.deletion.lineage_lock and prm.runtime.cost_cache.CostCacheRuntime - locking and cache semantics not supplied",
+      "db.archive_search.search_telegram_archive - archive query implementation not supplied",
+      "tests/pai_runtime_fixtures - fixture behavior not executed here"
+    ],
+    "summary": "Independently rechecked the prior #59 source-metadata/accounting P1s against the supplied full source: the GitHub path now rejects missing/malformed size (bounded nonnegative int, 128001 previously rejected by >128000) and requires a 40-hex blob SHA, raising StorageError rather than allowing unknown metadata; this is fail-closed and no longer the reported bypass. Interrupted prepared work is durably rewritten to source_outcome_unknown before continue, never re-read or refunded, and retained calls are explicitly labeled conservative_upper_bound with separate unknown_tool_calls, matching intentional no-double-spend semantics. Source hashing is applied to content the review note requires, content-filter-before-expression ordering is correct in the supplied comprehension, and no P0/P1 executable defect was found in the supplied files; therefore verdict is SHIP_OK."
+  },
+  "duration_seconds": 136.333
+}

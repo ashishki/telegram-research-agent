@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "status": "reviewed",
+  "call_number": 64,
+  "call_limit": 64,
+  "purpose": "model_63_durable_accounting_recheck",
+  "read_only": true,
+  "provider": "opencode_go",
+  "requested_model": "mimo-v2.6-pro",
+  "observed_model": "mimo-v2.6-pro",
+  "requested_effort": "thinking_disabled",
+  "observed_effort": "thinking_disabled",
+  "head_sha": "baaf3a2a971ad19d44ebc8e2e4d2d928607ef5d5",
+  "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+  "diff_sha256": "9b91485d725b74f6dfb55be53446e6327c930b524cfb66e8f284ca41f0dbbf36",
+  "sources": [
+    {
+      "path": "src/prm/runtime/model.py",
+      "sha256": "a61bfa17163dd9e73b1d28ec4a08d78a23abe93aa44908a2406fc9b25cad9461",
+      "bytes": 11493
+    },
+    {
+      "path": "src/prm/runtime/model_attempts.py",
+      "sha256": "d3049e9550f0b0539c4152d3c6334e615d16622da083d8b436c4550e732355e6",
+      "bytes": 2901
+    },
+    {
+      "path": "src/prm/runtime/model_errors.py",
+      "sha256": "975173e762808dc75ce4d3ae45b851b48830d16cf1a5ac6e886b9a7c1d275670",
+      "bytes": 2837
+    },
+    {
+      "path": "src/prm/storage/policy.py",
+      "sha256": "9723e8aaffd3fa5b34cd8c3abfe6e70bfc65a17b87a939dfcd065887b5c57a7e",
+      "bytes": 30275
+    },
+    {
+      "path": "tests/test_pai_chat_runtime.py",
+      "sha256": "9e77f9e730d4263063e313da154266086f90acea80f520a3fc69e97b040c1734",
+      "bytes": 16893
+    },
+    {
+      "path": "src/prm/application.py",
+      "sha256": "c89773ccdfc5b4be9e403d8468178a952d38c29dfb7b23dc92ecd5d9ffa19d95",
+      "bytes": 86773,
+      "line_ranges": [
+        [
+          1103,
+          1230
+        ]
+      ]
+    },
+    {
+      "path": "docs/verification/PAI-review-continuation-63.json",
+      "sha256": "c32ebec32ae4fcfaf98a99734e6dfc37da94cf142583b00f8e9dca15a3d346df",
+      "bytes": 7797
+    }
+  ],
+  "scope": "model_63_durable_accounting_recheck; supplied full current source/tests and explicitly labeled integration diff if present",
+  "input_sha256": "7af92bb3dcdb30f809c8e39012bd571f0fe3031d84865f48d7aeace9205f6370",
+  "input_bytes": 88020,
+  "output_token_cap": 16000,
+  "timeout_seconds": 900,
+  "workflow_receipt": false,
+  "human_authority": false,
+  "runner_path": ".playbook-artifacts/pai-review-as-needed.py",
+  "runner_sha256": "8306b7e250e58139ee08be8c58de615d3d6fe684f5a4726c091ce9eaf689d545",
+  "transport_path": "tools/mimo_code_review.py",
+  "transport_sha256": "b0ba01f2647f21c004e54d2b9840573b38ac43ea541e394fd61bdfa2c9705c75",
+  "command": ".venv-pai/bin/python .playbook-artifacts/pai-review-as-needed.py --call-number 64 --purpose model_63_durable_accounting_recheck",
+  "source_exclusions": [
+    "actual private corpus",
+    "live account payload",
+    "credentials",
+    "production configuration"
+  ],
+  "authority_exclusions": [
+    "human/workflow completion",
+    "live-account consent",
+    "production migration/deployment",
+    "product-provider spending"
+  ],
+  "request_body_sha256": "bd13a81e696c45b0c9542e5e5818deafd8f20b0b85748963841ebfdf44f24d3b",
+  "provider_call_attempted": true,
+  "usage": {
+    "prompt_tokens": 22956,
+    "completion_tokens": 257,
+    "total_tokens": 23213,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    }
+  },
+  "finish_reason": "stop",
+  "response_sha256": "20152b6fb2e13d1bd75f777a542c80591352ac89ba15676aa0d0ecb3b21443c5",
+  "findings": {
+    "verdict": "SHIP_OK",
+    "findings": [],
+    "not_verified": [
+      "llm/client base classes and any consumers outside the supplied sources",
+      "Concurrency of lineage_lock/store transactions under real Postgres beyond the described test runs",
+      "application.py beyond the supplied original-line-number excerpt (lines 1103-1229); no review claimed of omitted legacy application source"
+    ],
+    "summary": "All three prior #63 P1s are resolved against the supplied sources: record_accounting_unconfirmed durably persists bounded accepted/accounting-unconfirmed/usage-missing metadata into the existing owner-model attempt without model text, and if that marker write also fails a typed ModelAccountingUnconfirmed carries the accepted receipt which the supplied Chat caller catches and persists as a normal fenced ok result with accounting_status=unconfirmed; ModelAccountingReceipt correctly expresses accepted delivery with explicit unconfirmed accounting and retry_allowed=False rather than settled billing. ScopePreparationUnknown now declares attempt_ref/external_call_attempted at construction and the client preserves the type with correct refs. Fail-closed behavior, one-use version-bound fences, unknown-not-zero pricing, and media-allowlist rules hold in the reviewed code; no actual P0/P1 remains, so SHIP_OK per the stated consistency rule."
+  },
+  "duration_seconds": 14.122
+}

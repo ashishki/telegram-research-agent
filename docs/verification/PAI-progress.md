@@ -415,3 +415,63 @@ test counterexamples. Imported gate paths/hashes strengthened. Final related
 82 passed in 3.93 s, zero skips. Response PAI-tooling-review-43-response.md.
 43 calls consumed; #44 allocated for actual native audit under ongoing authority.
 No design/role gate is unlocked until a genuine accepted audit matches hashes.
+
+Review #45 reserved/attempted, 45 consumed under ongoing scoped authority including failures.
+Purpose: phase_D_product; source HEAD 273ab6b6b73c448f3e4918edece6c0d7e3ec429b. No automatic retry.
+
+Review #46 reserved/attempted, 46 consumed under ongoing scoped authority including failures.
+Purpose: phase_D_search_model; source HEAD 273ab6b6b73c448f3e4918edece6c0d7e3ec429b. No automatic retry.
+
+Review #47 reserved/attempted, 47 consumed under ongoing scoped authority including failures.
+Purpose: phase_D_brief_reader; source HEAD 273ab6b6b73c448f3e4918edece6c0d7e3ec429b. No automatic retry.
+
+Review #48 reserved/attempted, 48 consumed under ongoing scoped authority including failures.
+Purpose: phase_E_sources; source HEAD 273ab6b6b73c448f3e4918edece6c0d7e3ec429b. No automatic retry.
+
+Review #49 reserved/attempted, 49 consumed under ongoing scoped authority including failures.
+Purpose: phase_F_completeness; source HEAD 273ab6b6b73c448f3e4918edece6c0d7e3ec429b. No automatic retry.
+
+Review #50 reserved/attempted, 50 consumed under ongoing scoped authority including failures.
+Purpose: brief_reader_47_recheck; source HEAD a613d57b971656705e155cd01c373251e78423e4. No automatic retry.
+
+Review #51 reserved/attempted, 51 consumed under ongoing scoped authority including failures.
+Purpose: sources_48_recheck; source HEAD a613d57b971656705e155cd01c373251e78423e4. No automatic retry.
+
+Review #52 reserved/attempted, 52 consumed under ongoing scoped authority including failures.
+Purpose: media_49_recheck; source HEAD a613d57b971656705e155cd01c373251e78423e4. No automatic retry.
+
+Review #53 reserved/attempted, 53 consumed under ongoing scoped authority including failures.
+Purpose: migration_49_recheck; source HEAD a613d57b971656705e155cd01c373251e78423e4. No automatic retry.
+
+Review #54 reserved/attempted, 54 consumed under ongoing scoped authority including failures.
+Purpose: mail_body_51_recheck; source HEAD d605110bef5fd3605329a797b62af9f5315d4f98. No automatic retry.
+
+Review #55 reserved/attempted, 55 consumed under ongoing scoped authority including failures.
+Purpose: search_archive_model_small; source HEAD d605110bef5fd3605329a797b62af9f5315d4f98. No automatic retry.
+
+Review #56 reserved/attempted, 56 consumed under ongoing scoped authority including failures.
+Purpose: search_web_research_small; source HEAD d605110bef5fd3605329a797b62af9f5315d4f98. No automatic retry.
+
+Review #57 reserved/attempted, 57 consumed under ongoing scoped authority including failures.
+Purpose: migration_53_recheck; source HEAD cffa5ce2565d3a6dd2a7152624c01b3e1347e553. No automatic retry.
+
+Review #58 reserved/attempted, 58 consumed under ongoing scoped authority including failures.
+Purpose: model_55_recheck; source HEAD cffa5ce2565d3a6dd2a7152624c01b3e1347e553. No automatic retry.
+
+Review #59 reserved/attempted, 59 consumed under ongoing scoped authority including failures.
+Purpose: research_56_recheck; source HEAD cffa5ce2565d3a6dd2a7152624c01b3e1347e553. No automatic retry.
+
+Review #60 reserved/attempted, 60 consumed under ongoing scoped authority including failures.
+Purpose: model_58_recheck; source HEAD 1991c28064614d176f4fa28f13ef81b8e29e5cd1. No automatic retry.
+
+Review #61 reserved/attempted, 61 consumed under ongoing scoped authority including failures.
+Purpose: research_59_recheck; source HEAD 1991c28064614d176f4fa28f13ef81b8e29e5cd1. No automatic retry.
+
+Review #62 reserved/attempted, 62 consumed under ongoing scoped authority including failures.
+Purpose: model_compound_actual_failure_recheck; source HEAD 4554922c8f910b317d366f629f6d86aed52bff71. No automatic retry.
+
+Review #63 reserved/attempted, 63 consumed under ongoing scoped authority including failures.
+Purpose: model_62_actual_findings_recheck; source HEAD d20da79ba57438a79845a9425c2ebf7a8488520a. No automatic retry.
+
+Review #64 reserved/attempted, 64 consumed under ongoing scoped authority including failures.
+Purpose: model_63_durable_accounting_recheck; source HEAD baaf3a2a971ad19d44ebc8e2e4d2d928607ef5d5. No automatic retry.

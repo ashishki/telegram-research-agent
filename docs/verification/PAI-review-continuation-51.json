@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "status": "reviewed",
+  "call_number": 51,
+  "call_limit": 51,
+  "purpose": "sources_48_recheck",
+  "read_only": true,
+  "provider": "opencode_go",
+  "requested_model": "mimo-v2.6-pro",
+  "observed_model": "mimo-v2.6-pro",
+  "requested_effort": "thinking_disabled",
+  "observed_effort": "thinking_disabled",
+  "head_sha": "a613d57b971656705e155cd01c373251e78423e4",
+  "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+  "diff_sha256": "b335a6b88dc999f6366f9594eb7c2436da12af784b7bb53bd98cb49a17b03830",
+  "sources": [
+    {
+      "path": "src/prm/runtime/connections.py",
+      "sha256": "942996b79d409674b79f46d75925e3d2e150fc5a2afc714d5e73ab13c235835f",
+      "bytes": 20203
+    },
+    {
+      "path": "src/prm/runtime/graph.py",
+      "sha256": "64cf5946451f93e2392cbb670851252aa7d655c28d00104219a68c41ffa1bca5",
+      "bytes": 28590
+    },
+    {
+      "path": "src/prm/runtime/academic.py",
+      "sha256": "f97eec3f4e4fd9f5ed8e007bac1a02a7ca494b4530635023d672a04e39b8b0a1",
+      "bytes": 17843
+    },
+    {
+      "path": "src/prm/storage/policy.py",
+      "sha256": "6e16889bdd9f889daf7ced9c447e2e7c514a623c9d4958bdd9fd1f246a9bb4c2",
+      "bytes": 30184
+    },
+    {
+      "path": "tests/test_pai_connections.py",
+      "sha256": "46074a94d01895f6e00ba2e7306ffd8a2ada314fd22b51920881c13e85dc327e",
+      "bytes": 2109
+    },
+    {
+      "path": "tests/test_pai_graph_mail.py",
+      "sha256": "bb757fdafe0c7c03396d6a762bc95842d729fc8b9c1d9c39496d88a8e0f31b4d",
+      "bytes": 3344
+    },
+    {
+      "path": "docs/verification/PAI-review-continuation-48.json",
+      "sha256": "49c00c10b26408e7980c6e974b25f5b744ddc214cdfda2682c5d85468990d99f",
+      "bytes": 8150
+    }
+  ],
+  "scope": "sources_48_recheck; supplied full current source/tests and explicitly labeled integration diff if present",
+  "input_sha256": "1c5c3cd8f3b4a58137f0e9f0cee1968154a3c5d34b03f71ed041e65097aaeb6b",
+  "input_bytes": 120090,
+  "output_token_cap": 16000,
+  "timeout_seconds": 900,
+  "workflow_receipt": false,
+  "human_authority": false,
+  "runner_path": ".playbook-artifacts/pai-review-as-needed.py",
+  "runner_sha256": "8306b7e250e58139ee08be8c58de615d3d6fe684f5a4726c091ce9eaf689d545",
+  "transport_path": "tools/mimo_code_review.py",
+  "transport_sha256": "b0ba01f2647f21c004e54d2b9840573b38ac43ea541e394fd61bdfa2c9705c75",
+  "command": ".venv-pai/bin/python .playbook-artifacts/pai-review-as-needed.py --call-number 51 --purpose sources_48_recheck",
+  "source_exclusions": [
+    "actual private corpus",
+    "live account payload",
+    "credentials",
+    "production configuration"
+  ],
+  "authority_exclusions": [
+    "human/workflow completion",
+    "live-account consent",
+    "production migration/deployment",
+    "product-provider spending"
+  ],
+  "request_body_sha256": "6adc0601fec4b36a1a5cd57ff8c1d4911792d7250712c47d5ea49f387f116f47",
+  "provider_call_attempted": true,
+  "usage": {
+    "prompt_tokens": 31156,
+    "completion_tokens": 1038,
+    "total_tokens": 32194,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    }
+  },
+  "finish_reason": "stop",
+  "response_sha256": "fa32e7d0732c6e5343c45817dcbf4122c385e89913e136b31ec895307c6941a2",
+  "findings": {
+    "verdict": "FIX_P1_FIRST",
+    "findings": [
+      {
+        "severity": "P1",
+        "title": "Malformed `from` field in a delta row raises raw AttributeError/TypeError from `row.get('from',{}).get(...)`, not the typed StorageError path in all shapes",
+        "file": "src/prm/runtime/graph.py:46-53",
+        "issue": "`_mail_metadata` guards `sender` isinstance-str and wraps `ValueError/TypeError/KeyError/AttributeError`, but `row.get('from',{})` can be `None` (JSON null), which makes `.get('emailAddress',{})` raise `AttributeError` inside the `try` — this is caught. However `row` itself can be a non-dict (e.g. a string) in `fetch_page`/`sync` after the per-row `isinstance(row,dict)` check in `sync` is present but `fetch_page` (graph.py:213) calls `_mail_metadata(row)` before any `isinstance(row,dict)` validation, so a non-dict row produces `AttributeError` on `row.get` that is caught and re-raised as StorageError — acceptable. The real residual defect is that `read_message` (graph.py:254-255) parses `receivedDateTime` and nested `from` with no shape validation at all: `datetime.fromisoformat(value['receivedDateTime']...)` raises raw ValueError/KeyError and `value.get('from',{}).get(...)` raises AttributeError on a null `from`, escaping as untyped exceptions rather than a denied/typed error.",
+        "fix": "Route `read_message`'s `receivedDateTime`/`from` parsing through `_mail_metadata` (or equivalent typed validation) so malformed provider shapes raise `StorageError`/`CapabilityDenied` rather than leaking raw `ValueError`/`AttributeError`. Add a null/`from`-non-dict case to the malformed-metadata test beyond `[]`.",
+        "confidence": "medium"
+      },
+      {
+        "severity": "P2",
+        "title": "Graph cursor records are never consumed and `version=1` is not enforced as an expected version",
+        "file": "src/prm/runtime/graph.py:205-226",
+        "issue": "`self.store.get(request.owner_ref,'conversation',request.cursor,version=1)` passes `version=1` but the code only checks payload equality and never increments/deletes the cursor on use, so the same opaque cursor ref remains valid indefinitely and can be replayed across requests for the same selection scope. This is read-only pagination, not one-use write confirmation, so it is not by itself an authorization bypass (scope/connection binding and a fresh grant are still required per call), but it lacks any expiry or single-use bound.",
+        "fix": "Add an explicit expiry or consume-on-read version fence for stored cursors, and validate the stored record's expected version rather than ignoring `version=1`. Keep the existing per-call scope/connection/authorization checks as the primary guard.",
+        "confidence": "high"
+      }
+    ],
+    "not_verified": [
+      "`prm.storage.postgres` `get`/`put` version semantics and whether `version=1` is treated as an expected-version filter (implementation not in packet).",
+      "`prm.capabilities` grant decode/authorize logic and `abandon_before_transport` semantics (referenced only).",
+      "`pa_runtime.object_versions`/`object_heads` schema used by `cleanup_retired` (DDL not supplied).",
+      "Whether `read_message`'s untyped `datetime.fromisoformat` path is reachable with a malformed provider row in the synthetic fixtures (fixtures not supplied)."
+    ],
+    "summary": "The packet covers the connection/credential, Graph, academic, and policy layers plus two test files and the #48 review receipt. Fail-closed behavior is generally strong: token refresh commits a durable `awaiting_refresh` fence before network I/O and marks unknown outcomes non-retryable, `cleanup_retired` never deletes a ref that is any account's active `secret_ref` (the cross-owner counterexample test confirms retention), grants are provider/purpose/connection-bound, and unknown pricing is denied rather than zeroed. Resolving #48's cited items independently: the cursor P1 is not a fail-open authorization defect, since read-only pagination is not one-use write confirmation and each call still revalidates owner/connection/selection and obtains a fresh reservation — but cursors do lack expiry/consumption (P2). The credential-cleanup P1 is refuted by the supplied counterexample test: the global active-secret check is intentionally cross-owner and correctly prevents deleting any live token; the suggested owner-scoped fix would be unsafe. The `from`/date typing fix holds for `_mail_metadata` (including the `from: []` case), but `read_message` still parses `receivedDateTime`/`from` without typed validation and can raise raw `ValueError`/`AttributeError` on malformed rows (P1). With no P0 and one P1, verdict is FIX_P1_FIRST."
+  },
+  "duration_seconds": 20.058
+}
