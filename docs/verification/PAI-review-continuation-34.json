@@ -1,0 +1,145 @@
+{
+  "schema_version": 1,
+  "status": "reviewed",
+  "call_number": 34,
+  "call_limit": 34,
+  "purpose": "review_33_resolution",
+  "read_only": true,
+  "provider": "opencode_go",
+  "requested_model": "mimo-v2.6-pro",
+  "observed_model": "mimo-v2.6-pro",
+  "requested_effort": "thinking_disabled",
+  "observed_effort": "thinking_disabled",
+  "head_sha": "b29c496b5fb00d91a1d913e5877b5760d9ec6d3b",
+  "base_sha": "761ffd21bf10aab39325d3d47d8fd3117d037858",
+  "diff_sha256": "0bd9049b759cc1da1ee267c690e5f5346e509e55ff9240f256e5bbb9cc90d0f2",
+  "sources": [
+    {
+      "path": "src/prm/runtime/model_errors.py",
+      "sha256": "fcba5a68028b5c13624bf5a8ea0590a9a7eee235fb006207ab17a5cc61ab4bf3",
+      "bytes": 1818
+    },
+    {
+      "path": "src/prm/runtime/media_attempts.py",
+      "sha256": "e593ea338268c67ccd300653b1788a43d7ddef29ac2d7b17ee222f796db5deb4",
+      "bytes": 2759
+    },
+    {
+      "path": "src/prm/runtime/media.py",
+      "sha256": "418f38864fce9adc5957464641afcbfcd70922dc5ecbec56e9964afcf89c7a60",
+      "bytes": 10701
+    },
+    {
+      "path": "src/prm/runtime/speech.py",
+      "sha256": "a9244bc94b07eb0e585c87ee30f274a25c3305e582c4e6a5a42045d30793c5fe",
+      "bytes": 4617
+    },
+    {
+      "path": "src/prm/runtime/vision.py",
+      "sha256": "b873cf98e91c577756d8c3aff394399bdb6bf76afb96e53b369317906cdadda3",
+      "bytes": 6183
+    },
+    {
+      "path": "src/prm/runtime/model.py",
+      "sha256": "76ecda296ecad2d6658b9479a09b3a42045349027f63f93c984e785e2da90df4",
+      "bytes": 8531
+    },
+    {
+      "path": "src/prm/runtime/model_attempts.py",
+      "sha256": "5498d7273a349037dac1fcce150df5fb7328937910419240ce6e2b86a6882d87",
+      "bytes": 1588
+    },
+    {
+      "path": "src/prm/runtime/cost_cache.py",
+      "sha256": "a48fbcfa8594ad21cc8c7407c0b6585661b48674a80d93a0d171f76a611392b2",
+      "bytes": 8270
+    },
+    {
+      "path": "src/prm/storage/policy.py",
+      "sha256": "5775f2d3d8dada6f95021aa9783eb51cb095ebda307c33462bdb87453c31baed",
+      "bytes": 30056
+    },
+    {
+      "path": "tests/test_pai_media_runtime.py",
+      "sha256": "16f11ed04a1ede6ca7c053fff0048ab0c10eda92b86675c7f4abd1acac23be42",
+      "bytes": 14153
+    },
+    {
+      "path": "tests/test_pai_durable_policy.py",
+      "sha256": "fba8afae7c33fc41d98da79086d1f2e87bdee36c33ad9910678a4dbed4ff061c",
+      "bytes": 15770
+    },
+    {
+      "path": "tests/test_test_tiers.py",
+      "sha256": "56f2071a5a4d23f77c281e0db7f195feda726221e478f8da0a4c890b52791c61",
+      "bytes": 2792
+    },
+    {
+      "path": "tools/test_tiers.py",
+      "sha256": "2869655212e060d3a910bc9c1c55470c925749d5ceb7281f1a6aba1e4fcf0ee4",
+      "bytes": 11095
+    },
+    {
+      "path": "docs/verification/PAI-review-continuation-33.json",
+      "sha256": "314bccfd0bb61b4d9a1a8586669ab4cefff0999b457076482e9bfd465ea24b03",
+      "bytes": 12140
+    },
+    {
+      "path": "docs/verification/PAI-review-33-response.md",
+      "sha256": "3e25a077c0327460ce61952f30970379c42d4ee14a777ccb790bca35023bc416",
+      "bytes": 5187
+    }
+  ],
+  "scope": "review-33 actual-finding recheck; supplied complete source files",
+  "input_sha256": "b4997ed292f4cfcde065650199b8a240366d5ba9b32db98f3656e8a8ecbed4d6",
+  "input_bytes": 149411,
+  "output_token_cap": 16000,
+  "timeout_seconds": 900,
+  "workflow_receipt": false,
+  "human_authority": false,
+  "runner_path": ".playbook-artifacts/pai-review-resolution-34.py",
+  "runner_sha256": "6fb0844b5ed8c569ec2eccaf6e46642df58f9c859b9180990b1f3e067b32c7f8",
+  "transport_path": "tools/mimo_code_review.py",
+  "transport_sha256": "2ba3cbf032166616aa2eeba61f654308379b32d228e98f389f2099a02679262f",
+  "command": ".venv-pai/bin/python .playbook-artifacts/pai-review-resolution-34.py --call-number 34 --purpose review_33_resolution",
+  "source_exclusions": [
+    "actual private corpus",
+    "live account payload",
+    "credentials",
+    "production configuration"
+  ],
+  "authority_exclusions": [
+    "human/workflow completion",
+    "live-account consent",
+    "production migration/deployment",
+    "product-provider spending"
+  ],
+  "request_body_sha256": "d4c9408c66802a6ba26a8d40c2e719fa86d126ed3e85ee8a9b62aa525d9ddab9",
+  "provider_call_attempted": true,
+  "usage": {
+    "prompt_tokens": 40791,
+    "completion_tokens": 452,
+    "total_tokens": 41243,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    }
+  },
+  "finish_reason": "stop",
+  "response_sha256": "4e2709d7032f6c2f30cb3726e4a6b32502d4164952e63d30f5820587b2558126",
+  "findings": {
+    "verdict": "SHIP_OK",
+    "findings": [],
+    "not_verified": [
+      "Actual provider billing, live-account OAuth/token endpoints, real Postgres concurrency beyond the synthetic sandbox.",
+      "llm/client.py LLMOutcomeUnknown constructor behavior (MediaOutcomeUnknown passes receipt positionally and then rewrites args) and whether its base sets retry_allowed.",
+      "Whether CostCacheRuntime.record or snapshot() logging elsewhere leaks prompt/image text beyond the supplied modules.",
+      "Runtime callers of execute_reserved_groups outside the supplied media/chat excerpts and any governed tooling/hash gates.",
+      "Extraction/OCR subprocess internals (prm.runtime.media_extract) were not in the supplied packet."
+    ],
+    "summary": "The two review #33 findings are resolved in the supplied current code with executable tests: execute_fenced_media now raises MediaAccountingUnconfirmed carrying the AcceptedMediaReceipt (delivery_outcome='accepted', usage_recorded=False, estimated_cost_usd=None), the exact validated result, attempt_ref and operation_refs with retry_allowed=False when record() fails after a successful registry.execute_reserved, and MediaRuntime.extract/question consume that result to return the accepted transcription/answer with accounting_status='unconfirmed' while storing the transcript and cleaning temporary input (tests/test_pai_media_runtime.py:177-208 asserts this for both speech and vision). Rejection and malformed replies keep ModelProviderRejected/ModelResponseInvalid with distinct reason_kind and their bookkeeping failures cannot mask them (media_attempts.py:30-32,42-48; tests lines 163-174). Post-invocation compound failures now raise ScopeTransportUnknown with all prepared operation refs and retry_allowed=False (policy.py:374-376), verified by test_compound_post_invocation_denial_is_unknown_with_non_replayable_refs. Durable model-attempt fences remain non-replayable across reconstruction, budgets are conservatively consumed at the upper bound with no invented refunds or zero prices, and the changed verifier registration (tests/test_test_tiers.py plus tests/test_pai_review_recovery.py under the existing pai-complete --require-spec-matrix command) is ordinary test-tier metadata, not a governed tooling receipt. No P0 or P1 defects found in the supplied scope."
+  },
+  "duration_seconds": 12.981
+}

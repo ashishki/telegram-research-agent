@@ -295,3 +295,17 @@ error refs are typed/non-replayable. No independent closure fabricated.
 One-call #34 packet is prepared, explicitly uninvoked and unapproved until
 the owner extends 33 to 34. Formal role/design, live-account/production and
 operator acceptance gates remain open. No services/timers were enabled.
+
+# 2026-10-08 ongoing review-budget authority
+
+Owner: “разврешаю увеличивать по потребности” after the prepared review-34
+request. Review-budget increases are now authorized as needed for the existing
+local PAI reviews/finding rechecks; do not start another per-call permission
+loop. Advance the recorded allocation per fresh, bounded request; account for
+failures too. Same Mimo/OpenCode Go, public code/synthetic evidence only,
+16000 output / 900 s; no model substitution, private/live/product egress or
+human/production acceptance inferred. Before #34: 33 consumed; 34 allocated.
+Prepared source hashes and the pinned playbook entrypoint were verified.
+
+Review #34 reserved/attempted, 34/34 consumed including failures.
+Purpose: review_33_resolution; source HEAD b29c496b5fb00d91a1d913e5877b5760d9ec6d3b. No automatic retry.

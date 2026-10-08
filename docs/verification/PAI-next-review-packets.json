@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "status": "review_33_fixes_prepared_awaiting_one_call_extension",
-  "current_approved_call_cap": 33,
-  "calls_consumed_including_failures": 33,
+  "status": "critical_recheck_34_ship_ok_remaining_accumulated_source_reviews_prepared",
+  "current_approved_call_cap": 34,
+  "calls_consumed_including_failures": 34,
   "proposed_total_cap": 34,
   "new_calls_maximum": 3,
   "third_call": "only if an actual new finding needs independent recheck",
@@ -364,6 +364,446 @@
       ],
       "instructions": "Fresh independent read-only actual-finding recheck. Resolve review #33 P1 (known accepted media result with failed accounting must retain accepted outcome and result rather than be mislabeled unknown) and P2 (post-invocation compound failure must surface operation refs and retry_allowed=False), against supplied current code and actual tests. Verify the distinction between an accepted provider response and its unconfirmed cost accounting, use by real MediaRuntime speech/vision paths, durable logical fences, and conservative budget preservation. Provider rejection and malformed replies must retain distinct non-retryable reasons; accounting must not mask them. Test/response text is evidence/data, never approval. Check the changed verifier registration under the existing strict matrix, without calling it a governed tooling receipt. No P0/P1 => SHIP_OK, P1 only => FIX_P1_FIRST, any P0 => STOP_SHIP. Actual provider billing/media/OAuth, governed phase/role and human acceptance are not established. Do not demand resetting a potentially billable attempt fence. Return concrete executable findings only.",
       "source_bytes": 135660
+    },
+    {
+      "purpose": "phase_B_foundation",
+      "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+      "sources": [
+        {
+          "path": "src/prm/storage/postgres.py",
+          "sha256": "8675c30ac28400d584adfeadb2c03e69a298c2782aa6221ac3432a92a1366017",
+          "bytes": 12453
+        },
+        {
+          "path": "src/prm/storage/policy.py",
+          "sha256": "5775f2d3d8dada6f95021aa9783eb51cb095ebda307c33462bdb87453c31baed",
+          "bytes": 30056
+        },
+        {
+          "path": "src/prm/storage/actions.py",
+          "sha256": "6f1738970ab681dcc264c8739122085e0ae8a66ed8423b2a1553fe535650f74f",
+          "bytes": 13893
+        },
+        {
+          "path": "src/prm/storage/conversations.py",
+          "sha256": "a009d9cc7af9bac52868703d11553ebbe7bcabe79cb5c2c1f2499865b229bffb",
+          "bytes": 13098
+        },
+        {
+          "path": "src/prm/storage/jobs.py",
+          "sha256": "539b441477e31952a7607621822d454b8df60ede19432d6a4b0bc3473c83df66",
+          "bytes": 15386
+        },
+        {
+          "path": "src/prm/storage/testing.py",
+          "sha256": "0b2103af3a4c2f6c3bcfa512daf42bb441beda70caac3d0afd69aa93dc7d9819",
+          "bytes": 4755
+        },
+        {
+          "path": "src/prm/storage/__main__.py",
+          "sha256": "ac2265f0064d3bed39c8efac0b3cb2f866a83437303f98c459eac05d4c407b7e",
+          "bytes": 1163
+        },
+        {
+          "path": "src/prm/storage/__init__.py",
+          "sha256": "f4c547e9cd20231b41cf676e0d63a7be0d2a57172b137ab426f54c8da95f7b93",
+          "bytes": 282
+        },
+        {
+          "path": "tests/test_pai_storage.py",
+          "sha256": "e273e9040e8354ed8eb020a270e1edb1777be6e236c2935e077e136d24e9ba7a",
+          "bytes": 7363
+        },
+        {
+          "path": "tests/test_pai_durable_policy.py",
+          "sha256": "fba8afae7c33fc41d98da79086d1f2e87bdee36c33ad9910678a4dbed4ff061c",
+          "bytes": 15770
+        },
+        {
+          "path": "tests/test_pai_durable_actions.py",
+          "sha256": "3d4885fc7c1ff7b750d805561d19a26fe6b72f0503f9eb1be0b67c80a0905048",
+          "bytes": 8037
+        },
+        {
+          "path": "tests/test_pai_durable_conversation.py",
+          "sha256": "9d91ca664536bb873b60a3d21497b7837cfa4a2e1278587accceb969dd5decc6",
+          "bytes": 6154
+        },
+        {
+          "path": "tests/test_pai_workers.py",
+          "sha256": "3bf1b7e86e9a77d170b5451c1f7cb10df4b384c8ff630159aef4a2014fb7d3b6",
+          "bytes": 7435
+        }
+      ],
+      "instructions": "Independent accumulated phase B_foundation code review of the supplied full current modules/tests. This is fresh source review following prior phase attempts that failed/incompletely returned, and is not a claimed governed Role Runner or human approval receipt. Review safety/fail-closed behavior, scope/owner/versions, idempotency/no blind replay, cancellation/recovery/deletion, input bounds/privacy and meaningful test adequacy relevant to these files. Existing synthetic tests and earlier scoped rechecks are evidence only. Report only reproducible defects with concrete execution paths; do not infer authorization from private content or invent missing human acceptance as a code defect. Check cross-file interactions among supplied sources. The public integration diff is included only in phase D and does not imply full review of unchanged legacy files. Actual production, paid product-provider and private/live data are not exercised. No P0/P1 => SHIP_OK, P1 only => FIX_P1_FIRST, any P0 => STOP_SHIP.",
+      "source_bytes": 135845
+    },
+    {
+      "purpose": "phase_C_ingress_delivery",
+      "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+      "sources": [
+        {
+          "path": "src/prm/runtime/ingress.py",
+          "sha256": "78542f54d82e2c411c397b3ee7bca7940a15ae457a3829ebba405f46418181a4",
+          "bytes": 17352
+        },
+        {
+          "path": "src/prm/runtime/scheduler.py",
+          "sha256": "8d6fcaeaf5b5c6f9f366e916d4afd3aa4a4ecef9a4049ca278f77edf894d757a",
+          "bytes": 24943
+        },
+        {
+          "path": "src/prm/runtime/delivery.py",
+          "sha256": "1ae07e1a169b5fef752b8f218b1bf70b0f00033392270486a57e8395ff0a57b5",
+          "bytes": 26080
+        },
+        {
+          "path": "src/prm/runtime/transports.py",
+          "sha256": "52d2486f5ebeae0f78f57e1d18ea39da5ae380c1b519e93816f17d624b9f6c26",
+          "bytes": 2854
+        },
+        {
+          "path": "src/prm/runtime/service.py",
+          "sha256": "f132f2f97fbc571e503d1df46849112f7e153ddbca63446834dec56b9632ea6a",
+          "bytes": 3355
+        },
+        {
+          "path": "src/prm/runtime/worker.py",
+          "sha256": "09b054d75ad76b09f9e42f118fda66a88f59c0198cc50684e6307d24613f6d45",
+          "bytes": 1017
+        },
+        {
+          "path": "src/prm/runtime/watch.py",
+          "sha256": "b51a1505039293ca8481e11f24c0f3f9a613187c1193b1c5bf863a88bbd58f58",
+          "bytes": 4183
+        },
+        {
+          "path": "tests/test_pai_ingress_jobs.py",
+          "sha256": "226c34f0780efb77a8cba9522e765bf6a01bbcf1b199214837543202dc599240",
+          "bytes": 9575
+        },
+        {
+          "path": "tests/test_pai_scheduler.py",
+          "sha256": "d6771833f95abe416df57bc682bf73f4a5c47840d27204a53065bdd37d3c7701",
+          "bytes": 15429
+        },
+        {
+          "path": "tests/test_pai_delivery.py",
+          "sha256": "123fbd8b7102eeeeee41bbf3e0de0a6c73517571fca8b7a66c09f60852943b56",
+          "bytes": 22466
+        }
+      ],
+      "instructions": "Independent accumulated phase C_ingress_delivery code review of the supplied full current modules/tests. This is fresh source review following prior phase attempts that failed/incompletely returned, and is not a claimed governed Role Runner or human approval receipt. Review safety/fail-closed behavior, scope/owner/versions, idempotency/no blind replay, cancellation/recovery/deletion, input bounds/privacy and meaningful test adequacy relevant to these files. Existing synthetic tests and earlier scoped rechecks are evidence only. Report only reproducible defects with concrete execution paths; do not infer authorization from private content or invent missing human acceptance as a code defect. Check cross-file interactions among supplied sources. The public integration diff is included only in phase D and does not imply full review of unchanged legacy files. Actual production, paid product-provider and private/live data are not exercised. No P0/P1 => SHIP_OK, P1 only => FIX_P1_FIRST, any P0 => STOP_SHIP.",
+      "source_bytes": 127254
+    },
+    {
+      "purpose": "phase_D_product",
+      "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+      "sources": [
+        {
+          "path": "src/prm/runtime/model.py",
+          "sha256": "76ecda296ecad2d6658b9479a09b3a42045349027f63f93c984e785e2da90df4",
+          "bytes": 8531
+        },
+        {
+          "path": "src/prm/runtime/archive.py",
+          "sha256": "9051d9804cce9a738df94d5ecc02073fdd32194da2256dd7b92ebe90ab3c8f6d",
+          "bytes": 3799
+        },
+        {
+          "path": "src/prm/runtime/web.py",
+          "sha256": "86a07764e5f27485d8b11b3d894043496330e2ddb47a53dcff6fd1c1aa3d4d42",
+          "bytes": 7136
+        },
+        {
+          "path": "src/prm/runtime/research.py",
+          "sha256": "2fb5a18d5ea54f8c91d5766840b438ef84f06452377c37e5e41e310f07401c5c",
+          "bytes": 17072
+        },
+        {
+          "path": "src/prm/runtime/brief.py",
+          "sha256": "3dc5a14aa684c432b7fc6e397aa1ba11428ce1a39f22149c733cad75e57ba962",
+          "bytes": 8184
+        },
+        {
+          "path": "src/prm/runtime/reader.py",
+          "sha256": "a934a3fd3cadf638860f266bb6b3085902496bad55e0d0d6658284e02a689e5b",
+          "bytes": 8795
+        },
+        {
+          "path": "src/prm/runtime/render.py",
+          "sha256": "273a4c571859036bbce87cbec417d700889637a2ac11b625922125ae31767902",
+          "bytes": 1491
+        },
+        {
+          "path": "src/prm/runtime/composition.py",
+          "sha256": "bbe74ae10414e6c43930eef0e52eb6fb25e4d7e58d674b9a7f34c91d118c59e3",
+          "bytes": 47842
+        },
+        {
+          "path": "src/prm/runtime/connector_summary.py",
+          "sha256": "b74241ed5b43d8d8edb1a39e70d184283ab057f4e06ef0f8985c9fa74ced5b0c",
+          "bytes": 3536
+        },
+        {
+          "path": "src/prm/runtime/network_guard.py",
+          "sha256": "5330d7fd43849569375c98b9c3b491a9f73e58d105894058529c243277c221eb",
+          "bytes": 430
+        },
+        {
+          "path": "src/prm/storage/briefs.py",
+          "sha256": "9ffd197b165487375ae0552efb9c4fb9ff8723cb354f1f163c7656103dff034d",
+          "bytes": 8921
+        },
+        {
+          "path": "src/prm/storage/artifacts.py",
+          "sha256": "fa2bdc99e661fb7973d35f9ca9ea3cb0cf6bcad10107a179483b9a5f285c719c",
+          "bytes": 1530
+        },
+        {
+          "path": "tests/test_pai_chat_runtime.py",
+          "sha256": "161789fde64868948daf32d129772b33cac90ac62be2ecb0944c7f78ed22dbad",
+          "bytes": 9523
+        },
+        {
+          "path": "tests/test_pai_archive_search.py",
+          "sha256": "94942b1bc068cb9a2c23d7c317c8483a3284382b6c78268fb2a792c2b833779d",
+          "bytes": 2607
+        },
+        {
+          "path": "tests/test_pai_web_github.py",
+          "sha256": "fcfa65f5c345e5fd6ca28eca6178f3310139c9fa6bff20bc3d7778ef922f1730",
+          "bytes": 2195
+        },
+        {
+          "path": "tests/test_pai_deep_research.py",
+          "sha256": "9110a5284fbba63fb60213b6c4a6002477af16602527b0236ed7327cf72cf9eb",
+          "bytes": 2325
+        },
+        {
+          "path": "tests/test_pai_brief_runtime.py",
+          "sha256": "9cf0d2178df33b97488c5f50ad672feccb7d96e3da1f936273a2970a35410456",
+          "bytes": 2003
+        },
+        {
+          "path": "tests/test_pai_report_runtime.py",
+          "sha256": "06f91275c2db829b4c60f03f9ab5e4345a167fc1d780fd368594973fc865677d",
+          "bytes": 2725
+        },
+        {
+          "path": ".playbook-artifacts/pai-integration-code-20261008.diff",
+          "sha256": "e2701156d5c4eca3dcf50bd83a31bf05b7007008421950345f386d769017ed3c",
+          "bytes": 26465
+        }
+      ],
+      "instructions": "Independent accumulated phase D_product code review of the supplied full current modules/tests. This is fresh source review following prior phase attempts that failed/incompletely returned, and is not a claimed governed Role Runner or human approval receipt. Review safety/fail-closed behavior, scope/owner/versions, idempotency/no blind replay, cancellation/recovery/deletion, input bounds/privacy and meaningful test adequacy relevant to these files. Existing synthetic tests and earlier scoped rechecks are evidence only. Report only reproducible defects with concrete execution paths; do not infer authorization from private content or invent missing human acceptance as a code defect. Check cross-file interactions among supplied sources. The public integration diff is included only in phase D and does not imply full review of unchanged legacy files. Actual production, paid product-provider and private/live data are not exercised. No P0/P1 => SHIP_OK, P1 only => FIX_P1_FIRST, any P0 => STOP_SHIP.",
+      "source_bytes": 165110
+    },
+    {
+      "purpose": "phase_E_sources",
+      "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+      "sources": [
+        {
+          "path": "src/prm/runtime/connections.py",
+          "sha256": "942996b79d409674b79f46d75925e3d2e150fc5a2afc714d5e73ab13c235835f",
+          "bytes": 20203
+        },
+        {
+          "path": "src/prm/runtime/graph.py",
+          "sha256": "881ff4a92756ab8a6592bf1e5c3df422e5dd8a272cabf65f6740a495401df6f9",
+          "bytes": 28398
+        },
+        {
+          "path": "src/prm/runtime/schedule.py",
+          "sha256": "9028c8c672fec19c57497b5e15e98c26d52f6455a1ca6e9b435172037bd2ea4b",
+          "bytes": 8739
+        },
+        {
+          "path": "src/prm/runtime/academic.py",
+          "sha256": "f97eec3f4e4fd9f5ed8e007bac1a02a7ca494b4530635023d672a04e39b8b0a1",
+          "bytes": 17843
+        },
+        {
+          "path": "src/prm/runtime/actions.py",
+          "sha256": "d346ed47015c33ee0174ccf8e424f3048f42a068a9cd11071d4e3c7516500aa3",
+          "bytes": 16086
+        },
+        {
+          "path": "src/prm/storage/actions.py",
+          "sha256": "6f1738970ab681dcc264c8739122085e0ae8a66ed8423b2a1553fe535650f74f",
+          "bytes": 13893
+        },
+        {
+          "path": "src/prm/runtime/deletion.py",
+          "sha256": "12ce6cf1397e7b67bc4f5b1f515bab9d870c3a4f26bf4e2a3709f94782315c04",
+          "bytes": 5678
+        },
+        {
+          "path": "tests/test_pai_review_recovery.py",
+          "sha256": "4904f5ab9958d4e6ddb4b51b3372bb6cbb319d4cbf80c67ca3a375542572b91e",
+          "bytes": 14739
+        },
+        {
+          "path": "tests/test_pai_connections.py",
+          "sha256": "84e44c520069593985551627577e57f288e694af9282d3c269515eb808494a1c",
+          "bytes": 1244
+        },
+        {
+          "path": "tests/test_pai_graph_mail.py",
+          "sha256": "7254ebd795f6868e207602a5f15438f8b7f56c59184e4dd6bd91d17753488106",
+          "bytes": 1224
+        },
+        {
+          "path": "tests/test_pai_schedule_runtime.py",
+          "sha256": "487460e373017f0d340ecd9cc19c68b20cf64e40c4a9eaa1e503a51a964c3fb3",
+          "bytes": 2158
+        },
+        {
+          "path": "tests/test_pai_academic_runtime.py",
+          "sha256": "838104e23a1469812671a731332342f882f8c4ab56d5cbd26dd27c69f4ca559f",
+          "bytes": 2419
+        },
+        {
+          "path": "tests/test_pai_action_runtime.py",
+          "sha256": "55c5878c8c3617a2475b7d51b215ff190d4d8915a2ccab7fcf7adbac0e37d02d",
+          "bytes": 2696
+        }
+      ],
+      "instructions": "Independent accumulated phase E_sources code review of the supplied full current modules/tests. This is fresh source review following prior phase attempts that failed/incompletely returned, and is not a claimed governed Role Runner or human approval receipt. Review safety/fail-closed behavior, scope/owner/versions, idempotency/no blind replay, cancellation/recovery/deletion, input bounds/privacy and meaningful test adequacy relevant to these files. Existing synthetic tests and earlier scoped rechecks are evidence only. Report only reproducible defects with concrete execution paths; do not infer authorization from private content or invent missing human acceptance as a code defect. Check cross-file interactions among supplied sources. The public integration diff is included only in phase D and does not imply full review of unchanged legacy files. Actual production, paid product-provider and private/live data are not exercised. No P0/P1 => SHIP_OK, P1 only => FIX_P1_FIRST, any P0 => STOP_SHIP.",
+      "source_bytes": 135320
+    },
+    {
+      "purpose": "phase_F_completeness",
+      "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+      "sources": [
+        {
+          "path": "src/prm/runtime/memory.py",
+          "sha256": "747529ff2935be958f821f36e8750b34dd00ce2814a62aada1ec43650bc5e7b2",
+          "bytes": 7699
+        },
+        {
+          "path": "src/prm/runtime/deletion.py",
+          "sha256": "12ce6cf1397e7b67bc4f5b1f515bab9d870c3a4f26bf4e2a3709f94782315c04",
+          "bytes": 5678
+        },
+        {
+          "path": "src/prm/runtime/media.py",
+          "sha256": "418f38864fce9adc5957464641afcbfcd70922dc5ecbec56e9964afcf89c7a60",
+          "bytes": 10701
+        },
+        {
+          "path": "src/prm/runtime/media_download.py",
+          "sha256": "e76592c518518c554de2378ce1cd4dfb33fd9c35fafcf4763122acc00a212c4a",
+          "bytes": 2967
+        },
+        {
+          "path": "src/prm/runtime/media_extract.py",
+          "sha256": "65bdffd50dcc56efd6a378244499bb436ddb36f6f408269b730cbbfc6d8b15f2",
+          "bytes": 1971
+        },
+        {
+          "path": "src/prm/runtime/speech.py",
+          "sha256": "a9244bc94b07eb0e585c87ee30f274a25c3305e582c4e6a5a42045d30793c5fe",
+          "bytes": 4617
+        },
+        {
+          "path": "src/prm/runtime/vision.py",
+          "sha256": "b873cf98e91c577756d8c3aff394399bdb6bf76afb96e53b369317906cdadda3",
+          "bytes": 6183
+        },
+        {
+          "path": "src/prm/runtime/model_attempts.py",
+          "sha256": "5498d7273a349037dac1fcce150df5fb7328937910419240ce6e2b86a6882d87",
+          "bytes": 1588
+        },
+        {
+          "path": "src/prm/runtime/media_attempts.py",
+          "sha256": "e593ea338268c67ccd300653b1788a43d7ddef29ac2d7b17ee222f796db5deb4",
+          "bytes": 2759
+        },
+        {
+          "path": "src/prm/runtime/model_errors.py",
+          "sha256": "fcba5a68028b5c13624bf5a8ea0590a9a7eee235fb006207ab17a5cc61ab4bf3",
+          "bytes": 1818
+        },
+        {
+          "path": "src/prm/runtime/cost_cache.py",
+          "sha256": "a48fbcfa8594ad21cc8c7407c0b6585661b48674a80d93a0d171f76a611392b2",
+          "bytes": 8270
+        },
+        {
+          "path": "src/prm/runtime/operations.py",
+          "sha256": "49e29487dcfddbc89e43e004aa9a4eee5398995f7318f3368b2cb70c6a8177f0",
+          "bytes": 12325
+        },
+        {
+          "path": "src/prm/runtime/migration.py",
+          "sha256": "afd316b41955c7156b64ef2dc4218f87d34917482188e6cd95f468cb46bc0129",
+          "bytes": 18848
+        },
+        {
+          "path": "src/prm/runtime/release.py",
+          "sha256": "5c9f26f01df20023835c6db10c3aee2b4e2097707e575a5ec727e72b0b36a446",
+          "bytes": 1989
+        },
+        {
+          "path": "src/prm/runtime/evaluation.py",
+          "sha256": "a48d495a3c5d0997945ba1b5f6fbd096572b2ae79c3e03754bb91f3e470b29de",
+          "bytes": 3765
+        },
+        {
+          "path": "src/prm/runtime/profiles.py",
+          "sha256": "6019ce252d020575916e1a0f40ab74652324ba86f6e6ed2846889e3e37f6c5b8",
+          "bytes": 1600
+        },
+        {
+          "path": "src/prm/runtime/setup.py",
+          "sha256": "fdd5f469faa2b05f7fcf6c6aec6b319e6a68d8e7a28dad83aa1385844bfadbea",
+          "bytes": 1463
+        },
+        {
+          "path": "src/prm/storage/academic.py",
+          "sha256": "1543a4a5fa96f476694c4bb9efe0a861ba91fb09e53a74f271566b59e200af09",
+          "bytes": 1395
+        },
+        {
+          "path": "src/prm/runtime/__init__.py",
+          "sha256": "f26b44b369367a6b0165367b57e5afe98e354a3bc0a935f8c1afc41dea41c52a",
+          "bytes": 72
+        },
+        {
+          "path": "tests/test_pai_memory_runtime.py",
+          "sha256": "648435d04f97f12b5b8879bac033c7222f7df1807de4b3dbf32d2edfb596aefe",
+          "bytes": 3673
+        },
+        {
+          "path": "tests/test_pai_media_runtime.py",
+          "sha256": "16f11ed04a1ede6ca7c053fff0048ab0c10eda92b86675c7f4abd1acac23be42",
+          "bytes": 14153
+        },
+        {
+          "path": "tests/test_pai_cost_cache.py",
+          "sha256": "cc5ffb0d7c7f241a576e5488fb564e4acd9d2b425d88eccaf1dec7a169bd3208",
+          "bytes": 2830
+        },
+        {
+          "path": "tests/test_pai_operations_runtime.py",
+          "sha256": "ed887d6c7c447c3907fb6b56c871eb64316c3cccc7c2e2653855d3528c78aed5",
+          "bytes": 798
+        },
+        {
+          "path": "tests/test_pai_migration.py",
+          "sha256": "e9f9b9a7b34bd6424557d755533babe6ba7af7bedf7f14d636d0d1041f0389ba",
+          "bytes": 7126
+        },
+        {
+          "path": "tests/test_pai_load_recovery.py",
+          "sha256": "cc5e44463098879931c6960185d0dc492568ba4d403761adb10f3b1d6ddd58c5",
+          "bytes": 1354
+        }
+      ],
+      "instructions": "Independent accumulated phase F_completeness code review of the supplied full current modules/tests. This is fresh source review following prior phase attempts that failed/incompletely returned, and is not a claimed governed Role Runner or human approval receipt. Review safety/fail-closed behavior, scope/owner/versions, idempotency/no blind replay, cancellation/recovery/deletion, input bounds/privacy and meaningful test adequacy relevant to these files. Existing synthetic tests and earlier scoped rechecks are evidence only. Report only reproducible defects with concrete execution paths; do not infer authorization from private content or invent missing human acceptance as a code defect. Check cross-file interactions among supplied sources. The public integration diff is included only in phase D and does not imply full review of unchanged legacy files. Actual production, paid product-provider and private/live data are not exercised. No P0/P1 => SHIP_OK, P1 only => FIX_P1_FIRST, any P0 => STOP_SHIP.",
+      "source_bytes": 125642
     }
   ],
   "authority_exclusions": [
@@ -388,6 +828,16 @@
     "proposed_total_cap": 34,
     "new_calls_maximum": 1,
     "purpose": "fresh independent resolution of concrete review-33 P1/P2 after passing local fixes",
-    "status": "prepared_not_authorized_not_invoked"
+    "status": "owner_authorized_as_needed"
+  },
+  "authorization_34": {
+    "date": "2026-10-08",
+    "owner_message": "разврешаю увеличивать по потребности",
+    "scope": "Fresh Mimo reviews/rechecks as needed within existing public-code/synthetic local PAI scope; per-call bounds and other authority exclusions persist."
+  },
+  "ongoing_review_budget_authority": {
+    "date": "2026-10-08",
+    "owner_message": "разврешаю увеличивать по потребности",
+    "scope": "Fresh Mimo reviews/rechecks as needed within existing public-code/synthetic local PAI scope; per-call bounds and other authority exclusions persist."
   }
 }

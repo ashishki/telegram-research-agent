@@ -1,6 +1,6 @@
-# Current handoff — #33 findings locally fixed, one recheck requires budget
+# Current handoff — #34 SHIP_OK; remaining accumulated source review/testing
 
-2026-10-07. Assigned branch: docs/personal-assistant-blueprint-playbook-20260918.
+2026-10-08. Assigned branch: docs/personal-assistant-blueprint-playbook-20260918.
 Owner authorized finishing implementation, then testing/review, and confirmed
 “делай, разрешаю” after the implementation handoff. ADR-015 sequencing honored.
 Do not restart upfront permission loops, historical tasks or reviewer frameworks.
@@ -43,29 +43,36 @@ were reproduced/preserved/fixed. New recovery cases are registered in pai-comple
 Current code commits awaiting final recheck include non-retryable media errors,
 selected-message body reads, boolean policy denial, exact scope changes,
 durable token retirement/refresh fences, bounded calendar actions and typed
-coverage. The new #33 P1/P2 remain independently open until another fresh recheck.
+coverage. Fresh review #34 on b29c496 returned valid SHIP_OK with no findings,
+independently resolving #33 P1/P2. Latest runtime fix source: 1b09d5a.
+Receipt: PAI-review-continuation-34.json. Current pai-complete is running after
+the latest code/verifier changes; preserve its actual result, do not assume PASS.
 Scoped advisory reviews are not
 Deep Review/Role Runner/human approval receipts; accumulated phase/role coverage
 remains pending. Requested/observed model and effort, hashes and scopes are in
 PAI-critical-boundaries-recheck-28/29/30.json. Thinking disabled and strict JSON
 schema produced usable reports; earlier incomplete attempts stay preserved.
 
-Paid review count: 33/33 consumed INCLUDING failures. On 2026-10-07 the owner
+Paid review count: 34 consumed INCLUDING failures. On 2026-10-07 the owner
 answered “разрешаю, делай дотконца” to the explicit 30-to-33 extension proposal.
-Do not ask for the same budget authorization again or swap models automatically.
-Prepared, authorized next packets: docs/verification/PAI-next-review-packets.json.
+On 2026-10-08 the owner added “разврешаю увеличивать по потребности”: ongoing
+budget increases for necessary reviews/rechecks in the existing local PAI scope
+are now authorized. Allocate/log each fresh bounded request and count failures;
+do not restart a permission loop at 34/35/etc. Same provider/model/input exclusions
+and 16000 output / 900 s per call. No model substitution or live/product/production
+authority is inferred. Prepared packets: PAI-next-review-packets.json.
 The initial no-credential command stopped before provider I/O, preserving
 30/33. Owner then explicitly directed lookup to Georgia-Community-Navigator;
 its secrets/openrouter_api_key was used ONLY at the authorized OpenCode Go
 endpoint, which confirmed mimo-v2.6-pro. Do not print/copy the credential.
-Next: ask for one concrete budget extension from 33 to 34, then exactly one
-fresh actual-finding recheck against the committed #33 response/fixes/tests.
-Prepared packet: PAI-next-review-packets.json / review_33_resolution.
-Do not call #34 before that extension, retry or substitute models automatically.
-Source excerpts/call receipts remain recorded at their exact hashes/SHAs.
-After that explicit extension, record authorization_34/current cap and run:
-OPENCODE_API_KEY_FILE=/srv/openclaw-you/workspace/Georgia-Community-Navigator/secrets/openrouter_api_key .venv-pai/bin/python .playbook-artifacts/pai-review-resolution-34.py --call-number 34 --purpose review_33_resolution
-The compiled one-call runner rejects a missing extension before key/provider I/O.
+Next: accumulated phase B..F source reviews in bounded sequential packets,
+then any actual-finding fixes/rechecks and final local evidence. Code review
+packets include actual modules/tests; phase D includes the labeled integration
+diff since 8faee4. Governed tooling/design/role gates stay separate.
+Runner: .playbook-artifacts/pai-review-as-needed.py. Before each request verify
+its packet hashes and advance its logged allocation under the ongoing authority.
+Next command after allocating #35:
+OPENCODE_API_KEY_FILE=/srv/openclaw-you/workspace/Georgia-Community-Navigator/secrets/openrouter_api_key .venv-pai/bin/python .playbook-artifacts/pai-review-as-needed.py --call-number 35 --purpose phase_B_foundation
 Public code and synthetic evidence
 only; no private corpus, tokens or account payloads to reviewers.
 
