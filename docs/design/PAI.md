@@ -89,7 +89,7 @@ policy/proposal/receipt semantics. This reuse boundary delegates to the shared
 use cases and cannot create a second action engine or inherit a later topic.
 No application code or DB migration is implemented by this packet. PAI-00
 owns the bounded reviewer/checker/phase-finalizer tooling and owner strategy
-document. Its file budget is 64, covering the named instruction/tooling scope in
+document. Its draft file budget is 72, covering the named instruction/tooling scope in
 docs/verification/PAI-00-file-manifest.json, not all programme publications; this draft rescope is
 subject to the same independent reviews and human approval.
 
@@ -304,9 +304,9 @@ exact ten scenario/recovery bindings, hashes, dependencies and case identity;
 run_pai_acceptance requires actual named cases/zero skips, not planned evidence.
 Baseline PAI-00-reconciliation.md binds exact clock-fixture failures, commands,
 causes and corrections at 8faee4; old PA-00 UX was already repaired.
-PAI-00-file-manifest.json mechanically binds 64 paths<=64, uniqueness/existence/
+PAI-00-file-manifest.json mechanically binds 65 paths<=72, uniqueness/existence/
 allowed scope and rollback boundaries; feature-design/source publications belong
-to PAI-01/B..F. Manifest SHA256: 3bf476e070fb9678e3f5a1f4dd25275b84455b4a04bee26fa0a871f8e8681bba.
+to PAI-01/B..F. Manifest SHA256: 81626b82c2d9f550e23ca3812b7fea265bb64a85a61b69eebcaa4c46e9434f4a.
 Future human records: .playbook-artifacts/workflows/PAI/approval.json (real pinned
 TTY, human identity/date/design hashes/role refs); controlled PAI-29/owner-acceptance.json
 (candidateSHA/date/owner/per69ID+tenScenario live/visual/usefulness evidence hashes).

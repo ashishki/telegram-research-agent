@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "call_number": 72,
+  "status": "native_tooling_allocated_not_invoked",
+  "provider": "opencode_go",
+  "requested_model": "mimo-v2.6-pro",
+  "requested_effort": "provider_default",
+  "human_authority": false,
+  "provider_call_attempted": false
+}

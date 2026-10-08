@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "status": "native67_timeout_no_verdict_source68_independent_recheck",
-  "current_approved_call_cap": 79,
-  "calls_consumed_including_failures": 70,
+  "current_approved_call_cap": 80,
+  "calls_consumed_including_failures": 71,
   "proposed_total_cap": 34,
   "new_calls_maximum": 3,
   "third_call": "only if an actual new finding needs independent recheck",
@@ -1894,49 +1894,49 @@
   },
   "native_design_allocations": [
     {
-      "call_number": 72,
-      "role": "program_design_review",
-      "slice_group": "foundation",
-      "status": "allocated_not_invoked"
-    },
-    {
       "call_number": 73,
       "role": "program_design_review",
-      "slice_group": "product",
+      "slice_group": "foundation",
       "status": "allocated_not_invoked"
     },
     {
       "call_number": 74,
       "role": "program_design_review",
-      "slice_group": "sources",
+      "slice_group": "product",
       "status": "allocated_not_invoked"
     },
     {
       "call_number": 75,
       "role": "program_design_review",
-      "slice_group": "completeness",
+      "slice_group": "sources",
       "status": "allocated_not_invoked"
     },
     {
       "call_number": 76,
-      "role": "product_design_review",
-      "slice_group": "foundation",
+      "role": "program_design_review",
+      "slice_group": "completeness",
       "status": "allocated_not_invoked"
     },
     {
       "call_number": 77,
       "role": "product_design_review",
-      "slice_group": "product",
+      "slice_group": "foundation",
       "status": "allocated_not_invoked"
     },
     {
       "call_number": 78,
       "role": "product_design_review",
-      "slice_group": "sources",
+      "slice_group": "product",
       "status": "allocated_not_invoked"
     },
     {
       "call_number": 79,
+      "role": "product_design_review",
+      "slice_group": "sources",
+      "status": "allocated_not_invoked"
+    },
+    {
+      "call_number": 80,
       "role": "product_design_review",
       "slice_group": "completeness",
       "status": "allocated_not_invoked"
@@ -1966,5 +1966,12 @@
     "call_number": 71,
     "status": "allocated_not_invoked",
     "purpose": "native factual resolution including exact renderer sources, explicit extended-limit authority and pin/dependency bindings"
+  },
+  "native_tooling_recheck_72": {
+    "call_number": 72,
+    "status": "allocated_not_invoked",
+    "purpose": "same Mimo provider-default reasoning factual recheck after thinking-disabled reports contradicted code",
+    "output_cap": 16000,
+    "timeout": 900
   }
 }

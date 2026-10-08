@@ -2,8 +2,8 @@
   "schema_version": 1,
   "slice_id": "PAI-00",
   "kind": "declared_scope_not_completion",
-  "file_limit": 64,
-  "expected_count": 64,
+  "file_limit": 72,
+  "expected_count": 65,
   "paths": [
     ".playbook/instruction_manifest.json",
     ".playbook/project_verification.json",
@@ -52,6 +52,7 @@
     "docs/verification/PAI-review-continuation-69.json",
     "docs/verification/PAI-review-continuation-70.json",
     "docs/verification/PAI-review-continuation-71.json",
+    "docs/verification/PAI-review-continuation-72.json",
     "docs/verification/PAI-review-continuation.json",
     "docs/verification/PAI-tooling-maintenance-packet.md",
     "docs/verification/PAI-working-tree-evidence.json",
@@ -71,5 +72,6 @@
     "tools/test_tiers.py"
   ],
   "exclusions": "PAI-01 design/access publications and B..F code/review publications belong to their own slice scopes, not PAI-00 instruction/tooling closure. New PAI-00 paths must be registered and counted before closure.",
-  "rollback": "Prepare a reviewed path-scoped revert/forward fix for this manifest only; preserve other slices, owner changes, historical approvals and immutable pin. No rollback has been performed."
+  "rollback": "Prepare a reviewed path-scoped revert/forward fix for this manifest only; preserve other slices, owner changes, historical approvals and immutable pin. No rollback has been performed.",
+  "scope_revision": "Draft publication allowance increased for owner-authorized necessary review evidence; not human feature acceptance."
 }

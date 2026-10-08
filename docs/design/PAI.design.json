@@ -53,7 +53,7 @@
         "tools/run_pai_acceptance.py",
         "tests/test_pai_acceptance_guard.py"
       ],
-      "change_budget": "files<=64",
+      "change_budget": "files<=72",
       "dependencies": [],
       "expected_interfaces": [
         "PA requirement coverage: PA-00, PA-01, PA-18",
