@@ -21,12 +21,16 @@ def verify_report(path: Path, *, matrix: dict | None = None) -> tuple[bool, str]
         return False, 'invalid pytest report'
     if not cases:
         return False, 'zero acceptance tests'
+    observed=[(case.get('classname'),case.get('name')) for case in cases]
+    if len(observed)!=len(set(observed)):return False,'duplicate acceptance test nodes'
     if any(case.find(tag) is not None for case in cases for tag in ('skipped', 'failure', 'error')):
         return False, 'skipped, failed or errored acceptance test'
     if matrix is not None:
         names = {case.get('name', '').split('[')[0] for case in cases}
-        missing = [row['spec_id'] for row in matrix['requirements'] if row['case_name'] not in names]
         nodes = {(case.get('classname', ''), case.get('name', '').split('[')[0]) for case in cases}
+        missing = [row['spec_id'] for row in matrix['requirements'] if not any(
+            (module=='tests.test_pai_requirements' or module.startswith('tests.test_pai_requirements.'))
+            and name==row['case_name'] for module,name in nodes)]
         for row in matrix['scenarios']:
             for key in ('synthetic_test_node', 'recovery_test_node'):
                 if not row.get(key): continue

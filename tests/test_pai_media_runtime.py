@@ -249,3 +249,31 @@ def test_download_rejects_foreign_or_unbound_input_before_any_transport(pai):
         'media_input':{'file_ref':'synthetic_file','kind':'image'}},expected_version=0)
     with pytest.raises(CapabilityDenied,match='differs from authenticated'):adapter.download('other_file',kind='image',request_ref='download_owned')
     assert pai.requests==[] and pai.root.registry.snapshot(pai.root.owner_ref)['operations']==[]
+
+
+def test_oversized_local_media_context_releases_unprepared_model_reservations(pai,monkeypatch):
+    from tests.pai_runtime_fixtures import allow
+    runtime=MediaRuntime(pai.root,temporary_root=pai.path/'oversized_local_context')
+    asset=runtime.ingest(content=b'%PDF- synthetic bounded extraction',kind='document',mime_type='application/pdf')
+    monkeypatch.setattr(runtime,'extract',lambda *args,**kwargs:{'status':'extracted','pages':[[1,'я'*8000],[2,'я'*8000],[3,'я'*8000],[4,'я'*8000]]})
+    allow(pai,'model.generate',pai.root.model_resource_ref,'user_provided','answer.request')
+    allow(pai,'model.context_egress',asset.media_ref,'user_provided','media.question')
+    with pytest.raises(StorageError,match='request exceeds bounded scope'):runtime.question(asset,'Synthetic question',request_ref='oversized_media_context')
+    assert not pai.requests
+    assert all(w['reserved']==0 and w['consumed']==0 for w in pai.root.registry.snapshot(pai.root.owner_ref)['windows'])
+
+
+def test_cancel_during_local_extraction_blocks_model_stage(pai,monkeypatch):
+    from prm.storage.postgres import StateConflict
+    runtime=MediaRuntime(pai.root,temporary_root=pai.path/'cancel_extract')
+    asset=runtime.ingest(content=b'%PDF- synthetic extraction',kind='document',mime_type='application/pdf')
+    ack=pai.root.ingress.receive({'update_id':9501,'message':{'chat':{'id':42,'type':'private'},'from':{'id':42},'text':'/chat Synthetic extraction'}})
+    lease=pai.root.queue.claim(owner=pai.root.owner_ref,kinds=('compute.assistant',))
+    def extracted(*args,**kwargs):
+        assert pai.root.queue.cancel(owner=pai.root.owner_ref,job_id=ack.job_id)
+        return {'status':'extracted','pages':[[1,'Synthetic bounded page']]}
+    def guard():
+        with pai.root.queue.store.transaction() as tx:pai.root.queue._fenced(tx,lease)
+    monkeypatch.setattr(runtime,'extract',extracted)
+    with pytest.raises(StateConflict):runtime.question(asset,'Synthetic question',request_ref=lease.payload['input_ref'],guard=guard)
+    assert not pai.requests and not pai.root.registry.snapshot(pai.root.owner_ref)['operations']

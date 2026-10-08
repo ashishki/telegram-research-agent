@@ -48,6 +48,15 @@ def finalize(root: Path, feature: str, role: str, results: list[Path]):
         report = path.parent / "report.md"
         if digest(report.read_bytes()) != result["report_sha256"]:
             raise ReviewBlocked("phase report hash changed")
+        if json.loads((path.parent/'input_manifest.json').read_text())!=result['documents']:
+            raise ReviewBlocked('phase input manifest differs')
+        if digest((path.parent/'input_packet.txt').read_bytes())!=result['input_sha256']:
+            raise ReviewBlocked('phase input packet changed')
+        markers=re.findall(r'^'+ROLES[role]+r':\s*(PASS|ADVISORY|STOP_SHIP)\s*$',report.read_text(),re.M)
+        if markers!=[result['verdict']]:raise ReviewBlocked('phase report marker differs')
+        body='{'+report.read_text().split('\n{',1)[1]
+        parsed=review.parse_response({'model':result['observed_model'],'choices':[{'finish_reason':'stop','message':{'content':body}}]},result['requested_model'])
+        if parsed['verdict']!=result['verdict']:raise ReviewBlocked('phase structured verdict differs')
         if result["verdict"] not in {"PASS", "ADVISORY", "STOP_SHIP"}:
             raise ReviewBlocked("phase has no valid verdict")
         by_group[group] = (result, path, report)

@@ -12,6 +12,7 @@ from pathlib import Path
 import re
 import sys
 import uuid
+import subprocess
 from collections import Counter
 
 from playbook import ROOT, verified_upstream
@@ -65,6 +66,29 @@ TOOLING_REFS = (
 
 class ReviewBlocked(ValueError):
     """Safe, fixed diagnostic for a denied review operation."""
+
+
+def verify_packet_snapshot(root: Path, head: str, manifest: list) -> None:
+    """Provider inputs must be the exact committed bytes of the captured HEAD.
+
+    Unrelated dirty files are allowed; dirty review inputs are denied before keys.
+    This is reported provider metadata over TLS, not signed model attestation.
+    """
+    for item in manifest:
+        result=subprocess.run(['git','-C',str(root),'show',head+':'+item['path']],capture_output=True)
+        if (result.returncode or digest(result.stdout)!=item['sha256']
+            or digest((root/item['path']).read_bytes())!=item['sha256']):
+            raise ReviewBlocked('review inputs must match captured committed HEAD')
+
+
+def read_review_source(path: Path) -> bytes:
+    with os.fdopen(os.open(path,os.O_RDONLY|os.O_NOFOLLOW),'rb') as source:
+        if os.fstat(source.fileno()).st_nlink!=1:raise ReviewBlocked('linked review source denied')
+        data=source.read(1_048_577)
+    if len(data)>1_048_576:raise ReviewBlocked('review source exceeds input bound')
+    if re.search(rb'sk-[A-Za-z0-9_-]{24,}|-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|(?m:^Privacy-class:\s*(?:private|credential|live_account))',data):
+        raise ReviewBlocked('restricted review source denied before provider egress')
+    return data
 
 
 def digest(data: bytes) -> str:
@@ -198,8 +222,9 @@ def prepare_packet(root: Path, task: str, feature: str, role: str, tooling_revie
         path = lib.safe_repo_path(root, ref)
         if path is None or not path.is_file() or path.is_symlink():
             raise ReviewBlocked("missing or unsafe packet document")
-        data = path.read_bytes()
+        data=read_review_source(path)
         manifest.append({"path": ref, "sha256": digest(data), "bytes": len(data)})
+        manifest[-1].update(egress_data_class='public_repository_code_or_synthetic_design',egress_decision='allowed_fixed_review_source')
         content = data.decode("utf-8")
         if selected and ref == "docs/PERSONAL_ASSISTANT_SPEC.md":
             chunks = re.split(r"(?=^## [0-9]+\.)", content, flags=re.M)
@@ -292,6 +317,8 @@ def parse_response(payload: dict, requested_model: str) -> dict:
 
 def execute(args):
     root = args.root.resolve()
+    lib, workflow, approval = pinned_modules(root)
+    head = workflow.git_commit(root)
     tooling_review = getattr(args, "tooling_review", False)
     slice_group = getattr(args, "slice_group", None)
     if tooling_review and slice_group: raise ReviewBlocked("tooling and phase scopes cannot be combined")
@@ -316,6 +343,8 @@ def execute(args):
     tooling_audit_ref = None if tooling_review else require_tooling_audit(root)
     output_cap = getattr(args, "output_token_cap", 8000)
     if output_cap not in (8000, 16000): raise ReviewBlocked("unsupported review output cap")
+    if workflow.git_commit(root)!=head:raise ReviewBlocked('review HEAD changed during preparation')
+    verify_packet_snapshot(root,head,manifest)
     # No credential lookup before planning/scope/budget checks.
     from mimo_code_review import _api_key, _call_model
     key = _api_key(args.key_file)
@@ -324,7 +353,6 @@ def execute(args):
     before_hashes = lib.design_hashes(root, design)
     gate_modules=[{'path':str(Path(module.__file__).resolve()),
                    'sha256':digest(Path(module.__file__).read_bytes())} for module in (lib,workflow,approval) if hasattr(module,'__file__')]
-    head = workflow.git_commit(root)
     run_id = "opencode-" + uuid.uuid4().hex
     run_dir = root / ".playbook-artifacts" / "opencode-runs" / run_id
     run_dir.mkdir(parents=True, exist_ok=False)
@@ -411,6 +439,8 @@ def execute(args):
         "reviewed_slice_ids": [] if tooling_review else [f"PAI-{n:02}" for n in REVIEW_GROUPS[slice_group]] if slice_group else [s["slice_id"] for s in design["slices"]],
         "reviewed_spec_sections": [] if tooling_review else sorted(SPEC_GROUPS[slice_group]) if slice_group else list(range(16)),
         "requested_model": args.model, "observed_model": response["model"],
+        "identity_semantics": "provider-reported metadata over TLS; no signed model attestation",
+        "source_snapshot": "captured committed HEAD; unrelated dirty files allowed, dirty inputs denied",
         "requested_effort": request_evidence['requested_effort'],
         "observed_effort": "thinking_disabled" if getattr(args,'thinking_disabled',False) and
             isinstance(raw_usage,dict) and isinstance(raw_usage.get('completion_tokens_details'),dict) and

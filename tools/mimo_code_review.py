@@ -129,6 +129,7 @@ def _call_model(*, api_key: str, base_url: str, model: str, prompt: str, timeout
 def _read_review_stream(response, model: str, deadline: float) -> dict[str, Any]:
     """Bound SSE wire bytes/time; retain final text/usage, discard reasoning."""
     wire_bytes, text_bytes, content, finish, usage = 0, 0, [], None, None
+    observed_model=None
     # urllib HTTPResponse's socket lets each read respect the remaining TOTAL
     # deadline rather than extending it on every arriving token.
     sock = response.fp.raw._sock
@@ -164,13 +165,14 @@ def _read_review_stream(response, model: str, deadline: float) -> dict[str, Any]
                                              "finish_reason": None,
                                              "terminal_event": "done_without_finish"}
                 raise error
-            return {"model": model, "choices": [{"finish_reason": finish,
+            return {"model": observed_model, "choices": [{"finish_reason": finish,
                     "message": {"content": "".join(content)}}], "usage": usage}
         event = json.loads(data)
         if not isinstance(event, dict) or "error" in event:
             raise ValueError("review_stream_provider_error")
         if event.get("model") != model:
             raise ValueError("review_stream_model_mismatch")
+        observed_model=event['model']
         if isinstance(event.get("usage"), dict):
             usage = event["usage"]
         choices = event.get("choices")

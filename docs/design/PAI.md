@@ -304,9 +304,9 @@ exact ten scenario/recovery bindings, hashes, dependencies and case identity;
 run_pai_acceptance requires actual named cases/zero skips, not planned evidence.
 Baseline PAI-00-reconciliation.md binds exact clock-fixture failures, commands,
 causes and corrections at 8faee4; old PA-00 UX was already repaired.
-PAI-00-file-manifest.json mechanically binds 58 paths<=64, uniqueness/existence/
+PAI-00-file-manifest.json mechanically binds 60 paths<=64, uniqueness/existence/
 allowed scope and rollback boundaries; feature-design/source publications belong
-to PAI-01/B..F. Manifest SHA256: a09e5c4f966d8ec4545120854bfa0e316c156bffa8faa1c9493caa8bf13d8748.
+to PAI-01/B..F. Manifest SHA256: d49ddcd72a3b5f841169d5d1683f2b41cd3bbacb961091a3d79acfdca41b6627.
 Future human records: .playbook-artifacts/workflows/PAI/approval.json (real pinned
 TTY, human identity/date/design hashes/role refs); controlled PAI-29/owner-acceptance.json
 (candidateSHA/date/owner/per69ID+tenScenario live/visual/usefulness evidence hashes).

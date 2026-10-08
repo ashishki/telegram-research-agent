@@ -48,6 +48,11 @@ def setup_run(tmp_path, monkeypatch, *, planning_block=False):
     design = {"feature_id": "F", "slices": []}
     manifest = [{"path": "design.md", "sha256": review.digest(doc.read_bytes()), "bytes": len(doc.read_bytes())}]
     monkeypatch.setattr(review, "prepare_packet", lambda *args: ("synthetic packet", manifest, design))
+    def synthetic_snapshot(root,head,entries):
+        for entry in entries:
+            if review.digest((root/entry['path']).read_bytes())!=entry['sha256']:
+                raise review.ReviewBlocked('review inputs must match captured committed HEAD')
+    monkeypatch.setattr(review,'verify_packet_snapshot',synthetic_snapshot)
     calls, records = [], []
     def preflight(*args, **kwargs):
         if planning_block:
@@ -663,3 +668,59 @@ def test_phase_receipts_cannot_be_promoted_after_tooling_audit_changes(tmp_path,
     with pytest.raises(ValueError, match='phase receipts require'):
         complete.finalize(tmp_path, 'F', args.role, results)
     assert records == []
+
+
+def test_real_committed_snapshot_rejects_dirty_provider_inputs(tmp_path):
+    import subprocess
+    subprocess.run(['git','init','-q',str(tmp_path)],check=True)
+    doc=tmp_path/'public.md';doc.write_text('public committed source')
+    subprocess.run(['git','-C',str(tmp_path),'add','public.md'],check=True)
+    subprocess.run(['git','-C',str(tmp_path),'-c','user.name=Synthetic','-c','user.email=synthetic@example.test','commit','-qm','synthetic'],check=True)
+    head=subprocess.check_output(['git','-C',str(tmp_path),'rev-parse','HEAD'],text=True).strip()
+    manifest=[{'path':'public.md','sha256':review.digest(doc.read_bytes())}]
+    review.verify_packet_snapshot(tmp_path,head,manifest)
+    doc.write_text('uncommitted replacement')
+    with pytest.raises(review.ReviewBlocked,match='captured committed HEAD'):
+        review.verify_packet_snapshot(tmp_path,head,[{'path':'public.md','sha256':review.digest(doc.read_bytes())}])
+
+
+def test_dirty_input_is_denied_before_key_or_provider_lookup(tmp_path,monkeypatch):
+    args,calls,records=setup_run(tmp_path,monkeypatch)
+    original=review.prepare_packet
+    def changing(*params):
+        value=original(*params);(tmp_path/'design.md').write_text('changed during packet preparation');return value
+    monkeypatch.setattr(review,'prepare_packet',changing)
+    with pytest.raises(review.ReviewBlocked,match='captured committed HEAD'):review.execute(args)
+    assert calls==[] and records==[]
+
+
+@pytest.mark.parametrize('content',[('sk-'+'x'*32).encode(),b'Privacy-class: private\nsynthetic restricted fixture'])
+def test_restricted_content_source_denied_without_echoing_values(tmp_path,content):
+    source=tmp_path/'review.md';source.write_bytes(content)
+    with pytest.raises(review.ReviewBlocked,match='restricted review source') as failure:review.read_review_source(source)
+    assert content.decode() not in str(failure.value)
+
+
+def test_hardlinked_review_source_is_denied_before_content_read(tmp_path):
+    import os
+    source=tmp_path/'source.md';source.write_text('synthetic external source')
+    alias=tmp_path/'alias.md';os.link(source,alias)
+    with pytest.raises(review.ReviewBlocked,match='linked review source'):review.read_review_source(alias)
+
+
+def test_complete_review_rejects_rehashed_contradictory_phase_report(tmp_path,monkeypatch):
+    import finalize_opencode_design_reviews as complete
+    args,calls,records=setup_run(tmp_path,monkeypatch)
+    (tmp_path/'docs/design').mkdir(parents=True)
+    (tmp_path/'docs/design/F.design.json').write_text(json.dumps({'slices':[{'slice_id':f'PAI-{n:02}'} for n in range(32)]}))
+    for group in review.REVIEW_GROUPS:
+        args.slice_group=group;assert review.execute(args)==0
+    results=sorted((tmp_path/'.playbook-artifacts/opencode-runs').glob('*/result.json'))
+    bad=results[0];data=json.loads(bad.read_text());report=bad.parent/'report.md'
+    body=json.loads('{'+report.read_text().split('\n{',1)[1])
+    body['findings']=[{'severity':'P1','title':'Synthetic blocker','issue':'Synthetic unresolved boundary','fix':'Fix and recheck'}]
+    report.write_text('# Synthetic\n\nPROGRAM_DESIGN_REVIEW: ADVISORY\n\n'+json.dumps(body)+'\n')
+    data['report_sha256']=review.digest(report.read_bytes());bad.write_text(json.dumps(data));bad.with_suffix('.json.sha256').write_text(review.digest(bad.read_bytes()))
+    monkeypatch.setattr(complete,'pinned_modules',review.pinned_modules)
+    with pytest.raises(review.ReviewBlocked,match='critical findings'):complete.finalize(tmp_path,'F',args.role,results)
+    assert records==[]

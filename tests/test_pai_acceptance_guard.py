@@ -36,9 +36,18 @@ def test_missing_zero_or_omitted_matrix_cases_fail(tmp_path):
     ET.SubElement(root, 'testcase', classname='tests.test_pai_end_to_end', name='test_chat')
     ET.ElementTree(root).write(report)
     assert guard.verify_report(report, matrix=matrix)[0] is False
-    ET.SubElement(root, 'testcase', classname='tests.test_pai_end_to_end', name='test_requirement_chat_01')
+    ET.SubElement(root, 'testcase', classname='tests.test_pai_requirements', name='test_requirement_chat_01')
     ET.ElementTree(root).write(report)
     assert guard.verify_report(report, matrix=matrix)[0] is True
+
+
+def test_duplicate_or_wrong_module_cannot_substitute_required_acceptance(tmp_path):
+    report=tmp_path/'report.xml'
+    matrix={'requirements':[{'spec_id':'CHAT-01','case_name':'test_requirement_chat_01'}],'scenarios':[]}
+    report.write_text('<testsuite><testcase classname="tests.other" name="test_requirement_chat_01"/></testsuite>')
+    assert guard.verify_report(report,matrix=matrix)[0] is False
+    report.write_text('<testsuite>'+2*'<testcase classname="tests.test_pai_requirements" name="test_requirement_chat_01"/>'+'</testsuite>')
+    assert guard.verify_report(report,matrix=matrix)==(False,'duplicate acceptance test nodes')
 
 
 def test_no_implicit_historical_suite_or_filter_bypass():
