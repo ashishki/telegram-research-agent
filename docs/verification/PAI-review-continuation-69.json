@@ -1,9 +1,25 @@
 {
   "schema_version": 1,
   "call_number": 69,
-  "status": "native_tooling_allocated_not_invoked",
-  "provider": "opencode_go",
-  "requested_model": "mimo-v2.6-pro",
+  "status": "native_tooling_STOP_preserved",
+  "native_result_path": ".playbook-artifacts/opencode-runs/opencode-4d446b80673140b28f33164fa271a92e/result.json",
+  "native_result_sha256": "ff0b32b57d32c0ce271f73652017faf1468faa9f6f5617d6ec872a2e75e22338",
+  "provider_call_attempted": true,
   "human_authority": false,
-  "provider_call_attempted": false
+  "native_tooling_receipt": true,
+  "design_approval_record": false,
+  "provider": "opencode_go",
+  "read_only": true,
+  "reviewed_head": "37221c01782831611f2038fa9085c85c50274b7b",
+  "verdict": "STOP_SHIP",
+  "requested_model": "mimo-v2.6-pro",
+  "observed_model": "mimo-v2.6-pro",
+  "requested_effort": "thinking_disabled",
+  "observed_effort": "thinking_disabled",
+  "usage": {
+    "completion_tokens": 1470,
+    "prompt_tokens": 34729,
+    "total_tokens": 36199
+  },
+  "report_sha256": "a1bec47a8d283222fd61ab9c68b10949fb62ec05923a8b979267ef03eed809d2"
 }

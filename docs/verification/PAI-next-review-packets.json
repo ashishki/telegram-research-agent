@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "status": "native67_timeout_no_verdict_source68_independent_recheck",
-  "current_approved_call_cap": 77,
-  "calls_consumed_including_failures": 68,
+  "current_approved_call_cap": 78,
+  "calls_consumed_including_failures": 69,
   "proposed_total_cap": 34,
   "new_calls_maximum": 3,
   "third_call": "only if an actual new finding needs independent recheck",
@@ -1894,49 +1894,49 @@
   },
   "native_design_allocations": [
     {
-      "call_number": 70,
-      "role": "program_design_review",
-      "slice_group": "foundation",
-      "status": "allocated_not_invoked"
-    },
-    {
       "call_number": 71,
       "role": "program_design_review",
-      "slice_group": "product",
+      "slice_group": "foundation",
       "status": "allocated_not_invoked"
     },
     {
       "call_number": 72,
       "role": "program_design_review",
-      "slice_group": "sources",
+      "slice_group": "product",
       "status": "allocated_not_invoked"
     },
     {
       "call_number": 73,
       "role": "program_design_review",
-      "slice_group": "completeness",
+      "slice_group": "sources",
       "status": "allocated_not_invoked"
     },
     {
       "call_number": 74,
-      "role": "product_design_review",
-      "slice_group": "foundation",
+      "role": "program_design_review",
+      "slice_group": "completeness",
       "status": "allocated_not_invoked"
     },
     {
       "call_number": 75,
       "role": "product_design_review",
-      "slice_group": "product",
+      "slice_group": "foundation",
       "status": "allocated_not_invoked"
     },
     {
       "call_number": 76,
       "role": "product_design_review",
-      "slice_group": "sources",
+      "slice_group": "product",
       "status": "allocated_not_invoked"
     },
     {
       "call_number": 77,
+      "role": "product_design_review",
+      "slice_group": "sources",
+      "status": "allocated_not_invoked"
+    },
+    {
+      "call_number": 78,
       "role": "product_design_review",
       "slice_group": "completeness",
       "status": "allocated_not_invoked"
@@ -1956,5 +1956,10 @@
     "call_number": 69,
     "status": "allocated_not_invoked",
     "purpose": "fresh bounded native audit after #67 timeout; #68 independently closed latest media fixes"
+  },
+  "native_tooling_recheck_70": {
+    "call_number": 70,
+    "status": "allocated_not_invoked",
+    "purpose": "independent recheck of concrete upstream-module/provider/scope checks and explicit trust boundary after native69"
   }
 }

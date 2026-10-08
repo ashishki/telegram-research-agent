@@ -157,6 +157,9 @@ def require_tooling_audit(root: Path) -> str:
             raw = path.read_bytes()
             if path.with_suffix(".json.sha256").read_text().strip() != digest(raw): continue
             result = json.loads(raw)
+            actual_modules=[{'path':str(Path(m.__file__).resolve()),'sha256':digest(Path(m.__file__).read_bytes())}
+                for m in pinned_modules(root) if hasattr(m,'__file__')]
+            if result.get('pinned_gate_modules')!=actual_modules:continue
             if (result.get("review_scope") != "tooling" or result.get("role") != "program_design_review"
                 or result.get("provider") != "opencode_go" or result.get("read_only") is not True
                 or result.get("requested_model") != "mimo-v2.6-pro" or result.get("observed_model") != "mimo-v2.6-pro"
@@ -267,6 +270,7 @@ def prepare_packet(root: Path, task: str, feature: str, role: str, tooling_revie
     )
     if tooling_review:
         instruction += "Scope is the actual review transport/checker code only, not full feature design approval. Challenge budget/credentials, schema, provenance, source coverage, tamper guards and negative tests.\n"
+        instruction += "Trust boundary: trusted runner/workspace/Git and provider-reported metadata over authenticated TLS; no signed physical-model or external append-only attestation is claimed. Privileged replacement of all code/Git/evidence is outside local hash-integrity guarantees and must remain an explicit limitation, not fabricated cryptographic proof. Read actual guards and real-consumer negative tests; report reproducible defects within the stated boundary and preserve unsupported attestation in not_verified.\n"
     if selected:
         instruction += ("This is one declared phase of a COMPLETE programme review. Review only these slice scopes: "
                         + ",".join(sorted(selected)) + ". The COMPLETE canonical 32-slice registry and 69-requirement/10-scenario matrix are supplied as cross-phase context; only relevant specification sections are supplied. "

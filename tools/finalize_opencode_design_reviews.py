@@ -31,6 +31,7 @@ def finalize(root: Path, feature: str, role: str, results: list[Path]):
         if group not in REVIEW_GROUPS or group in by_group:
             raise ReviewBlocked("missing, unknown or duplicate review phase")
         if (result.get("feature_id") != feature or result.get("role") != role
+            or result.get('schema_version')!='assistant.opencode_design_review.v1' or result.get('review_scope')!='complete_design'
             or result.get("provider") != "opencode_go" or result.get("read_only") is not True
             or result.get("requested_model") != "mimo-v2.6-pro"
             or result.get("observed_model") != "mimo-v2.6-pro"):

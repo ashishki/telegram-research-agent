@@ -238,6 +238,10 @@ def test_real_pinned_design_record_accepts_non_codex_binding_and_rejects_drift(t
     with pytest.raises(approve_feature_design.ApprovalError,match='STOP_SHIP review blocks approval'):
         approve_feature_design.parse_design_review_record(root=tmp_path,feature_id='F',role=args.role,current_design=design,required=True)
     record_path.write_text(original_record)
+    record_path.write_text(json.dumps({**record,'role':'product_design_review'}))
+    with pytest.raises(approve_feature_design.ApprovalError):
+        approve_feature_design.parse_design_review_record(root=tmp_path,feature_id='F',role=args.role,current_design=design,required=True)
+    record_path.write_text(original_record)
     (folder / "F.md").write_text("# Changed synthetic design\n")
     with pytest.raises(approve_feature_design.ApprovalError, match="Markdown changed"):
         approve_feature_design.parse_design_review_record(
@@ -579,11 +583,13 @@ def test_missing_independent_tooling_audit_denies_before_provider(tmp_path, monk
     assert calls == [] and records == []
 
 
-def test_real_tooling_gate_rejects_changed_source_and_verdict_disagreement(tmp_path):
+def test_real_tooling_gate_rejects_changed_source_and_verdict_disagreement(tmp_path,monkeypatch):
     import importlib.util
     spec = importlib.util.spec_from_file_location('fresh_review_gate', review.__file__)
     fresh = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(fresh)
+    module_file=tmp_path/'pinned_gate.py';module_file.write_text('synthetic immutable gate fixture')
+    monkeypatch.setattr(fresh,'pinned_modules',lambda root:(SimpleNamespace(__file__=str(module_file)),))
     run = tmp_path / '.playbook-artifacts/opencode-runs/opencode-synthetic'
     run.mkdir(parents=True)
     manifest = []
@@ -597,12 +603,16 @@ def test_real_tooling_gate_rejects_changed_source_and_verdict_disagreement(tmp_p
     payload = {'review_scope': 'tooling', 'role': 'program_design_review', 'provider': 'opencode_go',
                'read_only': True, 'requested_model': 'mimo-v2.6-pro', 'observed_model': 'mimo-v2.6-pro',
                'verdict': 'ADVISORY', 'documents': manifest, 'report_sha256': fresh.digest(report.read_bytes())}
+    payload['pinned_gate_modules']=[{'path':str(module_file),'sha256':fresh.digest(module_file.read_bytes())}]
     result = run / 'result.json'
     def write():
         result.write_text(json.dumps(payload))
         result.with_suffix('.json.sha256').write_text(fresh.digest(result.read_bytes()))
     write()
     assert fresh.require_tooling_audit(tmp_path) == result.relative_to(tmp_path).as_posix()
+    module_file.write_text('changed pinned gate')
+    with pytest.raises(ValueError):fresh.require_tooling_audit(tmp_path)
+    module_file.write_text('synthetic immutable gate fixture')
     target = tmp_path / fresh.TOOLING_REFS[0]
     target.write_text('changed public source')
     with pytest.raises(ValueError): fresh.require_tooling_audit(tmp_path)
@@ -723,4 +733,35 @@ def test_complete_review_rejects_rehashed_contradictory_phase_report(tmp_path,mo
     data['report_sha256']=review.digest(report.read_bytes());bad.write_text(json.dumps(data));bad.with_suffix('.json.sha256').write_text(review.digest(bad.read_bytes()))
     monkeypatch.setattr(complete,'pinned_modules',review.pinned_modules)
     with pytest.raises(review.ReviewBlocked,match='critical findings'):complete.finalize(tmp_path,'F',args.role,results)
+    assert records==[]
+
+
+def test_legacy_wrapper_only_allows_read_only_help_and_verification(monkeypatch):
+    spec=importlib.util.spec_from_file_location('local_role_wrapper',review.ROOT/'tools/run_codex_role.py')
+    wrapper=importlib.util.module_from_spec(spec);spec.loader.exec_module(wrapper)
+    calls=[];monkeypatch.setattr(wrapper,'pinned_main',lambda argv:calls.append(argv) or 0)
+    for argv in (['run'],['--root','.','run'],['unknown'],[]):assert wrapper.main(argv)==2
+    assert calls==[]
+    assert wrapper.main(['--help'])==0 and wrapper.main(['verify','--result','synthetic.json'])==0
+
+
+def test_shared_review_transport_rejects_other_provider_or_model_before_http(monkeypatch):
+    calls=[];monkeypatch.setattr(mimo_code_review,'urlopen',lambda *args,**kwargs:calls.append(args))
+    for url,model in [('https://other.invalid','mimo-v2.6-pro'),('https://opencode.ai/zen/go/v1','other-model')]:
+        with pytest.raises(ValueError,match='authorized_review_provider'):
+            mimo_code_review._call_model(api_key='synthetic',base_url=url,model=model,prompt='synthetic',timeout=30)
+    assert calls==[]
+
+
+def test_tooling_scope_cannot_be_promoted_to_complete_design(tmp_path,monkeypatch):
+    import finalize_opencode_design_reviews as complete
+    args,calls,records=setup_run(tmp_path,monkeypatch)
+    (tmp_path/'docs/design').mkdir(parents=True)
+    (tmp_path/'docs/design/F.design.json').write_text(json.dumps({'slices':[{'slice_id':f'PAI-{n:02}'} for n in range(32)]}))
+    for group in review.REVIEW_GROUPS:
+        args.slice_group=group;assert review.execute(args)==0
+    results=sorted((tmp_path/'.playbook-artifacts/opencode-runs').glob('*/result.json'))
+    bad=results[0];data=json.loads(bad.read_text());data['review_scope']='tooling';bad.write_text(json.dumps(data));bad.with_suffix('.json.sha256').write_text(review.digest(bad.read_bytes()))
+    monkeypatch.setattr(complete,'pinned_modules',review.pinned_modules)
+    with pytest.raises(review.ReviewBlocked,match='identity/scope'):complete.finalize(tmp_path,'F',args.role,results)
     assert records==[]
