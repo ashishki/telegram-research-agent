@@ -132,6 +132,8 @@ class DurableResearchWorker:
         if gaps:text+='\n\nНеполное покрытие: '+', '.join(gaps)
         return queue.complete(lease,{'request_ref':lease.payload['input_ref'],'status':'partial' if gaps else synthesized['status'],
             'text':text,'evidence_refs':[entry['ref'] for entry in available],'tool_calls':calls,
+            'tool_call_accounting':'conservative_upper_bound',
+            'unknown_tool_calls':sum(entry['tool_calls'] for entry in completed if entry['status']=='source_outcome_unknown'),
             'gaps':gaps,'answer_payload':synthesized,'data_classes':sorted({'private_archive' if entry['source']=='archive' else 'public' for entry in available}) or ['user_provided'],'data_class':'private_archive' if any(entry['source']=='archive' for entry in available) else 'public'})
 
     def _gather(self,lease,index,step,prepared):

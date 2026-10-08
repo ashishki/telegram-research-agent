@@ -11,6 +11,7 @@ from llm.client import LLMCompletionReceipt, LLMOutcomeUnknown
 from prm.capabilities import CapabilityDenied, AuthorizationDecision
 from prm.storage.policy import DurableCapabilityRegistry
 from prm.storage.postgres import StorageError
+from .model_errors import ModelResponseInvalid
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -67,7 +68,7 @@ class ScopedModelClient:
     def __init__(self, endpoint: ModelEndpoint, registry: DurableCapabilityRegistry, *, groups, history=(), guard=None,usage_observer=None,task_ref=None):
         self.endpoint,self.registry,self.groups=endpoint,registry,tuple(tuple(group) for group in groups)
         self.history=tuple(history);self.guard=guard
-        self.usage_observer=usage_observer;self.task_ref=task_ref;self.attempt_ref=None;self._called=False
+        self.usage_observer=usage_observer;self.task_ref=task_ref;self.attempt_ref=None;self._called=False;self.input_digest=None
 
     def complete_with_receipt(self,*,prompt,system,max_tokens,category,authorization,data_class,owner_ref,connection_ref,resource_ref):
         endpoint=self.endpoint
@@ -90,10 +91,13 @@ class ScopedModelClient:
         if len(body)>48000:raise StorageError('model request exceeds bounded scope')
         from .model_attempts import prepare_model_attempt,ModelAttemptAlreadyRecorded
         operations=tuple(group[0].operation_ref for group in self.groups)
-        if self._called:raise ModelAttemptAlreadyRecorded(self.attempt_ref or operations[0],operations)
+        digest=hashlib.sha256(body).hexdigest()
+        if self._called:raise ModelAttemptAlreadyRecorded(self.attempt_ref or operations[0],operations,
+            recorded_digest=self.input_digest,requested_digest=digest)
         self._called=True
+        self.input_digest=digest
         self.attempt_ref=prepare_model_attempt(self.registry.store,owner=owner_ref,task_ref=self.task_ref or operations[0],
-            purpose=self.groups[0][0].purpose,operation_refs=operations,input_digest=hashlib.sha256(body).hexdigest())
+            purpose=self.groups[0][0].purpose,operation_refs=operations,input_digest=digest)
         started=time.monotonic();http_attempted=False
         def transport():
             nonlocal http_attempted
@@ -103,26 +107,42 @@ class ScopedModelClient:
             request=Request(endpoint.endpoint,data=body,headers=headers,method='POST')
             http_attempted=True
             with build_opener(ProxyHandler({}),NoRedirect()).open(request,timeout=endpoint.timeout_seconds) as response:
-                if response.headers.get_content_type()!='application/json':raise StorageError('model response type differs')
+                if response.headers.get_content_type()!='application/json':raise ModelResponseInvalid()
                 raw=response.read(1048577)
-                if len(raw)>1048576:raise StorageError('model response exceeds bound')
-                value=json.loads(raw)
+                if len(raw)>1048576:raise ModelResponseInvalid()
+                try:value=json.loads(raw)
+                except (ValueError,UnicodeError):raise ModelResponseInvalid() from None
+            if not isinstance(value,dict):raise ModelResponseInvalid()
             choices=value.get('choices')
             if value.get('model')!=endpoint.model or not isinstance(choices,list) or len(choices)!=1:
-                raise StorageError('observed model or choice identity differs')
+                raise ModelResponseInvalid()
             choice=choices[0]
-            if choice.get('finish_reason')!='stop' or choice.get('message',{}).get('tool_calls'):
-                raise StorageError('incomplete model output or tool invocation denied')
+            if not isinstance(choice,dict) or not isinstance(choice.get('message'),dict):raise ModelResponseInvalid()
+            if choice.get('finish_reason')!='stop' or choice['message'].get('tool_calls'):
+                raise ModelResponseInvalid()
             text=choice.get('message',{}).get('content')
-            if not isinstance(text,str) or not text.strip() or len(text.encode())>24000:raise StorageError('invalid model text')
+            if not isinstance(text,str) or not text.strip() or len(text.encode())>24000:raise ModelResponseInvalid()
             usage=value.get('usage',{})
+            if not isinstance(usage,dict):raise ModelResponseInvalid()
             for key in ('prompt_tokens','completion_tokens'):
-                if type(usage.get(key))is not int or not 0<=usage[key]<=1000000:raise StorageError('usage unavailable or invalid')
+                if type(usage.get(key))is not int or not 0<=usage[key]<=1000000:raise ModelResponseInvalid()
+            for detail,key,total in (('prompt_tokens_details','cached_tokens','prompt_tokens'),('completion_tokens_details','reasoning_tokens','completion_tokens')):
+                entry=usage.get(detail,{})
+                if not isinstance(entry,dict) or type(entry.get(key,0))is not int or not 0<=entry.get(key,0)<=usage[total]:raise ModelResponseInvalid()
             return text,usage
         try:
             reservations=tuple(tuple(decision.reservation for decision in group) for group in self.groups)
             text,usage=self.registry.execute_reserved_groups(reservations,transport)
         except CapabilityDenied:raise
+        except ModelResponseInvalid as error:
+            error.operation_refs=operations;error.attempt_ref=self.attempt_ref
+            if self.usage_observer:
+                invalid=LLMCompletionReceipt(text='',model=endpoint.model,input_tokens=0,output_tokens=0,estimated_cost_usd=None,
+                    duration_ms=int((time.monotonic()-started)*1000),attempts=1,usage_recorded=False,
+                    external_call_attempted=http_attempted,delivery_outcome='unknown')
+                try:self.usage_observer(invalid,{'input':None,'cached_input':None,'cache_write':None,'output':None,'reasoning':None,'semantics':'invalid_provider_response'},self.groups)
+                except Exception:error.accounting_status='unconfirmed'
+            raise error from None
         except Exception:
             unknown=LLMCompletionReceipt(text='',model=endpoint.model,input_tokens=0,output_tokens=0,
                 estimated_cost_usd=None,duration_ms=int((time.monotonic()-started)*1000),attempts=1,usage_recorded=False,

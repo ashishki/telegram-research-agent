@@ -55,3 +55,16 @@ def test_github_revocation_between_commit_and_content_is_not_hidden_as_partial(p
     provider=GitHubReadProvider(registry=pai.root.registry,owner_ref=pai.root.owner_ref,repository_ref='owner/repository',ref='main',upper_bound=0)
     with pytest.raises(CapabilityDenied):provider.read_repository_context('owner/repository')
     assert len(calls)==1
+
+
+@pytest.mark.parametrize('changed',[{'size':None},{'size':True},{'size':128001},{'sha':'invalid'}])
+def test_github_invalid_file_identity_metadata_is_rejected(pai,monkeypatch,changed):
+    from prm.runtime import web
+    from prm.storage.postgres import StorageError
+    allow(pai,'github.repository_context','owner/repository','public','project.context',provider='provider_github',connection=None,operation='read')
+    def http(url,**kwargs):
+        value={'sha':'a'*40} if '/commits/' in url else {'path':'README.md','size':0,'encoding':'base64','content':'','sha':'b'*40,**changed}
+        return {'content_type':'application/json','body':json.dumps(value).encode()}
+    monkeypatch.setattr(web,'_https_get',http)
+    provider=GitHubReadProvider(registry=pai.root.registry,owner_ref=pai.root.owner_ref,repository_ref='owner/repository',ref='main',upper_bound=0)
+    with pytest.raises(StorageError,match='scope or size'):provider.read_repository_context('owner/repository')

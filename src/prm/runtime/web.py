@@ -99,7 +99,9 @@ class GitHubReadProvider:
         for path in self.paths:
             try:
                 document=read('contents/'+quote(path,safe='/')+'?'+urlencode({'ref':sha}))
-                if document.get('encoding')!='base64' or document.get('path')!=path or document.get('size',128001)>128000:
+                if (not isinstance(document,dict) or document.get('encoding')!='base64' or document.get('path')!=path
+                    or type(document.get('size'))is not int or not 0<=document['size']<=128000
+                    or not isinstance(document.get('sha'),str) or not re.fullmatch(r'[a-f0-9]{40}',document['sha'])):
                     raise StorageError('GitHub file scope or size differs')
                 raw=base64.b64decode(document['content'],validate=False)
                 if len(raw)>128000:raise StorageError('GitHub content exceeds bound')

@@ -26,6 +26,7 @@ def runtime():
             body=json.loads(self.rfile.read(int(self.headers['Content-Length'])));requests.append(body)
             value={'model':'fixture_model','choices':[{'finish_reason':'stop','message':{'content':'Синтетическое объяснение с достаточным контекстом.'}}],
                    'usage':{'prompt_tokens':40,'completion_tokens':12}}
+            if body['messages'][-1]['content']=='Synthetic invalid usage':value['usage']['prompt_tokens_details']={'cached_tokens':[]}
             self.send_response(200);self.send_header('Content-Type','application/json');self.end_headers();self.wfile.write(json.dumps(value).encode())
     server=ThreadingHTTPServer(('127.0.0.1',0),Provider);thread=Thread(target=server.serve_forever);thread.start()
     try:
@@ -114,7 +115,8 @@ def test_unknown_model_call_has_logical_fence_across_fresh_reservations(pai):
     assert failed.value.operation_refs==('unknown_model_first',) and not failed.value.retry_allowed
     second,new_decision=client('unknown_model_fresh_reservation')
     try:
-        with pytest.raises(ModelAttemptAlreadyRecorded):second.complete_with_receipt(**dict(kwargs,authorization=new_decision))
+        with pytest.raises(ModelAttemptAlreadyRecorded) as replay:second.complete_with_receipt(**dict(kwargs,authorization=new_decision,prompt='Divergent synthetic body'))
+        assert replay.value.input_changed and replay.value.recorded_digest!=replay.value.requested_digest
         with pytest.raises(ModelAttemptAlreadyRecorded):first.complete_with_receipt(**kwargs)
         assert len([row for row in pai.requests if row[0]=='model'])==1
     finally:new_decision.reservation.abandon_before_transport()
@@ -169,3 +171,28 @@ def test_cancel_after_model_response_preserves_charge_and_prevents_result_comple
     assert state['status']=='cancelled' and not state['result_ref']
     assert len([row for row in pai.requests if row[0]=='model'])==1
     assert all(w['consumed']==1 for w in pai.root.registry.snapshot(pai.root.owner_ref)['windows'])
+
+
+def test_known_invalid_model_response_retains_typed_no_retry_even_if_accounting_fails(runtime):
+    from prm.capabilities import AuthorizationRequest
+    from prm.runtime.model_errors import ModelResponseInvalid
+    from prm.runtime.model_attempts import ModelAttemptAlreadyRecorded
+    from prm.storage.postgres import StorageError
+    root,requests,now=runtime;grant(root,now)
+    def client(operation):
+        decision=root.registry.authorize_and_reserve(AuthorizationRequest(owner_ref=root.owner_ref,connection_ref='connection_fixture',capability='model.generate',
+            resource_ref='resource_dialogue',operation='model_egress',data_class='user_provided',provider_ref='provider_openai',purpose='answer.request',operation_ref=operation),upper_bound=1)
+        return root.scoped_client(root.model_endpoint,groups=((decision,),),task_ref='invalid_reply_task',attempt_ref=operation),decision
+    current,decision=client('invalid_reply_attempt')
+    def failed_observer(*args):raise StorageError('synthetic accounting failure')
+    current.usage_observer=failed_observer
+    kwargs={'prompt':'Synthetic invalid usage','system':'Answer this question.','max_tokens':80,'category':'chat','authorization':decision,
+        'data_class':'user_provided','owner_ref':root.owner_ref,'connection_ref':'connection_fixture','resource_ref':'resource_dialogue'}
+    with pytest.raises(ModelResponseInvalid) as failure:current.complete_with_receipt(**kwargs)
+    assert not failure.value.retry_allowed and failure.value.operation_refs==('invalid_reply_attempt',)
+    assert failure.value.accounting_status=='unconfirmed'
+    replay,reserved=client('invalid_reply_fresh_reservation')
+    try:
+        with pytest.raises(ModelAttemptAlreadyRecorded):replay.complete_with_receipt(**dict(kwargs,authorization=reserved))
+    finally:reserved.reservation.abandon_before_transport()
+    assert len(requests)==1
