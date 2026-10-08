@@ -1,0 +1,136 @@
+{
+  "schema_version": 1,
+  "status": "reviewed",
+  "call_number": 39,
+  "call_limit": 39,
+  "purpose": "phase_C_delivery_recheck",
+  "read_only": true,
+  "provider": "opencode_go",
+  "requested_model": "mimo-v2.6-pro",
+  "observed_model": "mimo-v2.6-pro",
+  "requested_effort": "thinking_disabled",
+  "observed_effort": "thinking_disabled",
+  "head_sha": "15db746bcd97082cdb73abe1b0ec0e9249c30c18",
+  "base_sha": "c840ecc",
+  "diff_sha256": "426505f6acf01776019635decd296fa3057a987110a5cde06c2dedc0d2a92790",
+  "sources": [
+    {
+      "path": "src/prm/runtime/delivery.py",
+      "sha256": "2ffaff380f23d0a80d64c05ccb7079e293b8ed505f48ffc8458fc65f50a26804",
+      "bytes": 28875
+    },
+    {
+      "path": "src/prm/runtime/ingress.py",
+      "sha256": "48a1ecf9e36796ed1d7385ce09f996af27c1d25dd9fa6fa4f6339da3e0431656",
+      "bytes": 17639
+    },
+    {
+      "path": "src/prm/runtime/service.py",
+      "sha256": "f132f2f97fbc571e503d1df46849112f7e153ddbca63446834dec56b9632ea6a",
+      "bytes": 3355
+    },
+    {
+      "path": "src/prm/storage/jobs.py",
+      "sha256": "539b441477e31952a7607621822d454b8df60ede19432d6a4b0bc3473c83df66",
+      "bytes": 15386
+    },
+    {
+      "path": "src/prm/storage/policy.py",
+      "sha256": "6e16889bdd9f889daf7ced9c447e2e7c514a623c9d4958bdd9fd1f246a9bb4c2",
+      "bytes": 30184
+    },
+    {
+      "path": "tests/test_pai_delivery.py",
+      "sha256": "5515d4d9dfcc53a727a0b1a9978c2fc1902fb6edb763d4e63cc6cf6c146dccd7",
+      "bytes": 28732
+    },
+    {
+      "path": "tests/test_pai_ingress_jobs.py",
+      "sha256": "430680eed23c013932b890fadfd50a006908b6a671123c41e8aeadf9bda5ec81",
+      "bytes": 10359
+    },
+    {
+      "path": "tests/test_pai_workers.py",
+      "sha256": "3bf1b7e86e9a77d170b5451c1f7cb10df4b384c8ff630159aef4a2014fb7d3b6",
+      "bytes": 7435
+    },
+    {
+      "path": "docs/verification/PAI-review-continuation-38.json",
+      "sha256": "db933e924face93c1846d11dfce4c5c625a6d9d4139fb352c9b8bcb2c99630f5",
+      "bytes": 8754
+    },
+    {
+      "path": "docs/verification/PAI-review-38-response.md",
+      "sha256": "3655e52ab34c91fbe45f6843ceeb7b76f04fe7ab95f51e78e1b0c8109d184ad4",
+      "bytes": 3700
+    }
+  ],
+  "scope": "phase_C_delivery_recheck; supplied full current source/tests and explicitly labeled integration diff if present",
+  "input_sha256": "b12246bfb809d273264044c079250068dd3ea2800c8453941d7cc82451005460",
+  "input_bytes": 168244,
+  "output_token_cap": 16000,
+  "timeout_seconds": 900,
+  "workflow_receipt": false,
+  "human_authority": false,
+  "runner_path": ".playbook-artifacts/pai-review-as-needed.py",
+  "runner_sha256": "8306b7e250e58139ee08be8c58de615d3d6fe684f5a4726c091ce9eaf689d545",
+  "transport_path": "tools/mimo_code_review.py",
+  "transport_sha256": "b0ba01f2647f21c004e54d2b9840573b38ac43ea541e394fd61bdfa2c9705c75",
+  "command": ".venv-pai/bin/python .playbook-artifacts/pai-review-as-needed.py --call-number 39 --purpose phase_C_delivery_recheck",
+  "source_exclusions": [
+    "actual private corpus",
+    "live account payload",
+    "credentials",
+    "production configuration"
+  ],
+  "authority_exclusions": [
+    "human/workflow completion",
+    "live-account consent",
+    "production migration/deployment",
+    "product-provider spending"
+  ],
+  "request_body_sha256": "04af8c3de1e7663d08310e17a3de0907774421b4a1097821150994d54462825e",
+  "provider_call_attempted": true,
+  "usage": {
+    "prompt_tokens": 44857,
+    "completion_tokens": 1843,
+    "total_tokens": 46700,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    }
+  },
+  "finish_reason": "stop",
+  "response_sha256": "77afb130c62e30cfcf489ed8716e5b577edd19e72d2caa2717c878d38d723850",
+  "findings": {
+    "verdict": "FIX_P1_FIRST",
+    "findings": [
+      {
+        "severity": "P1",
+        "title": "Unknown multipart attempt can be re-driven to send remaining parts on each caller retry despite aggregate being pre-marked unknown",
+        "file": "src/prm/runtime/delivery.py:120",
+        "issue": "Once the aggregate attempt row is created with status 'unknown' before any part (line 117-119), a crash, ScopePreparationUnknown, or raised exception mid-part-loop returns without recording which parts were sent or attempted. A later deliver_result call for the same answer returns the existing aggregate row at line 113-116 before reaching the part loop, so it does not resend — good — but if the first call itself continues after a per-part _deliver raised (exception propagates out of deliver_result), no parts are lost; however when a part returns status 'not_sent' the loop returns the aggregate (line 126) while earlier parts are already sent, and nothing durably records that the aggregate cannot be retried as a whole or that the remaining parts must not be attempted on a subsequent call that somehow re-enters the loop (e.g. reconcile's own recursion calls _deliver per child but never the aggregate loop; the deliver_result path for a caller-supplied effect_lease that was renewed/reclaimed can reach the loop again only if the aggregate row was not created). More concretely: if the process crashes after the aggregate insert but before any part attempt, a subsequent deliver_result with a new valid effect lease for the same effect_key re-enters the aggregate early-return and never sends anything, leaving an unattempted aggregate permanently unknown — acceptable — but the reverse ordering issue is that reconcile can mark each child 'sent' via adapter evidence without re-checking that the child was actually attempted by this owner's send path (an adapter could report 'delivered' for a child attempt row that exists), and the per-part loop at line 124-125 reuses the same effect_lease across N separate _deliver calls, each of which runs its own execute_reserved_groups preparation; if a later part's preparation raises ScopePreparationUnknown after earlier parts were sent, the aggregate remains unknown and is returned by subsequent calls, but there is no durable record binding which parts were already accepted beyond child rows — the parent's provider_receipt is only set when ALL parts are 'sent', so a mixed state (part 1 sent, part 2 unknown) is only recoverable through reconcile, which is correct, but the retry-unreachable parent means the caller must reconcile children individually and there is no single operation that does so if the caller only holds the parent delivery_id. The claimed 'never resends already accepted or ambiguous partial sends' holds for the sender loop (line 114-116 early return), but if the parent row was inserted and the process died before ANY part call, a legitimate first-time send is permanently blocked (parent 'unknown' with zero children).",
+        "fix": "Do not insert the parent aggregate row before any part is attempted, or insert it in a 'preparing' state that permits the first part attempt exactly once under a fenced effect lease. Alternatively, allow the parent loop to resume from the first unattempted child under the same effect lease, treating already-created child rows idempotently, and record a durable 'parts_pending' count so a crash after the parent insert cannot strand an unattempted aggregate.",
+        "confidence": "high"
+      },
+      {
+        "severity": "P1",
+        "title": "Cancel acknowledgement can claim 'Задача отменена.' for a job already completed/failed by a racing worker, and does not reflect that state",
+        "file": "src/prm/runtime/ingress.py:163",
+        "issue": "control() reads state (line 158) before calling queue.cancel (line 162). queue.cancel uses an atomic UPDATE ... WHERE status IN ('queued','retry_wait','leased','running') and returns True if a row was updated. If the job completed between the status read and the cancel UPDATE, cancel returns False and the code correctly reports 'Задача уже имеет статус completed.' But if the job was still leased/running at the moment of the UPDATE, cancel returns True and the job is marked 'cancelled' — while the worker may have already been inside its slow external call and will later fail fenced completion (good). The message 'Уже начатый внешний вызов мог продолжиться.' is included when the pre-read state was leased/running (line 167). However if the job had already transitioned to 'completed' AFTER the initial status read but BEFORE the UPDATE, cancel's UPDATE will not match (completed not in the WHERE list), so it returns False and the message is correct. The remaining gap is the reverse race: the worker's fenced complete() could commit 'completed' between the UPDATE setting 'cancelled' and the subsequent queue.status() re-read at line 164 — impossible because complete() requires the job row status to still be leased/running under _fenced, and cancel has already flipped it to cancelled with token=NULL in the same transaction, so fenced complete will raise. That is correct. The actual defect is narrower: the acknowledgment text is chosen from the pre-cancel state variable (line 163, 167) rather than the actual post-cancel current state fetched at line 164; if state was 'queued' at read time but a worker claimed and completed the job before the cancel UPDATE, cancel returns False and the fallback text correctly reports current status. But if state was 'retry_wait' at read time and the job was leased/running at UPDATE time, the 'already started external call' warning is omitted even though the job may have been executing.",
+        "fix": "Derive the acknowledgment from the actual return value of queue.cancel plus a fresh status read after cancellation, and include the 'already started external call' warning whenever the job was ever leased/running in its history (e.g. attempts > 0 and status changed from a leased/running state), not just from a stale pre-read state.",
+        "confidence": "high"
+      }
+    ],
+    "not_verified": [
+      "src/prm/watch_jobs.py (render_watch_notification, _notification_from_payload, _subscription_from_payload) is not in the packet; the claimed strictness of notification payload decoding and the 3800-char rendered bound cannot be independently verified here.",
+      "src/prm/runtime/scheduler.py and src/prm/storage/actions.py, deletion.py, capabilities.py are not in the packet; grant reservation/settlement and Watch collection semantics were reviewed only via the inline policy.py and delivery.py usage.",
+      "Actual runtime behavior against real PostgreSQL and a synthetic HTTP provider was not executed; findings are from static source analysis only.",
+      "Whether deliver_result callers outside the packet (bot/prm_handlers.py) pass effect_lease for effect-mode results was not directly verified; the ingress /result path at ingress.py:174 passes no effect_lease, but the new scheduled-effect guard at delivery.py:93-96 covers the case where an effect intent exists and no prior attempt is present."
+    ],
+    "summary": "Review of the supplied source packet, including the previously omitted full JobQueue, confirms the scheduled-effect guard (delivery.py:93-96) correctly denies a scheduled answer delivery when effect_lease is None and no prior attempt exists, and a stale/cancelled effect lease is rejected by _fenced (jobs.py:146-149) before any transport. Explicit unscheduled owner result reads remain separately grant-guarded, and an existing attempt is returned without resend (delivery.py:114-116, 204-208). Cancelled compute completion is fenced (complete() calls _fenced before publishing a result), and cancel acknowledgment now surfaces that an already-started external call may continue, though it derives that warning from a pre-read state rather than actual post-cancel facts (P1). Multipart parent reconciliation requires exact child IDs, payload digests, destination/source bindings and per-part evidence before marking the parent sent; a missing/unattempted part cannot be inferred from one child's receipt (confirmed by test_multipart_missing_part_cannot_be_reconciled_by_one_aggregate_receipt). Rendered Watch text is bounded to 3800 chars (delivery.py:145) and source authority is checked in _source_current before sender. However two concrete P1 defects remain: (1) the parent aggregate row is inserted as 'unknown' before any part attempt, so a crash after insert but before the first part send permanently strands an unattempted aggregate with no way to resume under a valid lease; (2) cancel acknowledgment uses the pre-read state to decide whether to warn about an in-flight external call, which can omit that warning for jobs actually running at cancellation time. No P0 found. Two P1 issues, so FIX_P1_FIRST."
+  },
+  "duration_seconds": 84.933
+}

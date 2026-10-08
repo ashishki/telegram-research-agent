@@ -70,6 +70,21 @@ def test_empty_media_reference_is_denied_before_persistence(sandbox,media):
     assert count==0 and current.queue.claim(owner=current.owner_ref) is None
 
 
+def test_cancel_warning_uses_actual_attempts_if_worker_claims_after_status_read(sandbox,monkeypatch):
+    notices=[];current=ingress(sandbox,'cancel_claim_race');current.cancel_callback=lambda job:notices.append(job)
+    ack=current.receive(update(910,'Synthetic cancellation race'));status=current.queue.status;reads=[]
+    def read_then_claim(**kwargs):
+        value=status(**kwargs)
+        if not reads:
+            reads.append(True);assert value['status']=='queued'
+            assert current.queue.claim(owner=current.owner_ref,kinds=('compute.assistant',)) is not None
+        return value
+    monkeypatch.setattr(current.queue,'status',read_then_claim)
+    reply=current.control('cancel',ack.job_id)
+    assert reply.text=='Задача отменена. Уже начатый внешний вызов мог продолжиться.'
+    assert notices==[ack.job_id] and status(owner=current.owner_ref,job_id=ack.job_id)['status']=='cancelled'
+
+
 @pytest.mark.parametrize('changes', [
     {'from': {'id': 43}}, {'chat': {'id': -10042, 'type': 'group'}},
     {'chat': {'id': 43, 'type': 'private'}}, {'chat': {'id': 42, 'type': 'group'}},

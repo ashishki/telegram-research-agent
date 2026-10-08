@@ -357,3 +357,17 @@ failures preserved in PAI-review-38-response.md. Native mode maintenance:
 tooling packet: 131737 bytes, no provider call, human-selected planning depth
 still missing; no gate bypass or governed receipt invented. Retrofit 150 passed
 in 12.29 s. Next #39 C recheck under ongoing authority; 38 calls consumed.
+
+Review #39 reserved/attempted, 39 consumed under ongoing scoped authority including failures.
+Purpose: phase_C_delivery_recheck; source HEAD 15db746bcd97082cdb73abe1b0ec0e9249c30c18. No automatic retry.
+
+# 2026-10-08 cancel race and parent no-retry evidence
+
+#39 fixes/recheck response: PAI-review-39-response.md. Real queued-to-leased
+cancel race now uses post-cancel attempts. Conservative prepared multipart
+parent has a new interruption/no-child/no-resend/no-fake-evidence counterexample;
+its allegation remains independently open. 36 passed in 42.42 s, zero skips.
+Native planning selections restored via pinned interactive select-plan under
+the existing explicit delegation recorded in PAI-00/01 evidence, not invented
+from budget permission. Native prepare-only planning gate now passes.
+39 calls consumed. Next #40 C resolution, D/E/F and native tooling audit.

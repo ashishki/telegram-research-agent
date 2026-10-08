@@ -160,11 +160,11 @@ class TelegramJobIngress:
             return IntakeReply('Задача не найдена.')
         if command == 'cancel':
             cancelled = self.queue.cancel(owner=self.owner_ref, job_id=job_id)
-            if cancelled and state['status'] in {'leased','running'} and self.cancel_callback is not None:self.cancel_callback(job_id)
             current=self.queue.status(owner=self.owner_ref,job_id=job_id)
+            if cancelled and current['attempts']>0 and self.cancel_callback is not None:self.cancel_callback(job_id)
             if cancelled:
                 text='Задача отменена.'
-                if state['status'] in {'leased','running'}:text+=' Уже начатый внешний вызов мог продолжиться.'
+                if current['attempts']>0:text+=' Уже начатый внешний вызов мог продолжиться.'
             else:text=f"Задача уже имеет статус {current['status']}."
             return IntakeReply(text,job_id=job_id)
         if command == 'result' and state['status'] == 'completed':

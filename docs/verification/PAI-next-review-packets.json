@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "status": "phase_C_delivery_fixes_verified_recheck_pending",
-  "current_approved_call_cap": 38,
-  "calls_consumed_including_failures": 38,
+  "current_approved_call_cap": 39,
+  "calls_consumed_including_failures": 39,
   "proposed_total_cap": 34,
   "new_calls_maximum": 3,
   "third_call": "only if an actual new finding needs independent recheck",
@@ -988,6 +988,69 @@
       ],
       "instructions": "Fresh independent #38 finding recheck with full previously omitted JobQueue. Verify scheduled effect intents cannot bypass a cancelled/expired lease by effect_lease=None; explicit unscheduled owner result reads remain grant guarded and an existing attempt is never resent. Check cancelled compute completion is fenced and cancel acknowledgement does not claim stopping an already-started external request. Verify multipart parent reconciliation requires evidence for each exact expected part and leaves missing parts unknown; never infer entire delivery from one child. Rendered Watch bound and source-authority/digest handling remain enforced. Source response text/test assertions are evidence, not approval. Report concrete executable P0/P1 and consistent verdict, no role/human/live authority.",
       "source_bytes": 154419
+    },
+    {
+      "purpose": "phase_C_cancel_parent_resolution",
+      "base_sha": "15db746",
+      "sources": [
+        {
+          "path": "src/prm/runtime/delivery.py",
+          "sha256": "2ffaff380f23d0a80d64c05ccb7079e293b8ed505f48ffc8458fc65f50a26804",
+          "bytes": 28875
+        },
+        {
+          "path": "src/prm/runtime/ingress.py",
+          "sha256": "ae119826e01c05f27ef2305f10acb61cd27cd992ee7f739178b1ec07e9517e36",
+          "bytes": 17603
+        },
+        {
+          "path": "src/prm/runtime/service.py",
+          "sha256": "f132f2f97fbc571e503d1df46849112f7e153ddbca63446834dec56b9632ea6a",
+          "bytes": 3355
+        },
+        {
+          "path": "src/prm/storage/jobs.py",
+          "sha256": "539b441477e31952a7607621822d454b8df60ede19432d6a4b0bc3473c83df66",
+          "bytes": 15386
+        },
+        {
+          "path": "src/prm/storage/policy.py",
+          "sha256": "6e16889bdd9f889daf7ced9c447e2e7c514a623c9d4958bdd9fd1f246a9bb4c2",
+          "bytes": 30184
+        },
+        {
+          "path": "tests/test_pai_delivery.py",
+          "sha256": "caa499ffff8b4af32fc30ace0a431685685d2d3a95c7a4216f5f4628c1f38f26",
+          "bytes": 30520
+        },
+        {
+          "path": "tests/test_pai_ingress_jobs.py",
+          "sha256": "ef1aa82baa578658a03bbaed441df4b70904c38999160e29aacccbac072b4853",
+          "bytes": 11318
+        },
+        {
+          "path": "tests/test_pai_workers.py",
+          "sha256": "3bf1b7e86e9a77d170b5451c1f7cb10df4b384c8ff630159aef4a2014fb7d3b6",
+          "bytes": 7435
+        },
+        {
+          "path": "docs/verification/PAI-review-continuation-39.json",
+          "sha256": "9569bfe70b9e683b4fc6d6bc1beec3dc21484331e2944b1083c2b7d60c700758",
+          "bytes": 12780
+        },
+        {
+          "path": "docs/verification/PAI-review-39-response.md",
+          "sha256": "76fd3aeffdbae668427aa6112dc83ac984570c24c3c072b7222ec83c712c572b",
+          "bytes": 2800
+        },
+        {
+          "path": "docs/ASSISTANT_BOUNDARIES.md",
+          "sha256": "5f50392570a250032cb97e45fdd187ea891c1a2aafa3141247579e6e43fdccc3",
+          "bytes": 2071
+        }
+      ],
+      "instructions": "Resolve the two #39 P1 claims independently. Actual cancel race now uses post-cancel attempts and has a real read-then-claim counterexample. The reviewer #39 analysis itself confirms existing aggregate prevents retry and exact per-part reconciliation, yet labels an unknown prepared parent with no children a blocker. Assess that allegation under the explicitly documented no-blind-retry/prepared boundary and the new immediate-post-parent interruption test. Do NOT recommend removing potentially processed/billable durable fences simply to make retries possible. Prepared/unknown means reconciliation/new explicit intent, not fabricated known failure. Review only reproducible correctness/safety defects in supplied sources, distinguish deliberate conservatism/availability tradeoffs from permission escalation or duplicate effects. Use consistent verdict: no P0/P1 SHIP_OK, P1 FIX_P1_FIRST, any P0 STOP_SHIP. No role/human/live acceptance is granted.",
+      "source_bytes": 162327
     }
   ],
   "authority_exclusions": [

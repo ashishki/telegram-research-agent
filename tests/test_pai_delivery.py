@@ -303,6 +303,27 @@ def test_multipart_missing_part_cannot_be_reconciled_by_one_aggregate_receipt(ca
     assert after['status']=='unknown' and observed==[pending['id']+'_part_2'] and len(calls)==2
 
 
+def test_aggregate_preparation_without_parts_never_authorizes_second_dispatch(case,monkeypatch):
+    scheduler,registry,sub,clock,actor=case
+    grants(case);store=scheduler.queue.store
+    item=store.put(sub.owner_ref,'conversation','input_aggregate_fence',{'query':'Synthetic'},expected_version=0)
+    job=scheduler.queue.enqueue(owner=sub.owner_ref,idempotency_key='aggregate_fence',deadline=datetime.now(timezone.utc)+timedelta(minutes=5),
+        payload={'schema_version':1,'input_namespace':'conversation','input_ref':item.object_id,'input_version':1,'input_digest':item.digest,
+            'connection_ref':None,'resource_ref':'resource_aggregate','purpose':'local.assistant','consent_revision':1})
+    scheduler.queue.complete(scheduler.queue.claim(owner=sub.owner_ref),{'text':'Synthetic '*800,'data_class':'private_archive'})
+    calls=[];executor=DeliveryExecutor(store.target,registry=registry,sender=lambda *args:calls.append(args))
+    def interrupted(**kwargs):raise OSError('synthetic stop after aggregate fence, before child preparation')
+    with monkeypatch.context() as stopped:
+        stopped.setattr(executor,'_deliver',interrupted)
+        with pytest.raises(OSError):executor.deliver_result(owner=sub.owner_ref,job_id=job,destination_ref='destination_private',upper_bound=1)
+    pending=executor.deliver_result(owner=sub.owner_ref,job_id=job,destination_ref='destination_private',upper_bound=1)
+    assert pending['status']=='unknown' and calls==[]
+    assert executor.attempt(owner=sub.owner_ref,delivery_id=pending['id']+'_part_1') is None
+    observations=[]
+    assert executor.reconcile(owner=sub.owner_ref,delivery_id=pending['id'],adapter=lambda row:observations.append(row),upper_bound=1)['status']=='unknown'
+    assert observations==[] and calls==[]
+
+
 def test_private_delivery_status_and_actual_prm_adapter(case):
     from bot.prm_handlers import deliver_completed_prm_job
     from prm.runtime.ingress import TelegramJobIngress
