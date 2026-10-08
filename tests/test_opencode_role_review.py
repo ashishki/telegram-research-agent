@@ -101,6 +101,38 @@ def test_one_fake_provider_call_emits_distinct_hash_bound_non_codex_evidence(tmp
     assert records[0]["read_only"] is True
 
 
+@pytest.mark.parametrize('reasoning,observed',[(0,'thinking_disabled'),(None,'unknown'),(5,'unknown'),(False,'unknown')])
+def test_explicit_review_thinking_mode_requires_actual_telemetry_for_observation(tmp_path,monkeypatch,reasoning,observed):
+    args,calls,records=setup_run(tmp_path,monkeypatch);args.thinking_disabled=True
+    def provider(**kwargs):
+        calls.append(kwargs);payload=response()
+        payload['usage']={'prompt_tokens':1,'completion_tokens':1,'total_tokens':2,
+            'completion_tokens_details':{'reasoning_tokens':reasoning}}
+        return payload
+    monkeypatch.setattr(mimo_code_review,'_call_model',provider)
+    assert review.execute(args)==0 and calls[1]['thinking_disabled'] is True
+    path=next((tmp_path/'.playbook-artifacts/opencode-runs').glob('*/result.json'))
+    result=json.loads(path.read_text())
+    assert result['requested_effort']=='thinking_disabled' and result['observed_effort']==observed
+
+
+def test_explicit_thinking_mode_is_sent_once_and_invalid_mode_cannot_call_provider(monkeypatch):
+    requests=[]
+    class FakeHTTP:
+        def __enter__(self):return self
+        def __exit__(self,*args):return False
+        def read(self,limit):return json.dumps(response()).encode()
+    def fake_open(request,timeout):requests.append(json.loads(request.data));return FakeHTTP()
+    monkeypatch.setattr(mimo_code_review,'urlopen',fake_open)
+    kwargs={'api_key':'synthetic-key','base_url':'https://opencode.ai/zen/go/v1','model':'mimo-v2.6-pro',
+        'prompt':'Synthetic review packet','timeout':30}
+    mimo_code_review._call_model(**kwargs,thinking_disabled=True)
+    assert requests[0]['thinking']=={'type':'disabled'}
+    with pytest.raises(ValueError,match='invalid_review_thinking_mode'):
+        mimo_code_review._call_model(**kwargs,thinking_disabled='disabled')
+    assert len(requests)==1
+
+
 @pytest.mark.parametrize("timeout,expected", [(300, 0), (900, 0), (901, 2), (29, 2)])
 def test_design_review_deadline_bounds_reach_actual_transport(tmp_path, monkeypatch, timeout, expected):
     _, calls, records = setup_run(tmp_path, monkeypatch)

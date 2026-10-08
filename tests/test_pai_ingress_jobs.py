@@ -118,7 +118,8 @@ def test_real_polling_accepts_new_request_and_cancel_during_slow_application(san
     monkeypatch.setattr(bot, '_telegram_get_updates', poll)
     try:
         bot.run_bot(SimpleNamespace(db_path=':memory:'), job_ingress=current)
-        assert len(sent) == 2 and 'Запрос сохранён' in sent[0] and sent[1] == 'Задача отменена.'
+        assert len(sent) == 2 and 'Запрос сохранён' in sent[0]
+        assert sent[1] == 'Задача отменена. Уже начатый внешний вызов мог продолжиться.'
         assert not release.is_set()
         assert ingress(sandbox, 'slow').queue.status(owner=current.owner_ref, job_id=first.job_id)['status'] == 'cancelled'
     finally:

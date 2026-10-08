@@ -273,7 +273,34 @@ def test_cancelled_effect_lease_cannot_send_completed_result(case):
     calls = []
     executor = DeliveryExecutor(scheduler.queue.store.target, registry=registry, sender=lambda *args: calls.append(args))
     with pytest.raises(StateConflict): executor.deliver_result(owner=sub.owner_ref, job_id=job, destination_ref='destination_private', upper_bound=1, effect_lease=lease)
+    with pytest.raises(CapabilityDenied,match='current effect lease'):
+        executor.deliver_result(owner=sub.owner_ref,job_id=job,destination_ref='destination_private',upper_bound=1)
     assert not calls
+
+
+def test_multipart_missing_part_cannot_be_reconciled_by_one_aggregate_receipt(case):
+    scheduler,registry,sub,clock,actor=case
+    grants(case);store=scheduler.queue.store
+    item=store.put(sub.owner_ref,'conversation','input_parts_reconciliation',{'query':'Synthetic'},expected_version=0)
+    job=scheduler.queue.enqueue(owner=sub.owner_ref,idempotency_key='parts_reconciliation',deadline=datetime.now(timezone.utc)+timedelta(minutes=5),
+        payload={'schema_version':1,'input_namespace':'conversation','input_ref':item.object_id,'input_version':1,'input_digest':item.digest,
+            'connection_ref':None,'resource_ref':'resource_parts','purpose':'local.assistant','consent_revision':1})
+    scheduler.queue.complete(scheduler.queue.claim(owner=sub.owner_ref),{'text':'Synthetic '*800,'data_class':'private_archive'})
+    calls=[]
+    def sender(*args):
+        calls.append(args)
+        if len(calls)==1:return TransportReceipt('synthetic_part_1')
+        raise OSError('synthetic part ACK loss')
+    executor=DeliveryExecutor(store.target,registry=registry,sender=sender)
+    pending=executor.deliver_result(owner=sub.owner_ref,job_id=job,destination_ref='destination_private',upper_bound=1)
+    assert pending['status']=='unknown' and len(calls)==2
+    observed=[]
+    def proof(item):
+        observed.append(item['id'])
+        return ReconciliationObservation(item['attempt_ref'],item['destination_ref'],item['digest'],'delivered','synthetic_operator_evidence','synthetic_part_2')
+    after=executor.reconcile(owner=sub.owner_ref,delivery_id=pending['id'],adapter=proof,upper_bound=1)
+    # Third part was never attempted: evidence for part 2 cannot prove it sent.
+    assert after['status']=='unknown' and observed==[pending['id']+'_part_2'] and len(calls)==2
 
 
 def test_private_delivery_status_and_actual_prm_adapter(case):

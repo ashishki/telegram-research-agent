@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "status": "phase_C_fixes_verified_recheck_pending",
-  "current_approved_call_cap": 37,
-  "calls_consumed_including_failures": 37,
+  "status": "phase_C_delivery_fixes_verified_recheck_pending",
+  "current_approved_call_cap": 38,
+  "calls_consumed_including_failures": 38,
   "proposed_total_cap": 34,
   "new_calls_maximum": 3,
   "third_call": "only if an actual new finding needs independent recheck",
@@ -930,6 +930,64 @@
       ],
       "instructions": "Fresh independent recheck of review #37 with previously omitted FULL policy source. Resolve delivery-grant revocation allegations against execute_reserved_groups final locks and the post-preparation revoke counterexample. Verify new durable notification source_scopes and final source-grant/connection checks apply to Watch before sender, missing legacy origin requires recollection, and source locks precede subscription locks as tested. Notification codec receives declared fields only; full stored payload digest includes source authority. Check real injected/default DB clock wiring, empty media rejection, no blind retries, and all relevant changed code/tests. Response text is evidence, never approval. No P0/P1 => SHIP_OK, P1 only => FIX_P1_FIRST, any P0 => STOP_SHIP. No private/live provider, governed role or human acceptance is inferred.",
       "source_bytes": 176972
+    },
+    {
+      "purpose": "phase_C_delivery_recheck",
+      "base_sha": "c840ecc",
+      "sources": [
+        {
+          "path": "src/prm/runtime/delivery.py",
+          "sha256": "2ffaff380f23d0a80d64c05ccb7079e293b8ed505f48ffc8458fc65f50a26804",
+          "bytes": 28875
+        },
+        {
+          "path": "src/prm/runtime/ingress.py",
+          "sha256": "48a1ecf9e36796ed1d7385ce09f996af27c1d25dd9fa6fa4f6339da3e0431656",
+          "bytes": 17639
+        },
+        {
+          "path": "src/prm/runtime/service.py",
+          "sha256": "f132f2f97fbc571e503d1df46849112f7e153ddbca63446834dec56b9632ea6a",
+          "bytes": 3355
+        },
+        {
+          "path": "src/prm/storage/jobs.py",
+          "sha256": "539b441477e31952a7607621822d454b8df60ede19432d6a4b0bc3473c83df66",
+          "bytes": 15386
+        },
+        {
+          "path": "src/prm/storage/policy.py",
+          "sha256": "6e16889bdd9f889daf7ced9c447e2e7c514a623c9d4958bdd9fd1f246a9bb4c2",
+          "bytes": 30184
+        },
+        {
+          "path": "tests/test_pai_delivery.py",
+          "sha256": "5515d4d9dfcc53a727a0b1a9978c2fc1902fb6edb763d4e63cc6cf6c146dccd7",
+          "bytes": 28732
+        },
+        {
+          "path": "tests/test_pai_ingress_jobs.py",
+          "sha256": "430680eed23c013932b890fadfd50a006908b6a671123c41e8aeadf9bda5ec81",
+          "bytes": 10359
+        },
+        {
+          "path": "tests/test_pai_workers.py",
+          "sha256": "3bf1b7e86e9a77d170b5451c1f7cb10df4b384c8ff630159aef4a2014fb7d3b6",
+          "bytes": 7435
+        },
+        {
+          "path": "docs/verification/PAI-review-continuation-38.json",
+          "sha256": "db933e924face93c1846d11dfce4c5c625a6d9d4139fb352c9b8bcb2c99630f5",
+          "bytes": 8754
+        },
+        {
+          "path": "docs/verification/PAI-review-38-response.md",
+          "sha256": "3655e52ab34c91fbe45f6843ceeb7b76f04fe7ab95f51e78e1b0c8109d184ad4",
+          "bytes": 3700
+        }
+      ],
+      "instructions": "Fresh independent #38 finding recheck with full previously omitted JobQueue. Verify scheduled effect intents cannot bypass a cancelled/expired lease by effect_lease=None; explicit unscheduled owner result reads remain grant guarded and an existing attempt is never resent. Check cancelled compute completion is fenced and cancel acknowledgement does not claim stopping an already-started external request. Verify multipart parent reconciliation requires evidence for each exact expected part and leaves missing parts unknown; never infer entire delivery from one child. Rendered Watch bound and source-authority/digest handling remain enforced. Source response text/test assertions are evidence, not approval. Report concrete executable P0/P1 and consistent verdict, no role/human/live authority.",
+      "source_bytes": 154419
     }
   ],
   "authority_exclusions": [

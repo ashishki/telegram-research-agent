@@ -90,6 +90,10 @@ class DeliveryExecutor:
                        'data_class':result.payload.get('data_class','private_archive'),
                        'data_classes':result.payload.get('data_classes',[result.payload.get('data_class','private_archive')]),
                        'request_ref': result.payload.get('request_ref'),'source_scopes':result.payload.get('payload',{}).get('source_scopes',[])}
+            if effect_lease is None and tx.conn.execute("SELECT 1 FROM pa_jobs.jobs WHERE owner=%s AND mode='effect' AND payload->>'effect_key'=%s LIMIT 1",
+                (owner,'answer_'+job_id)).fetchone():
+                prior=tx.conn.execute('SELECT 1 FROM pa_delivery.attempts WHERE owner=%s AND id=%s',(owner,'answer_'+job_id)).fetchone()
+                if prior is None:raise CapabilityDenied('scheduled answer delivery requires its current effect lease')
             if effect_lease is not None:
                 from prm.storage.jobs import JobQueue
                 if (effect_lease.owner != owner or effect_lease.mode != 'effect'
@@ -137,7 +141,9 @@ class DeliveryExecutor:
             if not isinstance(source_scopes,list) or not 1<=len(source_scopes)<=16:
                 raise CapabilityDenied('notification source authority missing; recollection required')
             notification = _notification_from_payload(stored)
-            payload = {'text': render_watch_notification(notification), 'schedule_id': note['schedule_id'],
+            rendered=render_watch_notification(notification)
+            if not 0<len(rendered)<=3800:raise StorageError('rendered Watch notification exceeds delivery bound')
+            payload = {'text': rendered, 'schedule_id': note['schedule_id'],
                        'data_class':notification.data_class,
                        'revision': note['revision'], 'notification_digest': _canonical(note['payload'])[1],
                        'source_scopes':source_scopes}
@@ -281,6 +287,24 @@ class DeliveryExecutor:
             raise StorageError('attempt unavailable')
         if pending['status'] != 'unknown' or adapter is None:
             return pending
+        if pending['digest']!=_canonical(pending['payload'])[1]:raise StateConflict('reconciliation payload integrity differs')
+        if pending['kind']=='answer' and len(pending['payload'].get('text',''))>3800:
+            payload=pending['payload'];text=payload['text']
+            parts=[text[index:index+3600] for index in range(0,len(text),3600)];receipts=[]
+            for index,part in enumerate(parts):
+                child_id=delivery_id+'_part_'+str(index+1)
+                child=self.attempt(owner=owner,delivery_id=child_id)
+                if child is None:return pending  # No evidence for an unattempted part.
+                expected={**payload,'text':'['+str(index+1)+'/'+str(len(parts))+']\n'+part,'part':index+1,'parts':len(parts)}
+                if (child['digest']!=_canonical(expected)[1] or child['destination_ref']!=pending['destination_ref']
+                    or child['source_ref']!=pending['source_ref']):raise StateConflict('aggregate part binding differs')
+                child=self.reconcile(owner=owner,delivery_id=child_id,adapter=adapter,upper_bound=upper_bound)
+                if child['status']!='sent':return pending
+                receipts.append(child['provider_receipt'])
+            with self.store.transaction() as tx:
+                tx.conn.execute("UPDATE pa_delivery.attempts SET status='sent',provider_receipt=%s,reason='all_parts_provider_reconciled' WHERE owner=%s AND id=%s AND status='unknown'",
+                    ('parts:'+hashlib.sha256('|'.join(receipts).encode()).hexdigest(),owner,delivery_id))
+            return self.attempt(owner=owner,delivery_id=delivery_id)
         request = AuthorizationRequest(owner_ref=owner, connection_ref=None, capability='assistant.delivery_reconciliation',
             resource_ref=pending['destination_ref'], operation='read', data_class='private_connector_metadata',
             provider_ref='provider_telegram', purpose='delivery.reconcile', operation_ref='reconcile_' + uuid.uuid4().hex)

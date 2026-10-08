@@ -161,7 +161,12 @@ class TelegramJobIngress:
         if command == 'cancel':
             cancelled = self.queue.cancel(owner=self.owner_ref, job_id=job_id)
             if cancelled and state['status'] in {'leased','running'} and self.cancel_callback is not None:self.cancel_callback(job_id)
-            return IntakeReply('Задача отменена.' if cancelled else f"Задача уже имеет статус {state['status']}.", job_id=job_id)
+            current=self.queue.status(owner=self.owner_ref,job_id=job_id)
+            if cancelled:
+                text='Задача отменена.'
+                if state['status'] in {'leased','running'}:text+=' Уже начатый внешний вызов мог продолжиться.'
+            else:text=f"Задача уже имеет статус {current['status']}."
+            return IntakeReply(text,job_id=job_id)
         if command == 'result' and state['status'] == 'completed':
             if self.durable_results:
                 if self.delivery_executor is None or self.destination_ref is None:

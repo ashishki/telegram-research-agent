@@ -342,3 +342,18 @@ subscription lock order, empty media refs and scheduler clock wiring verified.
 PAI-review-37-response.md. Focused-prm: 652 passed in 132.56 s on pre-C-fix
 source. 37 paid calls consumed; next bounded independent recheck #38 under
 ongoing authority, then D/E/F. No formal/human/live acceptance manufactured.
+
+Review #38 reserved/attempted, 38 consumed under ongoing scoped authority including failures.
+Purpose: phase_C_findings_recheck; source HEAD c840ecce52d5a47e6d99a7668cc529e65ab5b1e7. No automatic retry.
+
+# 2026-10-08 phase-C follow-through and native review mode
+
+#38 resolves #37, retains new effect-lease P1 and multipart/bounds P2s.
+Scheduled delivery now rejects omitted leases; multipart reconciliation requires
+all exact parts; cancel text retains truthful in-flight distinction. Final C
+checks: 34 passed in 43.53 s, zero skips; syntax and old-message assertion
+failures preserved in PAI-review-38-response.md. Native mode maintenance:
+80 bridge/role/guard/tier checks and 57 final mode checks passed. Prepare-only
+tooling packet: 131737 bytes, no provider call, human-selected planning depth
+still missing; no gate bypass or governed receipt invented. Retrofit 150 passed
+in 12.29 s. Next #39 C recheck under ongoing authority; 38 calls consumed.

@@ -1,0 +1,163 @@
+{
+  "schema_version": 1,
+  "status": "reviewed",
+  "call_number": 38,
+  "call_limit": 38,
+  "purpose": "phase_C_findings_recheck",
+  "read_only": true,
+  "provider": "opencode_go",
+  "requested_model": "mimo-v2.6-pro",
+  "observed_model": "mimo-v2.6-pro",
+  "requested_effort": "thinking_disabled",
+  "observed_effort": "thinking_disabled",
+  "head_sha": "c840ecce52d5a47e6d99a7668cc529e65ab5b1e7",
+  "base_sha": "cf3c00b",
+  "diff_sha256": "65e78e26159abd46c9fad00322bb89ade6f099395701becf49356c69b2ecb271",
+  "sources": [
+    {
+      "path": "src/prm/runtime/ingress.py",
+      "sha256": "2494628b7675f5e0cf57b5dda0fc667954a3cdfdccfcdb063a117de1d42b6594",
+      "bytes": 17359
+    },
+    {
+      "path": "src/prm/runtime/scheduler.py",
+      "sha256": "c94de1fafc6bfc35f79b516379b3c1c42f9e8fa68bed4590d05ce2d2c576df87",
+      "bytes": 25153
+    },
+    {
+      "path": "src/prm/runtime/delivery.py",
+      "sha256": "fc64753b86c0c010cff232005ef49bbfe038049a96b1f04b10bf50d04d66989b",
+      "bytes": 26632
+    },
+    {
+      "path": "src/prm/runtime/transports.py",
+      "sha256": "52d2486f5ebeae0f78f57e1d18ea39da5ae380c1b519e93816f17d624b9f6c26",
+      "bytes": 2854
+    },
+    {
+      "path": "src/prm/runtime/service.py",
+      "sha256": "f132f2f97fbc571e503d1df46849112f7e153ddbca63446834dec56b9632ea6a",
+      "bytes": 3355
+    },
+    {
+      "path": "src/prm/runtime/worker.py",
+      "sha256": "09b054d75ad76b09f9e42f118fda66a88f59c0198cc50684e6307d24613f6d45",
+      "bytes": 1017
+    },
+    {
+      "path": "src/prm/runtime/watch.py",
+      "sha256": "22c3482dd9ed2ed8de9f96fdffe227281fa7f2472e75b3522a52302468128f4c",
+      "bytes": 4116
+    },
+    {
+      "path": "tests/test_pai_ingress_jobs.py",
+      "sha256": "3327f2a41541ddff64f1942119fdfafce5bb5bd78b5228170fbf4adcaecf56dc",
+      "bytes": 10267
+    },
+    {
+      "path": "tests/test_pai_scheduler.py",
+      "sha256": "d6771833f95abe416df57bc682bf73f4a5c47840d27204a53065bdd37d3c7701",
+      "bytes": 15429
+    },
+    {
+      "path": "tests/test_pai_delivery.py",
+      "sha256": "5b0e044cdf1b5bc9aa97e8ae727c2c4da8e2578e3783556c9be6a2e1666d9680",
+      "bytes": 26762
+    },
+    {
+      "path": "src/prm/storage/policy.py",
+      "sha256": "6e16889bdd9f889daf7ced9c447e2e7c514a623c9d4958bdd9fd1f246a9bb4c2",
+      "bytes": 30184
+    },
+    {
+      "path": "tests/test_pai_watch_wiring.py",
+      "sha256": "a498ad8ef5c8ee7cf183b5482e300d9a6499b2ff80e1d1fc281f2d44a6d3a5b1",
+      "bytes": 2283
+    },
+    {
+      "path": "docs/verification/PAI-review-continuation-37.json",
+      "sha256": "af948514d7c51ddd35f287d10218ee1acb350758539761003381b5184e7c980a",
+      "bytes": 7663
+    },
+    {
+      "path": "docs/verification/PAI-review-37-response.md",
+      "sha256": "00f3409f7ef0a7c95a928cedaf5990ff36592148bb64c599e158e148f658c987",
+      "bytes": 3898
+    }
+  ],
+  "scope": "phase_C_findings_recheck; supplied full current source/tests and explicitly labeled integration diff if present",
+  "input_sha256": "9aef4f6ea3737452015940b5fa9694fd50359e2ce083f92ae239b11bcfbebcfa",
+  "input_bytes": 193058,
+  "output_token_cap": 16000,
+  "timeout_seconds": 900,
+  "workflow_receipt": false,
+  "human_authority": false,
+  "runner_path": ".playbook-artifacts/pai-review-as-needed.py",
+  "runner_sha256": "8306b7e250e58139ee08be8c58de615d3d6fe684f5a4726c091ce9eaf689d545",
+  "transport_path": "tools/mimo_code_review.py",
+  "transport_sha256": "2ba3cbf032166616aa2eeba61f654308379b32d228e98f389f2099a02679262f",
+  "command": ".venv-pai/bin/python .playbook-artifacts/pai-review-as-needed.py --call-number 38 --purpose phase_C_findings_recheck",
+  "source_exclusions": [
+    "actual private corpus",
+    "live account payload",
+    "credentials",
+    "production configuration"
+  ],
+  "authority_exclusions": [
+    "human/workflow completion",
+    "live-account consent",
+    "production migration/deployment",
+    "product-provider spending"
+  ],
+  "request_body_sha256": "eb4c076b91c72b4625e7c1d23261ea138bc7e7dab4b8c68639dc87fd943aa62c",
+  "provider_call_attempted": true,
+  "usage": {
+    "prompt_tokens": 50847,
+    "completion_tokens": 797,
+    "total_tokens": 51644,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    }
+  },
+  "finish_reason": "stop",
+  "response_sha256": "b403e3d8401647d94aea5990fd337abef3c4ea99465db6cf6553ddd1ed2e2027",
+  "findings": {
+    "verdict": "FIX_P1_FIRST",
+    "findings": [
+      {
+        "severity": "P1",
+        "title": "Cancellation acknowledged for still-running job is reported truthfully only by accident of shared state, but result of completed-after-cancel is delivered with no fence binding effect_lease in deliver_result's caller path",
+        "file": "src/prm/runtime/ingress.py:163",
+        "issue": "control('cancel') races with the worker: a cancel that lands while the job is leased invokes cancel_callback but the message still says 'Задача отменена.' even when the worker may still be running and later writes a result; more importantly, deliver_result only enforces effect_lease fencing when the caller passes one, so the durable_results path invoked from ingress never binds the currently leased effect job, allowing a cancelled/expired effect lease's result to be delivered.",
+        "fix": "Require an effect_lease (or equivalent durable effect job binding) for any delivery of an answer produced under an effect-mode lease, and reject delivery when the producing job was cancelled; make the cancel acknowledgement distinguish 'cancel requested' from 'cancelled'.",
+        "confidence": "medium"
+      },
+      {
+        "severity": "P2",
+        "title": "Multi-part aggregate delivery can send remaining parts after a prior part already sent while aggregate stays unknown, contradicting no-blind-retry intent on partial failure",
+        "file": "src/prm/runtime/delivery.py:116",
+        "issue": "The aggregate is durably marked unknown before parts, and a part returning not 'sent' stops iteration, but an exception mid-loop (e.g. connection loss) leaves earlier parts possibly accepted; a later call returns the aggregate without resending, yet the loop's early return path for a non-'sent' part does not reconcile previously sent parts or mark the aggregate as such, so the reconciliation path for the aggregate has no per-part evidence.",
+        "fix": "Record per-part attempt rows and have reconciliation require provider evidence for every part before ever marking the aggregate sent; keep per-part outcomes in the aggregate payload.",
+        "confidence": "medium"
+      },
+      {
+        "severity": "P2",
+        "title": "Notification codec/digest path trusts stored payload fields without strict schema validation of declared fields",
+        "file": "src/prm/runtime/delivery.py:139",
+        "issue": "deliver_watch pops source_scopes then passes the remainder to _notification_from_payload; the declared-fields contract depends entirely on that helper (not in packet) rejecting unknown/missing keys. The digest covers the full stored payload, but no local bounds on rendered text or title/summary lengths exist at delivery time.",
+        "fix": "Validate a strict allowlist of keys and per-field bounds in deliver_watch before reconstructing the notification, and cap rendered output length.",
+        "confidence": "low"
+      }
+    ],
+    "not_verified": [
+      "prm/storage/jobs.py, policy.py, watch_jobs.py, actions.py, deletion.py, capabilities.py and bot/* are not in the packet; grant reservation/settlement semantics, _notification_from_payload strictness, and effect-lease creation are outside supplied source.",
+      "Runtime behavior against real PostgreSQL and the synthetic HTTP provider was not executed; conclusions are from static source review.",
+      "Whether deliver_result callers (bot/prm_handlers) pass effect_lease for effect-mode results cannot be verified here."
+    ],
+    "summary": "Recheck of the full current policy source resolves the review #37 P1 allegation against execute_reserved_groups: it revalidates grants under FOR UPDATE locks through the sender, and the new post-preparation revocation test plus _source_current (now applied to watch before sender) and durable source_scopes with legacy-origin recollection, source-before-subscription lock ordering, injected/DB clock wiring, and empty-media rejection all hold in the supplied source and tests. Remaining issues are a real P1 around delivery of results without a mandatory effect-lease/fence binding (ingress deliver_result path), plus two P2s on multi-part aggregate reconciliation evidence and notification payload bound checks. No P0; one P1 remains, so FIX_P1_FIRST."
+  },
+  "duration_seconds": 111.896
+}

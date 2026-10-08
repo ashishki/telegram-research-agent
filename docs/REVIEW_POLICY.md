@@ -1,6 +1,6 @@
 # Review Policy — PA / PAI
 
-Updated: 2026-10-06. Pin: d570163ab17ec3b4245187c778f1e8d89af9690f.
+Updated: 2026-10-08. Pin: d570163ab17ec3b4245187c778f1e8d89af9690f.
 
 ## Authority and provenance
 
@@ -20,6 +20,19 @@ docs/verification/PAI-progress.md; read the current count before each request. T
 approved design/recheck output up to 16000 tokens and deadlines up to 900 s.
 Defaults remain 8000/300; no automatic retries or model substitution.
 Per-call bounds/private-source exclusions persist; no credential availability scans.
+
+Owner amendments on 2026-10-07 extended the count to 33; on 2026-10-08 the
+owner explicitly authorized “разврешаю увеличивать по потребности”. Necessary
+review/recheck budget increases in the existing local PAI scope are now
+authorized on an ongoing basis. Allocate/log each fresh bounded request, count
+failed/inconsistent responses too, and do not restart per-call permission loops.
+Provider/model/data exclusions remain unchanged. The owner separately directed
+review-key lookup to Georgia-Community-Navigator; that reviewed key location is
+now known, without permission to scan other credentials or send private data.
+The existing observed thinking-disabled mode is available explicitly in the
+native OpenCode route; record requested mode separately from actual telemetry.
+These amendments grant neither product-provider spending nor human design,
+live account, background runtime, production or release authority.
 
 ## Roles, runners and receipt compatibility
 

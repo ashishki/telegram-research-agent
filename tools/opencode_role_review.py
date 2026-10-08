@@ -325,6 +325,7 @@ def execute(args):
         "input_sha256": digest(packet.encode()), "input_bytes": len(packet.encode()),
         "call_cap": 1, "output_token_cap": output_cap, "timeout_seconds": args.timeout_seconds,
         "transport": "sse",
+        "requested_effort": "thinking_disabled" if getattr(args,'thinking_disabled',False) else "not_requested",
         "status": "request_prepared", "cost": "unknown",
     }
     (run_dir / "attempt.json").write_text(json.dumps(request_evidence, indent=2) + "\n")
@@ -333,7 +334,8 @@ def execute(args):
         response = _call_model(api_key=key, base_url="https://opencode.ai/zen/go/v1",
                                model=args.model, prompt=packet, timeout=args.timeout_seconds,
                                max_output_tokens=output_cap, response_schema=VERDICT_SCHEMA,
-                               session_id=run_id.removeprefix("opencode-"), stream=True)
+                               session_id=run_id.removeprefix("opencode-"), stream=True,
+                               thinking_disabled=getattr(args,'thinking_disabled',False))
         verdict = parse_response(response, args.model)
     except Exception as exc:
         code = getattr(exc, "code", None)
@@ -395,7 +397,11 @@ def execute(args):
         "reviewed_slice_ids": [] if tooling_review else [f"PAI-{n:02}" for n in REVIEW_GROUPS[slice_group]] if slice_group else [s["slice_id"] for s in design["slices"]],
         "reviewed_spec_sections": [] if tooling_review else sorted(SPEC_GROUPS[slice_group]) if slice_group else list(range(16)),
         "requested_model": args.model, "observed_model": response["model"],
-        "requested_effort": "not_requested", "observed_effort": "unknown",
+        "requested_effort": request_evidence['requested_effort'],
+        "observed_effort": "thinking_disabled" if getattr(args,'thinking_disabled',False) and
+            isinstance(raw_usage,dict) and isinstance(raw_usage.get('completion_tokens_details'),dict) and
+            type(raw_usage['completion_tokens_details'].get('reasoning_tokens'))is int and
+            raw_usage['completion_tokens_details']['reasoning_tokens']==0 else "unknown",
         "generated_at": datetime.now(timezone.utc).isoformat(), "read_only": True,
         "input_sha256": digest(packet.encode()), "documents": manifest,
         "design_hashes": before_hashes, "report_sha256": digest(report.read_bytes()),
@@ -439,6 +445,8 @@ def main(argv=None):
     parser.add_argument("--prepare-only", action="store_true")
     parser.add_argument("--tooling-review", action="store_true",
                         help="separate narrow code audit; never publishes full-design approval evidence")
+    parser.add_argument('--thinking-disabled',action='store_true',
+                        help='explicit bounded Mimo review mode; receipt records requested and observed effort separately')
     parser.add_argument("--slice-group", choices=sorted(REVIEW_GROUPS),
                         help="one phase; full-design evidence requires independent coverage of every phase")
     args = parser.parse_args(argv)

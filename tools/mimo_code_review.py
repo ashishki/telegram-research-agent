@@ -80,9 +80,12 @@ def _api_key(explicit_file: str) -> str:
 
 def _call_model(*, api_key: str, base_url: str, model: str, prompt: str, timeout: int,
                 max_output_tokens: int = 8000, response_schema: dict | None = None,
-                session_id: str | None = None, stream: bool = False) -> dict[str, Any]:
+                session_id: str | None = None, stream: bool = False,
+                thinking_disabled: bool = False) -> dict[str, Any]:
     if type(max_output_tokens) is not int or not 1 <= max_output_tokens <= 16000:
         raise ValueError("invalid_review_output_bound")
+    if type(thinking_disabled) is not bool:
+        raise ValueError("invalid_review_thinking_mode")
     body = {
         "model": model,
         "messages": [
@@ -101,6 +104,7 @@ def _call_model(*, api_key: str, base_url: str, model: str, prompt: str, timeout
     }
     if stream:
         body.update(stream=True, stream_options={"include_usage": True})
+    if thinking_disabled:body['thinking']={'type':'disabled'}
     request = Request(
         f"{base_url.rstrip('/')}/chat/completions",
         data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
