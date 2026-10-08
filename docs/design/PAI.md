@@ -89,8 +89,8 @@ policy/proposal/receipt semantics. This reuse boundary delegates to the shared
 use cases and cannot create a second action engine or inherit a later topic.
 No application code or DB migration is implemented by this packet. PAI-00
 owns the bounded reviewer/checker/phase-finalizer tooling and owner strategy
-document. Its file budget is 64, covering 57 accumulated instruction/tooling/
-verification paths plus bounded publication receipts; this draft rescope is
+document. Its file budget is 64, covering the named instruction/tooling scope in
+docs/verification/PAI-00-file-manifest.json, not all programme publications; this draft rescope is
 subject to the same independent reviews and human approval.
 
 ### Interfaces and invariants
@@ -272,23 +272,19 @@ usefulness remain distinct; final gates are PAI-26..29 / PA-18.
 
 ## 7. Vertical Slices
 
-PAI.design.json is the draft machine registry for all 32 packets. The human
-task pack retains full outcomes, exact acceptance scenarios and PA-Refs.
-Phase A is instructions/design, B durable state, C execution, D core product,
-E sources/actions, F completeness/recovery, G separately scoped real completion.
-Each product-facing packet must reach real application/ingress/adapters with
-only external I/O faked. Infrastructure cards prove actual multiprocess storage
-or lifecycle behavior. No skeleton-only closure.
+PAI.design.json registers all32 draft packets. A=instructions/design,
+B=durable state, C=execution, D=core product, E=sources/actions,
+F=completeness/recovery, G=separately scoped real completion. Product cards
+must wire real application/ingress/adapters, with only external I/O faked;
+infrastructure proves real multiprocess storage/lifecycle. No skeleton closure.
 
 ## 8. Open Decisions
 
-The owner approved the current project brief and assigned planning depth;
-pinned planning is selected. Mimo generic-record compatibility is tested, but
-independent design recheck and hash-bound feature approval remain pending. Live retention/cost/provider/account parameters
-remain owner decisions. Conditional Redis/archive migration needs measurements.
-No listed open decision is inferred from elapsed time or a configured key.
+Project brief/planning depth are selected. Exact hash-bound feature design,
+live account/retention/cost/provider decisions and conditional scaling remain
+pending; neither time nor a configured key supplies them.
 
-Requirements-matrix-SHA256: ca19e6417b95556578dd776bcf3033953ab4482f05a716c201454bd32d3acff6
+Requirements-matrix-SHA256: 32d8dbbc05cb690887a37ba3cc63f5510108b0bc785ef7ea118330363e5a5ee7
 
 ## 9. Human Approval
 
@@ -298,3 +294,26 @@ reviews through an agreed compliant runner, then approve in pinned workflow.
 This draft registers scope only; original PA review_required state is preserved.
 PAI-02..26 depend on that gate. Prepare independent authorized maintenance and
 review/access packets while waiting; no product design bypass.
+
+
+## 10. Concrete bindings (review65 follow-through)
+
+PAI-00 tests/test_prm_product_ux_eval.py and tests/test_opencode_role_review.py already occur in BOTH slice argv and matrix.test_files;
+all seven named regression files exist. check_pai_plan validates full69 IDs,
+exact ten scenario/recovery bindings, hashes, dependencies and case identity;
+run_pai_acceptance requires actual named cases/zero skips, not planned evidence.
+Baseline PAI-00-reconciliation.md binds exact clock-fixture failures, commands,
+causes and corrections at 8faee4; old PA-00 UX was already repaired.
+PAI-00-file-manifest.json mechanically binds 58 paths<=64, uniqueness/existence/
+allowed scope and rollback boundaries; feature-design/source publications belong
+to PAI-01/B..F. Manifest SHA256: a09e5c4f966d8ec4545120854bfa0e316c156bffa8faa1c9493caa8bf13d8748.
+Future human records: .playbook-artifacts/workflows/PAI/approval.json (real pinned
+TTY, human identity/date/design hashes/role refs); controlled PAI-29/owner-acceptance.json
+(candidateSHA/date/owner/per69ID+tenScenario live/visual/usefulness evidence hashes).
+Do not forge future date/SHA. Controlled PAI-27/approved-scope.json and durable
+expiring CapabilityGrants separately bind exact live account/provider/operation/
+egress/bounds; policy checks before credentials/transport/final effects. PAI-28/
+cutover-approval.json binds production SHA/target/window/rollback. No live approval.
+Receipt schemas, immutable identity/hash/scope/verdict checks and tooling/design/
+human separation are specified in REVIEW_POLICY.md and enforced by actual native
+consumers. Full factual bindings: docs/verification/PAI-design-evidence-bindings.md.

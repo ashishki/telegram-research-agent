@@ -6,7 +6,8 @@
   "slice_bindings": {
     "PAI-00": {
       "expected_paths": [
-        "docs/verification/PAI-progress.md"
+        "docs/verification/PAI-progress.md",
+        "docs/verification/PAI-00-file-manifest.json"
       ],
       "verification_refs": [
         "PAI-00/planning_structure",

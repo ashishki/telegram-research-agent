@@ -54,7 +54,7 @@ def test_registration_rejects_task_drift_from_design_and_card(monkeypatch, chang
         plan.check(ROOT)
 
 
-@pytest.mark.parametrize("mutation", ["requirement", "scenario", "verification", "runtime_scope", "scope_overlap"])
+@pytest.mark.parametrize("mutation", ["requirement", "scenario", "verification", "runtime_scope", "scope_overlap", "case_alias"])
 def test_fine_spec_and_scope_gaps_cannot_pass_planning(monkeypatch, mutation):
     import json
     matrix_path = ROOT / "docs/design/PAI.requirements.json"
@@ -65,6 +65,7 @@ def test_fine_spec_and_scope_gaps_cannot_pass_planning(monkeypatch, mutation):
     elif mutation == "scenario": matrix["scenarios"].pop()
     elif mutation == "verification": matrix["requirements"][0]["verification_refs"] = ["PAI-99/invented"]
     elif mutation == "runtime_scope": registry["slices"][1]["allowed_files"].append("src/prm/capabilities.py")
+    elif mutation=='case_alias':matrix['requirements'][1]['case_name']=matrix['requirements'][0]['case_name']
     else: registry["slices"][24]["forbidden_files"].append("systemd/**")
     original = Path.read_text
     def read_text(path, *args, **kwargs):
@@ -78,8 +79,23 @@ def test_fine_spec_and_scope_gaps_cannot_pass_planning(monkeypatch, mutation):
         "verification": "unknown requirement verification",
         "runtime_scope": "grants runtime/checker",
         "scope_overlap": "scope overlap",
+        "case_alias": "requirement case identity differs",
     }[mutation]):
         plan.check(ROOT)
+
+
+@pytest.mark.parametrize('mutation',['count','duplicate','private'])
+def test_instruction_scope_manifest_cannot_hide_extra_or_private_paths(monkeypatch,mutation):
+    import json
+    path=ROOT/'docs/verification/PAI-00-file-manifest.json';manifest=json.loads(path.read_text())
+    if mutation=='count':manifest['expected_count']-=1
+    elif mutation=='duplicate':manifest['paths'][-1]=manifest['paths'][0]
+    else:manifest['paths'][-1]='secrets/private_token'
+    original=Path.read_text
+    def read_text(source,*args,**kwargs):
+        return json.dumps(manifest) if source.resolve()==path else original(source,*args,**kwargs)
+    monkeypatch.setattr(Path,'read_text',read_text)
+    with pytest.raises(ValueError,match='file manifest'):plan.check(ROOT)
 
 
 def test_requirement_matrix_bytes_are_bound_to_reviewed_design(monkeypatch):

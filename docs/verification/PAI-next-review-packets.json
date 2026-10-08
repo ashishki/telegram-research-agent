@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "status": "B_F_source_rechecks_closed_native_design_and_final_validation_pending",
-  "current_approved_call_cap": 72,
-  "calls_consumed_including_failures": 64,
+  "status": "native_design_65_STOP_preserved_factual_bindings_and_checker_reaudit_pending",
+  "current_approved_call_cap": 74,
+  "calls_consumed_including_failures": 65,
   "proposed_total_cap": 34,
   "new_calls_maximum": 3,
   "third_call": "only if an actual new finding needs independent recheck",
@@ -1855,52 +1855,57 @@
   },
   "native_design_allocations": [
     {
-      "call_number": 65,
-      "role": "program_design_review",
-      "slice_group": "foundation",
-      "status": "allocated_not_invoked"
-    },
-    {
-      "call_number": 66,
-      "role": "program_design_review",
-      "slice_group": "product",
-      "status": "allocated_not_invoked"
-    },
-    {
       "call_number": 67,
       "role": "program_design_review",
-      "slice_group": "sources",
+      "slice_group": "foundation",
       "status": "allocated_not_invoked"
     },
     {
       "call_number": 68,
       "role": "program_design_review",
-      "slice_group": "completeness",
+      "slice_group": "product",
       "status": "allocated_not_invoked"
     },
     {
       "call_number": 69,
-      "role": "product_design_review",
-      "slice_group": "foundation",
+      "role": "program_design_review",
+      "slice_group": "sources",
       "status": "allocated_not_invoked"
     },
     {
       "call_number": 70,
-      "role": "product_design_review",
-      "slice_group": "product",
+      "role": "program_design_review",
+      "slice_group": "completeness",
       "status": "allocated_not_invoked"
     },
     {
       "call_number": 71,
       "role": "product_design_review",
-      "slice_group": "sources",
+      "slice_group": "foundation",
       "status": "allocated_not_invoked"
     },
     {
       "call_number": 72,
       "role": "product_design_review",
+      "slice_group": "product",
+      "status": "allocated_not_invoked"
+    },
+    {
+      "call_number": 73,
+      "role": "product_design_review",
+      "slice_group": "sources",
+      "status": "allocated_not_invoked"
+    },
+    {
+      "call_number": 74,
+      "role": "product_design_review",
       "slice_group": "completeness",
       "status": "allocated_not_invoked"
     }
-  ]
+  ],
+  "native_tooling_recheck_66": {
+    "status": "allocated_not_invoked",
+    "purpose": "critical checker exact-case/PAI-00 manifest enforcement after formal #65",
+    "call_number": 66
+  }
 }
