@@ -1,14 +1,14 @@
 {
   "schema_version": 1,
-  "status": "native67_timeout_no_verdict_source68_independent_recheck",
-  "current_approved_call_cap": 81,
-  "calls_consumed_including_failures": 72,
+  "status": "native73_length_no_verdict_native74_allocated",
+  "current_approved_call_cap": 82,
+  "calls_consumed_including_failures": 73,
   "proposed_total_cap": 34,
   "new_calls_maximum": 3,
   "third_call": "only if an actual new finding needs independent recheck",
   "provider": "opencode_go",
   "model": "mimo-v2.6-pro",
-  "mode": "fresh read-only; thinking disabled; strict JSON schema; advisory only",
+  "mode": "fresh read-only; explicit thinking-disabled or provider-default reasoning recorded per request; strict JSON schema",
   "per_call_output_tokens_maximum": 16000,
   "per_call_timeout_seconds_maximum": 900,
   "source_exclusions": [
@@ -1894,49 +1894,49 @@
   },
   "native_design_allocations": [
     {
-      "call_number": 73,
-      "role": "program_design_review",
-      "slice_group": "foundation",
-      "status": "allocated_not_invoked"
-    },
-    {
-      "call_number": 74,
-      "role": "program_design_review",
-      "slice_group": "product",
-      "status": "allocated_not_invoked"
-    },
-    {
       "call_number": 75,
       "role": "program_design_review",
-      "slice_group": "sources",
+      "slice_group": "foundation",
       "status": "allocated_not_invoked"
     },
     {
       "call_number": 76,
       "role": "program_design_review",
-      "slice_group": "completeness",
+      "slice_group": "product",
       "status": "allocated_not_invoked"
     },
     {
       "call_number": 77,
-      "role": "product_design_review",
-      "slice_group": "foundation",
+      "role": "program_design_review",
+      "slice_group": "sources",
       "status": "allocated_not_invoked"
     },
     {
       "call_number": 78,
-      "role": "product_design_review",
-      "slice_group": "product",
+      "role": "program_design_review",
+      "slice_group": "completeness",
       "status": "allocated_not_invoked"
     },
     {
       "call_number": 79,
       "role": "product_design_review",
-      "slice_group": "sources",
+      "slice_group": "foundation",
       "status": "allocated_not_invoked"
     },
     {
       "call_number": 80,
+      "role": "product_design_review",
+      "slice_group": "product",
+      "status": "allocated_not_invoked"
+    },
+    {
+      "call_number": 81,
+      "role": "product_design_review",
+      "slice_group": "sources",
+      "status": "allocated_not_invoked"
+    },
+    {
+      "call_number": 82,
       "role": "product_design_review",
       "slice_group": "completeness",
       "status": "allocated_not_invoked"
@@ -1976,7 +1976,14 @@
   },
   "native_tooling_recheck_73": {
     "call_number": 73,
-    "status": "allocated_not_invoked",
+    "status": "consumed_no_valid_verdict_length",
     "purpose": "default-reasoning native recheck of actual STOP/projection fixes and supported-wrapper trust boundary"
+  },
+  "native_tooling_recheck_74": {
+    "call_number": 74,
+    "status": "allocated_not_invoked",
+    "purpose": "fresh same-source native recheck after default-reasoning output exhaustion; explicit thinking-disabled mode",
+    "output_cap": 16000,
+    "timeout": 900
   }
 }

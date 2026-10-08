@@ -1,0 +1,1996 @@
+{
+  "schema_version": 1,
+  "status": "local_runtime_synthetic_verified_formal_review_pending",
+  "candidate_head": "0110ec0",
+  "runtime_change_commit": "caf97a7",
+  "canonical_matrix_ref": "docs/design/PAI.requirements.json",
+  "canonical_matrix_sha256": "32d8dbbc05cb690887a37ba3cc63f5510108b0bc785ef7ea118330363e5a5ee7",
+  "synthetic_full_tier": {
+    "status": "passed",
+    "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/test_tiers.py pai-complete",
+    "log_path": ".playbook-artifacts/pai-validation-20261008/pai-complete-caf97a7.log",
+    "result": "320 passed in 962.74 s; exact69 requirements/ten scenarios; zero skips/failures",
+    "source_snapshot": "caf97a7 runtime",
+    "log_sha256": "e4dcb89291785c7958a3f87f6979bfdcc89d1092878ee1ea5cc7a1436a66ddd5"
+  },
+  "requirements": [
+    {
+      "spec_id": "ACADEMIC-01",
+      "slices": [
+        "PAI-19"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_academic_01",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-51.json",
+        "docs/verification/PAI-review-continuation-54.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "ACADEMIC-02",
+      "slices": [
+        "PAI-19"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_academic_02",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-51.json",
+        "docs/verification/PAI-review-continuation-54.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "ACADEMIC-03",
+      "slices": [
+        "PAI-19"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_academic_03",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-51.json",
+        "docs/verification/PAI-review-continuation-54.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "ACADEMIC-04",
+      "slices": [
+        "PAI-19"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_academic_04",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-51.json",
+        "docs/verification/PAI-review-continuation-54.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "ACADEMIC-05",
+      "slices": [
+        "PAI-19"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_academic_05",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-51.json",
+        "docs/verification/PAI-review-continuation-54.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "ACT-01",
+      "slices": [
+        "PAI-04",
+        "PAI-20"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_act_01",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-36.json",
+        "docs/verification/PAI-review-continuation-51.json",
+        "docs/verification/PAI-review-continuation-54.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic",
+        "privacy_review"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "ACT-02",
+      "slices": [
+        "PAI-04",
+        "PAI-20"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_act_02",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-36.json",
+        "docs/verification/PAI-review-continuation-51.json",
+        "docs/verification/PAI-review-continuation-54.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic",
+        "privacy_review"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "ACT-03",
+      "slices": [
+        "PAI-04",
+        "PAI-09",
+        "PAI-20"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_act_03",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-36.json",
+        "docs/verification/PAI-review-continuation-42.json",
+        "docs/verification/PAI-review-continuation-50.json",
+        "docs/verification/PAI-review-continuation-51.json",
+        "docs/verification/PAI-review-continuation-54.json",
+        "docs/verification/PAI-review-continuation-61.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic",
+        "privacy_review"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "ARCH-01",
+      "slices": [
+        "PAI-01",
+        "PAI-07"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_arch_01",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-36.json",
+        "docs/verification/PAI-review-continuation-42.json",
+        "docs/verification/PAI-review-continuation-50.json",
+        "docs/verification/PAI-review-continuation-61.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "ARCH-02",
+      "slices": [
+        "PAI-02",
+        "PAI-21"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_arch_02",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-36.json",
+        "docs/verification/PAI-review-continuation-52.json",
+        "docs/verification/PAI-review-continuation-57.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "BRIEF-01",
+      "slices": [
+        "PAI-14"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_brief_01",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-42.json",
+        "docs/verification/PAI-review-continuation-50.json",
+        "docs/verification/PAI-review-continuation-61.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "BRIEF-02",
+      "slices": [
+        "PAI-14"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_brief_02",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-42.json",
+        "docs/verification/PAI-review-continuation-50.json",
+        "docs/verification/PAI-review-continuation-61.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "BRIEF-03",
+      "slices": [
+        "PAI-05",
+        "PAI-14",
+        "PAI-15"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_brief_03",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-36.json",
+        "docs/verification/PAI-review-continuation-42.json",
+        "docs/verification/PAI-review-continuation-50.json",
+        "docs/verification/PAI-review-continuation-61.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "BRIEF-04",
+      "slices": [
+        "PAI-14"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_brief_04",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-42.json",
+        "docs/verification/PAI-review-continuation-50.json",
+        "docs/verification/PAI-review-continuation-61.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "BRIEF-05",
+      "slices": [
+        "PAI-14"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_brief_05",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-42.json",
+        "docs/verification/PAI-review-continuation-50.json",
+        "docs/verification/PAI-review-continuation-61.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "BRIEF-06",
+      "slices": [
+        "PAI-14",
+        "PAI-17",
+        "PAI-19"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_brief_06",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-42.json",
+        "docs/verification/PAI-review-continuation-50.json",
+        "docs/verification/PAI-review-continuation-51.json",
+        "docs/verification/PAI-review-continuation-54.json",
+        "docs/verification/PAI-review-continuation-61.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "BRIEF-07",
+      "slices": [
+        "PAI-14"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_brief_07",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-42.json",
+        "docs/verification/PAI-review-continuation-50.json",
+        "docs/verification/PAI-review-continuation-61.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "CHAT-01",
+      "slices": [
+        "PAI-10"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_chat_01",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-42.json",
+        "docs/verification/PAI-review-continuation-50.json",
+        "docs/verification/PAI-review-continuation-61.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "CHAT-02",
+      "slices": [
+        "PAI-05",
+        "PAI-07",
+        "PAI-10"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_chat_02",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-36.json",
+        "docs/verification/PAI-review-continuation-42.json",
+        "docs/verification/PAI-review-continuation-50.json",
+        "docs/verification/PAI-review-continuation-61.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "CONNECT-01",
+      "slices": [
+        "PAI-17",
+        "PAI-18",
+        "PAI-19"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_connect_01",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-51.json",
+        "docs/verification/PAI-review-continuation-54.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic",
+        "privacy_review"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "CONNECT-02",
+      "slices": [
+        "PAI-16",
+        "PAI-17",
+        "PAI-18"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_connect_02",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-51.json",
+        "docs/verification/PAI-review-continuation-54.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic",
+        "privacy_review"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "CONNECT-03",
+      "slices": [
+        "PAI-16",
+        "PAI-20"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_connect_03",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-51.json",
+        "docs/verification/PAI-review-continuation-54.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic",
+        "privacy_review"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "COST-01",
+      "slices": [
+        "PAI-03",
+        "PAI-23"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_cost_01",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-36.json",
+        "docs/verification/PAI-review-continuation-52.json",
+        "docs/verification/PAI-review-continuation-57.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "COST-02",
+      "slices": [
+        "PAI-23"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_cost_02",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-52.json",
+        "docs/verification/PAI-review-continuation-57.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "DONE-01",
+      "slices": [
+        "PAI-26",
+        "PAI-27",
+        "PAI-28",
+        "PAI-29"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_done_01",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-52.json",
+        "docs/verification/PAI-review-continuation-57.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "EVAL-01",
+      "slices": [
+        "PAI-23",
+        "PAI-26",
+        "PAI-27",
+        "PAI-29"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_eval_01",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-52.json",
+        "docs/verification/PAI-review-continuation-57.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "EVAL-02",
+      "slices": [
+        "PAI-23",
+        "PAI-26"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_eval_02",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-52.json",
+        "docs/verification/PAI-review-continuation-57.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "EVAL-03",
+      "slices": [
+        "PAI-15",
+        "PAI-27",
+        "PAI-29"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_eval_03",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-42.json",
+        "docs/verification/PAI-review-continuation-50.json",
+        "docs/verification/PAI-review-continuation-52.json",
+        "docs/verification/PAI-review-continuation-57.json",
+        "docs/verification/PAI-review-continuation-61.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "EVIDENCE-01",
+      "slices": [
+        "PAI-11",
+        "PAI-12",
+        "PAI-17",
+        "PAI-19"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_evidence_01",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-42.json",
+        "docs/verification/PAI-review-continuation-50.json",
+        "docs/verification/PAI-review-continuation-51.json",
+        "docs/verification/PAI-review-continuation-54.json",
+        "docs/verification/PAI-review-continuation-61.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "EVIDENCE-02",
+      "slices": [
+        "PAI-11",
+        "PAI-12",
+        "PAI-19"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_evidence_02",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-42.json",
+        "docs/verification/PAI-review-continuation-50.json",
+        "docs/verification/PAI-review-continuation-51.json",
+        "docs/verification/PAI-review-continuation-54.json",
+        "docs/verification/PAI-review-continuation-61.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "EVIDENCE-03",
+      "slices": [
+        "PAI-12"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_evidence_03",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-42.json",
+        "docs/verification/PAI-review-continuation-50.json",
+        "docs/verification/PAI-review-continuation-61.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "MEDIA-01",
+      "slices": [
+        "PAI-22"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_media_01",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-52.json",
+        "docs/verification/PAI-review-continuation-57.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "MEDIA-02",
+      "slices": [
+        "PAI-22"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_media_02",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-52.json",
+        "docs/verification/PAI-review-continuation-57.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "MEDIA-03",
+      "slices": [
+        "PAI-05",
+        "PAI-15",
+        "PAI-22"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_media_03",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-36.json",
+        "docs/verification/PAI-review-continuation-42.json",
+        "docs/verification/PAI-review-continuation-50.json",
+        "docs/verification/PAI-review-continuation-52.json",
+        "docs/verification/PAI-review-continuation-57.json",
+        "docs/verification/PAI-review-continuation-61.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "MEM-01",
+      "slices": [
+        "PAI-05"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_mem_01",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-36.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic",
+        "privacy_review"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "MEM-02",
+      "slices": [
+        "PAI-21"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_mem_02",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-52.json",
+        "docs/verification/PAI-review-continuation-57.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic",
+        "privacy_review"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "MEM-03",
+      "slices": [
+        "PAI-21"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_mem_03",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-52.json",
+        "docs/verification/PAI-review-continuation-57.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic",
+        "privacy_review"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "MIGRATION-01",
+      "slices": [
+        "PAI-02",
+        "PAI-25"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_migration_01",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-36.json",
+        "docs/verification/PAI-review-continuation-52.json",
+        "docs/verification/PAI-review-continuation-57.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "MODEL-01",
+      "slices": [
+        "PAI-10",
+        "PAI-23"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_model_01",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-42.json",
+        "docs/verification/PAI-review-continuation-50.json",
+        "docs/verification/PAI-review-continuation-52.json",
+        "docs/verification/PAI-review-continuation-57.json",
+        "docs/verification/PAI-review-continuation-61.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "MODEL-02",
+      "slices": [
+        "PAI-23"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_model_02",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-52.json",
+        "docs/verification/PAI-review-continuation-57.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "OPS-01",
+      "slices": [
+        "PAI-06",
+        "PAI-07",
+        "PAI-08",
+        "PAI-09"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_ops_01",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-36.json",
+        "docs/verification/PAI-review-continuation-42.json",
+        "docs/verification/PAI-review-continuation-50.json",
+        "docs/verification/PAI-review-continuation-61.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "OPS-02",
+      "slices": [
+        "PAI-24",
+        "PAI-25"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_ops_02",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-52.json",
+        "docs/verification/PAI-review-continuation-57.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "PERM-01",
+      "slices": [
+        "PAI-03",
+        "PAI-04",
+        "PAI-09",
+        "PAI-16",
+        "PAI-20"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_perm_01",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-36.json",
+        "docs/verification/PAI-review-continuation-42.json",
+        "docs/verification/PAI-review-continuation-50.json",
+        "docs/verification/PAI-review-continuation-51.json",
+        "docs/verification/PAI-review-continuation-54.json",
+        "docs/verification/PAI-review-continuation-61.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic",
+        "privacy_review"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "PLAN-01",
+      "slices": [
+        "PAI-00",
+        "PAI-01",
+        "PAI-26"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_plan_01",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-36.json",
+        "docs/verification/PAI-review-continuation-52.json",
+        "docs/verification/PAI-review-continuation-57.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "program_design_review",
+        "product_design_review"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "PLAN-02",
+      "slices": [
+        "PAI-00",
+        "PAI-01"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_plan_02",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-36.json"
+      ],
+      "required_review_roles": [
+        "program_design_review",
+        "product_design_review"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "PLAN-03",
+      "slices": [
+        "PAI-00",
+        "PAI-23"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_plan_03",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-36.json",
+        "docs/verification/PAI-review-continuation-52.json",
+        "docs/verification/PAI-review-continuation-57.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "program_design_review",
+        "product_design_review"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "QUALITY-01",
+      "slices": [
+        "PAI-23",
+        "PAI-26",
+        "PAI-29"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_quality_01",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-52.json",
+        "docs/verification/PAI-review-continuation-57.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "RAG-01",
+      "slices": [
+        "PAI-11"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_rag_01",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-42.json",
+        "docs/verification/PAI-review-continuation-50.json",
+        "docs/verification/PAI-review-continuation-61.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "SEARCH-01",
+      "slices": [
+        "PAI-11",
+        "PAI-12",
+        "PAI-13"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_search_01",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-42.json",
+        "docs/verification/PAI-review-continuation-50.json",
+        "docs/verification/PAI-review-continuation-61.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "SEARCH-02",
+      "slices": [
+        "PAI-10",
+        "PAI-11",
+        "PAI-12"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_search_02",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-42.json",
+        "docs/verification/PAI-review-continuation-50.json",
+        "docs/verification/PAI-review-continuation-61.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "SEARCH-03",
+      "slices": [
+        "PAI-13"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_search_03",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-42.json",
+        "docs/verification/PAI-review-continuation-50.json",
+        "docs/verification/PAI-review-continuation-61.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "SEARCH-04",
+      "slices": [
+        "PAI-11",
+        "PAI-12",
+        "PAI-13"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_search_04",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-42.json",
+        "docs/verification/PAI-review-continuation-50.json",
+        "docs/verification/PAI-review-continuation-61.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "SEC-01",
+      "slices": [
+        "PAI-12",
+        "PAI-17",
+        "PAI-19",
+        "PAI-21",
+        "PAI-22",
+        "PAI-26"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_sec_01",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-42.json",
+        "docs/verification/PAI-review-continuation-50.json",
+        "docs/verification/PAI-review-continuation-51.json",
+        "docs/verification/PAI-review-continuation-52.json",
+        "docs/verification/PAI-review-continuation-54.json",
+        "docs/verification/PAI-review-continuation-57.json",
+        "docs/verification/PAI-review-continuation-61.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic",
+        "privacy_review"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "SEC-02",
+      "slices": [
+        "PAI-03",
+        "PAI-16",
+        "PAI-22"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_sec_02",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-36.json",
+        "docs/verification/PAI-review-continuation-51.json",
+        "docs/verification/PAI-review-continuation-52.json",
+        "docs/verification/PAI-review-continuation-54.json",
+        "docs/verification/PAI-review-continuation-57.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic",
+        "privacy_review"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "SEC-03",
+      "slices": [
+        "PAI-16",
+        "PAI-24"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_sec_03",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-51.json",
+        "docs/verification/PAI-review-continuation-52.json",
+        "docs/verification/PAI-review-continuation-54.json",
+        "docs/verification/PAI-review-continuation-57.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic",
+        "privacy_review"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "SEC-04",
+      "slices": [
+        "PAI-21",
+        "PAI-25"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_sec_04",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-52.json",
+        "docs/verification/PAI-review-continuation-57.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic",
+        "privacy_review"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "UX-01",
+      "slices": [
+        "PAI-07",
+        "PAI-16"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_ux_01",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-42.json",
+        "docs/verification/PAI-review-continuation-50.json",
+        "docs/verification/PAI-review-continuation-51.json",
+        "docs/verification/PAI-review-continuation-54.json",
+        "docs/verification/PAI-review-continuation-61.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "UX-02",
+      "slices": [
+        "PAI-10",
+        "PAI-11",
+        "PAI-14"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_ux_02",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-42.json",
+        "docs/verification/PAI-review-continuation-50.json",
+        "docs/verification/PAI-review-continuation-61.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "UX-03",
+      "slices": [
+        "PAI-05",
+        "PAI-10",
+        "PAI-14",
+        "PAI-20"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_ux_03",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-36.json",
+        "docs/verification/PAI-review-continuation-42.json",
+        "docs/verification/PAI-review-continuation-50.json",
+        "docs/verification/PAI-review-continuation-51.json",
+        "docs/verification/PAI-review-continuation-54.json",
+        "docs/verification/PAI-review-continuation-61.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "UX-04",
+      "slices": [
+        "PAI-06",
+        "PAI-07",
+        "PAI-13"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_ux_04",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-36.json",
+        "docs/verification/PAI-review-continuation-42.json",
+        "docs/verification/PAI-review-continuation-50.json",
+        "docs/verification/PAI-review-continuation-61.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "UX-05",
+      "slices": [
+        "PAI-07",
+        "PAI-09",
+        "PAI-20"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_ux_05",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-42.json",
+        "docs/verification/PAI-review-continuation-50.json",
+        "docs/verification/PAI-review-continuation-51.json",
+        "docs/verification/PAI-review-continuation-54.json",
+        "docs/verification/PAI-review-continuation-61.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "VISUAL-01",
+      "slices": [
+        "PAI-15"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_visual_01",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-42.json",
+        "docs/verification/PAI-review-continuation-50.json",
+        "docs/verification/PAI-review-continuation-61.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "VISUAL-02",
+      "slices": [
+        "PAI-15"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_visual_02",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-42.json",
+        "docs/verification/PAI-review-continuation-50.json",
+        "docs/verification/PAI-review-continuation-61.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "VISUAL-03",
+      "slices": [
+        "PAI-15"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_visual_03",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-42.json",
+        "docs/verification/PAI-review-continuation-50.json",
+        "docs/verification/PAI-review-continuation-61.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "VISUAL-04",
+      "slices": [
+        "PAI-15"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_visual_04",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-42.json",
+        "docs/verification/PAI-review-continuation-50.json",
+        "docs/verification/PAI-review-continuation-61.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "WATCH-01",
+      "slices": [
+        "PAI-08"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_watch_01",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-42.json",
+        "docs/verification/PAI-review-continuation-50.json",
+        "docs/verification/PAI-review-continuation-61.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "WATCH-02",
+      "slices": [
+        "PAI-08"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_watch_02",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-42.json",
+        "docs/verification/PAI-review-continuation-50.json",
+        "docs/verification/PAI-review-continuation-61.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "WATCH-03",
+      "slices": [
+        "PAI-08",
+        "PAI-09"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_watch_03",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-42.json",
+        "docs/verification/PAI-review-continuation-50.json",
+        "docs/verification/PAI-review-continuation-61.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    },
+    {
+      "spec_id": "WATCH-04",
+      "slices": [
+        "PAI-08",
+        "PAI-09"
+      ],
+      "synthetic_test_node": "tests/test_pai_requirements.py::test_requirement_watch_04",
+      "synthetic_status": "bound_case_observed_pass_in_full_tier",
+      "source_boundary_recheck_refs": [
+        "docs/verification/PAI-review-continuation-42.json",
+        "docs/verification/PAI-review-continuation-50.json",
+        "docs/verification/PAI-review-continuation-61.json",
+        "docs/verification/PAI-review-continuation-64.json"
+      ],
+      "required_review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "formal_role_acceptance": false,
+      "live_evidence": false,
+      "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
+      "canonical_status_unchanged": "planned"
+    }
+  ],
+  "scenarios": [
+    {
+      "scenario_id": "SC13.2-01",
+      "synthetic_test_node": "tests/test_pai_end_to_end.py::test_chat_multiturn_and_topic_return",
+      "recovery_test_node": null,
+      "synthetic_status": "binding_and_recovery_nodes_observed_pass_in_full_tier",
+      "live_evidence": false,
+      "human_evidence": false
+    },
+    {
+      "scenario_id": "SC13.2-02",
+      "synthetic_test_node": "tests/test_pai_end_to_end.py::test_object_followups_confirmation_cancel_restart",
+      "recovery_test_node": "tests/test_pai_load_recovery.py::test_object_followups_confirmation_cancel_restart",
+      "synthetic_status": "binding_and_recovery_nodes_observed_pass_in_full_tier",
+      "live_evidence": false,
+      "human_evidence": false
+    },
+    {
+      "scenario_id": "SC13.2-03",
+      "synthetic_test_node": "tests/test_pai_end_to_end.py::test_archive_web_conflicts_and_coverage",
+      "recovery_test_node": null,
+      "synthetic_status": "binding_and_recovery_nodes_observed_pass_in_full_tier",
+      "live_evidence": false,
+      "human_evidence": false
+    },
+    {
+      "scenario_id": "SC13.2-04",
+      "synthetic_test_node": "tests/test_pai_end_to_end.py::test_weekly_brief_dedup_deadline_and_outage",
+      "recovery_test_node": null,
+      "synthetic_status": "binding_and_recovery_nodes_observed_pass_in_full_tier",
+      "live_evidence": false,
+      "human_evidence": false
+    },
+    {
+      "scenario_id": "SC13.2-05",
+      "synthetic_test_node": "tests/test_pai_end_to_end.py::test_report_views_mobile_cyrillic_dark_theme",
+      "recovery_test_node": null,
+      "synthetic_status": "binding_and_recovery_nodes_observed_pass_in_full_tier",
+      "live_evidence": false,
+      "human_evidence": false
+    },
+    {
+      "scenario_id": "SC13.2-06",
+      "synthetic_test_node": "tests/test_pai_end_to_end.py::test_watch_pause_dst_revoke_and_unknown_send",
+      "recovery_test_node": "tests/test_pai_load_recovery.py::test_watch_pause_dst_revoke_and_unknown_send",
+      "synthetic_status": "binding_and_recovery_nodes_observed_pass_in_full_tier",
+      "live_evidence": false,
+      "human_evidence": false
+    },
+    {
+      "scenario_id": "SC13.2-07",
+      "synthetic_test_node": "tests/test_pai_end_to_end.py::test_academic_deadline_conflict_local_done_and_eligibility",
+      "recovery_test_node": null,
+      "synthetic_status": "binding_and_recovery_nodes_observed_pass_in_full_tier",
+      "live_evidence": false,
+      "human_evidence": false
+    },
+    {
+      "scenario_id": "SC13.2-08",
+      "synthetic_test_node": "tests/test_pai_end_to_end.py::test_action_edit_confirm_double_click_owner_expiry_version",
+      "recovery_test_node": "tests/test_pai_load_recovery.py::test_action_edit_confirm_double_click_owner_expiry_version",
+      "synthetic_status": "binding_and_recovery_nodes_observed_pass_in_full_tier",
+      "live_evidence": false,
+      "human_evidence": false
+    },
+    {
+      "scenario_id": "SC13.2-09",
+      "synthetic_test_node": "tests/test_pai_end_to_end.py::test_source_injection_secret_query_and_fallback_denials",
+      "recovery_test_node": "tests/test_pai_load_recovery.py::test_source_injection_secret_query_and_fallback_denials",
+      "synthetic_status": "binding_and_recovery_nodes_observed_pass_in_full_tier",
+      "live_evidence": false,
+      "human_evidence": false
+    },
+    {
+      "scenario_id": "SC13.2-10",
+      "synthetic_test_node": "tests/test_pai_end_to_end.py::test_restore_migration_revoke_delete_and_cache",
+      "recovery_test_node": "tests/test_pai_load_recovery.py::test_restore_migration_revoke_delete_and_cache",
+      "synthetic_status": "binding_and_recovery_nodes_observed_pass_in_full_tier",
+      "live_evidence": false,
+      "human_evidence": false
+    }
+  ],
+  "formal_review": {
+    "program_design_review": "pending_native_complete_aggregation",
+    "product_design_review": "pending_native_complete_aggregation",
+    "slice_test_critic_privacy_maintainability": "non-Codex governed adapter/receipts remain pending; advisory source rechecks are not substituted",
+    "tooling": "native73 default-reasoning recheck pending; native72 STOP includes actual STOP/projection fixes and direct-consumer policy boundary"
+  },
+  "live_provider_evidence": false,
+  "human_design_approval": false,
+  "human_visual_usefulness_acceptance": false,
+  "production_deployment": false,
+  "remaining_gates": [
+    "Close genuine native tooling audit and actual all-four-group program/product design sets; runtime full320/focused673/retrofit150 and latest tooling106 passed at named snapshots.",
+    "Preserve any native STOP/P0/P1 until corrected and independently rechecked.",
+    "Exact hash-bound owner design decision through the pinned workflow; unsupported governed acceptance roles remain separate.",
+    "PAI-27 exact source/account/provider/operation/private-egress/budget canary scope and actual observations.",
+    "PAI-28 separately approved production target/service/reader authentication/cutover and operator rollback window.",
+    "PAI-29 actual visual/usefulness pilot and full owner acceptance.",
+    "PAI-30/31 remain conditional on measured limits; no trigger has been observed."
+  ],
+  "source_boundary_closure": "Latest media budget/cancel #68 SHIP_OK; other unchanged runtime source closures as recorded.",
+  "changed_files": {
+    "base_sha": "8faee4232cb30e6b6f39cfbd974c151846f79da6",
+    "head_sha": "37221c01782831611f2038fa9085c85c50274b7b",
+    "paths": [
+      ".gitignore",
+      ".playbook/instruction_manifest.json",
+      ".playbook/project_verification.json",
+      "AGENTS.md",
+      "README.md",
+      "docs/ARCHITECTURE.md",
+      "docs/ASSISTANT_BOUNDARIES.md",
+      "docs/CODEX_PROMPT.before-pai-20261006.md",
+      "docs/CODEX_PROMPT.md",
+      "docs/IMPLEMENTATION_CONTRACT.md",
+      "docs/PA_IMPLEMENTATION_TASKS.md",
+      "docs/PA_SCALING_STRATEGY_2026-10-06.md",
+      "docs/PERSONAL_ASSISTANT_BRIEF.md",
+      "docs/PLAYBOOK_ADOPTION.md",
+      "docs/PROJECT_BRIEF.md",
+      "docs/REVIEW_POLICY.md",
+      "docs/adr/ADR-012-pa-assignment-and-instruction-scope.md",
+      "docs/adr/ADR-013-pa-durable-runtime.md",
+      "docs/adr/ADR-014-pa-local-implementation-proceed.md",
+      "docs/adr/ADR-015-pa-implementation-before-validation.md",
+      "docs/design/PAI.design.json",
+      "docs/design/PAI.md",
+      "docs/design/PAI.requirements.json",
+      "docs/prompts/ORCHESTRATOR.md",
+      "docs/prompts/pa_sol_implementation.md",
+      "docs/prompts/personal_assistant_implementer.md",
+      "docs/prompts/prm_search_news_implementer.md",
+      "docs/prompts/prm_search_news_reviewer.md",
+      "docs/prompts/workflow_claude_reviewer.md",
+      "docs/prompts/workflow_codex_fixer.md",
+      "docs/prompts/workflow_codex_implementer.md",
+      "docs/prompts/workflow_orchestrator.md",
+      "docs/prompts/workflow_quickref.md",
+      "docs/tasks.md",
+      "docs/verification/PAI-00-file-manifest.json",
+      "docs/verification/PAI-00-reconciliation.md",
+      "docs/verification/PAI-01-durable-design.md",
+      "docs/verification/PAI-01-product-P1-recheck.json",
+      "docs/verification/PAI-01-product-review-04c4efa.md",
+      "docs/verification/PAI-01-recheck-failure-opencode-0e0de111ad6a4ec4874692092971e13a.json",
+      "docs/verification/PAI-01-recheck-failure-opencode-a555e37f79224009b6fb1a771fc760ee.json",
+      "docs/verification/PAI-01-recheck-failure-opencode-c80df329c1f448eb90f313d07fb85a62.json",
+      "docs/verification/PAI-01-review-failure-1136863.json",
+      "docs/verification/PAI-01-review-failure-a5cd3d2.json",
+      "docs/verification/PAI-02-storage.md",
+      "docs/verification/PAI-03-durable-policy.md",
+      "docs/verification/PAI-04-durable-actions.md",
+      "docs/verification/PAI-05-durable-conversation.md",
+      "docs/verification/PAI-06-workers.md",
+      "docs/verification/PAI-07-ingress.md",
+      "docs/verification/PAI-08-scheduler.md",
+      "docs/verification/PAI-09-delivery.md",
+      "docs/verification/PAI-27-access-packet.md",
+      "docs/verification/PAI-28-cutover-packet.md",
+      "docs/verification/PAI-29-pilot-packet.md",
+      "docs/verification/PAI-MIMO-CALL-PROTOCOL.md",
+      "docs/verification/PAI-MIMO-SSE-diagnostic.json",
+      "docs/verification/PAI-access-release-pilot-packet.md",
+      "docs/verification/PAI-conditional-infrastructure.md",
+      "docs/verification/PAI-critical-boundaries-recheck-28.json",
+      "docs/verification/PAI-critical-boundaries-recheck-29.json",
+      "docs/verification/PAI-critical-boundaries-recheck-30.json",
+      "docs/verification/PAI-delivery-review-incomplete.json",
+      "docs/verification/PAI-design-evidence-bindings.md",
+      "docs/verification/PAI-implementation-pass-20261007.md",
+      "docs/verification/PAI-local-code-receipt-20261007.json",
+      "docs/verification/PAI-native-tooling-66-response.md",
+      "docs/verification/PAI-next-review-packets.json",
+      "docs/verification/PAI-phase-c-review-failure.json",
+      "docs/verification/PAI-phase-d-review-24.json",
+      "docs/verification/PAI-phase-e-review-25.json",
+      "docs/verification/PAI-phase-f-review-26.json",
+      "docs/verification/PAI-progress.md",
+      "docs/verification/PAI-render-recheck-27.json",
+      "docs/verification/PAI-review-30-response.md",
+      "docs/verification/PAI-review-31-response.md",
+      "docs/verification/PAI-review-32-candidate.json",
+      "docs/verification/PAI-review-32-response.md",
+      "docs/verification/PAI-review-33-response.md",
+      "docs/verification/PAI-review-35-response.md",
+      "docs/verification/PAI-review-37-response.md",
+      "docs/verification/PAI-review-38-response.md",
+      "docs/verification/PAI-review-39-response.md",
+      "docs/verification/PAI-review-40-response.md",
+      "docs/verification/PAI-review-47-response.md",
+      "docs/verification/PAI-review-48-response.md",
+      "docs/verification/PAI-review-49-response.md",
+      "docs/verification/PAI-review-51-response.md",
+      "docs/verification/PAI-review-53-response.md",
+      "docs/verification/PAI-review-55-response.md",
+      "docs/verification/PAI-review-56-response.md",
+      "docs/verification/PAI-review-58-response.md",
+      "docs/verification/PAI-review-59-response.md",
+      "docs/verification/PAI-review-60-response.md",
+      "docs/verification/PAI-review-62-response.md",
+      "docs/verification/PAI-review-63-response.md",
+      "docs/verification/PAI-review-continuation-20261007.json",
+      "docs/verification/PAI-review-continuation-31.json",
+      "docs/verification/PAI-review-continuation-32.json",
+      "docs/verification/PAI-review-continuation-33.json",
+      "docs/verification/PAI-review-continuation-34.json",
+      "docs/verification/PAI-review-continuation-35.json",
+      "docs/verification/PAI-review-continuation-36.json",
+      "docs/verification/PAI-review-continuation-37.json",
+      "docs/verification/PAI-review-continuation-38.json",
+      "docs/verification/PAI-review-continuation-39.json",
+      "docs/verification/PAI-review-continuation-40.json",
+      "docs/verification/PAI-review-continuation-41.json",
+      "docs/verification/PAI-review-continuation-42.json",
+      "docs/verification/PAI-review-continuation-43.json",
+      "docs/verification/PAI-review-continuation-44.json",
+      "docs/verification/PAI-review-continuation-45.json",
+      "docs/verification/PAI-review-continuation-46.json",
+      "docs/verification/PAI-review-continuation-47.json",
+      "docs/verification/PAI-review-continuation-48.json",
+      "docs/verification/PAI-review-continuation-49.json",
+      "docs/verification/PAI-review-continuation-50.json",
+      "docs/verification/PAI-review-continuation-51.json",
+      "docs/verification/PAI-review-continuation-52.json",
+      "docs/verification/PAI-review-continuation-53.json",
+      "docs/verification/PAI-review-continuation-54.json",
+      "docs/verification/PAI-review-continuation-55.json",
+      "docs/verification/PAI-review-continuation-56.json",
+      "docs/verification/PAI-review-continuation-57.json",
+      "docs/verification/PAI-review-continuation-58.json",
+      "docs/verification/PAI-review-continuation-59.json",
+      "docs/verification/PAI-review-continuation-60.json",
+      "docs/verification/PAI-review-continuation-61.json",
+      "docs/verification/PAI-review-continuation-62.json",
+      "docs/verification/PAI-review-continuation-63.json",
+      "docs/verification/PAI-review-continuation-64.json",
+      "docs/verification/PAI-review-continuation-65.json",
+      "docs/verification/PAI-review-continuation-66.json",
+      "docs/verification/PAI-review-continuation-67.json",
+      "docs/verification/PAI-review-continuation-68.json",
+      "docs/verification/PAI-review-continuation-69.json",
+      "docs/verification/PAI-review-continuation.json",
+      "docs/verification/PAI-synthetic-requirement-evidence-20261007.json",
+      "docs/verification/PAI-tooling-maintenance-packet.md",
+      "docs/verification/PAI-tooling-review-41-response.md",
+      "docs/verification/PAI-tooling-review-43-response.md",
+      "docs/verification/PAI-validation-20261007.json",
+      "docs/verification/PAI-validation-20261008.json",
+      "docs/verification/PAI-verification-20261007.md",
+      "docs/verification/PAI-working-tree-evidence.json",
+      "requirements-pai-crypto.lock",
+      "requirements.txt",
+      "src/bot/bot.py",
+      "src/bot/prm_handlers.py",
+      "src/llm/client.py",
+      "src/prm/academic_inbox.py",
+      "src/prm/application.py",
+      "src/prm/briefs.py",
+      "src/prm/capabilities.py",
+      "src/prm/cli.py",
+      "src/prm/confirmed_actions.py",
+      "src/prm/conversation.py",
+      "src/prm/public_web.py",
+      "src/prm/runtime/__init__.py",
+      "src/prm/runtime/academic.py",
+      "src/prm/runtime/actions.py",
+      "src/prm/runtime/archive.py",
+      "src/prm/runtime/brief.py",
+      "src/prm/runtime/composition.py",
+      "src/prm/runtime/connections.py",
+      "src/prm/runtime/connector_summary.py",
+      "src/prm/runtime/cost_cache.py",
+      "src/prm/runtime/deletion.py",
+      "src/prm/runtime/delivery.py",
+      "src/prm/runtime/evaluation.py",
+      "src/prm/runtime/graph.py",
+      "src/prm/runtime/ingress.py",
+      "src/prm/runtime/media.py",
+      "src/prm/runtime/media_attempts.py",
+      "src/prm/runtime/media_download.py",
+      "src/prm/runtime/media_extract.py",
+      "src/prm/runtime/memory.py",
+      "src/prm/runtime/migration.py",
+      "src/prm/runtime/model.py",
+      "src/prm/runtime/model_attempts.py",
+      "src/prm/runtime/model_errors.py",
+      "src/prm/runtime/network_guard.py",
+      "src/prm/runtime/operations.py",
+      "src/prm/runtime/profiles.py",
+      "src/prm/runtime/reader.py",
+      "src/prm/runtime/release.py",
+      "src/prm/runtime/render.py",
+      "src/prm/runtime/research.py",
+      "src/prm/runtime/schedule.py",
+      "src/prm/runtime/scheduler.py",
+      "src/prm/runtime/service.py",
+      "src/prm/runtime/setup.py",
+      "src/prm/runtime/speech.py",
+      "src/prm/runtime/transports.py",
+      "src/prm/runtime/vision.py",
+      "src/prm/runtime/watch.py",
+      "src/prm/runtime/web.py",
+      "src/prm/runtime/worker.py",
+      "src/prm/storage/__init__.py",
+      "src/prm/storage/__main__.py",
+      "src/prm/storage/academic.py",
+      "src/prm/storage/actions.py",
+      "src/prm/storage/artifacts.py",
+      "src/prm/storage/briefs.py",
+      "src/prm/storage/conversations.py",
+      "src/prm/storage/jobs.py",
+      "src/prm/storage/policy.py",
+      "src/prm/storage/postgres.py",
+      "src/prm/storage/testing.py",
+      "src/prm/synthesis.py",
+      "systemd/pai-worker.service.example",
+      "tests/pai_runtime_fixtures.py",
+      "tests/test_assistant_conversation.py",
+      "tests/test_memory_research.py",
+      "tests/test_opencode_role_review.py",
+      "tests/test_pai_academic_runtime.py",
+      "tests/test_pai_acceptance_guard.py",
+      "tests/test_pai_action_runtime.py",
+      "tests/test_pai_archive_search.py",
+      "tests/test_pai_brief_runtime.py",
+      "tests/test_pai_chat_runtime.py",
+      "tests/test_pai_connections.py",
+      "tests/test_pai_cost_cache.py",
+      "tests/test_pai_deep_research.py",
+      "tests/test_pai_delivery.py",
+      "tests/test_pai_durable_actions.py",
+      "tests/test_pai_durable_conversation.py",
+      "tests/test_pai_durable_policy.py",
+      "tests/test_pai_end_to_end.py",
+      "tests/test_pai_graph_mail.py",
+      "tests/test_pai_ingress_jobs.py",
+      "tests/test_pai_load_recovery.py",
+      "tests/test_pai_media_runtime.py",
+      "tests/test_pai_memory_runtime.py",
+      "tests/test_pai_migration.py",
+      "tests/test_pai_operations_runtime.py",
+      "tests/test_pai_plan.py",
+      "tests/test_pai_report_runtime.py",
+      "tests/test_pai_requirements.py",
+      "tests/test_pai_review_recovery.py",
+      "tests/test_pai_schedule_runtime.py",
+      "tests/test_pai_scheduler.py",
+      "tests/test_pai_storage.py",
+      "tests/test_pai_watch_wiring.py",
+      "tests/test_pai_web_github.py",
+      "tests/test_pai_workers.py",
+      "tests/test_playbook_bridge.py",
+      "tests/test_test_tiers.py",
+      "tools/check_pai_plan.py",
+      "tools/finalize_opencode_design_reviews.py",
+      "tools/mimo_code_review.py",
+      "tools/opencode_role_review.py",
+      "tools/playbook.py",
+      "tools/run_codex_role.py",
+      "tools/run_pai_acceptance.py",
+      "tools/test_tiers.py"
+    ],
+    "count": 256,
+    "diff_sha256": "a0d54ca8e7fe6dd6a8a598ffe1bb2c34f05b13cc2637f07575823cfd1f10f1ad"
+  },
+  "upstream_enforcement_proposal": "docs/verification/PAI-upstream-gate-proposal.md"
+}
