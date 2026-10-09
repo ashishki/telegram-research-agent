@@ -1,7 +1,7 @@
 # Current handoff — review99 P1 locally fixed; independent102 next
 
 2026-10-09. Assigned branch docs/personal-assistant-blueprint-playbook-20260918.
-Base9098d0c; commit current corrected design/runtime/tests/evidence before102.
+Review99 correction committed atba4985a; new matrix-only correction must commit before103.
 Current implementer uses active default model/reasoning; no override.
 Read current task PAI-00/01 and REVIEW_POLICY; full programme remains all32
 Chat/Search/Brief/Watch/confirmedAct packets,69 IDs and ten scenarios.
@@ -37,16 +37,21 @@ corrected plan/bridge48passed3.41s; pin/32/69/ten/diff pass. Initial4plan failur
 (renderer limit) and prior typed-wrapper failure retained, no weakened checker.
 No full historical pytest/current full-spec runtime acceptance claimed.
 
-Next: ONE actual independent program/product102 P1 recheck after scoped commit:
-    .venv-pai/bin/python .playbook-artifacts/pai-native-design-once.py --call-number 102 --role program_design_review --group product
-Inspect processes/receipts before fresh requests. If102 clears,103 foundation/
-104 sources/105 completeness complete program;106..109 all four product groups.
-All must use the SAME corrected committed HEAD/design and accepted current93
-critical hashes; no HEAD/design/tooling edits while fresh set runs. Each request
-max/input1MB/output131072/7200, one explicit call/no retry. Preserve any new STOP,
-fix P0/P1 then actual independent recheck before dependent work. Only aggregate
-all four genuine parts per role with tools/finalize_opencode_design_reviews.py,
-then actual require_trusted_design_records/real pinned generic parser.
+Actual102 ended structural ADVISORY but its summary=placeholder/fix=test/
+not_verified=[x] make it semantically unusable, not P1 closure or a complete
+part. Original immutable102 report/verdict remains unchanged;102 consumed.
+PAI-review-102-quality.md records the issue. Existing required PG/SQLite node
+added to PAI-09 matrix.security_test_nodes; no code/test/checker edits. Commit
+this design-only correction before ONE fresh full program/product103 recheck:
+    .venv-pai/bin/python .playbook-artifacts/pai-native-design-once.py --call-number 103 --role program_design_review --group product
+If103 gives usable P1 closure,104 foundation/105 sources/106 completeness
+finish program;107..110 all four product groups. Allocation110 uses ongoing
+necessary-review authority. No dependent batch/aggregate yet. Same corrected
+HEAD/design/current tooling93 through all parts. No automatic retry/fallback.
+Only use genuine semantically complete actual reports; placeholder fields never
+supply a missing independent disposition. Finalize all four parts per role via
+tools/finalize_opencode_design_reviews.py, then require_trusted_design_records/
+real pinned generic parser. Human approval remains a separate exact decision.
 
 Use .venv-pai/bin/python, PYTHONPATH=src, PYTEST_DISABLE_PLUGIN_AUTOLOAD=1,
 and pinned tools/playbook.py. Local synthetic PostgreSQL/tests are authorized.

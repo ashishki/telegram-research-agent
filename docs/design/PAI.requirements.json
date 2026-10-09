@@ -184,6 +184,7 @@
       "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
       "evidence_status": "planned; no implementation or review acceptance implied",
       "security_test_nodes": [
+        "tests/test_pai_delivery.py::test_postgres_authority_spans_legacy_sqlite_send",
         "tests/test_pai_delivery.py::test_sqlite_busy_boundary_distinguishes_no_send",
         "tests/test_pai_delivery.py::test_multipart_not_started_does_not_claim_absence_after_prior_send"
       ]
