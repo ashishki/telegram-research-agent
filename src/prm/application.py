@@ -586,6 +586,7 @@ class PersonalResearchAssistant:
         source_payload: Mapping[str, Any] | None = None,
         route: Mapping[str, Any] | None = None,
         refresh_note: bool = False,
+        prepared_document: BriefDocument | None = None,
     ) -> AssistantResult:
         """Render one explicit local-evidence BriefDocument without retrieval.
 
@@ -597,7 +598,19 @@ class PersonalResearchAssistant:
         durable_owner_ref = _brief_owner_ref(request)
         brief_request = _with_authenticated_brief_owner(brief_request, durable_owner_ref)
         try:
-            document = build_brief_document(brief_request)
+            if prepared_document is None:
+                document = build_brief_document(brief_request)
+            else:
+                if (type(prepared_document) is not BriefDocument
+                    or prepared_document.owner_ref != brief_request.owner_ref
+                    or prepared_document.topic != brief_request.topic
+                    or (prepared_document.window.timezone, prepared_document.window.start_at, prepared_document.window.end_at)
+                       != (brief_request.window.timezone, brief_request.window.start_at, brief_request.window.end_at)):
+                    raise ValueError('prepared Brief owner/topic/window differs')
+                # A runtime-built immutable document is a presentation input,
+                # not an instruction to refresh/increment its saved version.
+                from prm.briefs import _stored_document, _storage_document
+                document = _stored_document(_storage_document(prepared_document))
         except ValueError as exc:
             return AssistantResult(
                 interaction_id="",
@@ -616,7 +629,7 @@ class PersonalResearchAssistant:
                 route=dict(route or {"mode": "brief", "primary_intent": "writer_brief"}),
         )
         editorial_measurement: Mapping[str, object] = {"status": "saved_editorial" if document.editorial else "not_attempted"}
-        if document.editorial is None and not refresh_note:
+        if document.editorial is None and not refresh_note and prepared_document is None:
             editorial, editorial_measurement = synthesize_brief_editorial(
                 document, question=request.query, access=request.archive_synthesis_access,
             )
@@ -1805,14 +1818,15 @@ def _shorten_visible_response(text: str) -> str:
     clean = " ".join(str(text or "").split())
     if not clean:
         return "Для сокращения сначала нужен видимый ответ."
-    for marker in (". ", "! ", "? ", "\n"):
-        if marker in clean:
-            return clean.split(marker, 1)[0].rstrip(".!? ") + "."
+    for boundary in re.finditer(r'[.!?](?:\*\*)?\s+',clean):
+        # An ordered-list marker such as "1." is not a sentence.
+        if re.search(r'[A-Za-zА-Яа-яЁё]',clean[:boundary.start()]):
+            return clean[:boundary.end()].rstrip()[:420]
     return clean[:420].rstrip() + ("…" if len(clean) > 420 else "")
 
 
 def _clean_model_answer(value: object) -> str:
-    return " ".join(str(value or "").split())[:2_400]
+    return "\n".join(" ".join(line.split()) for line in str(value or "").strip().splitlines())[:2_400]
 
 
 def _env_enabled(name: str) -> bool:

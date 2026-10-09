@@ -100,7 +100,8 @@
       "test_files": [
         "tests/test_pai_durable_conversation.py",
         "tests/test_assistant_conversation.py",
-        "tests/test_assistant_report_dialogue.py"
+        "tests/test_assistant_report_dialogue.py",
+        "tests/test_pai_product_sessions.py"
       ],
       "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
       "evidence_status": "planned; no implementation or review acceptance implied"
@@ -140,7 +141,8 @@
         "tests/test_pai_ingress_jobs.py",
         "tests/test_prm_bot_dispatch.py",
         "tests/test_callbacks.py",
-        "tests/test_prm_cli.py"
+        "tests/test_prm_cli.py",
+        "tests/test_pai_product_sessions.py"
       ],
       "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
       "evidence_status": "planned; no implementation or review acceptance implied"
@@ -206,7 +208,8 @@
         "tests/test_assistant_conversation.py",
         "tests/test_prm_application.py",
         "tests/test_openai_provider.py",
-        "tests/test_llm_client.py"
+        "tests/test_llm_client.py",
+        "tests/test_pai_product_sessions.py"
       ],
       "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
       "evidence_status": "planned; no implementation or review acceptance implied"
@@ -290,7 +293,8 @@
         "tests/test_pai_brief_runtime.py",
         "tests/test_assistant_briefs.py",
         "tests/test_assistant_brief_editorial.py",
-        "tests/test_assistant_report_dialogue.py"
+        "tests/test_assistant_report_dialogue.py",
+        "tests/test_pai_product_sessions.py"
       ],
       "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
       "evidence_status": "planned; no implementation or review acceptance implied"
@@ -312,7 +316,8 @@
         "tests/test_pai_report_runtime.py",
         "tests/test_assistant_report_exports.py",
         "tests/test_assistant_report_access.py",
-        "tests/test_pdf_inspection.py"
+        "tests/test_pdf_inspection.py",
+        "tests/test_pai_product_sessions.py"
       ],
       "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
       "evidence_status": "planned; no implementation or review acceptance implied"
@@ -548,7 +553,8 @@
       ],
       "test_files": [
         "tests/test_pai_end_to_end.py",
-        "tests/test_pai_load_recovery.py"
+        "tests/test_pai_load_recovery.py",
+        "tests/test_pai_product_sessions.py"
       ],
       "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
       "evidence_status": "planned; no implementation or review acceptance implied"

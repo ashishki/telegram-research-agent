@@ -295,7 +295,7 @@ Project brief/planning depth are selected. Exact hash-bound feature design,
 live account/retention/cost/provider decisions and conditional scaling remain
 pending; neither time nor a configured key supplies them.
 
-Requirements-matrix-SHA256: e93a1341da0558992fcf662a584c3c66099741bde06182d3fc89f8b47963f5de
+Requirements-matrix-SHA256: da62553521fbeced4906e57a033498e8af20cdb5714866fac94faa7f7dc3ab35
 
 ## 9. Human Approval
 

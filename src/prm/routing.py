@@ -534,11 +534,14 @@ def _research_intent(
 
 def _requires_current_fact_verification(lowered: str, *, archive_scope: bool) -> bool:
     explicit_external = _contains_any(lowered, _EXPLICIT_EXTERNAL_MARKERS)
+    personal_recall = bool(re.search(r"(как меня зовут|как называется мой проект|что я (?:сейчас )?изучаю|о ч[её]м мы говорили|что я (?:сказал|сказала|просил|просила|обещал|обещала))", lowered))
     role_or_version_question = bool(re.search(r"\b(who\s+is|what\s+version|ceo|version)\b", lowered)) or bool(
         re.search(r"(кто\s+(такой|сейчас|является).{0,24}(ceo|руковод|директор)|какая\s+версия)", lowered)
     )
     if role_or_version_question:
         return True
+    if personal_recall and not explicit_external and not _contains_any(lowered, _CURRENT_MARKERS):
+        return False
     if archive_scope:
         # A lone "now" remains archive-scoped, but a concrete current-fact
         # request (price/latest/today) may coexist with an archive question.

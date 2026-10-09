@@ -1,6 +1,7 @@
 """Process-local transactions on an explicitly identified synthetic PostgreSQL."""
 from __future__ import annotations
 from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 import hashlib
 import json
@@ -16,6 +17,21 @@ from psycopg.rows import dict_row
 class StorageError(RuntimeError): pass
 class StateConflict(StorageError): pass
 class SchemaMismatch(StorageError): pass
+
+
+_TRANSPORT_IDLE_MS = ContextVar('pa_bounded_model_transport_idle_ms', default=15000)
+
+
+@contextmanager
+def model_transport_idle_bound(seconds):
+    """Trusted model invocation only; never a persistent connection setting."""
+    if type(seconds) is not int or not 1 <= seconds <= 120:
+        raise StorageError('explicit bounded model transport deadline required')
+    marker = _TRANSPORT_IDLE_MS.set(max(15000, (seconds + 5) * 1000))
+    try:
+        yield
+    finally:
+        _TRANSPORT_IDLE_MS.reset(marker)
 
 SCHEMA_VERSION = 1
 NAMESPACES = frozenset({'conversation', 'result', 'memory'})
@@ -216,6 +232,7 @@ class PostgresStore:
         with self.target.connect() as conn:
             try:
                 with conn.transaction():
+                    conn.execute("SELECT set_config('idle_in_transaction_session_timeout',%s,true)", (str(_TRANSPORT_IDLE_MS.get()),))
                     if _version(conn)!=SCHEMA_VERSION:raise SchemaMismatch('runtime schema must be migrated explicitly')
                     yield StateTransaction(conn)
             except psycopg.Error:

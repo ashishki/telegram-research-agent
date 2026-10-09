@@ -1,0 +1,55 @@
+{
+  "source_project": "Georgia-Community-Navigator",
+  "source_git_head": "83f0701db58f04086930b6ccbe70a6e48a2fd479",
+  "mode": "read-only conceptual adaptation; no execution, deployment, data or credential copy from GCN",
+  "permission": "owner explicitly requested examining nearby GCN chat ideas/solutions and using applicable ones",
+  "license": "no relicensing or assertion of general open-source rights; explicit same-owner reuse request",
+  "files": [
+    {
+      "path": "app/dialogue/monthly_pdf.py",
+      "sha256": "9bcfc5b6b49ea1fc16db307685148ad04e477861baf64265a4038d24ee952e3a",
+      "dirty": true
+    },
+    {
+      "path": "app/dialogue/monthly_pdf_conversation.py",
+      "sha256": "bdac8135e3fdaecbcec6c0aae48075c55157c74516b9e356b002a340cbee79ee",
+      "dirty": false
+    },
+    {
+      "path": "evaluation/product/monthly_pdf_session_llm_judge.py",
+      "sha256": "89ac77744f4ab357cb10df30756285052597852b919cdfe9e26caa20c0b01009",
+      "dirty": false
+    },
+    {
+      "path": "docs/product/monthly_pdf_contextual_dialogues.md",
+      "sha256": "a6e2dba6364a83098c2bc52d2051ca8e9c164a531c2ce38383cd9a5104135c44",
+      "dirty": false
+    },
+    {
+      "path": "docs/IMPLEMENTATION_CONTRACT.md",
+      "sha256": "e384b1d19d2608520da5809a7ff54d00b805a82a47cf4959939f9bd7224c91e1",
+      "dirty": false
+    }
+  ],
+  "adopted_patterns": [
+    "compact explicit session state and topic repair",
+    "explicit new topic overrides stale context",
+    "bounded grounded draft separate from conversational composition",
+    "state promotion tied to delivered answer",
+    "session-window judging with evidence and media, not isolated copywriting",
+    "fail-closed missing/partial provider assessment; advisory scores only"
+  ],
+  "excluded": [
+    "Georgia legal/tax/migration knowledge",
+    "tenant production data",
+    "live service/configuration changes",
+    "automatic retry policy or unmetered composer calls"
+  ],
+  "applied_to_pa": {
+    "bounded_supplied_turns": "src/prm/storage/conversations.py: one anchor plus three recent turns,1200 chars per turn, existing expiring retention; no durable saved preference inference",
+    "distinct_egress": "src/prm/runtime/composition.py: user_provided/dialogue.history grant is separate from generated history and current prompt; no grant means omission",
+    "topic_precedence": "/new removes expiring context; supplied-turn context explicitly yields to current request/topic change",
+    "session_judge": "captured full sessions with expected goals, actual output/status, evidence and artifact content; independent advisory GLM evaluation",
+    "delivery_bound_promotion": "reference concept retained; existing PA record-after-model-reply semantics are not changed to require a Telegram receipt in this slice; no claim of full adoption"
+  }
+}

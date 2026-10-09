@@ -65,7 +65,7 @@ class BriefRuntime:
         request=OperatorRequest(query=topic,mode='brief',chat_id=self.root.owner_chat_id,
             actor_id=self.root.owner_chat_id,owner_chat_id=self.root.owner_chat_id)
         from prm.briefs import rebuild_brief_request
-        result=assistant.render_brief_document(request,rebuild_brief_request(document))
+        result=assistant.render_brief_document(request,rebuild_brief_request(document),prepared_document=document)
         classes=self.root.briefs.pending_classes.get(document.content_digest,('private_archive','private_connector_content'))
         refs=result.payload.get('conversation',{}).get('response_refs',())
         if refs:self.root.conversations.record_origin(refs[0],classes,source_scopes=self.root.briefs.pending_scopes.get(document.content_digest,()))
@@ -99,7 +99,7 @@ class RuntimeBriefEditorial:
         client=root.scoped_client(endpoint,groups=groups,task_ref=document.brief_id,attempt_ref=operation,history=({'role':'user','content':'Untrusted selected evidence: '+json.dumps(sources,ensure_ascii=False)},))
         try:
             receipt=client.complete_with_receipt(prompt=document.topic,
-                system='Return JSON {stories:[{title,summary,explanation,plain_explanation,why_selected,next_step,caveat,anchors:[{evidence_ref,quote}]}],omitted_refs:[]}. Select at most five actual events. Each quote must be an exact selected source substring of at least 16 characters. Explain importance separately from facts. Preserve deadlines/conflicts/coverage. No tools or external claims.',
+                system='Return JSON {stories:[{title,summary,explanation,plain_explanation,why_selected,next_step,caveat,anchors:[{evidence_ref,quote}]}],omitted_refs:[]}. Write every reader-facing field in Russian; keep JSON keys unchanged and source quotes verbatim. Select at most five actual events. Each quote must be an exact selected source substring of at least 16 characters. Explain importance separately from facts. Preserve deadlines/conflicts/coverage. No tools or external claims.',
                 max_tokens=3500,category='brief_editorial',authorization=groups[0][0],data_class='user_provided',owner_ref=root.owner_ref,
                 connection_ref=endpoint.connection_ref,resource_ref=root.model_resource_ref)
             return BriefEditorial.from_dict(json.loads(receipt.text),document.evidence)

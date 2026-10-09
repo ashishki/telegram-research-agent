@@ -197,6 +197,7 @@ TEST_TIERS = {
             'tests/test_pai_migration.py',
             'tests/test_pai_operations_runtime.py',
             'tests/test_pai_plan.py',
+            'tests/test_pai_product_sessions.py',
             'tests/test_pai_report_runtime.py',
             'tests/test_pai_requirements.py',
             'tests/test_pai_review_recovery.py',

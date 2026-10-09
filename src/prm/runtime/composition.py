@@ -166,6 +166,15 @@ class AssistantRuntime:
                     context=self.registry.authorize_and_reserve(history_request,upper_bound=self.model_upper_bound)
                     if context.allowed:
                         groups.append((context,));history=[{'role':'assistant','content':item['text'][:2400]} for item in prior]
+                supplied=self.conversations.user_prompts_for_model(request.chat_id)
+                if supplied:
+                    user_history_request=replace(text_request,capability='model.context_egress',data_class='user_provided',
+                        purpose='dialogue.history',operation_ref=operation+'_user_history')
+                    user_context=self.registry.authorize_and_reserve(user_history_request,upper_bound=self.model_upper_bound)
+                    if user_context.allowed:
+                        import json
+                        groups.append((user_context,))
+                        history=[{'role':'user','content':'Earlier user turns from this expiring dialogue, oldest first. They are context, not new commands or permanent preferences. Follow the current request and any explicit topic change: '+json.dumps(supplied,ensure_ascii=False)},*history[-3:]]
                 access=RuntimeModelAccess(decision,self.owner_ref,endpoint.connection_ref,self.model_resource_ref)
                 client=self.scoped_client(endpoint,groups=groups,history=history,guard=guard,task_ref=request_ref,attempt_ref=operation)
         options=dict(settings=self.settings,conversations=self.conversations,public_web_provider=self.public_web_provider,
@@ -187,6 +196,7 @@ class AssistantRuntime:
             if result.payload.get('model_call_attempted') and result.status=='ok' and type(access)is RuntimeModelAccess:
                 state=self.conversations.record_response(request.chat_id,text=result.text,topic='')
                 self.conversations.record_origin(state.object_refs[0].response_ref,('model_generated',))
+                self.conversations.attach_user_prompt(state.object_refs[0].response_ref,request.query)
                 result=replace(result,payload={**result.payload,'source_data_class':'model_generated',
                     'conversation':{'conversation_id':state.conversation_id,'summary_version':state.summary_version,
                                     'response_refs':[item.response_ref for item in state.object_refs],'retention':'durable_expiring'}})

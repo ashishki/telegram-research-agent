@@ -34,7 +34,7 @@ class ModelEndpoint:
         if (not self.provider_ref.startswith('provider_') or not self.connection_ref.startswith('connection_')
             or not self.model or len(self.model)>128 or not isinstance(self.token,str)
             or '\n' in self.token or '\r' in self.token or url.username or url.password or url.fragment
-            or not 1<=self.timeout_seconds<=8):
+            or type(self.timeout_seconds) is not int or not 1<=self.timeout_seconds<=120):
             raise StorageError('explicit bounded model endpoint required')
         if self.synthetic_http:
             if url.scheme!='http' or url.hostname!='127.0.0.1' or not url.port:
@@ -138,7 +138,10 @@ class ScopedModelClient:
                 known_reply_error=error;raise
         try:
             reservations=tuple(tuple(decision.reservation for decision in group) for group in self.groups)
-            text,usage=self.registry.execute_reserved_groups(reservations,checked_transport)
+            if endpoint.timeout_seconds<=8:
+                text,usage=self.registry.execute_reserved_groups(reservations,checked_transport)
+            else:
+                text,usage=self.registry.execute_reserved_groups(reservations,checked_transport,model_timeout_seconds=endpoint.timeout_seconds)
         except CapabilityDenied:raise
         except ScopePreparationUnknown as error:
             raise ScopePreparationUnknown(error.operation_refs,attempt_ref=self.attempt_ref) from None

@@ -238,5 +238,6 @@ class AssistantJobWorker:
                   'data_class':result.payload.get('source_data_class','model_generated' if result.mode=='chat' else 'private_archive'),
                   'data_classes':result.payload.get('source_data_classes',[result.payload.get('source_data_class','model_generated' if result.mode=='chat' else 'private_archive')]),
                   'interaction_id': result.interaction_id, 'payload': dict(result.payload)}
-        _canonical(record)
+        from .result_payloads import bounded_result_record
+        record = bounded_result_record(queue, lease, record)
         return queue.complete(lease, record)

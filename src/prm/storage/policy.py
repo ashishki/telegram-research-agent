@@ -334,7 +334,20 @@ class DurableCapabilityRegistry(CapabilityRegistry):
             self.settle(owner,operation,outcome='unknown')
             raise
 
-    def execute_reserved_groups(self,groups,transport):
+    def execute_reserved_groups(self,groups,transport,*,model_timeout_seconds=None):
+        groups=tuple(tuple(group) for group in groups)
+        if model_timeout_seconds is not None:
+            from .postgres import model_transport_idle_bound
+            if type(model_timeout_seconds) is not int or not 1 <= model_timeout_seconds <= 120:
+                raise StorageError('explicit bounded model transport deadline required')
+            members=tuple(member for group in groups for member in group)
+            if any(member._request.operation!='model_egress' or member._request.capability not in {'model.generate','model.context_egress'} for member in members):
+                raise CapabilityDenied('extended transport deadline is model-only')
+            with model_transport_idle_bound(model_timeout_seconds):
+                return self._execute_reserved_groups(groups,transport,deadline_seconds=model_timeout_seconds)
+        return self._execute_reserved_groups(groups,transport,deadline_seconds=10)
+
+    def _execute_reserved_groups(self,groups,transport,*,deadline_seconds):
         """One HTTP call requiring distinct data scopes; all scopes precede I/O.
 
         Independent operation fences keep the legacy closed archive pair intact.
@@ -362,7 +375,7 @@ class DurableCapabilityRegistry(CapabilityRegistry):
                 if any(not auth.authorize(member._request,now=now).allowed for member in members):
                     raise CapabilityDenied('current scope group changed')
                 started=time.monotonic();transport_started=True;result=self._invoke_transport(members,transport)
-                if conn.closed or time.monotonic()-started>10:raise StorageError('scope group transport outcome unknown')
+                if conn.closed or time.monotonic()-started>deadline_seconds:raise StorageError('scope group transport outcome unknown')
             for operation in prepared:self.settle(owner,operation,outcome='accepted')
             return result
         except Exception as error:

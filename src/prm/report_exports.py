@@ -505,11 +505,13 @@ def render_paginated_html(
 
 
 def render_paginated_pdf(document: BriefDocument) -> BriefReportArtifact:
-    """Render the fixed-page HTML to PDF locally; fall back to the plain PDF."""
+    """Use fixed pages when they fit; preserve long content with flow pagination."""
 
-    html_artifact = render_paginated_html(document)
     try:
+        html_artifact = render_paginated_html(document)
         body = _render_with_weasyprint(str(html_artifact.body))
+    except BriefReportRenderError:
+        return render_designed_pdf(document)
     except Exception:
         body = _render_fallback_pdf(document)
     if not isinstance(body, bytes) or not body.startswith(b"%PDF-"):
@@ -519,6 +521,7 @@ def render_paginated_pdf(document: BriefDocument) -> BriefReportArtifact:
 
 def _paginated_stylesheet() -> str:
     return """
+@page { size: A4; margin: 0; @top-left { content: none; } @top-center { content: none; } @top-right { content: none; } @bottom-center { content: none; } }
 .brief-doc { background: var(--bg); }
 .page { position: relative; width: 210mm; height: 297mm; box-sizing: border-box; padding: 13mm 14mm 16mm; background: var(--bg); break-after: page; break-inside: avoid; overflow: hidden; }
 .page:last-of-type { break-after: auto; }
@@ -669,7 +672,17 @@ def _render_with_weasyprint(html: str) -> bytes:
         from weasyprint import HTML as WeasyHTML
     except ImportError as exc:  # pragma: no cover - the declared dependency is available in CI
         raise BriefReportRenderUnavailable("local PDF renderer is unavailable") from exc
-    return WeasyHTML(string=html, url_fetcher=_reject_external_resource).write_pdf()
+    rendered=WeasyHTML(string=html, url_fetcher=_reject_external_resource).render()
+    if '<main class="brief-doc"' in html:
+        for page in rendered.pages:
+            for box in page._page_box.descendants():
+                if box.element is None or box.element.get('class')!='page-body':continue
+                right,bottom=box.position_x+box.width,box.position_y+box.height
+                for child in box.descendants():
+                    if child is box:continue
+                    if child.position_x+child.width>right+1 or child.position_y+child.height>bottom+1:
+                        raise BriefReportRenderError('page_overflow: fixed report content would be clipped')
+    return rendered.write_pdf()
 
 
 def render_report(document: BriefDocument, format: Literal["html", "markdown", "pdf"]) -> BriefReportArtifact:

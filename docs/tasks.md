@@ -706,7 +706,7 @@ Status: planned
 Depends-On: PAI-03 PAI-04
 Risk-Level: high
 Critic-Required: required
-Runtime-Verification: required
+Runtime-Verification:; `.venv-pai/bin/python tools/run_pai_acceptance.py -q tests/test_pai_product_sessions.py` required
 Correction-Budget: 2
 Planning-Depth: designed_slices
 Slice-ID: PAI-05
@@ -714,7 +714,7 @@ Objective: после перезапуска «объясни второй пу�
 Acceptance-Criteria:
   - restart, новая тема, отмена, старый callback, две pending proposals и expiry дают правильный результат; retained history удаляется по выбранной политике; беседа другого owner недоступна.
   - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
-Verification:
+Verification:; `.venv-pai/bin/python tools/run_pai_acceptance.py -q tests/test_pai_product_sessions.py`
   - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_durable_conversation.py tests/test_assistant_conversation.py tests/test_assistant_report_dialogue.py
 Context-Refs:
   - docs/PA_IMPLEMENTATION_TASKS.md#pai-05
@@ -766,6 +766,7 @@ Acceptance-Criteria:
   - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
 Verification:
   - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_ingress_jobs.py tests/test_prm_bot_dispatch.py tests/test_callbacks.py tests/test_prm_cli.py
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_product_sessions.py
 Context-Refs:
   - docs/PA_IMPLEMENTATION_TASKS.md#pai-07
   - docs/design/PAI.md
@@ -843,6 +844,7 @@ Acceptance-Criteria:
 Verification:
   - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_chat_runtime.py tests/test_assistant_conversation.py tests/test_prm_application.py tests/test_openai_provider.py tests/test_llm_client.py
   - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_chat_runtime.py::test_chat_fallback_provider_without_data_class_grant_is_not_called
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_product_sessions.py
 Context-Refs:
   - docs/PA_IMPLEMENTATION_TASKS.md#pai-10
   - docs/design/PAI.md
@@ -935,7 +937,7 @@ Status: planned
 Depends-On: PAI-05 PAI-08 PAI-09 PAI-11 PAI-13
 Risk-Level: high
 Critic-Required: required
-Runtime-Verification: required
+Runtime-Verification:; `.venv-pai/bin/python tools/run_pai_acceptance.py -q tests/test_pai_product_sessions.py` required
 Correction-Budget: 2
 Planning-Depth: designed_slices
 Slice-ID: PAI-14
@@ -943,7 +945,7 @@ Objective: «что важного за неделю» даёт редакцио
 Acceptance-Criteria:
   - quiet/partial week, дубли, противоречия, delayed source, DST и followups проходят; смена представления не перегенерирует факты. Fixture quality не выдаётся за human/live quality.
   - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
-Verification:
+Verification:; `.venv-pai/bin/python tools/run_pai_acceptance.py -q tests/test_pai_product_sessions.py`
   - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_brief_runtime.py tests/test_assistant_briefs.py tests/test_assistant_brief_editorial.py tests/test_assistant_report_dialogue.py
 Context-Refs:
   - docs/PA_IMPLEMENTATION_TASKS.md#pai-14
@@ -960,7 +962,7 @@ Status: planned
 Depends-On: PAI-07 PAI-14
 Risk-Level: high
 Critic-Required: required
-Runtime-Verification: required
+Runtime-Verification:; `.venv-pai/bin/python tools/run_pai_acceptance.py -q tests/test_pai_product_sessions.py` required
 Correction-Budget: 2
 Planning-Depth: designed_slices
 Slice-ID: PAI-15
@@ -968,7 +970,7 @@ Objective: один отчёт читается с телефона в Telegram 
 Acceptance-Criteria:
   - чужой/отозванный/истёкший доступ не читает artifact; Telegram/HTML/PDF показывают те же story/source IDs, ничего не обрезано. Человеческая визуальная приёмка остаётся в PAI-27/29.
   - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
-Verification:
+Verification:; `.venv-pai/bin/python tools/run_pai_acceptance.py -q tests/test_pai_product_sessions.py`
   - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_report_runtime.py tests/test_assistant_report_exports.py tests/test_assistant_report_access.py tests/test_pdf_inspection.py
 Context-Refs:
   - docs/PA_IMPLEMENTATION_TASKS.md#pai-15
@@ -1251,6 +1253,7 @@ Verification:
   - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_end_to_end.py tests/test_pai_load_recovery.py
   - python3 tools/test_tiers.py focused-prm
   - python3 tools/test_tiers.py retrofit-boundaries
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_product_sessions.py
 Context-Refs:
   - docs/PA_IMPLEMENTATION_TASKS.md#pai-26
   - docs/design/PAI.md

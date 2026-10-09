@@ -144,6 +144,33 @@ class DurableConversationStore(ConversationStore):
         with self.store.transaction() as tx:
             tx.conn.execute("UPDATE pa_conversation.history SET payload=jsonb_set(payload,'{source_data_class}',%s) WHERE owner=%s AND payload->>'response_ref'=%s",
                 (Jsonb(data_class),self.owner_ref,response_ref))
+
+    def attach_user_prompt(self,response_ref,text):
+        """Retain the supplied turn only with its expiring generated response."""
+        if not isinstance(text,str) or not text.strip() or len(text)>48000:
+            raise StorageError('bounded supplied dialogue turn required')
+        if not self.history_retention_seconds:return
+        with self.store.transaction() as tx:
+            rows=tx.conn.execute("SELECT id,payload FROM pa_conversation.history WHERE owner=%s AND payload->>'response_ref'=%s AND payload->>'source_data_class'='model_generated' FOR UPDATE",
+                (self.owner_ref,response_ref)).fetchall()
+            for row in rows:
+                old=row['payload'].get('user_prompt')
+                if old is not None and old!=text[:1200]:raise StateConflict('supplied dialogue turn is immutable')
+                tx.conn.execute("UPDATE pa_conversation.history SET payload=jsonb_set(payload,'{user_prompt}',%s) WHERE owner=%s AND id=%s",
+                    (Jsonb(text[:1200]),self.owner_ref,row['id']))
+
+    def user_prompts_for_model(self,chat_id):
+        """One original anchor plus three recent supplied turns, at most4800 chars."""
+        with self.store.transaction() as tx:
+            _check(tx.conn)
+            rows=tx.conn.execute("""WITH eligible AS (SELECT id,created_at,payload FROM pa_conversation.history
+                WHERE owner=%s AND conversation_id=%s AND expires>clock_timestamp()
+                AND payload->>'source_data_class'='model_generated' AND payload ? 'user_prompt'),
+                chosen AS ((SELECT * FROM eligible ORDER BY created_at,id LIMIT 1)
+                    UNION (SELECT * FROM eligible ORDER BY created_at DESC,id DESC LIMIT 3))
+                SELECT payload FROM chosen ORDER BY created_at,id""",
+                (self.owner_ref,conversation_id_for(chat_id))).fetchall()
+            return tuple(row['payload']['user_prompt'] for row in rows)
     def response_origin(self,response_ref):
         ref='response_origin_'+hashlib.sha256(response_ref.encode()).hexdigest()[:32]
         item=self.store.get(self.owner_ref,'conversation',ref)

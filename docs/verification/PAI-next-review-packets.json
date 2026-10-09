@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "status": "actual109_self_referential_summary_quality_guard_verified_new_tooling110_required",
+  "status": "actual110_usable_tooling_advisory_accepted_sources111_next",
   "current_approved_call_cap": 118,
-  "calls_consumed_including_failures": 109,
+  "calls_consumed_including_failures": 111,
   "proposed_total_cap": 34,
   "new_calls_maximum": 3,
   "third_call": "only if an actual new finding needs independent recheck",
@@ -1897,7 +1897,7 @@
       "call_number": 111,
       "role": "program_design_review",
       "slice_group": "sources",
-      "status": "blocked_actual_tooling110_then_academic_p1_closure"
+      "status": "native_design_phase_completed"
     },
     {
       "call_number": 112,
@@ -2791,11 +2791,20 @@
   ],
   "native_tooling_recheck_110": {
     "call_number": 110,
-    "status": "allocated_not_invoked",
+    "status": "native_tooling_completed",
     "model": "glm-5.3",
     "requested_effort": "max",
     "output_cap": 131072,
     "timeout": 7200,
     "purpose": "independent observed-placeholder rejection, failure-only publication and scoped-summary prompt audit"
+  },
+  "actual110_current_tooling_gate": {
+    "receipt_ref": "docs/verification/PAI-review-continuation-110.json",
+    "actual_result_ref": ".playbook-artifacts/opencode-runs/opencode-3162b81977de4eb785c4575af19bb706/result.json",
+    "verdict": "ADVISORY",
+    "critical_findings": 0,
+    "p2_findings": 5,
+    "actual_gate_passed": true,
+    "human_approval": false
   }
 }
