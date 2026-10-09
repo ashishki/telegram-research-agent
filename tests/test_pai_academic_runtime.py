@@ -28,3 +28,29 @@ def test_local_done_atomically_stops_bound_watch_subject_and_future_notification
             (pai.root.owner_ref,subscription.subscription_id,ref)).fetchone()
     assert row['state']=='completed'
     assert pai.root.queue.store.get(pai.root.owner_ref,'memory',ref).payload['completion']=='local_done'
+
+
+def test_academic_stage_and_local_completion_survive_fresh_runtime(pai):
+    from types import SimpleNamespace
+    import pytest
+    from prm.capabilities import CapabilityDenied
+    from prm.storage.jobs import JobQueue
+    from prm.storage.postgres import StateConflict
+    from prm.runtime.memory import MemoryRuntime
+    from tests.test_pai_requirements import academic_pair
+    runtime,candidates,ref=academic_pair(pai)
+    actor={'chat_id':'42','actor_id':'42','owner_chat_id':'42'}
+    assert runtime.stage()=='unknown'
+    preview=runtime.preview_stage('studying',actor_ref=pai.root.owner_ref)
+    assert runtime.stage()=='unknown'
+    MemoryRuntime(pai.root).confirm(preview,**actor)
+    runtime.mark_done(ref,actor_ref=pai.root.owner_ref)
+    fresh=SimpleNamespace(owner_ref=pai.root.owner_ref,owner_chat_id='42',queue=JobQueue(pai.pg.app))
+    reopened=AcademicRuntime(fresh)
+    assert reopened.stage()=='studying'
+    stored=fresh.queue.store.get(fresh.owner_ref,'memory',ref)
+    assert stored.payload['completion']=='local_done'
+    assert 'сдача в источнике не подтверждена' in reopened.describe((__import__('dataclasses').replace(candidates[0],completion='local_done'),))
+    with pytest.raises(CapabilityDenied):reopened.preview_stage('completed',actor_ref='owner_foreign')
+    with pytest.raises(StateConflict):MemoryRuntime(fresh).confirm(preview,**actor)
+    assert reopened.stage()=='studying' and not pai.requests

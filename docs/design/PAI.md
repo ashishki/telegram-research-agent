@@ -74,7 +74,7 @@ no arbitrary network or provider secrets. All interfaces call shared use cases.
 | pa_actions proposals, confirmations, attempts, receipts | Action/effect repository | exact content/version; one-use confirmation; unique effect key |
 | pa_jobs jobs, checkpoints, schedules, occurrences | Job/scheduler repository | fenced writes; unique occurrence; consent revision; explicit cancel |
 | pa_connections connections, cursors, source_records | Connector repository | account/provider IDs scoped; tombstones and partial coverage |
-| pa_memory facts, preferences, deletion_requests | Memory repository | explicit confirmation/provenance; version CAS; deletion propagation |
+| pa_runtime memory values; pa_memory refs/tombstones | Memory core19; library21 | explicit confirmation/provenance; version CAS; deletion propagation |
 
 Foreign keys are owner/scoped, not bare provider object IDs. Token storage is
 outside these tables; ADR-013 binds TokenVault, keys and reconciliation scopes.
@@ -295,7 +295,7 @@ Project brief/planning depth are selected. Exact hash-bound feature design,
 live account/retention/cost/provider decisions and conditional scaling remain
 pending; neither time nor a configured key supplies them.
 
-Requirements-matrix-SHA256: a1f8ed85ff92ce3d7a084b40c232d39ef0352710cc53afbdaca1c4ff2b8f6d7b
+Requirements-matrix-SHA256: e93a1341da0558992fcf662a584c3c66099741bde06182d3fc89f8b47963f5de
 
 ## 9. Human Approval
 

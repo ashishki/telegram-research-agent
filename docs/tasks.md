@@ -1071,6 +1071,7 @@ Acceptance-Criteria:
   - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
 Verification:
   - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_academic_runtime.py tests/test_assistant_academic.py tests/test_assistant_subscriptions.py
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_academic_runtime.py::test_academic_stage_and_local_completion_survive_fresh_runtime
 Context-Refs:
   - docs/PA_IMPLEMENTATION_TASKS.md#pai-19
   - docs/design/PAI.md
@@ -1109,7 +1110,7 @@ Owner: codex
 Phase: pai-f
 Type: agent:runtime
 Status: planned
-Depends-On: PAI-05 PAI-14 PAI-17
+Depends-On: PAI-05 PAI-14 PAI-17 PAI-19
 Risk-Level: high
 Critic-Required: required
 Runtime-Verification: required

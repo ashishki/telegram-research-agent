@@ -803,7 +803,7 @@ attempts; не удалять receipts.
 <a id="pai-21"></a>
 ### PAI-21 — Подключить память, исправление и сквозное удаление
 
-Depends-On: PAI-05, PAI-14, PAI-17
+Depends-On: PAI-05, PAI-14, PAI-17, PAI-19
 
 PA-Refs: PA-14
 

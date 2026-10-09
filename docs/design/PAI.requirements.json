@@ -388,7 +388,13 @@
         "src/prm/application.py",
         "src/prm/runtime/composition.py",
         "src/prm/runtime/scheduler.py",
-        "src/prm/watch_jobs.py"
+        "src/prm/watch_jobs.py",
+        "src/prm/runtime/academic.py",
+        "src/prm/runtime/memory.py",
+        "src/prm/runtime/deletion.py",
+        "src/prm/runtime/setup.py",
+        "src/prm/runtime/migration.py",
+        "src/prm/storage/**"
       ],
       "verification_refs": [
         "PAI-19/acceptance"
@@ -399,7 +405,10 @@
         "tests/test_assistant_subscriptions.py"
       ],
       "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
-      "evidence_status": "planned; no implementation or review acceptance implied"
+      "evidence_status": "planned; no implementation or review acceptance implied",
+      "security_test_nodes": [
+        "tests/test_pai_academic_runtime.py::test_academic_stage_and_local_completion_survive_fresh_runtime"
+      ]
     },
     "PAI-20": {
       "expected_paths": [
@@ -436,7 +445,8 @@
         "src/prm/storage/**",
         "src/prm/runtime/deletion.py",
         "src/prm/application.py",
-        "src/prm/runtime/composition.py"
+        "src/prm/runtime/composition.py",
+        "src/prm/runtime/memory.py"
       ],
       "verification_refs": [
         "PAI-21/acceptance"

@@ -1,0 +1,136 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-09",
+  "base_commit": "fa8aade6ae47d85072c27fc1c14bd4d934fbf957",
+  "status": "academic_home_design_and_restart_fixture_verified_independent108_required",
+  "checks": [
+    {
+      "argv": [
+        ".venv-pai/bin/python",
+        "tools/run_pai_acceptance.py",
+        "-q",
+        "tests/test_pai_academic_runtime.py",
+        "tests/test_pai_memory_runtime.py",
+        "tests/test_assistant_academic.py",
+        "tests/test_assistant_subscriptions.py",
+        "tests/test_pai_requirements.py::test_requirement_academic_02",
+        "tests/test_pai_requirements.py::test_requirement_academic_05"
+      ],
+      "environment": {
+        "PYTHONPATH": "src",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"
+      },
+      "exit_code": 0,
+      "result": "21 passed in 31.84s; strict scoped zero skips/failures",
+      "log_path": ".playbook-artifacts/pai-validation-20261009-107/affected.log",
+      "log_sha256": "c209b945310c6df40ca5df32cb083cd656e418cd91f9eb5efe397a59f7b64d79"
+    },
+    {
+      "argv": [
+        ".venv-pai/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_pai_plan.py",
+        "tests/test_playbook_bridge.py"
+      ],
+      "environment": {
+        "PYTHONPATH": "src",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"
+      },
+      "exit_code": 0,
+      "result": "48 passed in 2.55s",
+      "log_path": ".playbook-artifacts/pai-validation-20261009-107/plan.log",
+      "log_sha256": "ae5d634c74c0595661b00b22cdaf3eab9246835690a878f4271a3410cfca4ff4"
+    },
+    {
+      "argv": [
+        ".venv-pai/bin/python",
+        "tools/playbook.py",
+        "--check-pin"
+      ],
+      "exit_code": 0,
+      "result": "Playbook pin verified; no model, hook or application runtime enabled.",
+      "log_path": ".playbook-artifacts/pai-validation-20261009-107/pin.log",
+      "log_sha256": "a0bbdfed39cb015f3a6cad3c4c848a2ca577566ca3bc06104a9d61639e50d0c0"
+    },
+    {
+      "argv": [
+        ".venv-pai/bin/python",
+        "tools/check_pai_plan.py"
+      ],
+      "exit_code": 0,
+      "result": "PAI plan: 32 registered packets; dependency/acceptance/PA coverage and pinned schema checks passed.\nSpec coverage: 69 exact requirement IDs, 10 mandatory scenarios; planned evidence is not a PASS.\nDesign state: draft; 2 planned test files absent; no product/review/human/live claim.",
+      "log_path": ".playbook-artifacts/pai-validation-20261009-107/matrix.log",
+      "log_sha256": "3ac8f22e48d470d88352af228e77b3edaba0f68bb886426d78cfa2f534c79c0a"
+    },
+    {
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "result": "",
+      "log_path": ".playbook-artifacts/pai-validation-20261009-107/diff.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "changed_files": [
+    "docs/CODEX_PROMPT.md",
+    "docs/PA_IMPLEMENTATION_TASKS.md",
+    "docs/adr/ADR-013-pa-durable-runtime.md",
+    "docs/design/PAI.design.json",
+    "docs/design/PAI.md",
+    "docs/design/PAI.requirements.json",
+    "docs/tasks.md",
+    "docs/verification/PAI-next-review-packets.json",
+    "docs/verification/PAI-progress.md",
+    "tests/test_pai_academic_runtime.py"
+  ],
+  "source_hashes": [
+    {
+      "path": "docs/PA_IMPLEMENTATION_TASKS.md",
+      "sha256": "943e29516f5d01793f696e0e3dc9afc0406fafaa1c2f093635d2e0919e07e12c"
+    },
+    {
+      "path": "docs/adr/ADR-013-pa-durable-runtime.md",
+      "sha256": "8d5a87f68c5292f0d85a9e8690f76b3c34a343256414dbe2edca3032a54a5893"
+    },
+    {
+      "path": "docs/design/PAI.design.json",
+      "sha256": "20f4a993baa81ea7d5d60602b4794ef7dfc9828e9f42717c53907c46d8556af7"
+    },
+    {
+      "path": "docs/design/PAI.md",
+      "sha256": "365c26c4bf40b5c50e51050315c9419df24936b5edcce8211fad05956701f783"
+    },
+    {
+      "path": "docs/design/PAI.requirements.json",
+      "sha256": "e93a1341da0558992fcf662a584c3c66099741bde06182d3fc89f8b47963f5de"
+    },
+    {
+      "path": "docs/tasks.md",
+      "sha256": "9abb70b57e303cc7d9548a61d8ebc9bf068f193de1ea3f6fef031ec7c111228f"
+    },
+    {
+      "path": "tests/test_pai_academic_runtime.py",
+      "sha256": "11a339af0e97dd16ff82dbe70d70d35ff1420a3b22f6e3290fa30d2ed175f3c4"
+    }
+  ],
+  "scheduler_allegation_at_reviewed_sha": {
+    "path": "src/prm/runtime/scheduler.py",
+    "present_in_PAI19_allowed_files": true,
+    "source": "actual git show fa8aade:docs/design/PAI.design.json"
+  },
+  "actual_current_tooling_gate": ".playbook-artifacts/opencode-runs/opencode-29055ba0d75241f78f0b87bf446b71fa/result.json",
+  "remaining_gates": [
+    "actual108 independent P1 closure",
+    "all four fresh parts per role",
+    "real pinned generic consumers",
+    "human exact design approval",
+    "other governed roles",
+    "live/product egress/retention/production/service/timer/release/PAI27..29",
+    "unmeasured conditional30/31"
+  ]
+}

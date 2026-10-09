@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "status": "actual105_stop_p1_local_response_pending_tests_and_recheck107",
-  "current_approved_call_cap": 114,
-  "calls_consumed_including_failures": 106,
+  "status": "actual107_new_academic_home_p1_local_design_response_verified_recheck108_next",
+  "current_approved_call_cap": 115,
+  "calls_consumed_including_failures": 107,
   "proposed_total_cap": 34,
   "new_calls_maximum": 3,
   "third_call": "only if an actual new finding needs independent recheck",
@@ -1894,52 +1894,52 @@
   },
   "native_design_allocations": [
     {
-      "call_number": 107,
-      "role": "program_design_review",
-      "slice_group": "sources",
-      "status": "allocated_actual105_p1_independent_recheck_after_scoped_commit"
-    },
-    {
       "call_number": 108,
       "role": "program_design_review",
-      "slice_group": "foundation",
-      "status": "blocked_actual107_p1_closure"
+      "slice_group": "sources",
+      "status": "allocated_review107_academic_home_p1_recheck"
     },
     {
       "call_number": 109,
       "role": "program_design_review",
-      "slice_group": "product",
-      "status": "blocked_actual107_p1_closure"
+      "slice_group": "foundation",
+      "status": "blocked_actual108_p1_closure"
     },
     {
       "call_number": 110,
       "role": "program_design_review",
-      "slice_group": "completeness",
-      "status": "blocked_actual107_p1_closure"
+      "slice_group": "product",
+      "status": "blocked_actual108_p1_closure"
     },
     {
       "call_number": 111,
-      "role": "product_design_review",
-      "slice_group": "foundation",
-      "status": "blocked_actual107_p1_closure"
+      "role": "program_design_review",
+      "slice_group": "completeness",
+      "status": "blocked_actual108_p1_closure"
     },
     {
       "call_number": 112,
       "role": "product_design_review",
-      "slice_group": "product",
-      "status": "blocked_actual107_p1_closure"
+      "slice_group": "foundation",
+      "status": "blocked_actual108_p1_closure"
     },
     {
       "call_number": 113,
       "role": "product_design_review",
-      "slice_group": "sources",
-      "status": "blocked_actual107_p1_closure"
+      "slice_group": "product",
+      "status": "blocked_actual108_p1_closure"
     },
     {
       "call_number": 114,
       "role": "product_design_review",
+      "slice_group": "sources",
+      "status": "blocked_actual108_p1_closure"
+    },
+    {
+      "call_number": 115,
+      "role": "product_design_review",
       "slice_group": "completeness",
-      "status": "blocked_actual107_p1_closure"
+      "status": "blocked_actual108_p1_closure"
     }
   ],
   "native_tooling_recheck_66": {
@@ -2635,5 +2635,56 @@
     "usable_complete_part": false,
     "human_approval": false
   },
-  "allocation_107_114_reason": "Actual105 two P1 design response, genuine sources recheck107, then complete fresh phase sets under ongoing necessary-review authority. All current103/104/105/106 become historical when binding source design changes;106 explicitly incomplete. No automatic retry/fallback."
+  "allocation_107_114_reason": "Actual105 two P1 design response, genuine sources recheck107, then complete fresh phase sets under ongoing necessary-review authority. All current103/104/105/106 become historical when binding source design changes;106 explicitly incomplete. No automatic retry/fallback.",
+  "native_design_allocation_history_107": [
+    {
+      "call_number": 107,
+      "role": "program_design_review",
+      "slice_group": "sources",
+      "status": "native_design_phase_completed"
+    },
+    {
+      "call_number": 108,
+      "role": "program_design_review",
+      "slice_group": "foundation",
+      "status": "blocked_actual107_p1_closure"
+    },
+    {
+      "call_number": 109,
+      "role": "program_design_review",
+      "slice_group": "product",
+      "status": "blocked_actual107_p1_closure"
+    },
+    {
+      "call_number": 110,
+      "role": "program_design_review",
+      "slice_group": "completeness",
+      "status": "blocked_actual107_p1_closure"
+    },
+    {
+      "call_number": 111,
+      "role": "product_design_review",
+      "slice_group": "foundation",
+      "status": "blocked_actual107_p1_closure"
+    },
+    {
+      "call_number": 112,
+      "role": "product_design_review",
+      "slice_group": "product",
+      "status": "blocked_actual107_p1_closure"
+    },
+    {
+      "call_number": 113,
+      "role": "product_design_review",
+      "slice_group": "sources",
+      "status": "blocked_actual107_p1_closure"
+    },
+    {
+      "call_number": 114,
+      "role": "product_design_review",
+      "slice_group": "completeness",
+      "status": "blocked_actual107_p1_closure"
+    }
+  ],
+  "allocation_108_115_reason": "Actual107 new academic-state ownership P1 response, one fresh sources108 recheck then all fresh full parts under ongoing authority; no automatic retry/fallback."
 }

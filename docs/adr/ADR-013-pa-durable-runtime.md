@@ -323,3 +323,41 @@ service/key rotation, paid product egress, human acceptance or real integration.
 
 
 Official sources (checked2026-10-09): [Graph sendMail](https://learn.microsoft.com/en-us/graph/api/user-sendmail?view=graph-rest-1.0), [Graph message send](https://learn.microsoft.com/en-us/graph/api/message-send?view=graph-rest-1.0), [Graph list messages](https://learn.microsoft.com/en-us/graph/api/user-list-messages?view=graph-rest-1.0), [Graph get message](https://learn.microsoft.com/en-us/graph/api/message-get?view=graph-rest-1.0), [Cryptography46.0.3 Fernet](https://cryptography.io/en/46.0.3/fernet/).
+
+## Durable academic-state ownership — review107
+
+PAI-19 owns the early bounded shared memory-core bootstrap, using PAI-02's
+pa_runtime.object_versions/object_heads namespace memory and PAI-04's explicit
+owner/preview/version/one-use semantics. Stage object memory_academic_stage has
+owner, explicit source provenance, selected preparation/waiting/studying/completed
+value, version/digest and time. It is never inferred from mail/Canvas or kept
+only in ConversationState. AcademicRuntime.preview_stage uses existing
+MemoryRuntime.preview/confirm and pa_memory.previews. PAI-19 owns the required
+installer/bootstrap/file paths, pa_memory core previews/tombstones/dependencies,
+and pa_academic.watches. PAI-21 depends on19 and extends the SAME general library,
+not a later prerequisite or a second profile repository.
+
+Academic candidate records academic_<stable-source-identity> use the same
+owner/version/CAS memory repository. Local done, owner-reported completion and
+provider-confirmed submission remain independent provenance/state dimensions;
+a local mark never submits or becomes source confirmation. Provider confirmation
+needs selected authorized source/version evidence, never a subject/body phrase.
+Merge/re-read preserves local state without erasing source evidence. mark_done
+updates the candidate and bound reminder subjects atomically under the existing
+lineage/schedule locks. Minimal stage and completion fields do not require grades,
+roster or submission bodies. Retention/deletion/export/restore use the existing
+shared tombstone/version rules; PAI-19 owns bounded bootstrap/academic wiring,
+PAI-21/25 own the later full deletion/library/restore protocol. No schema, live
+migration, institution access or human approval is inferred from ownership.
+
+Required test_academic_stage_and_local_completion_survive_fresh_runtime uses
+actual PG connections/new JobQueue/AcademicRuntime objects without dialogue
+history, explicit stage confirmation, local completion, unchanged source-send
+count and stale/foreign-actor refusal. This fixture covers currently implemented
+stage/local-done persistence; it is not full source-submission/provenance or live
+academic acceptance. Formal tasks remain planned; do not mark missing paths done.
+
+Review107's scheduler.py P2 allegation is not reproduced: the actualfa8aade
+PAI-19 allowed_files already contains src/prm/runtime/scheduler.py, matching the
+matrix expected_paths. Preserve the original report; raw committed registry
+comparison is response evidence, not implementer override of107 STOP.
