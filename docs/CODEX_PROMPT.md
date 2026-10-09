@@ -1,8 +1,8 @@
-# Current handoff — max resources; review88 P1 fixes verified; native91 next
+# Current handoff — actual91 argv P1 fixed; native92 recheck next
 
 2026-10-09. Assigned branch docs/personal-assistant-blueprint-playbook-20260918.
 Committed base84155e2; current corrected design/tests/tooling/public evidence
-will be committed before actual native91. Active session Git/network permitted.
+are committed atf64c504; later91 response is the new scoped change. Active session Git/network permitted.
 Use current implementer default model/reasoning; no implementer override.
 
 Owner selected GLM-5.3 on SAME OpenCode Go (“давай”), authorized necessary review
@@ -45,17 +45,25 @@ planned test files absent. Use .venv-pai/bin/python, PYTHONPATH=src and
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1. No full historical pytest or broad rerun.
 
 Critical tooling/policy changed for full input/nonempty schema/max hint/cadence/
-honest brief projection. Old79 is now stale: new actual tooling91 MUST precede
-new design calls.90 actual calls consumed;99 allocated under ongoing authority.
-New full set:92 product/product P1 recheck first, then93..96 program all four,
-97 product/foundation,98 product/sources,99 product/completeness. Old records
+honest brief projection. Old79 is now stale: actual91 STOP requires independent tooling92 after its fixes.91 actual calls
+consumed;100 allocated under ongoing authority. New full set:93 product/product
+P1 recheck first, then94..97 program all four,98 product/foundation,99 product/
+sources,100 product/completeness. Old records
 cannot fill new slots. Stop dependent requests for actual P0/P1, fix and obtain
 independent closure; no implementer override. Preserve one unchanged committed
 HEAD/design through accepted tooling and the full fresh design set.
 
+Actual91 STOP atf64c504 (1 P1/2 P2),995.972s, usage47293/56153/103446;
+preserve exact receipt/report. Real pinned parser confirmed last-wins duplicates.
+Bridge now canonical strict approve grammar, duplicate/abbreviation/terminator
+refusal, genuine help exits locally. Tier source added to critical manifest;
+post-call drift records unknown failure without verdict content.168 scoped tests
+passed7.67s, pin/32/69/ten planning passed. PAI-native-tooling-91-response.md binds
+proof, exact command/log hash and all original findings. No independent closure.
+
 Next ONE actual command after scoped commit:
 
-    .venv-pai/bin/python .playbook-artifacts/pai-native-tooling-once.py --call-number 91
+    .venv-pai/bin/python .playbook-artifacts/pai-native-tooling-once.py --call-number 92
 
 Canonical native route tools/run_codex_role.py run --provider opencode-go --model
 glm-5.3 --root . --task PAI-00 --feature-id PAI --role program_design_review

@@ -179,3 +179,41 @@ def test_pai_human_approval_cannot_bypass_current_independent_tooling(tmp_path, 
         assert bridge.main(['feature_workflow', 'approve', *flags]) == 2
         audit.assert_called_once_with(tmp_path, 'PAI')
         run.assert_not_called()
+
+
+@pytest.mark.parametrize('args', [
+    ['approve','--feature-id','OTHER','--feature-id','PAI'],
+    ['approve','--feature-id=OTHER','--feature-id=PAI'],
+    ['approve','--feature-id','PAI','--feature-id=OTHER'],
+    ['--root','/other','--root','.', 'approve','--feature-id','PAI'],
+    ['--root=/other','--root=.', 'approve','--feature-id','PAI'],
+    ['approve','--feature','PAI'],
+    ['approve','--feature-id','PAI','--','--help'],
+    ['approve','--feature-id','PAI','--','-h'],
+])
+def test_ambiguous_approval_never_reaches_pinned_consumer(tmp_path,args):
+    sys.path.insert(0,str(ROOT/'tools'));import opencode_role_review as review
+    upstream,_=fixture(tmp_path)
+    with patch.object(bridge,'ROOT',tmp_path),patch.object(bridge,'verified_upstream',return_value=upstream), \
+         patch.object(review,'require_trusted_design_records') as audit,patch.object(bridge.subprocess,'run') as run:
+        assert bridge.main(['feature_workflow',*args])==2
+        audit.assert_not_called();run.assert_not_called()
+
+
+@pytest.mark.parametrize('help_flag',['--help','-h'])
+def test_real_approval_help_cannot_execute_approval(tmp_path,help_flag):
+    upstream,_=fixture(tmp_path)
+    with patch.object(bridge,'ROOT',tmp_path),patch.object(bridge,'verified_upstream',return_value=upstream),patch.object(bridge.subprocess,'run') as run:
+        assert bridge.main(['feature_workflow','approve',help_flag])==0
+        run.assert_not_called()
+
+
+def test_actual_pinned_parser_last_wins_is_blocked_by_bridge():
+    sys.path.insert(0,str(ROOT/'tools'));import opencode_role_review as review
+    _,consumer,_=review.pinned_modules(ROOT)
+    args=['--root','/other','--root',str(ROOT),'approve','--feature-id','OTHER','--feature-id','PAI']
+    actual=consumer.build_parser().parse_args(args)
+    assert actual.feature_id=='PAI' and actual.root==ROOT
+    with patch.object(bridge,'verified_upstream',return_value=ROOT/'.playbook/upstream'),patch.object(bridge.subprocess,'run') as run:
+        assert bridge.main(['feature_workflow',*args])==2
+        run.assert_not_called()

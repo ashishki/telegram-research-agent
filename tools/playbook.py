@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import argparse
 import json
 import subprocess
 import sys
@@ -90,12 +91,28 @@ def load_generated_verifier(upstream: Path) -> ModuleType:
 
 
 def option_value(args: list[str], name: str) -> str | None:
+    matches=[]
     for index, arg in enumerate(args):
         if arg.startswith(name + '='):
-            return arg.split('=', 1)[1]
-        if arg == name and index + 1 < len(args):
-            return args[index + 1]
-    return None
+            matches.append(arg.split('=', 1)[1])
+        elif arg == name:
+            if index + 1 == len(args) or args[index + 1].startswith('-'):
+                raise ValueError('Missing gated option value: ' + name)
+            matches.append(args[index + 1])
+    if len(matches)>1:raise ValueError('Repeated gated option: ' + name)
+    return matches[0] if matches else None
+
+
+def approval_arguments(args: list[str]):
+    """Accept canonical approval syntax only; never sniff a different argv meaning."""
+    if '--' in args:raise ValueError('Approval option terminator is not supported')
+    option_value(args,'--root');option_value(args,'--feature-id')
+    parser=argparse.ArgumentParser(prog='playbook feature_workflow',allow_abbrev=False)
+    parser.add_argument('--root',type=Path,default=ROOT)
+    sub=parser.add_subparsers(dest='command',required=True)
+    approve=sub.add_parser('approve',allow_abbrev=False)
+    approve.add_argument('--feature-id',required=True)
+    return parser.parse_args(args)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -121,13 +138,14 @@ def main(argv: list[str] | None = None) -> int:
                 return int(verifier.main())
             finally:
                 sys.argv = previous_argv
-        if (name == 'feature_workflow' and 'approve' in args and not {'--help', '-h'} & set(args)
-            and option_value(args, '--feature-id') == 'PAI'):
-            target_root = option_value(args, '--root')
-            if target_root and Path(target_root).resolve() != ROOT:
-                raise ValueError('PAI approval must target the assigned workspace')
-            from opencode_role_review import require_trusted_design_records
-            require_trusted_design_records(ROOT, 'PAI')
+        if name == 'feature_workflow' and 'approve' in args:
+            try:approval=approval_arguments(args)
+            except SystemExit as exc:return 0 if exc.code==0 else 2
+            if approval.feature_id == 'PAI':
+                if approval.root.resolve() != ROOT:
+                    raise ValueError('PAI approval must target the assigned workspace')
+                from opencode_role_review import require_trusted_design_records
+                require_trusted_design_records(ROOT, 'PAI')
         script = upstream / 'tools' / (name + '.py')
         if not script.is_file() or script.is_symlink():
             raise ValueError('Pinned tool is missing or symlinked')

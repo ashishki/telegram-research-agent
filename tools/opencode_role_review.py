@@ -64,6 +64,7 @@ TOOLING_REFS = (
     "docs/REVIEW_POLICY.md", "tools/playbook.py", "tools/run_codex_role.py",
     "tools/opencode_role_review.py", "tools/mimo_code_review.py", "tools/check_pai_plan.py",
     "tools/finalize_opencode_design_reviews.py", "tools/run_pai_acceptance.py",
+    "tools/test_tiers.py",
     "tests/test_playbook_bridge.py", "tests/test_pai_plan.py",
     "tests/test_opencode_role_review.py", "tests/test_pai_acceptance_guard.py",
 )
@@ -490,12 +491,24 @@ def execute(args):
                                thinking_disabled=getattr(args,'thinking_disabled',False),
                                reasoning_effort=effort)
         verdict = parse_response(response, args.model)
+        if workflow.git_commit(root) != head:
+            raise ReviewBlocked("reviewed HEAD changed during execution")
+        if runtime_dependencies()!=dependencies:raise ReviewBlocked('review runtime dependencies changed')
+        if any(digest(Path(item['path']).read_bytes())!=item['sha256'] for item in gate_modules):
+            raise ReviewBlocked('pinned gate module changed during review')
+        for item in manifest:
+            if digest((root / item["path"]).read_bytes()) != item["sha256"]:
+                raise ReviewBlocked("reviewed document changed during execution")
+        if lib.design_hashes(root, design) != before_hashes:
+            raise ReviewBlocked("reviewed design changed during execution")
+        if not tooling_review and require_tooling_audit(root) != tooling_audit_ref:
+            raise ReviewBlocked("tooling audit changed during design execution")
     except Exception as exc:
         code = getattr(exc, "code", None)
         failure = {**request_evidence, "status": "no_valid_verdict",
                    "error_type": type(exc).__name__,
                    "http_status": code if type(code) is int and 100 <= code <= 599 else None,
-                   "provider_outcome": "unknown", "observed_model": None}
+                   "provider_outcome": "unknown", "observed_model": None, "provider_call_attempted": True}
         safe_transport_errors = {"review_response_too_large", "review_stream_deadline",
             "review_stream_incomplete", "review_stream_invalid_event", "review_stream_provider_error",
             "review_stream_model_mismatch", "review_stream_invalid_choices", "review_stream_invalid_choice",
@@ -522,18 +535,6 @@ def execute(args):
                 failure["usage"] = {key: usage[key] for key in ("prompt_tokens", "completion_tokens", "total_tokens") if type(usage.get(key)) is int and usage[key] >= 0}
         (run_dir / "failure.json").write_text(json.dumps(failure, indent=2) + "\n")
         raise
-    if workflow.git_commit(root) != head:
-        raise ReviewBlocked("reviewed HEAD changed during execution")
-    if runtime_dependencies()!=dependencies:raise ReviewBlocked('review runtime dependencies changed')
-    if any(digest(Path(item['path']).read_bytes())!=item['sha256'] for item in gate_modules):
-        raise ReviewBlocked('pinned gate module changed during review')
-    for item in manifest:
-        if digest((root / item["path"]).read_bytes()) != item["sha256"]:
-            raise ReviewBlocked("reviewed document changed during execution")
-    if lib.design_hashes(root, design) != before_hashes:
-        raise ReviewBlocked("reviewed design changed during execution")
-    if not tooling_review and require_tooling_audit(root) != tooling_audit_ref:
-        raise ReviewBlocked("tooling audit changed during design execution")
     report = run_dir / "report.md"
     report.write_text(
         f"# Independent OpenCode Go {args.role}\n\n{ROLES[args.role]}: {verdict['verdict']}\n\n"

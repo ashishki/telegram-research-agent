@@ -194,6 +194,10 @@ def test_input_drift_during_provider_call_never_creates_a_review_record(tmp_path
         review.execute(args)
     assert records == []
     assert not list((tmp_path / ".playbook-artifacts/opencode-runs").glob("*/result.json"))
+    failure=json.loads(next((tmp_path/'.playbook-artifacts/opencode-runs').glob('*/failure.json')).read_text())
+    assert failure['status']=='no_valid_verdict' and failure['provider_call_attempted'] is True
+    assert failure['provider_outcome']=='unknown' and failure['observed_model']=='mimo-v2.6-pro'
+    assert 'verdict' not in failure and 'summary' not in failure
 
 
 def test_provider_output_limit_is_real_and_rejects_invalid_bounds(monkeypatch):
@@ -632,6 +636,9 @@ def test_real_tooling_gate_rejects_changed_source_and_verdict_disagreement(tmp_p
         result.with_suffix('.json.sha256').write_text(fresh.digest(result.read_bytes()))
     write()
     assert fresh.require_tooling_audit(tmp_path) == result.relative_to(tmp_path).as_posix()
+    tier=tmp_path/'tools/test_tiers.py';tier.write_text('altered tier drops matrix flag')
+    with pytest.raises(ValueError,match='independent current tooling audit'):fresh.require_tooling_audit(tmp_path)
+    tier.write_text('synthetic public toolchain fixture')
     import shutil
     conflicting=run.parent/'opencode-aaa-newer-stop';shutil.copytree(run,conflicting)
     stopped={**payload,'verdict':'STOP_SHIP','generated_at':'2026-10-08T13:00:00+00:00'}
