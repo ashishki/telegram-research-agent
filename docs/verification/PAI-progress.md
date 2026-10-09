@@ -708,3 +708,28 @@ Actual advisory session judge GLM5.3/max478.329s usage7313/31202/38515:6 full
 sessions24 turns; raw pass labels inconsistent with floor, only3/6 meet4 on all
 axes. Preserve both original labels and derived qualification. Actual vision
 DeepSeek21.834s usage5068/4462/9530:warn, pagination/mobile3; known P2s retained.
+
+Independent engineering call113 allocated: one scoped repaired-runtime safety check at 6467c503c7d196926632da03cf5dce49ed181d2e; not the superseded programme/design batch113. Public code/synthetic only,GLM5.3/max, one call/no retry. Product-session judge has a separate advisory workload count.
+
+113 consumed as actual independent P1 closure attempt on6467c50: failed_unknown,
+HTTPError0.577s, no report/usage, exact status not captured. No closed verdict.
+Current source/main-result deletion2/10.85s and scoped67/210.53s pass. Post-fix
+Flash capture5 actual requests eachHTTP429; no fresh successful Chat/judge proof.
+Provider requests stopped. Native observed-response replay returned the actual
+first step with0 new model calls; source indentation regressions pass. New full
+PAI/spec-matrix pass is still running on6467c50; PRM736/151.08s and retrofit150/
+14.37s completed on that same candidate. Ongoing source is frozen; only metadata
+handoff work remains, no blind provider retries or fake113 closure. Future114
+packet is prepared as a separate frozen-source script, not executed/allocated.
+
+Final current verification on6467c503c7d196926632da03cf5dce49ed181d2e:
+PAI359 passed1115.03s, zero skips/failures, all69 exact IDs/10 scenarios;
+PRM736 passed151.08s; retrofit150 passed14.37s. Layers overlap, not unique total.
+Exact argv/environment/exits/log hashes in dated post-review-tiers receipts.
+All14 changed code/test/tool files still match the tested committed bytes.
+Actual replay corrected the observed shortening without new inference. Original
+GLM/vision scores and STOP/P1/113 HTTPError/Flash429 records are retained.
+Summary and exact public synthetic judge input are archived in verification.
+Pin/plan and references pass; formal task approvals still produce51 known gates.
+No phase/slice/design/human/live/release acceptance inferred. Current stop point:
+independent P1 closure after provider recovery; prepared separate114 is not run.

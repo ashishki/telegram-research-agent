@@ -1,0 +1,804 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-09",
+  "owner_scope": "ADR-016; complete available active product verification and real model judging; UTD deferred",
+  "candidate_sha": "6467c503c7d196926632da03cf5dce49ed181d2e",
+  "branch": "docs/personal-assistant-blueprint-playbook-20260918",
+  "tests": {
+    "pai-complete": {
+      "schema_version": 1,
+      "scope": "owner-requested complete active product verification; no historical full pytest",
+      "tier": "pai-complete",
+      "argv": [
+        ".venv-pai/bin/python",
+        "tools/test_tiers.py",
+        "pai-complete"
+      ],
+      "environment": {
+        "PYTHONPATH": "src",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"
+      },
+      "source_head": "6467c503c7d196926632da03cf5dce49ed181d2e",
+      "started_at": "2026-10-09T21:21:32.889103+00:00",
+      "status": "passed",
+      "utd_live_api": "not_available_owner_deferred",
+      "human_acceptance": false,
+      "exit_code": 0,
+      "duration_seconds": 1116.488,
+      "finished_at": "2026-10-09T21:40:09.377955+00:00",
+      "log_path": ".playbook-artifacts/pai-product-verification-20261009/post-review-tiers/pai-complete.log",
+      "log_sha256": "26f5725851f430a02495326143cf9a6a71b8274793092db831dd04354a05a262",
+      "pytest_passed": 359,
+      "pytest_seconds": 1115.03
+    },
+    "focused-prm": {
+      "schema_version": 1,
+      "scope": "owner-requested complete active product verification; no historical full pytest",
+      "tier": "focused-prm",
+      "argv": [
+        ".venv-pai/bin/python",
+        "tools/test_tiers.py",
+        "focused-prm"
+      ],
+      "environment": {
+        "PYTHONPATH": "src",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"
+      },
+      "source_head": "6467c503c7d196926632da03cf5dce49ed181d2e",
+      "started_at": "2026-10-09T21:21:32.890798+00:00",
+      "status": "passed",
+      "utd_live_api": "not_available_owner_deferred",
+      "human_acceptance": false,
+      "exit_code": 0,
+      "duration_seconds": 152.516,
+      "finished_at": "2026-10-09T21:24:05.407695+00:00",
+      "log_path": ".playbook-artifacts/pai-product-verification-20261009/post-review-tiers/focused-prm.log",
+      "log_sha256": "d487f0eb883fb203bce377c669ca0a6ebb31c666f6ccc5bf3520315492a3d2aa",
+      "pytest_passed": 736,
+      "pytest_seconds": 151.08
+    },
+    "retrofit-boundaries": {
+      "schema_version": 1,
+      "scope": "owner-requested complete active product verification; no historical full pytest",
+      "tier": "retrofit-boundaries",
+      "argv": [
+        ".venv-pai/bin/python",
+        "tools/test_tiers.py",
+        "retrofit-boundaries"
+      ],
+      "environment": {
+        "PYTHONPATH": "src",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"
+      },
+      "source_head": "6467c503c7d196926632da03cf5dce49ed181d2e",
+      "started_at": "2026-10-09T21:21:32.873935+00:00",
+      "status": "passed",
+      "utd_live_api": "not_available_owner_deferred",
+      "human_acceptance": false,
+      "exit_code": 0,
+      "duration_seconds": 15.289,
+      "finished_at": "2026-10-09T21:21:48.163774+00:00",
+      "log_path": ".playbook-artifacts/pai-product-verification-20261009/post-review-tiers/retrofit-boundaries.log",
+      "log_sha256": "3c9d9f32f1d04b077d56367b30fe2bd02828dd43a2bd1313013e24ab88eb3192",
+      "pytest_passed": 150,
+      "pytest_seconds": 14.37
+    }
+  },
+  "overlapping_tests_not_unique_total": true,
+  "captured_sessions": 6,
+  "captured_turns": 24,
+  "generator_calls": 11,
+  "provider": "opencode_go",
+  "generator_model": "mimo-v2.6-flash",
+  "generator_transport": "actual PA client through disclosed Go benchmark adapter; original app messages/max_tokens translation/thinking disabled; configured30s deadline; no production selection",
+  "private_content": false,
+  "real_accounts_or_messages": false,
+  "utd_live_api": "deferred_no_api",
+  "session_judge": {
+    "schema_version": 1,
+    "owner_authority": "active2026-10-09 explicit full product/model-judge instruction",
+    "provider": "opencode_go",
+    "model": "glm-5.3",
+    "requested_effort": "max",
+    "privacy": "public_synthetic_only",
+    "actual_private_content": false,
+    "dataset_sha256": "5b00e4867092fff2f3d3a7465d7641b4984afb42463ba23f789ba8565ee6ffbd",
+    "input_sha256": "d9765af7aba575fbc865f21873e77dbf3c4297cbe75e268ab5608bc6aa4cd3c3",
+    "capture_provenance": [
+      {
+        "path": ".playbook-artifacts/pai-product-verification-20261009/chat-final/sessions.json",
+        "sha256": "b5e051da61c1ab5c959d41c4fcdad323e013f8af4e06f4460c280685d9efca38",
+        "base_head": "cb7020fc827b6a175a30c406fbe32db0047cc598",
+        "manifest": ".playbook-artifacts/pai-product-verification-20261009/chat-final/source-manifest.json"
+      },
+      {
+        "path": ".playbook-artifacts/pai-product-verification-20261009/capabilities-final/sessions.json",
+        "sha256": "436edfce4d85f5be74469c1708b01d2d8635d13f888da4fe216811c4807b4e29",
+        "base_head": "cb7020fc827b6a175a30c406fbe32db0047cc598",
+        "manifest": ".playbook-artifacts/pai-product-verification-20261009/capabilities-final/source-manifest.json"
+      }
+    ],
+    "maximum_calls": 1,
+    "automatic_retry": false,
+    "output_maximum": 131072,
+    "timeout_seconds": 900,
+    "advisory_only": true,
+    "human_calibration": "not_available",
+    "source_head": "cbab0fbf005754884422c3c372373d6b23748bbf",
+    "status": "judged",
+    "cost": "unknown",
+    "observed_model": "glm-5.3",
+    "observed_effort": "unknown",
+    "usage": {
+      "prompt_tokens": 7313,
+      "completion_tokens": 31202,
+      "total_tokens": 38515,
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cached_tokens": 11
+      }
+    },
+    "duration_seconds": 478.329,
+    "verdict": {
+      "cases": [
+        {
+          "case_id": "context_and_topic",
+          "scores": {
+            "source_support": 3,
+            "usable_next_step": 4,
+            "context_continuity": 4,
+            "topic_switch": 5,
+            "goal_progress": 3,
+            "clarity": 3,
+            "honest_execution_status": 2,
+            "safety_boundary": 5
+          },
+          "suggestions": [
+            "Route simple meta-requests («сделай короче», «подробнее», «формальнее») to a real re-edit of the previous answer instead of a canned system-state line.",
+            "Remove or rewrite the «диалог экспирирует» disclaimer so it is consistent with actual context retention; if detail is missing, say exactly what was never supplied (file structure) versus what is remembered («Аврора», Python, первые тесты).",
+            "Fix generated code samples (indentation of the assert inside the test function) and mark placeholder identifiers clearly as illustrative.",
+            "Keep user-facing Russian free of internal jargon and anglicisms."
+          ],
+          "failures": [
+            "Turn 3 (major): «Сделай короче» is answered only with «Сейчас твой диалог экспирирует, так что я не могу увидеть детали твоего проекта напрямую.» — nothing is shortened, the line is irrelevant to the request, and it reads as a canned template response; the user must repeat or rephrase to get anything usable.",
+            "Turns 2–3 (major): the «диалог экспирирует» excuse is internally inconsistent and leaks internal mechanics: the assistant demonstrably retains the Aurora/Python context (uses it in the same turn 2 and recalls it exactly in turn 4), so the statement misrepresents actual behavior to the user.",
+            "Turn 2 (moderate): the example code block is syntactically broken for a beginner audience — the assert inside def test_... is not indented — and «from calculator import сложение # замени на реальное имя» is only weakly flagged as a placeholder.",
+            "Turn 2 (minor): «экспирирует» is an unnatural anglicism; «истекает/заканчивается» would be correct Russian (or the phrase should not appear at all)."
+          ],
+          "verdict": "pass"
+        },
+        {
+          "case_id": "editing_and_context_repair",
+          "scores": {
+            "source_support": 5,
+            "usable_next_step": 5,
+            "context_continuity": 5,
+            "topic_switch": 4,
+            "goal_progress": 5,
+            "clarity": 5,
+            "honest_execution_status": 5,
+            "safety_boundary": 5
+          },
+          "suggestions": [
+            "Keep the current deadline-preservation discipline; it is the strongest behavior in this set.",
+            "When the user asks for a recall, answer with the fact («завтра утром») and only then offer help; do not prepend meta-commentary about your own drafts.",
+            "Standardize the register used toward the user («ты» vs «Вы») across the product."
+          ],
+          "failures": [
+            "Turn 5 (minor): the answer opens with a meta-phrase («это срок, который фигурировал во всех вариантах, которые я предлагал») instead of anchoring first to the user's own original wording («Не смогу закончить сегодня, пришлю завтра утром»); the fact is correct, the framing is slightly self-referential.",
+            "Turn 5 (minor): register toward the user switches to formal «Хотите», while turn 3 in another session addresses the same user informally — inconsistent assistant persona across the product."
+          ],
+          "verdict": "pass"
+        },
+        {
+          "case_id": "archive_research",
+          "scores": {
+            "source_support": 5,
+            "usable_next_step": 4,
+            "context_continuity": 5,
+            "topic_switch": 4,
+            "goal_progress": 4,
+            "clarity": 4,
+            "honest_execution_status": 5,
+            "safety_boundary": 5
+          },
+          "suggestions": [
+            "Add an explicit coverage statement to research results: how many relevant items the archive returned under the query, and that the list is exhaustive with respect to that query.",
+            "Separate «not stated in sources» from «not measured» per item so the user can distinguish an information gap from a measurement gap.",
+            "Wrap operator surfaces (job id, /status, /cancel) in a plain-language sentence or hide them behind buttons; an ordinary user should not need a raw UUID to follow up.",
+            "Verify and document the delivery channel for completed research results so it is consistent with the session's chat path."
+          ],
+          "failures": [
+            "Turn 1 (moderate): the acknowledgment exposes a raw job UUID plus /status and /cancel commands — a working operator control, but machine-style for an ordinary user, with no plain-language statement of what happens next or when.",
+            "Turn 2 (moderate): coverage framing is incomplete — the result does not state that these are the items the archive query returned, and the measurement status of normalize_email is left unstated rather than explicitly marked unknown; the user cannot distinguish «measured» from «no data».",
+            "Turn 2 (minor): the completed result is delivered as stored_result (real research worker, synthetic sources) while every other turn in the record goes through a synthetic Telegram send; this record shows no sent receipt for the result, so the user-facing channel for research completion is unverified."
+          ],
+          "verdict": "pass"
+        },
+        {
+          "case_id": "weekly_brief",
+          "scores": {
+            "source_support": 5,
+            "usable_next_step": 4,
+            "context_continuity": 5,
+            "topic_switch": 4,
+            "goal_progress": 5,
+            "clarity": 4,
+            "honest_execution_status": 5,
+            "safety_boundary": 5
+          },
+          "suggestions": [
+            "Make the coverage line count what it names, e.g. «проверен 1 источник-ресурс (архив); использовано 3 записи» — or drop the count at chat level.",
+            "Link every asserted finding at chat level (1001 and 1002), not only the first source.",
+            "Clean markdown escaping, remove duplicated text inside timeline entries, and move internal version/identity hashes out of the user-facing artifact.",
+            "Phrase coverage as «полное в пределах локального архива» explicitly."
+          ],
+          "failures": [
+            "Chat message (moderate): the headline item asserts findings from two sources but links only https://t.me/source/1001; the slugify finding from /1002 is uncited at chat level (it is cited only in the full artifact).",
+            "Chat message (moderate): «✓ Проверено 1 из 1 источников» conflicts with the three sources actually used and cited in the artifact (1001–1003); the count apparently refers to the single archive resource, but as worded it misstates source coverage to the user.",
+            "Artifact (minor): rendering blemishes — stray escape sequences ('\\(' and '\\_'), each timeline entry duplicating its source text, and internal version/identity hashes (brief_0843d7f061ce6993202c015f, sha256) exposed in the readable brief.",
+            "Artifact (minor): «Статус покрытия: complete» is stated without spelling out that completeness holds only within the bounded local archive selection (limitation listed elsewhere as bounded_local_archive_selection)."
+          ],
+          "verdict": "pass"
+        },
+        {
+          "case_id": "watch",
+          "scores": {
+            "source_support": 4,
+            "usable_next_step": 3,
+            "context_continuity": 4,
+            "topic_switch": 4,
+            "goal_progress": 4,
+            "clarity": 3,
+            "honest_execution_status": 5,
+            "safety_boundary": 5
+          },
+          "suggestions": [
+            "Confirm pauses explicitly: «Подписка приостановлена: сбор и отправка остановлены; возобновить — /watchresume».",
+            "Surface the subscription ID proactively after confirmation, with a plain-language description of what will be watched and under which caps/quiet hours/expiry.",
+            "Render empty values as «— нет данных» instead of a dangling label, and describe the last collection outcome concretely without claiming live delivery.",
+            "Add a plain-language layer (buttons or sentences) on top of hash-token commands for non-operator users."
+          ],
+          "failures": [
+            "Turn 5 (moderate): the pause acknowledgment «Состояние подписки сохранено» does not state the resulting state or effect — the user cannot tell paused from active, nor what stops (collection and sends) or how to resume; the evidence (new_job_after_pause false) shows the pause worked, but the reply never says so.",
+            "Turns 3–5 (moderate, usability/continuity): the user addresses /watchstatus and /watchpause by watch_89bebc89033244c897a640d6fa073f04, an identifier the assistant never surfaced in any prior turn; in a real conversation the user would have nothing to reference.",
+            "Whole flow (moderate, usability): hash-token commands with terse machine replies — a functional operator control, not natural conversation; no plain-language summary of what the subscription will do is ever given.",
+            "Turn 3 (minor): «Последний результат: .» renders an empty value with a stray dot — a machine artifact in user-visible text.",
+            "Turn 4 (minor): «Последний результат: active» is vague — it restates the subscription state instead of describing the last collection outcome; the user learns nothing about what changed or whether a notification was produced."
+          ],
+          "verdict": "pass"
+        },
+        {
+          "case_id": "confirmed_action",
+          "scores": {
+            "source_support": 4,
+            "usable_next_step": 3,
+            "context_continuity": 4,
+            "topic_switch": 4,
+            "goal_progress": 4,
+            "clarity": 3,
+            "honest_execution_status": 5,
+            "safety_boundary": 5
+          },
+          "suggestions": [
+            "On repeated confirmation, state plainly: «Это подтверждение уже выполненного действия — второе письмо не отправлено; итог прежний: succeeded».",
+            "Include the provider message ID in the reconcile reply, or say explicitly that it is unavailable.",
+            "Surface the action ID and follow-up handles in the confirmation reply so the user never needs an unseen internal ID.",
+            "Replace machine fields with human sentences in consistent Russian; render empty/unknown values as words, not dangling labels."
+          ],
+          "failures": [
+            "Turn 4 (moderate): the reply to the repeated /actconfirm does not explain idempotency — the user cannot tell whether a second email was sent; the provider ref label «synthetic_sent_2» may even suggest a second provider object, while the case evidence shows exactly one write (synthetic_graph_write_count 1).",
+            "Turn 3 (moderate): the reconcile outcome provides no provider message ID or verifiable detail — just «succeeded»; the user receives nothing concrete to check against the provider.",
+            "Turns 3 (moderate, usability/continuity): the user invokes /actreconcile with action_04b919a0541885064d40f73effdcac8ecc060c55, an internal action ID the assistant never displayed in any prior turn.",
+            "Turns 2 and 4 (minor): machine-style mixed-language statuses with an empty trailing value («Исход действия: unknown. Provider ref: ») — terse and unnatural for an ordinary user; the empty ref is honest but rendered as a dangling label.",
+            "Turn 1 (minor): the /actconfirm affordance is a long hash token with no plain-language statement of what confirming will do; also the preview is a raw JSON echo including the internal account_ref."
+          ],
+          "verdict": "pass"
+        }
+      ],
+      "summary": "The assistant behaves as a disciplined, honest state machine with strong fact fidelity, but not yet as a consistently natural conversational product. Its strongest demonstrated quality is execution truthfulness: saved watch intent is never conflated with a running monitor, the scheduler is reported unconfirmed until evidence shows activity, a mail send stays «unknown» until provider reconciliation, a repeated /actconfirm produces no second write (synthetic_graph_write_count 1), and nothing is claimed as live integration, recipient delivery or human acceptance — all Telegram receipts, archive contents, watch effects and graph writes in these records are explicitly synthetic, and only provider inference is framed as real. Fact fidelity is equally strong where sources exist: archive findings and the weekly brief reproduce supplied texts, URLs, windows and publication times exactly, keep unmeasured effects unmeasured, report the unittest/pytest source as containing no quality-advantage data, and add only conditional next steps. The single substantive functional defect is conversational robustness: a trivial in-chat edit request («Сделай короче») is answered by an irrelevant canned system line that also misrepresents the assistant's own demonstrably intact context — the one session scored below the diagnostic floor. The remaining weaknesses are ergonomic and presentational: operator-grade surfaces (raw JSON, UUID/hash tokens, mixed-language machine statuses, dangling empty fields, internal IDs the user was never shown in-band), an under-specified pause acknowledgment, a citation-count inconsistency and under-linked chat summary in the brief, and artifact rendering blemishes. Priority work, in order: (1) restore genuine handling of in-chat edit requests and remove the «диалог экспирирует» template; (2) humanize control surfaces — plain-language confirmations, proactively surfaced IDs, explained idempotency, no dangling machine fields; (3) align brief coverage counts with cited sources and clean artifact rendering; (4) make research-result delivery channel-consistent and coverage statements explicit. This conclusion is advisory and derives solely from the supplied synthetic records; it contains no release approval.",
+      "unknowns": [
+        "Delivery channel and sent receipt for the completed archive_research result (turn 2) — not shown in the record.",
+        "Provider message ID for the confirmed mail action — absent from the reconcile reply; unknown rather than failed.",
+        "User-facing availability of the watch subscription ID and action ID outside these transcripts — not shown; flagged as continuity gaps, not proven defects."
+      ]
+    }
+  },
+  "visual_judge": {
+    "authority": "owner2026-10-09 all available product/model-quality testing",
+    "provider": "opencode_go",
+    "model": "deepseek-v4-flash-vision-exp",
+    "privacy": "public_synthetic_only",
+    "maximum_calls": 1,
+    "automatic_retry": false,
+    "timeout_seconds": 90,
+    "input_bytes": 1491082,
+    "input_sha256": "79012b05c905e1783836c813a995820763d692b08bb2132350b0e3a07231216f",
+    "images": [
+      {
+        "path": ".playbook-artifacts/pai-product-verification-20261009/corrected-brief/brief-pdf-page-1.png",
+        "sha256": "34128ec14058df867dcf5dbecb9250468a6764513e9f20bc28c3cc7a02fa2269",
+        "bytes": 151000
+      },
+      {
+        "path": ".playbook-artifacts/pai-product-verification-20261009/corrected-brief/brief-pdf-page-2.png",
+        "sha256": "0d5166f2a9dcdeee676c20a9de11da3ff7a6b7c8bde08b16c1531ccffe3fc57e",
+        "bytes": 92007
+      },
+      {
+        "path": ".playbook-artifacts/pai-product-verification-20261009/corrected-brief/brief-pdf-page-3.png",
+        "sha256": "b83d6d7e29cee408814024ca34259f4883157470c8d6e1296bb9b566cfa0cb00",
+        "bytes": 76736
+      },
+      {
+        "path": ".playbook-artifacts/pai-product-verification-20261009/corrected-brief/brief-pdf-page-4.png",
+        "sha256": "2db33819de3e58e63fe2f091e5a8f715743865c0ef0979a86497a4c72b8150fb",
+        "bytes": 89515
+      },
+      {
+        "path": ".playbook-artifacts/pai-product-verification-20261009/corrected-brief/mobile-light.png",
+        "sha256": "1a0d99e8c0d3d650b82164a553b5021ff178c2bada458c63ef15d552458158d8",
+        "bytes": 340722
+      },
+      {
+        "path": ".playbook-artifacts/pai-product-verification-20261009/corrected-brief/mobile-dark.png",
+        "sha256": "0d9f84344350af0262a572dcf534e99a254a3eb96b01d002968eaa3f8f8b48b7",
+        "bytes": 366120
+      }
+    ],
+    "advisory_only": true,
+    "experimental_vision_availability": "public Go model list; account capability not presumed",
+    "source_receipt": ".playbook-artifacts/pai-product-verification-20261009/corrected-brief/render-receipt.json",
+    "status": "judged",
+    "cost": "unknown",
+    "observed_model": "deepseek-v4-flash-vision-exp",
+    "observed_effort": "unknown",
+    "usage": {
+      "prompt_tokens": 5068,
+      "completion_tokens": 4462,
+      "total_tokens": 9530,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 5068,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 2944
+      }
+    },
+    "judgment": {
+      "scores": {
+        "pdf_legibility": 4,
+        "pdf_pagination": 3,
+        "source_visibility": 4,
+        "mobile_layout": 3,
+        "dark_theme": 4,
+        "visual_hierarchy": 4
+      },
+      "verdict": "warn",
+      "findings": [
+        "PDF p.1: body text (~10–11 pt) with generous line height renders crisply; the four KPI cards (3 пунктов / 3 источников / 0 конфликтов дат / полное покрытие) sit on one row with equal padding and their label/value contrast is clear — legible at page scale.",
+        "PDF p.1→p.2 content continuity: the СОБЫТИЕ 1 story splits deliberately; p.2 resumes with «Условный следующий шаг.» and «Оговорка.» without restating the event heading, the card's side rules and bottom rounded corner close cleanly mid-page, and p.3→p.4 continues the «Источники» card list (source 1 on p.3, sources 2 and 3 on p.4) — no content is lost or duplicated across the break.",
+        "PDF running header wraps poorly on every page after p.1: p.2 shows the right-hand timeframe «2026-10-02 22:51 — 2026-10-09 22:51 Europe/ Berlin» broken onto two lines while the centered section label «Наблюдения по дням» is also two lines; p.3 («Europe/ Berlin») and p.4 repeat the wrap, making the header band taller and noisier than intended.",
+        "PDF p.2 ДИНАМИКА / «Наблюдения по дням»: a single black bar with y ticks 3 / 1.5 / 0 stacked ~70 px, ~141 px and ~211 px apart — the 1.5 tick is not placed at the midpoint of the 0–3 range and no axis rule or gridline is drawn, so bar height cannot be read quantitatively; the x label «10-07» is ~7 pt and the section ends with ~200 px of blank page.",
+        "PDF p.3 «Пункты по источникам»: one full-width black bar labelled t.me with the value «3» floating to the right, with no scale, baseline or comparison bar, so the magnitude of 3 is visually unanchored; the bar spans almost the whole text column and dominates the section.",
+        "PDF p.3 layout crowding: the «Ограничения» sub-heading sits immediately against the Coverage table's bottom border with almost no leading gap, so the bullet bounded_local_archive_selection appears attached to the table rather than as a separate list.",
+        "PDF p.4 trailing void: after the third source card the page ends with a tall (~450 px) light-tinted empty container with no text or border content inside, which reads as an unrendered or orphaned block rather than intentional whitespace; p.2 and p.3 similarly leave ~180–200 px of empty tail.",
+        "PDF p.3–p.4 source cards repeat themselves: in all three cards the bold title is a verbatim duplicate of the first body sentence (e.g. «Аврора: добавлены unit tests для функции normalize_email. Тест проверяет удаление пробелов и нижний регистр.») — the same string appears twice, roughly doubling text volume with zero added information and blunting hierarchy.",
+        "Source visibility is otherwise solid across formats: p.2 lists inline citations @source/1001–@source/1003 with quoted supporting snippets in nested blockquotes, and p.3/p.4 expand each into a card with a visible, underlined URL (https://t.me/source/1001–1003) plus the «2026-10-07T20:51:20.091096Z (published) · active» provenance line, so a reader can trace every claim to a source identifier.",
+        "Mobile (light) Coverage table: three columns compressed into ~300 px force mid-word breaks — the header renders as «Ограничен/ие» and the cell value breaks as «resource_a/rchive», splitting an identifier across lines and hurting scanability; the narrow column should be reflowed to stacked label:value rows or the identifier allowed to shrink.",
+        "Mobile (light and dark) charts are effectively illegible: the ДИНАМИКА day bar and the «Пункты по источникам» bar are scaled to a miniature frame in which the labels (3, 1.5, 0, 10-07, t.me, 3) are ~4–5 px tall; these figures should scale up, rotate their labels, or be replaced by a textual value line at narrow viewports.",
+        "Dark theme: near-black background with light body text, visible card borders and an inverted light-teal chart fill keep contrast adequate; source-link URLs (teal) remain readable on the dark surface and eyebrow labels keep their accent colour — no element is lost or blown out when switching themes.",
+        "Mobile overflow: no horizontal page scroll detected at the captured width; long unbreakable tokens (normalize_email, slugify, bounded_local_archive_selection, source URLs, the ISO timestamp) wrap inside their cards instead of pushing the layout wider, so the failure mode is aggressive wrapping rather than clipping.",
+        "Visual hierarchy: teal uppercase eyebrows (АНАЛИТИЧЕСКИЙ БРИФ, СОБЫТИЕ 1, ДИНАМИКА, ГРАНИЦЫ ВЫБОРКИ, ПРОВЕРЯЕМЫЕ ОСНОВАНИЯ) plus bold section headings establish a consistent reading order on both the PDF and the mobile pages; it weakens only at the PDF p.3 table/heading collision and where source-card titles duplicate their own body text."
+      ],
+      "summary": "The brief is legible and structurally sound: PDF body copy, KPI cards, inline @source/1001–1003 citations and the expanded source cards with URLs and timestamps all render cleanly, and the event story splits across p.1→p.2 and the source list across p.3→p.4 without losing or duplicating content. Mobile light/dark layouts avoid horizontal overflow and dark-theme contrast is adequate. Issues keeping this at advisory level rather than a clean pass: both PDF charts are under-specified (single bars with unanchored or misaligned ticks and tiny labels), p.4 ends in a large empty tinted block and p.2/p.3 carry ~200 px of dead tail, the running-header timeframe wraps to two lines on every page after p.1, source-card titles verbatim-duplicate their own first sentence, and on mobile the Coverage table breaks «Ограничение» and «resource_archive» mid-word while both charts shrink to unreadable miniature scale. Recommended fixes: give charts real axes/gridlines and a narrow-viewport fallback, reflow the coverage table to stacked rows, collapse the duplicate title/body in source cards, tighten the page-end whitespace and drop the empty container on p.4."
+    },
+    "duration_seconds": 21.834
+  },
+  "independent_code_safety_initial": {
+    "call_number": 112,
+    "kind": "single_independent_repaired_implementation_safety_review; not old112 design batch",
+    "provider": "opencode_go",
+    "requested_model": "glm-5.3",
+    "requested_effort": "max",
+    "source_head": "cbab0fbf005754884422c3c372373d6b23748bbf",
+    "base_head": "cb7020fc827b6a175a30c406fbe32db0047cc598",
+    "diff_sha256": "f64a21745f3fea230e56b69799230003a818a33d4faf8bc9cd2561454dd9a552",
+    "input_sha256": "cccd12684cee71aef32f1c2b979511fbebbb65b0501b76dd62e1fdf7b6f9d574",
+    "input_bytes": 211834,
+    "input_bound": 1000000,
+    "input_authority": "existing2026-10-09 owner maximum-resource public-code directive recorded in PAI-maximum-review-authority-20261009.md",
+    "private_content": false,
+    "source_paths": [
+      "src/prm/application.py",
+      "src/prm/report_exports.py",
+      "src/prm/routing.py",
+      "src/prm/runtime/brief.py",
+      "src/prm/runtime/composition.py",
+      "src/prm/runtime/ingress.py",
+      "src/prm/runtime/model.py",
+      "src/prm/runtime/result_payloads.py",
+      "src/prm/storage/conversations.py",
+      "src/prm/storage/policy.py",
+      "src/prm/storage/postgres.py",
+      "tests/test_pai_product_sessions.py",
+      "tools/test_tiers.py"
+    ],
+    "context_paths": [
+      "src/prm/runtime/result_payloads.py",
+      "src/prm/storage/conversations.py",
+      "src/prm/storage/policy.py",
+      "src/prm/storage/postgres.py",
+      "src/prm/runtime/composition.py",
+      "src/prm/runtime/model.py",
+      "src/prm/storage/jobs.py",
+      "src/prm/runtime/deletion.py",
+      "tests/test_pai_product_sessions.py"
+    ],
+    "maximum_calls": 1,
+    "automatic_retry": false,
+    "timeout_seconds": 900,
+    "output_maximum": 131072,
+    "authority": "owner ongoing necessary scoped reviews plus2026-10-09 product testing; phase safety check",
+    "formal_design_or_human_acceptance": false,
+    "status": "reviewed",
+    "cost": "unknown",
+    "observed_model": "glm-5.3",
+    "observed_effort": "unknown",
+    "usage": {
+      "prompt_tokens": 48116,
+      "completion_tokens": 26566,
+      "total_tokens": 74682,
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cached_tokens": 10
+      }
+    },
+    "review": {
+      "verdict": "STOP",
+      "findings": [
+        {
+          "severity": "P1",
+          "file": "src/prm/runtime/result_payloads.py",
+          "line": 96,
+          "recommendation": "Bind chunks to the delivered result's lineage, not only the job input: in bounded_result_record (or in JobQueue.complete after reading the manifest), also insert pa_memory.dependencies edges from each payload['conversation']['response_ref'] parent (the same parents complete() already uses) to every chunk ref, or from the main result 'result_'+job_id to each chunk ref, so chunks cascade when the response, memory, brief, or main result is deleted; tombstone chunk refs alongside the main result in delete_derived_in. Add a regression test that deletes the response_ref (not the input) and asserts resolve_result_payload fails because the chunks are gone, mirroring the memory-forget trigger.",
+          "description": "Split diagnostic chunks have no lineage edge from the delivered result or its content sources, so owner deletion of the response/memory/brief orphans private payload copies. bounded_result_record() inserts pa_memory.dependencies edges only from the job input (lease.payload['input_namespace']/input_ref) to each chunk ref, while JobQueue.complete() separately inserts response_ref -> 'result_'+job_id edges. delete_derived_in() removes only dependency descendants. Pre-diff, a >64KiB payload was inlined in the single result object that WAS a descendant of the conversation response_refs, so deleting the response removed it; post-diff the chunk objects escape that cascade. Concrete trigger: a /memorysearch or research/brief job whose payload exceeds 64KiB (e.g., many memory payloads, large verification claim sets) is chunked; the owner then runs /forget on a referenced memory — composition registers memory->response dependencies via register_dependency for source_memory_refs — delete_derived_in removes the memory, the response result and the main job result (response->main edge), but the chunk objects remain in pa_runtime.object_versions holding the full memory/brief/archive-derived payload, with no tombstone and no owner-reachable path that deletes the conversation-namespace ingress input. This breaks the documented contract in src/prm/runtime/deletion.py ('Invalidate an owned derived dependency graph') and is a regression introduced by this diff; the new test only exercises deletion via the input object, so green fixtures do not cover it."
+        }
+      ],
+      "summary": "The repair is largely sound on the named controls, but one material lineage defect requires a fix before further active testing. Verified as safe within the reviewed diff: (1) prior-user versus generated-history egress are genuinely separate grants — user prompts egress under capability model.context_egress with data_class user_provided and a distinct operation fence (composition.py ~169-178, operation+'_user_history'), while prior assistant text stays model_generated; revocation and /new topic reset behave, prompts are bounded to 4 turns/4800 chars and expire with the history rows (conversations.py attach_user_prompt/user_prompts_for_model); (2) no promotion of private content into generic chat — user prompts attach only to rows tagged source_data_class='model_generated' (record_origin -> tag_response_source), so private_connector_content rows are excluded by both the attach SELECT and the read filter; (3) the extended model deadline is finite (int-only 1..120), model-only (operation='model_egress' with model.generate/model.context_egress enforced in policy.py execute_reserved_groups; delivery denied with no transport call), and the PostgreSQL guard idle_in_transaction_session_timeout is raised only transaction-locally via set_config(...,true) inside model_transport_idle_bound and resets to 15s after the context exits; unknown outcomes remain non-replayable via operation fences ('operation_already_attempted', ScopeTransportUnknown/ScopePreparationUnknown with retry_allowed=False); (4) the prepared BriefDocument path validates owner/topic/window identity and suppresses phantom refresh/editorial re-synthesis, binding the weekly reply to the first saved version; (5) export retention works — fixed-page overflow is detected against page-body child bounds in _render_with_weasyprint and render_paginated_pdf falls back to the flow-designed PDF, and the test asserts actual caveat/source text survives in the rendered PDF. The blocking defect is the split-result lineage gap detailed in findings: chunked diagnostic copies of large private payloads are children of the job input only, so the owner-deletion paths that remove the delivered result, its memory, or its brief (memory forget, response deletion, brief forget) leave the full private payload copies stored indefinitely, regressing the pre-diff behavior where the inlined payload was deleted as a descendant of the conversation response. This is introduced by the diff (new result_payloads.py) and is not covered by the new tests, which only delete via the input object; the supplied green tier results are therefore not acceptance evidence for it. P2 advisories below are non-blocking but should be tracked. Limits: this was a read-only static review of the supplied diff and context; no tests were executed, no live provider, mailbox, calendar, Canvas/UTD access, or human-usefulness evaluation was possible, matching the stated still-unknown list; pre-existing code outside the diff was judged only where the diff touches it, and no acceptance or release authority is implied."
+    },
+    "duration_seconds": 481.525
+  },
+  "independent_P1_recheck": {
+    "call_number": 113,
+    "kind": "single_independent_P1_closure_recheck; not programme/design batch",
+    "provider": "opencode_go",
+    "requested_model": "glm-5.3",
+    "requested_effort": "max",
+    "source_head": "6467c503c7d196926632da03cf5dce49ed181d2e",
+    "base_head": "cbab0fbf005754884422c3c372373d6b23748bbf",
+    "diff_sha256": "3bc5ef3939839be8833daca0d812ab6fc8812f569674910541fd6d41a2e2635e",
+    "input_sha256": "48c1c8a2ceeccafdad00be4ccf92343b62a405f3d180f9287f563aa90a250768",
+    "input_bytes": 80125,
+    "input_bound": 1000000,
+    "input_authority": "existing2026-10-09 owner maximum-resource public-code directive recorded in PAI-maximum-review-authority-20261009.md",
+    "private_content": false,
+    "source_paths": [
+      "src/prm/application.py",
+      "src/prm/report_exports.py",
+      "src/prm/routing.py",
+      "src/prm/runtime/brief.py",
+      "src/prm/runtime/composition.py",
+      "src/prm/runtime/ingress.py",
+      "src/prm/runtime/model.py",
+      "src/prm/runtime/result_payloads.py",
+      "src/prm/storage/conversations.py",
+      "src/prm/storage/policy.py",
+      "src/prm/storage/postgres.py",
+      "tests/test_pai_product_sessions.py",
+      "tools/test_tiers.py"
+    ],
+    "context_paths": [
+      "src/prm/runtime/result_payloads.py",
+      "src/prm/conversation.py",
+      "src/prm/storage/jobs.py",
+      "src/prm/runtime/deletion.py",
+      "tests/test_pai_product_sessions.py"
+    ],
+    "maximum_calls": 1,
+    "automatic_retry": false,
+    "timeout_seconds": 7200,
+    "output_maximum": 131072,
+    "authority": "owner ongoing necessary scoped reviews plus2026-10-09 product testing; phase safety check",
+    "formal_design_or_human_acceptance": false,
+    "status": "failed_unknown",
+    "cost": "unknown",
+    "error_type": "HTTPError",
+    "duration_seconds": 0.577,
+    "provider_outcome": "unknown"
+  },
+  "P1_status": "fixed_and_regression_tested; independent closure unavailable",
+  "post_fix_live_chat": {
+    "scope": ".playbook-artifacts/pai-product-verification-20261009/chat-post-review/sessions-scope.json",
+    "calls": [
+      {
+        "call_number": 1,
+        "session": "context_and_topic_after_fixes",
+        "input_sha256": "116b4c7e4cc3f74991689d6f128e3d221738d354cfed992a37301270f96422ae",
+        "requested_model": "mimo-v2.6-flash",
+        "status": "failed_unknown",
+        "cost": "unknown",
+        "actual_provider_call": true,
+        "error_type": "HTTPError",
+        "http_status": 429,
+        "duration_seconds": 0.523
+      },
+      {
+        "call_number": 2,
+        "session": "context_and_topic_after_fixes",
+        "input_sha256": "304f55af2db025c8fd0a1bfe9f3ef58dffb3eccb504a79a9d9a8a08bbb52cb18",
+        "requested_model": "mimo-v2.6-flash",
+        "status": "failed_unknown",
+        "cost": "unknown",
+        "actual_provider_call": true,
+        "error_type": "HTTPError",
+        "http_status": 429,
+        "duration_seconds": 0.457
+      },
+      {
+        "call_number": 3,
+        "session": "context_and_topic_after_fixes",
+        "input_sha256": "0f085330b8e535118ad24391c1e41465d34af6a9a7938f00d48812e9410304ca",
+        "requested_model": "mimo-v2.6-flash",
+        "status": "failed_unknown",
+        "cost": "unknown",
+        "actual_provider_call": true,
+        "error_type": "HTTPError",
+        "http_status": 429,
+        "duration_seconds": 0.492
+      },
+      {
+        "call_number": 4,
+        "session": "context_and_topic_after_fixes",
+        "input_sha256": "60c6184941c9d49aa77590b7996dd4bafc676aed87552a861a6dfef95483b15f",
+        "requested_model": "mimo-v2.6-flash",
+        "status": "failed_unknown",
+        "cost": "unknown",
+        "actual_provider_call": true,
+        "error_type": "HTTPError",
+        "http_status": 429,
+        "duration_seconds": 0.517
+      },
+      {
+        "call_number": 5,
+        "session": "context_and_topic_after_fixes",
+        "input_sha256": "add9b4f7497001ae22d0533f47d492e7be2b55e9bbdd10ad1744aa94a1ff5d15",
+        "requested_model": "mimo-v2.6-flash",
+        "status": "failed_unknown",
+        "cost": "unknown",
+        "actual_provider_call": true,
+        "error_type": "HTTPError",
+        "http_status": 429,
+        "duration_seconds": 0.427
+      }
+    ]
+  },
+  "offline_actual_reply_replay": {
+    "status": "replayed_local_followup",
+    "source_head": "6467c503c7d196926632da03cf5dce49ed181d2e",
+    "source_capture_sha256": "b5e051da61c1ab5c959d41c4fcdad323e013f8af4e06f4460c280685d9efca38",
+    "original_visible_answer_sha256": "43f85cd1481a8f06c27956e4bb5d78e56ebec378d03e64937d7c37b91023bf9c",
+    "original_generator": "mimo-v2.6-flash actual prior captured reply; no regenerated provider response",
+    "before_shortening": "Сейчас твой диалог экспирирует, так что я не могу увидеть детали твоего проекта напрямую.",
+    "after_shortening": "**Посмотри структуру проекта и найди первую «чистую» функцию для теста.**",
+    "actual_native_worker_status": "ok",
+    "new_model_calls": 0,
+    "key_read": false,
+    "all_content_synthetic": true,
+    "new_independent_model_quality_grade": false
+  },
+  "public_github": {
+    "capability": "github_context",
+    "status": "read",
+    "observed_ref": "e4f7f174bc4a1686b31639d29a3e211941390979",
+    "duration_seconds": 0.933,
+    "payload_sha256": "fb8e9edc9a12ace4df0fadef15b3eabfcd2841f639d6c91c6fd4b006f78d9786",
+    "available_keys": [
+      "gaps",
+      "items",
+      "observed_ref",
+      "read_only",
+      "ref",
+      "repository_ref",
+      "requested_ref",
+      "status"
+    ],
+    "actual_public_http": true
+  },
+  "public_document": [
+    {
+      "capability": "public_document_read",
+      "status": "read",
+      "duration_seconds": 0.761,
+      "payload_sha256": "41f97814705bf5b1fed52c8c5cee9a91f899cac83d641ac73e13b03e3606d08a",
+      "available_keys": [
+        "body",
+        "final_url",
+        "headers",
+        "published_at",
+        "status"
+      ],
+      "provider_status": 200,
+      "response_bytes": 336954,
+      "final_url": "https://docs.python.org/3/library/unittest.html",
+      "actual_public_http": true
+    }
+  ],
+  "artifact_receipt": {
+    "status": "rendered",
+    "runtime": "native scoped BriefRuntime and PrivateReportRuntime isolated renderer",
+    "source_head": "cbab0fbf005754884422c3c372373d6b23748bbf",
+    "captured_session_sha256": "436edfce4d85f5be74469c1708b01d2d8635d13f888da4fe216811c4807b4e29",
+    "editorial_content": "exact observed MiMo Flash story JSON reused; not a new paid inference",
+    "synthetic_source_reconstruction": "exact captured source texts/IDs/URLs/publication times; fresh synthetic runtime, same requested window",
+    "new_model_calls": 0,
+    "real_account_or_messages": false,
+    "assets": [
+      {
+        "format": "html",
+        "path": ".playbook-artifacts/pai-product-verification-20261009/corrected-brief/product-brief.html",
+        "sha256": "cefae7f7defe80430b8115ba02bbe088fa7a561b3ebdfd29c092e01b13d5f887",
+        "media_type": "text/html; charset=utf-8",
+        "synthetic": true
+      },
+      {
+        "format": "pdf",
+        "path": ".playbook-artifacts/pai-product-verification-20261009/corrected-brief/product-brief.pdf",
+        "sha256": "e7dd12d56da7ffd1d203f65f75140bfb4f4e685c574897490ad956452183836c",
+        "media_type": "application/pdf",
+        "synthetic": true
+      },
+      {
+        "format": "markdown",
+        "path": ".playbook-artifacts/pai-product-verification-20261009/corrected-brief/product-brief.md",
+        "sha256": "467600e1cf11900b5cf3de83a6823020650a3712776681b9be46c2fb33c2cc95",
+        "media_type": "text/markdown; charset=utf-8",
+        "synthetic": true
+      }
+    ],
+    "code_sha256": "05883b0da8fddda64e7c13853c71fcc1f9fc029a3ee76531f01126829bac143c"
+  },
+  "browser_pdf_layout": {
+    "synthetic_only": true,
+    "html_sha256": "cefae7f7defe80430b8115ba02bbe088fa7a561b3ebdfd29c092e01b13d5f887",
+    "pdf_sha256": "e7dd12d56da7ffd1d203f65f75140bfb4f4e685c574897490ad956452183836c",
+    "browser": "Chromium1243 via Playwright1.63.0",
+    "actual_external_browser_requests": false,
+    "screens": [
+      {
+        "case": "desktop-light",
+        "errors": [],
+        "dimensions": {
+          "viewport": 1280,
+          "document": 1280,
+          "body": 1280,
+          "background": "rgb(245, 245, 240)",
+          "overflows": []
+        },
+        "screenshot": "desktop-light.png"
+      },
+      {
+        "case": "mobile-light",
+        "errors": [],
+        "dimensions": {
+          "viewport": 390,
+          "document": 390,
+          "body": 390,
+          "background": "rgb(245, 245, 240)",
+          "overflows": []
+        },
+        "screenshot": "mobile-light.png"
+      },
+      {
+        "case": "mobile-dark",
+        "errors": [],
+        "dimensions": {
+          "viewport": 390,
+          "document": 390,
+          "body": 390,
+          "background": "rgb(18, 23, 22)",
+          "overflows": []
+        },
+        "screenshot": "mobile-dark.png"
+      }
+    ],
+    "pdf_pages": 4,
+    "pdf_out_of_page_text": [],
+    "human_acceptance": false
+  },
+  "changed_files": [
+    "docs/CODEX_PROMPT.md",
+    "docs/adr/ADR-016-pa-product-verification.md",
+    "docs/design/PAI.design.json",
+    "docs/design/PAI.md",
+    "docs/design/PAI.requirements.json",
+    "docs/tasks.md",
+    "docs/verification/PAI-GCN-reuse-20261009.json",
+    "docs/verification/PAI-next-review-packets.json",
+    "docs/verification/PAI-progress.md",
+    "docs/verification/PAI-review-continuation-110.json",
+    "docs/verification/PAI-review-continuation-111.json",
+    "docs/verification/PAI-tooling-110-accepted.md",
+    "src/prm/application.py",
+    "src/prm/conversation.py",
+    "src/prm/report_exports.py",
+    "src/prm/routing.py",
+    "src/prm/runtime/brief.py",
+    "src/prm/runtime/composition.py",
+    "src/prm/runtime/ingress.py",
+    "src/prm/runtime/model.py",
+    "src/prm/runtime/result_payloads.py",
+    "src/prm/storage/conversations.py",
+    "src/prm/storage/policy.py",
+    "src/prm/storage/postgres.py",
+    "tests/test_pai_product_sessions.py",
+    "tools/test_tiers.py"
+  ],
+  "diagnostic_qualification": {
+    "floor_per_axis": 4,
+    "qualified_session_count": 3,
+    "evaluated_sessions": 6,
+    "raw_model_labels_preserved": true,
+    "not_a_release_gate": true
+  },
+  "human_acceptance": false,
+  "full_programme_or_release_acceptance": false,
+  "remaining_gates": [
+    "independent closure recheck of fixed P1 unavailable after113 HTTPError; current Go returns429",
+    "real mail/calendar selected test account and exact source scopes",
+    "Brave discovery credential",
+    "UTD API explicitly deferred",
+    "formal design/role/human gates and future slices remain",
+    "live Telegram usability and provider deployment not evidenced by synthetic delivery"
+  ],
+  "formal_gate_check": {
+    "argv": [
+      ".venv-pai/bin/python",
+      "tools/playbook.py",
+      "playbook_validate",
+      "--root",
+      ".",
+      "--check",
+      "tasks",
+      "--check",
+      "references"
+    ],
+    "exit_code": 1,
+    "duration_seconds": 1.577,
+    "source_head": "6467c503c7d196926632da03cf5dce49ed181d2e",
+    "reported_errors": 51,
+    "reported_kind": "TASK_DESIGN_APPROVAL_REQUIRED",
+    "scope": "formal approvals intentionally ungranted; owner-authorized safe local testing continues; no approval forged",
+    "log_sha256": "dcf772d8c9d75f36757b5e0600868ed34c26611e97b8cff2ecb2ed586bb2352a"
+  },
+  "reference_check": {
+    "argv": [
+      ".venv-pai/bin/python",
+      "tools/playbook.py",
+      "playbook_validate",
+      "--root",
+      ".",
+      "--check",
+      "references"
+    ],
+    "exit_code": 0,
+    "result": "errors=0 warnings=0"
+  },
+  "exact_public_judge_input": "docs/verification/PAI-product-session-judge-20261009.input.txt",
+  "frozen_source_verification": {
+    "source_sha": "6467c503c7d196926632da03cf5dce49ed181d2e",
+    "code_files": 14,
+    "working_bytes_match_tested_commit": true
+  }
+}
