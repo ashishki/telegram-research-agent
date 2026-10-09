@@ -80,3 +80,22 @@ MiMo Pro/Flash use the same Go provider for explicit public synthetic developmen
 benchmarks, with documented thinking disabled and actual model/usage recorded;
 neither benchmark is production configuration. GLM5.3 judges full session evidence
 independently with requested max; any absent observed effort/cost stays unknown.
+
+The actual independent code review112 found a P1 in the new chunk storage:
+response/main-result deletion could leave chunks because they had only input
+lineage. A new response-deletion test actually failed. Bind every chunk to both
+its main result and the exact existing response/evidence parents under the same
+lineage lock; validate parents and main-result tombstone before writing. Two
+source/main-result deletion regressions pass; independent113 closure is required
+before dependent work. Do not convert the original357-case green result into
+acceptance of this defect or erase the original STOP/reproduction.
+
+The actual session judge exposed two more Chat defects: stored visible answers
+flattened line/code indentation, and local shortening chose a generic preamble
+instead of the first supplied step. Preserve response/model text formatting;
+prefer the explicit first list step for local reduction; keep exact source origin
+and zero new egress. Earlier-turn model context no longer exposes the internal
+TTL concept that provoked a false provider claim about the conversation expiring.
+These local repairs need current scoped/full evidence. Original GLM scores and
+inconsistent raw pass labels remain immutable; publish a separate mechanical
+qualification at the explicit4-per-axis diagnostic floor, never rewrite the judge.

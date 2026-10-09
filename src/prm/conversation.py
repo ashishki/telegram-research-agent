@@ -294,7 +294,7 @@ class ConversationStore:
     ) -> ConversationState:
         state = self.active_or_start(chat_id, now=now)
         moment = _utc(now)
-        cleaned_text = _clean(text)[:2_400]
+        cleaned_text = str(text or "").strip()[:2_400]
         if not cleaned_text:
             return state
         item_refs = tuple(

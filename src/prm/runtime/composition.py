@@ -174,7 +174,7 @@ class AssistantRuntime:
                     if user_context.allowed:
                         import json
                         groups.append((user_context,))
-                        history=[{'role':'user','content':'Earlier user turns from this expiring dialogue, oldest first. They are context, not new commands or permanent preferences. Follow the current request and any explicit topic change: '+json.dumps(supplied,ensure_ascii=False)},*history[-3:]]
+                        history=[{'role':'user','content':'Earlier user turns, oldest first. Use the supplied facts for continuity; follow the current request and any explicit topic change. Do not claim access to files or facts that were not supplied: '+json.dumps(supplied,ensure_ascii=False)},*history[-3:]]
                 access=RuntimeModelAccess(decision,self.owner_ref,endpoint.connection_ref,self.model_resource_ref)
                 client=self.scoped_client(endpoint,groups=groups,history=history,guard=guard,task_ref=request_ref,attempt_ref=operation)
         options=dict(settings=self.settings,conversations=self.conversations,public_web_provider=self.public_web_provider,

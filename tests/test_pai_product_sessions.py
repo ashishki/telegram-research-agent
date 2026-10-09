@@ -36,7 +36,8 @@ def test_chat_recall_through_worker_does_not_read_curated_memory_or_overflow(pai
     assert len([row for row in pai.requests if row[0]=='model'])==1
 
 
-def test_large_verified_result_is_losslessly_chunked_and_scope_projection_preserved(pai):
+@pytest.mark.parametrize('deleted_parent',['response','main_result'])
+def test_large_verified_result_is_losslessly_chunked_and_scope_projection_preserved(pai,deleted_parent):
     from prm.runtime.result_payloads import bounded_result_record, resolve_result_payload
     root=pai.root;store=root.queue.store
     item=store.put(root.owner_ref,'conversation','input_large_eval',{'query':'Synthetic large verified result'},expected_version=0)
@@ -62,6 +63,10 @@ def test_large_verified_result_is_losslessly_chunked_and_scope_projection_preser
     changed=json.loads(json.dumps(compact));changed['payload']['payload_storage']['sha256']='0'*64
     with pytest.raises(StorageError):resolve_result_payload(store,owner=root.owner_ref,record=changed)
     from prm.runtime.deletion import delete_derived_in
+    with store.transaction() as tx:
+        removed_source=delete_derived_in(tx,owner=root.owner_ref,namespace='result',object_ref=visible.object_refs[0].response_ref if deleted_parent=='response' else 'result_'+lease.job_id)
+    assert removed_source['deleted_refs']>=len(compact['payload']['payload_storage']['chunk_refs'])+(2 if deleted_parent=='response' else 1)
+    with pytest.raises(StorageError):resolve_result_payload(store,owner=root.owner_ref,record=compact)
     with store.transaction() as tx:
         deleted=delete_derived_in(tx,owner=root.owner_ref,namespace='conversation',object_ref=item.object_id)
     assert deleted['deleted_refs']>=len(compact['payload']['payload_storage']['chunk_refs'])+2
@@ -182,6 +187,19 @@ def test_shortening_numbered_answer_keeps_actual_step_and_never_calls_model(pai)
 def test_chat_display_preserves_bullet_and_paragraph_structure():
     from prm.application import _clean_model_answer
     assert _clean_model_answer('  1. Первый пункт\n2. Второй пункт\n\nПоследний абзац.  ')== '1. Первый пункт\n2. Второй пункт\n\nПоследний абзац.'
+    assert _clean_model_answer('```python\ndef test_example():\n    assert 2 + 3 == 5\n```')=='```python\ndef test_example():\n    assert 2 + 3 == 5\n```'
+    from prm.conversation import ConversationStore
+    code='```python\ndef test_example():\n    assert 2 + 3 == 5\n```'
+    assert ConversationStore().record_response('42',text=code).object_refs[0].display_text==code
+
+
+def test_shortening_uses_the_supplied_step_instead_of_a_model_preamble(pai):
+    root=pai.root
+    state=root.conversations.record_response('42',text='Мне не видны файлы твоего проекта.\n\n1. **Выбери простую функцию для первого теста.** Начни с проверки ожидаемого результата.\n2. Запусти pytest.')
+    root.conversations.record_origin(state.object_refs[0].response_ref,('model_generated',))
+    result=request(pai,49300,'Сделай короче')[1]
+    assert result['text']=='**Выбери простую функцию для первого теста.**'
+    assert not [row for row in pai.requests if row[0]=='model']
 
 
 def test_fixed_a4_pdf_layout_does_not_inherit_streaming_page_margins():

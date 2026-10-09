@@ -694,3 +694,17 @@ Latest repaired scoped64/154.56s and registration/bridge39/1.56s are real passes
 final complete active tiers and independent advisory session judge remain to finish.
 GCN read-only concept provenance and exact limitations are recorded, no borrowed
 production/domain acceptance or post-Telegram promotion claimed.
+
+Independent engineering call112 allocated: one scoped repaired-runtime safety check at cbab0fbf005754884422c3c372373d6b23748bbf; not the superseded programme/design batch112. Public code/synthetic only,GLM5.3/max, one call/no retry. Product-session judge has a separate advisory workload count.
+
+Actual engineering112: GLM5.3/max,481.525s,usage48116/26566/74682, STOP/P1
+atcbab0fb. One genuine split-result deletion-lineage regression found; original
+independent report and actual failing source-deletion test preserved. Fix binds
+chunks to main result/response parents under shared lock with tombstone/source
+checks. Two deletion cases passed10.85s; exact113 independent closure required.
+Fullcbab0fb PAI357 passed1025.71s with69 IDs/10 scenarios, zero skips/failures;
+PRM736/138.38s and retrofit150/10.89s. This full green suite did not catch the P1.
+Actual advisory session judge GLM5.3/max478.329s usage7313/31202/38515:6 full
+sessions24 turns; raw pass labels inconsistent with floor, only3/6 meet4 on all
+axes. Preserve both original labels and derived qualification. Actual vision
+DeepSeek21.834s usage5068/4462/9530:warn, pagination/mobile3; known P2s retained.

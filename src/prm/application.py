@@ -1818,6 +1818,8 @@ def _shorten_visible_response(text: str) -> str:
     clean = " ".join(str(text or "").split())
     if not clean:
         return "Для сокращения сначала нужен видимый ответ."
+    step=re.search(r'(?m)^\s*(?:\d+[.)]|[-•])\s+(.+)',str(text or ''))
+    if step:clean=" ".join(step.group(1).split())
     for boundary in re.finditer(r'[.!?](?:\*\*)?\s+',clean):
         # An ordered-list marker such as "1." is not a sentence.
         if re.search(r'[A-Za-zА-Яа-яЁё]',clean[:boundary.start()]):
@@ -1826,7 +1828,7 @@ def _shorten_visible_response(text: str) -> str:
 
 
 def _clean_model_answer(value: object) -> str:
-    return "\n".join(" ".join(line.split()) for line in str(value or "").strip().splitlines())[:2_400]
+    return "\n".join(line.rstrip() for line in str(value or "").strip().splitlines())[:2_400]
 
 
 def _env_enabled(name: str) -> bool:

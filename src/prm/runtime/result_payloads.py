@@ -43,6 +43,14 @@ def bounded_result_record(queue, lease, record):
         from .deletion import lineage_lock
         lineage_lock(tx.conn,lease.owner)
         queue._fenced(tx, lease)
+        result_ref='result_'+lease.job_id
+        if tx._deleted(lease.owner,'result',result_ref):
+            raise StorageError('result was deleted before diagnostic storage')
+        parents=list(payload.get('conversation',{}).get('response_refs',()))+list(record.get('evidence_refs',()))
+        if len(parents)>32:raise StorageError('bounded result dependencies required')
+        for parent in set(parents):
+            if tx.get(lease.owner,'result',parent) is None:
+                raise StorageError('diagnostic result source was deleted')
         for index, (ref, piece) in enumerate(zip(refs, pieces)):
             value = {'schema_version': 1, 'index': index, 'sha256': digest,
                      'input_ref': manifest['input_ref'],
@@ -55,6 +63,9 @@ def bounded_result_record(queue, lease, record):
             if tx.conn.execute("SELECT to_regclass('pa_memory.dependencies') AS meta").fetchone()['meta'] is not None:
                 tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',
                     (lease.owner, lease.payload['input_namespace'], lease.payload['input_ref'], 'result', ref))
+                for parent in set([result_ref,*parents]):
+                    tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',
+                        (lease.owner,'result',parent,'result',ref))
     return result
 
 
