@@ -49,6 +49,19 @@ provider, production, background job, service, timer or release authority.
 The recorded current selection is checked before credentials/provider calls and
 when consuming tooling/phase records; mixed-model phase sets cannot aggregate.
 
+The later owner correction on 2026-10-09 was “нет, делай макс, неп роблема”.
+Fresh GLM reviews should explicitly request reasoning_effort=max; no low/high
+substitution or disabled-thinking field. Z.ai documents max as GLM-5.3's default
+and reasoning as always enabled (https://docs.z.ai/guides/llm/glm-5.3).
+OpenCode Go forwarding/actual effort is unverified; requested max never becomes
+observed max without provider telemetry. Audit78 actually returned model glm-5.3
+and finish_reason=length at16000 output, without a verdict; preserve that failure.
+The CLI supports larger GLM output caps64000/128000, but requests above16000
+require separately recorded per_call_output_authority and the configured maximum
+before credentials. That numerical choice is pending; max reasoning alone does
+not raise it. Legacy Mimo remains capped at16000. Larger GLM streams have a64MiB
+wire bound; final text1MiB, event64KiB, deadline/no-retry/private exclusions persist.
+
 ## Roles, runners and receipt compatibility
 
 | Role | Required route/evidence | Current integration |

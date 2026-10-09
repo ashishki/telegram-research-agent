@@ -1,14 +1,14 @@
 {
   "schema_version": 1,
-  "status": "glm_cutover_local_verified_audit78_preflight_blocked_no_provider_call",
-  "current_approved_call_cap": 86,
-  "calls_consumed_including_failures": 77,
+  "status": "explicit_glm_max_prepared_larger_output_decision_pending",
+  "current_approved_call_cap": 87,
+  "calls_consumed_including_failures": 78,
   "proposed_total_cap": 34,
   "new_calls_maximum": 3,
   "third_call": "only if an actual new finding needs independent recheck",
   "provider": "opencode_go",
   "model": "glm-5.3",
-  "mode": "fresh read-only; provider-default reasoning; strict JSON schema; no model fallback",
+  "mode": "fresh read-only; explicitly requested GLM max reasoning; strict JSON schema; no retry/model fallback",
   "per_call_output_tokens_maximum": 16000,
   "per_call_timeout_seconds_maximum": 900,
   "source_exclusions": [
@@ -1894,49 +1894,49 @@
   },
   "native_design_allocations": [
     {
-      "call_number": 79,
-      "role": "program_design_review",
-      "slice_group": "foundation",
-      "status": "blocked_current_tooling_gate_not_invoked"
-    },
-    {
       "call_number": 80,
       "role": "program_design_review",
-      "slice_group": "product",
+      "slice_group": "foundation",
       "status": "blocked_current_tooling_gate_not_invoked"
     },
     {
       "call_number": 81,
       "role": "program_design_review",
-      "slice_group": "sources",
+      "slice_group": "product",
       "status": "blocked_current_tooling_gate_not_invoked"
     },
     {
       "call_number": 82,
       "role": "program_design_review",
-      "slice_group": "completeness",
+      "slice_group": "sources",
       "status": "blocked_current_tooling_gate_not_invoked"
     },
     {
       "call_number": 83,
-      "role": "product_design_review",
-      "slice_group": "foundation",
+      "role": "program_design_review",
+      "slice_group": "completeness",
       "status": "blocked_current_tooling_gate_not_invoked"
     },
     {
       "call_number": 84,
       "role": "product_design_review",
-      "slice_group": "product",
+      "slice_group": "foundation",
       "status": "blocked_current_tooling_gate_not_invoked"
     },
     {
       "call_number": 85,
       "role": "product_design_review",
-      "slice_group": "sources",
+      "slice_group": "product",
       "status": "blocked_current_tooling_gate_not_invoked"
     },
     {
       "call_number": 86,
+      "role": "product_design_review",
+      "slice_group": "sources",
+      "status": "blocked_current_tooling_gate_not_invoked"
+    },
+    {
+      "call_number": 87,
       "role": "product_design_review",
       "slice_group": "completeness",
       "status": "blocked_current_tooling_gate_not_invoked"
@@ -2021,7 +2021,7 @@
   },
   "native_tooling_recheck_78": {
     "call_number": 78,
-    "status": "blocked_commit_required_not_invoked",
+    "status": "native_tooling_no_valid_verdict_length",
     "model": "glm-5.3",
     "purpose": "first independently authorized GLM audit of reviewer model cutover",
     "output_cap": 16000,
@@ -2033,5 +2033,35 @@
     "provider_call_attempted": false,
     "paid_calls_consumed": 0,
     "reason": "dirty reviewer inputs cannot match committed HEAD; .git currently read-only"
+  },
+  "reviewer_effort_authority": {
+    "date": "2026-10-09",
+    "owner_message": "нет, делай макс, неп роблема",
+    "provider": "opencode_go",
+    "model": "glm-5.3",
+    "requested_effort": "max",
+    "decision_ref": "docs/verification/PAI-native-tooling-78-response.md",
+    "output_cap_extension": false
+  },
+  "native_tooling_recheck_79": {
+    "call_number": 79,
+    "status": "prepared_output_cap_decision_pending_not_invoked",
+    "model": "glm-5.3",
+    "requested_effort": "max",
+    "purpose": "fresh tooling audit of explicit max and separately authorized output bounds",
+    "output_cap": null,
+    "timeout": 900
+  },
+  "proposed_per_call_output_extension": {
+    "choices": [
+      64000,
+      128000
+    ],
+    "current_maximum": 16000,
+    "status": "owner_numerical_choice_pending",
+    "requested_effort": "max",
+    "provider": "opencode_go",
+    "model": "glm-5.3",
+    "automatic_retry": false
   }
 }

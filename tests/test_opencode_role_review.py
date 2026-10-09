@@ -969,6 +969,113 @@ def test_glm_transport_keeps_native_metadata_and_omits_mimo_thinking_parameter(m
     assert len(captured)==1
 
 
+@pytest.mark.parametrize('finish', ['stop', 'length'])
+def test_glm_max_effort_reaches_wire_and_never_fabricates_observed_effort(tmp_path, monkeypatch, finish):
+    real_transport = mimo_code_review._call_model
+    args, calls, records = setup_run(tmp_path, monkeypatch)
+    select_glm_fixture(tmp_path, args)
+    args.reasoning_effort = 'max'
+    captured = []
+    def open_fake(request, timeout):
+        captured.append(json.loads(request.data))
+        return stream_response([
+            stream_event({'reasoning_content': 'synthetic hidden reasoning'}, model='glm-5.3'),
+            stream_event({'content': response()['choices'][0]['message']['content']}, model='glm-5.3'),
+            stream_event(finish=finish, model='glm-5.3'), '[DONE]'])
+    monkeypatch.setattr(mimo_code_review, 'urlopen', open_fake)
+    monkeypatch.setattr(mimo_code_review, '_call_model', real_transport)
+    if finish == 'length':
+        with pytest.raises(review.ReviewBlocked, match='incomplete reviewer response'):
+            review.execute(args)
+        evidence = json.loads(next((tmp_path/'.playbook-artifacts/opencode-runs').glob('*/failure.json')).read_text())
+        assert records == [] and evidence['finish_reason'] == 'length'
+        assert not list((tmp_path/'.playbook-artifacts/opencode-runs').glob('*/result.json'))
+    else:
+        assert review.execute(args) == 0
+        evidence = json.loads(next((tmp_path/'.playbook-artifacts/opencode-runs').glob('*/result.json')).read_text())
+        assert evidence['observed_effort'] == 'unknown'
+        assert len(records) == 1
+    assert evidence['requested_effort'] == 'max'
+    assert evidence['observed_model'] == 'glm-5.3'
+    assert len(captured) == 1 and captured[0]['reasoning_effort'] == 'max'
+    assert 'thinking' not in captured[0]
+    assert all('synthetic hidden reasoning' not in p.read_text() for p in (tmp_path/'.playbook-artifacts').rglob('*') if p.is_file())
+
+
+@pytest.mark.parametrize('effort,model', [('low','glm-5.3'), ('high','glm-5.3'), ('max','mimo-v2.6-pro')])
+def test_unrequested_effort_modes_are_denied_before_keys_and_transport(tmp_path, monkeypatch, effort, model):
+    real_transport = mimo_code_review._call_model
+    args, calls, records = setup_run(tmp_path, monkeypatch)
+    if model == 'glm-5.3': select_glm_fixture(tmp_path, args)
+    args.reasoning_effort = effort
+    with pytest.raises(review.ReviewBlocked, match='reasoning effort outside'):
+        review.execute(args)
+    assert calls == [] and records == []
+    with pytest.raises(ValueError, match='invalid_review_reasoning_effort'):
+        real_transport(api_key='synthetic', base_url='https://opencode.ai/zen/go/v1',
+            model=model, prompt='synthetic', timeout=30, reasoning_effort=effort)
+    assert calls == []
+
+
+@pytest.mark.parametrize('cap', [64000, 128000])
+@pytest.mark.parametrize('authority', ['old_cap', 'missing_output_authority', 'approved'])
+def test_larger_glm_output_needs_separate_authority_before_credentials(tmp_path, monkeypatch, cap, authority):
+    args, calls, records = setup_run(tmp_path, monkeypatch)
+    select_glm_fixture(tmp_path, args)
+    args.output_token_cap = cap
+    args.reasoning_effort = 'max'
+    budget = tmp_path/'docs/verification/PAI-next-review-packets.json'
+    data = json.loads(budget.read_text())
+    if authority != 'old_cap': data['per_call_output_tokens_maximum'] = cap
+    if authority == 'approved':
+        data['per_call_output_authority'] = {'owner_message': 'synthetic explicit cap decision',
+            'provider': 'opencode_go', 'model': 'glm-5.3', 'maximum_tokens': cap}
+    budget.write_text(json.dumps(data))
+    def provider(**kwargs):
+        calls.append(kwargs)
+        result = response(); result['model'] = 'glm-5.3'; return result
+    monkeypatch.setattr(mimo_code_review, '_call_model', provider)
+    if authority != 'approved':
+        with pytest.raises(review.ReviewBlocked): review.execute(args)
+        assert calls == [] and records == []
+    else:
+        assert review.execute(args) == 0
+        assert calls[1]['max_output_tokens'] == cap and calls[1]['reasoning_effort'] == 'max'
+
+
+def test_extended_glm_transport_keeps_final_text_and_legacy_bounds(monkeypatch):
+    import time
+    captured = []
+    events = [stream_event({'reasoning_content': 'x' * 60000}, model='glm-5.3')] * 140
+    events += [stream_event({'content': '{}'}, model='glm-5.3'), stream_event(finish='stop', model='glm-5.3'), '[DONE]']
+    def open_fake(request, timeout):
+        captured.append(json.loads(request.data)); return stream_response(events)
+    monkeypatch.setattr(mimo_code_review, 'urlopen', open_fake)
+    result = mimo_code_review._call_model(api_key='synthetic', base_url='https://opencode.ai/zen/go/v1',
+        model='glm-5.3', prompt='synthetic', timeout=900, max_output_tokens=64000, reasoning_effort='max', stream=True)
+    assert result['choices'][0]['message']['content'] == '{}'
+    assert captured[0]['max_tokens'] == 64000 and len(captured) == 1
+    with pytest.raises(ValueError, match='invalid_review_output_bound'):
+        mimo_code_review._call_model(api_key='synthetic', base_url='https://opencode.ai/zen/go/v1',
+            model='mimo-v2.6-pro', prompt='synthetic', timeout=900, max_output_tokens=64000)
+    with pytest.raises(ValueError, match='review_response_too_large'):
+        mimo_code_review._read_review_stream(stream_response(events), 'glm-5.3', time.monotonic() + 900)
+    with pytest.raises(ValueError, match='review_response_too_large'):
+        mimo_code_review._read_review_stream(stream_response([stream_event({'content': 'x' * 60000}, model='glm-5.3')] * 18),
+            'glm-5.3', time.monotonic() + 900, max_wire_bytes=67_108_864)
+
+
+def test_native_glm_cli_defaults_to_owner_requested_max(tmp_path, monkeypatch):
+    _, calls, _ = setup_run(tmp_path, monkeypatch)
+    select_glm_fixture(tmp_path)
+    def provider(**kwargs):
+        calls.append(kwargs); result = response(); result['model'] = 'glm-5.3'; return result
+    monkeypatch.setattr(mimo_code_review, '_call_model', provider)
+    assert review.main(['run', '--root', str(tmp_path), '--task', 'T1', '--feature-id', 'F',
+        '--role', 'program_design_review', '--model', 'glm-5.3', '--allow-provider-egress', '--call-cap', '1']) == 0
+    assert calls[1]['reasoning_effort'] == 'max'
+
+
 @pytest.mark.parametrize('mixed',[False,True])
 def test_glm_complete_record_requires_four_same_model_parts(tmp_path,monkeypatch,mixed):
     import finalize_opencode_design_reviews as complete

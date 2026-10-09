@@ -84,15 +84,19 @@ def _api_key(explicit_file: str) -> str:
 def _call_model(*, api_key: str, base_url: str, model: str, prompt: str, timeout: int,
                 max_output_tokens: int = 8000, response_schema: dict | None = None,
                 session_id: str | None = None, stream: bool = False,
-                thinking_disabled: bool = False) -> dict[str, Any]:
+                thinking_disabled: bool = False,
+                reasoning_effort: str | None = None) -> dict[str, Any]:
     if base_url.rstrip('/')!='https://opencode.ai/zen/go/v1' or model not in SUPPORTED_REVIEW_MODELS:
         raise ValueError('outside_authorized_review_provider')
-    if type(max_output_tokens) is not int or not 1 <= max_output_tokens <= 16000:
+    output_limit = 128000 if model == CURRENT_REVIEW_MODEL else 16000
+    if type(max_output_tokens) is not int or not 1 <= max_output_tokens <= output_limit:
         raise ValueError("invalid_review_output_bound")
     if type(thinking_disabled) is not bool:
         raise ValueError("invalid_review_thinking_mode")
     if thinking_disabled and model!='mimo-v2.6-pro':
         raise ValueError("invalid_review_thinking_mode")
+    if reasoning_effort is not None and (model != CURRENT_REVIEW_MODEL or reasoning_effort != 'max' or thinking_disabled):
+        raise ValueError("invalid_review_reasoning_effort")
     body = {
         "model": model,
         "messages": [
@@ -112,6 +116,7 @@ def _call_model(*, api_key: str, base_url: str, model: str, prompt: str, timeout
     if stream:
         body.update(stream=True, stream_options={"include_usage": True})
     if thinking_disabled:body['thinking']={'type':'disabled'}
+    if reasoning_effort is not None:body['reasoning_effort']=reasoning_effort
     request = Request(
         f"{base_url.rstrip('/')}/chat/completions",
         data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
@@ -126,14 +131,15 @@ def _call_model(*, api_key: str, base_url: str, model: str, prompt: str, timeout
     deadline = time.monotonic() + max(30, timeout)
     with urlopen(request, timeout=max(30, timeout)) as response:  # nosec B310
         if stream:
-            return _read_review_stream(response, model, deadline)
+            return _read_review_stream(response, model, deadline,
+                max_wire_bytes=67_108_864 if max_output_tokens > 16000 else 8_388_608)
         raw = response.read(1_048_577)
         if len(raw) > 1_048_576:
             raise ValueError("review_response_too_large")
         return json.loads(raw)
 
 
-def _read_review_stream(response, model: str, deadline: float) -> dict[str, Any]:
+def _read_review_stream(response, model: str, deadline: float, *, max_wire_bytes: int = 8_388_608) -> dict[str, Any]:
     """Bound SSE wire bytes/time; retain final text/usage, discard reasoning."""
     wire_bytes, text_bytes, content, finish, usage = 0, 0, [], None, None
     observed_model=None
@@ -147,7 +153,7 @@ def _read_review_stream(response, model: str, deadline: float) -> dict[str, Any]
         sock.settimeout(remaining)
         # SSE repeats JSON metadata for every chunk; its wire envelope is
         # larger than the same bounded final answer in one JSON response.
-        line = response.readline(min(65_537, 8_388_609 - wire_bytes))
+        line = response.readline(min(65_537, max_wire_bytes + 1 - wire_bytes))
         if not line:
             error = ValueError("review_stream_incomplete")
             error.review_stream_state = {"wire_bytes": wire_bytes, "final_text_bytes": text_bytes,
@@ -157,7 +163,7 @@ def _read_review_stream(response, model: str, deadline: float) -> dict[str, Any]
         wire_bytes += len(line)
         if time.monotonic() > deadline:
             raise TimeoutError("review_stream_deadline")
-        if wire_bytes > 8_388_608 or len(line) > 65_536:
+        if wire_bytes > max_wire_bytes or len(line) > 65_536:
             raise ValueError("review_response_too_large")
         line = line.strip()
         if not line or line.startswith(b":"):

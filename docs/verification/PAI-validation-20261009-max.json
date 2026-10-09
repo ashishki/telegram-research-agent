@@ -1,0 +1,141 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-09",
+  "status": "explicit_max_locally_verified_output_authority_pending",
+  "base_commit": "1719bb7c06eaa1dc9d6ddfb2d7390c4535984f0c",
+  "changed_files": [
+    "docs/CODEX_PROMPT.md",
+    "docs/REVIEW_POLICY.md",
+    "docs/verification/PAI-native-tooling-78-response.md",
+    "docs/verification/PAI-next-review-packets.json",
+    "docs/verification/PAI-progress.md",
+    "docs/verification/PAI-release-candidate.json",
+    "docs/verification/PAI-release-candidate.md",
+    "docs/verification/PAI-review-continuation-78.json",
+    "docs/verification/PAI-validation-20261009-max.json",
+    "tests/test_opencode_role_review.py",
+    "tools/mimo_code_review.py",
+    "tools/opencode_role_review.py"
+  ],
+  "source_hashes": [
+    {
+      "path": "tools/mimo_code_review.py",
+      "sha256": "33b8fd9de1521d34cb5b00a993b87be1aeae6c89c2318bd519e87db97590fac2",
+      "bytes": 17127
+    },
+    {
+      "path": "tools/opencode_role_review.py",
+      "sha256": "74370b6a4acf4f17f49dc4c2ec2386a576b21e415e717dd6bdd028265e658eb2",
+      "bytes": 39484
+    },
+    {
+      "path": "tests/test_opencode_role_review.py",
+      "sha256": "79a7f92a9a16c27995fe7f6ab6c7a706ff41b78dabd663832276961fea23dd1f",
+      "bytes": 64192
+    },
+    {
+      "path": "docs/REVIEW_POLICY.md",
+      "sha256": "10287b0aae317a09e0df891af047fa3c4b4b92a35dc22f4feed585d3298a285e",
+      "bytes": 10321
+    }
+  ],
+  "initial_failure": {
+    "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python -m pytest -q tests/test_opencode_role_review.py tests/test_pai_acceptance_guard.py tests/test_playbook_bridge.py tests/test_pai_plan.py",
+    "exit_code": 1,
+    "result": "3 failed,137 passed in7.71s",
+    "evidence": "observed unified-exec output; no original log file retained",
+    "tests": "test_unrequested_effort_modes_are_denied_before_keys_and_transport[low-glm-5.3], [high-glm-5.3], [max-mimo-v2.6-pro]",
+    "cause": "Fixture replaced _call_model; negative transport assertions called the synthetic provider. Capture the real transport before setup_run. Guards/assertions unchanged."
+  },
+  "checks": [
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python -m pytest -q tests/test_opencode_role_review.py tests/test_pai_acceptance_guard.py tests/test_playbook_bridge.py tests/test_pai_plan.py",
+      "exit_code": 0,
+      "result": "140 passed in 8.48s",
+      "log_path": ".playbook-artifacts/pai-validation-20261009-max/final-max.log",
+      "log_sha256": "97c00e6ae666d60b95dd81f9046d6dc233f1353027bab5669168b65c910f23f6"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python -m pytest -q tests/test_opencode_role_review.py tests/test_pai_acceptance_guard.py tests/test_playbook_bridge.py tests/test_pai_plan.py",
+      "exit_code": 0,
+      "result": "147 passed in 7.85s",
+      "log_path": ".playbook-artifacts/pai-validation-20261009-max/final-cap.log",
+      "log_sha256": "732e9aa8ce0fa03f1db627c71e65e7921330d034a2bdf062bd1b39128dd452a2"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python -m pytest -q tests/test_opencode_role_review.py tests/test_pai_acceptance_guard.py tests/test_playbook_bridge.py tests/test_pai_plan.py",
+      "exit_code": 0,
+      "result": "147 passed in 6.41s",
+      "log_path": ".playbook-artifacts/pai-validation-20261009-max/final.log",
+      "log_sha256": "7f946153de9cd12ab318084b5ce60c8b49d239c6726402207b8d226407b06502"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python -m pytest -q tests/test_opencode_role_review.py tests/test_pai_acceptance_guard.py tests/test_playbook_bridge.py tests/test_pai_plan.py",
+      "exit_code": 0,
+      "result": "148 passed in 8.79s",
+      "log_path": ".playbook-artifacts/pai-validation-20261009-max/final-default-max.log",
+      "log_sha256": "866adbc35afa134d15c642a0be0ffd235627c4aa5bc2d42947e6fa6a83486bb7"
+    }
+  ],
+  "planning": {
+    "pin_command": ".venv-pai/bin/python tools/playbook.py --check-pin",
+    "pin_exit_code": 0,
+    "plan_command": ".venv-pai/bin/python tools/check_pai_plan.py",
+    "plan_exit_code": 0,
+    "result": "32 packets/69 exact requirement IDs/ten mandatory scenarios; draft, conditional30/31 test files absent; no acceptance inferred"
+  },
+  "prepare_only": {
+    "status": "prepared_only",
+    "bytes": 196629,
+    "input_sha256": "381f08515db452a261791f7ce69d02fcfaa51414fabe09528e3c2f23e3bdd2a0",
+    "planning_gate": null,
+    "provider_call": false
+  },
+  "actual_audit78": {
+    "receipt_ref": "docs/verification/PAI-review-continuation-78.json",
+    "reviewed_commit": "1719bb7c06eaa1dc9d6ddfb2d7390c4535984f0c",
+    "exit_code": 2,
+    "duration_seconds": 238.047,
+    "requested_model": "glm-5.3",
+    "observed_model": "glm-5.3",
+    "requested_effort": "not_requested",
+    "observed_effort": "unknown",
+    "finish_reason": "length",
+    "usage": {
+      "prompt_tokens": 43859,
+      "completion_tokens": 16000,
+      "total_tokens": 59859
+    },
+    "verdict": null,
+    "cost": "unknown"
+  },
+  "reviewer_effort_decision": {
+    "owner_message": "нет, делай макс, неп роблема",
+    "requested_effort": "max",
+    "observed_effort": "unknown",
+    "parameter_docs": "https://docs.z.ai/guides/llm/glm-5.3",
+    "go_docs": "https://docs.opencode.ai/docs/go/",
+    "go_forwarding_verified": false
+  },
+  "next_request": {
+    "call_number": 79,
+    "status": "not_invoked",
+    "requested_effort": "max",
+    "output_cap": "owner_numerical_choice_pending",
+    "timeout_seconds": 900,
+    "call_cap": 1
+  },
+  "calls_consumed_including_failures": 78,
+  "human_design_approval": false,
+  "tooling_independent_acceptance": false,
+  "remaining_gates": [
+    "actual numerical output choice",
+    "committed source for fresh audit79",
+    "complete accepted independent tooling audit",
+    "four genuine phase parts per program/product role",
+    "human exact design approval",
+    "governed other role adapters",
+    "live/private/product-provider/production/services/timers/release authority"
+  ],
+  "next_command": "Record actual numerical output answer; commit exact scoped inputs; execute one native audit79 with --reasoning-effort max and that --output-token-cap; key location already owner-authorized."
+}

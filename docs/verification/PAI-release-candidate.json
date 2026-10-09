@@ -1712,7 +1712,7 @@
     "program_design_review": "pending_native_complete_aggregation",
     "product_design_review": "pending_native_complete_aggregation",
     "slice_test_critic_privacy_maintainability": "non-Codex governed adapter/receipts remain pending; advisory source rechecks are not substituted",
-    "tooling": "GLM replacement owner-authorized20261009; local cutover135 tests passed; audit78 preflight blocked on uncommitted inputs in read-only Git session, no API call or verdict"
+    "tooling": "GLM audit78 at1719bb7 attempted: observed glm-5.3, length at16000 output, no verdict. Explicit owner-requested max and larger-cap authority guard locally prepared; fresh audit79 not invoked, numerical output choice pending."
   },
   "live_provider_evidence": false,
   "human_design_approval": false,
@@ -2057,5 +2057,13 @@
       }
     ],
     "result": "135 passed8.12s; unchanged provider/data/per-call bounds; actual GLM integration unverified"
+  },
+  "continuation_20261009_max": {
+    "reviewed_head": "1719bb7c06eaa1dc9d6ddfb2d7390c4535984f0c",
+    "review_ref": "docs/verification/PAI-review-continuation-78.json",
+    "tooling_gate": "closed_no_complete_verdict",
+    "calls_consumed": 78,
+    "human_design_approval": false,
+    "output_limit_decision": "pending"
   }
 }

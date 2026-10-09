@@ -139,6 +139,13 @@ def extended_review_authority(root,args,output_cap):
             or args.timeout_seconds>record.get('per_call_timeout_seconds_maximum',0)
             or output_cap>record.get('per_call_output_tokens_maximum',0)):
             raise ReviewBlocked('extended review authority missing or outside scope')
+        if output_cap > 16000:
+            output_authority = record.get('per_call_output_authority')
+            if (not isinstance(output_authority, dict) or not output_authority.get('owner_message')
+                or output_authority.get('model') != args.model or output_authority.get('provider') != 'opencode_go'
+                or type(output_authority.get('maximum_tokens')) is not int
+                or output_authority['maximum_tokens'] < output_cap):
+                raise ReviewBlocked('larger output requires separately recorded owner authority')
         return {'path':str(path.relative_to(root)),'sha256':digest(raw),'authority':record['ongoing_review_budget_authority']}
     except (OSError,ValueError,TypeError):raise ReviewBlocked('extended review authority missing or outside scope') from None
 
@@ -421,9 +428,13 @@ def execute(args):
     model_authority=reviewer_model_authority(root,args.model)
     if getattr(args,'thinking_disabled',False) and args.model!='mimo-v2.6-pro':
         raise ReviewBlocked('thinking-disabled mode is supported only for historical Mimo scope')
+    effort = getattr(args, 'reasoning_effort', None)
+    if effort is not None and (args.model != CURRENT_REVIEW_MODEL or effort != 'max' or getattr(args, 'thinking_disabled', False)):
+        raise ReviewBlocked('reasoning effort outside bounded GLM review scope')
     tooling_audit_ref = None if tooling_review else require_tooling_audit(root)
     output_cap = getattr(args, "output_token_cap", 8000)
-    if output_cap not in (8000, 16000): raise ReviewBlocked("unsupported review output cap")
+    if output_cap not in (8000, 16000, 64000, 128000) or (output_cap > 16000 and args.model != CURRENT_REVIEW_MODEL):
+        raise ReviewBlocked("unsupported review output cap")
     authority=extended_review_authority(root,args,output_cap)
     dependencies=runtime_dependencies()
     if workflow.git_commit(root)!=head:raise ReviewBlocked('review HEAD changed during preparation')
@@ -449,7 +460,7 @@ def execute(args):
         "input_sha256": digest(packet.encode()), "input_bytes": len(packet.encode()),
         "call_cap": 1, "output_token_cap": output_cap, "timeout_seconds": args.timeout_seconds,
         "transport": "sse",
-        "requested_effort": "thinking_disabled" if getattr(args,'thinking_disabled',False) else "not_requested",
+        "requested_effort": effort or ("thinking_disabled" if getattr(args,'thinking_disabled',False) else "not_requested"),
         "status": "request_prepared", "cost": "unknown",
     }
     (run_dir / "attempt.json").write_text(json.dumps(request_evidence, indent=2) + "\n")
@@ -459,7 +470,8 @@ def execute(args):
                                model=args.model, prompt=packet, timeout=args.timeout_seconds,
                                max_output_tokens=output_cap, response_schema=VERDICT_SCHEMA,
                                session_id=run_id.removeprefix("opencode-"), stream=True,
-                               thinking_disabled=getattr(args,'thinking_disabled',False))
+                               thinking_disabled=getattr(args,'thinking_disabled',False),
+                               reasoning_effort=effort)
         verdict = parse_response(response, args.model)
     except Exception as exc:
         code = getattr(exc, "code", None)
@@ -477,7 +489,7 @@ def execute(args):
         if isinstance(stream_state, dict):
             failure["stream_state"] = {
                 k: stream_state[k] for k in ("wire_bytes", "final_text_bytes")
-                if type(stream_state.get(k)) is int and 0 <= stream_state[k] <= 8_388_608}
+                if type(stream_state.get(k)) is int and 0 <= stream_state[k] <= 67_108_864}
             if stream_state.get("finish_reason") in {"stop", "length", "content_filter", "tool_calls", None}:
                 failure["stream_state"]["finish_reason"] = stream_state.get("finish_reason")
             if stream_state.get("terminal_event") in {"eof", "done_without_finish"}:
@@ -572,17 +584,21 @@ def main(argv=None):
     parser.add_argument("--timeout-seconds", type=int, default=300,
                         help="up to 900 requires the owner's separately approved design/recheck scope")
     parser.add_argument("--call-cap", type=int, default=0)
-    parser.add_argument("--output-token-cap", type=int, choices=[8000, 16000], default=8000,
-                        help="16000 requires the owner's separately approved design/recheck scope")
+    parser.add_argument("--output-token-cap", type=int, choices=[8000, 16000, 64000, 128000], default=8000,
+                        help="extended caps require recorded owner scope; above 16000 requires separate output authority")
     parser.add_argument("--allow-provider-egress", action="store_true")
     parser.add_argument("--prepare-only", action="store_true")
     parser.add_argument("--tooling-review", action="store_true",
                         help="separate narrow code audit; never publishes full-design approval evidence")
     parser.add_argument('--thinking-disabled',action='store_true',
                         help='explicit bounded Mimo review mode; receipt records requested and observed effort separately')
+    parser.add_argument('--reasoning-effort', choices=['max'],
+                        help='documented GLM reasoning effort within existing bounds; observed effort remains unknown without telemetry')
     parser.add_argument("--slice-group", choices=sorted(REVIEW_GROUPS),
                         help="one phase; full-design evidence requires independent coverage of every phase")
     args = parser.parse_args(argv)
+    if args.model == CURRENT_REVIEW_MODEL and args.reasoning_effort is None:
+        args.reasoning_effort = 'max'
     try:
         if not 30 <= args.timeout_seconds <= 900:
             raise ReviewBlocked("timeout outside bounded review scope")
