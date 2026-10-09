@@ -995,6 +995,7 @@ Acceptance-Criteria:
   - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
 Verification:
   - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_connections.py tests/test_assistant_mail.py tests/test_assistant_calendar.py tests/test_assistant_egress.py
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_connections.py::test_secret_store_binding_protects_at_rest_revoke_and_export tests/test_pai_connections.py::test_same_connection_refresh_is_serialized_before_http
 Context-Refs:
   - docs/PA_IMPLEMENTATION_TASKS.md#pai-16
   - docs/design/PAI.md
@@ -1095,6 +1096,7 @@ Acceptance-Criteria:
   - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
 Verification:
   - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_action_runtime.py tests/test_assistant_actions.py tests/test_pai_delivery.py tests/test_prm_post_answer_actions.py
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_action_runtime.py::test_mail_202_and_ack_loss_need_separate_exact_reconciliation_read tests/test_pai_action_runtime.py::test_mail_reconciliation_denies_missing_oauth_scope_before_http tests/test_pai_action_runtime.py::test_mail_reconciliation_mismatched_digest_keeps_unknown
 Context-Refs:
   - docs/PA_IMPLEMENTATION_TASKS.md#pai-20
   - docs/design/PAI.md

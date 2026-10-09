@@ -77,12 +77,14 @@ class GraphTransport:
         if reservation._transport_committed:return self.registry.execute_prepared(reservation,transport)
         return self.registry.execute_reserved((reservation,),transport)
 
-    def _guarded_http(self,*,path,method,body,headers):
+    def _guarded_http(self,*,path,method,body,headers,required_oauth_scopes=()):
         with self.connections.store.transaction() as tx:
             row=tx.conn.execute('SELECT * FROM pa_connections.accounts WHERE owner=%s AND id=%s FOR UPDATE',(self.owner_ref,self.connection_ref)).fetchone()
             now=tx.conn.execute('SELECT clock_timestamp() AS now').fetchone()['now']
             if not row or row['status']!='connected' or row['account_ref']!=self.account_ref or row['expires']<=now:
                 raise CapabilityDenied('Graph connection revoked or expired')
+            if required_oauth_scopes and not set(required_oauth_scopes).intersection(row['scopes']):
+                raise CapabilityDenied('separate provider evidence read scope required')
             token=self.connections.vault.get(row['secret_ref'])['access_token']
             data=None if body is None else json.dumps(body,ensure_ascii=False).encode()
             if data is not None and len(data)>64000:raise StorageError('Graph request exceeds bound')

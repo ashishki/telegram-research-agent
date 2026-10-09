@@ -1,0 +1,174 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-09",
+  "base_commit": "1fd24528c36f746186045e9a5e051a5027e94a9d",
+  "status": "actual105_p1_local_response_verified_independent107_required",
+  "checks": [
+    {
+      "argv": [
+        ".venv-pai/bin/python",
+        "tools/run_pai_acceptance.py",
+        "-q",
+        "tests/test_pai_connections.py",
+        "tests/test_pai_action_runtime.py"
+      ],
+      "environment": {
+        "PYTHONPATH": "src",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"
+      },
+      "exit_code": 0,
+      "result": "13 passed in 52.31s; zero skips/failures",
+      "log_path": ".playbook-artifacts/pai-validation-20261009-105/targeted.log",
+      "log_sha256": "f2d012fc08a5cb7131644f774d5e96c1753c301ac9d282385bdb52ebb8aca1a7"
+    },
+    {
+      "argv": [
+        ".venv-pai/bin/python",
+        "tools/run_pai_acceptance.py",
+        "-q",
+        "tests/test_pai_connections.py",
+        "tests/test_pai_action_runtime.py",
+        "tests/test_assistant_mail.py",
+        "tests/test_assistant_calendar.py",
+        "tests/test_assistant_egress.py",
+        "tests/test_assistant_actions.py",
+        "tests/test_pai_delivery.py",
+        "tests/test_prm_post_answer_actions.py",
+        "tests/test_pai_graph_mail.py",
+        "tests/test_pai_schedule_runtime.py",
+        "tests/test_pai_end_to_end.py",
+        "tests/test_pai_durable_actions.py"
+      ],
+      "environment": {
+        "PYTHONPATH": "src",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"
+      },
+      "exit_code": 0,
+      "result": "163 passed in 220.21s; zero skips/failures",
+      "log_path": ".playbook-artifacts/pai-validation-20261009-105/affected.log",
+      "log_sha256": "ff57aa32b1cc55b269e8794f2657c13b4caebeacbdfe16d14a3d8c96611eaf5e"
+    },
+    {
+      "argv": [
+        ".venv-pai/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_pai_plan.py",
+        "tests/test_playbook_bridge.py"
+      ],
+      "environment": {
+        "PYTHONPATH": "src",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"
+      },
+      "exit_code": 0,
+      "result": "48 passed in 3.10s",
+      "log_path": ".playbook-artifacts/pai-validation-20261009-105/plan-final.log",
+      "log_sha256": "dd4745d4333c838b5b967d34695ad58b2da74b3e724d84009b4bc8bffcfc5f49"
+    },
+    {
+      "argv": [
+        ".venv-pai/bin/python",
+        "tools/playbook.py",
+        "--check-pin"
+      ],
+      "exit_code": 0,
+      "result": "Playbook pin verified; no model, hook or application runtime enabled.",
+      "log_path": ".playbook-artifacts/pai-validation-20261009-105/pin.log",
+      "log_sha256": "a0bbdfed39cb015f3a6cad3c4c848a2ca577566ca3bc06104a9d61639e50d0c0"
+    },
+    {
+      "argv": [
+        ".venv-pai/bin/python",
+        "tools/check_pai_plan.py"
+      ],
+      "exit_code": 0,
+      "result": "PAI plan: 32 registered packets; dependency/acceptance/PA coverage and pinned schema checks passed.\nSpec coverage: 69 exact requirement IDs, 10 mandatory scenarios; planned evidence is not a PASS.\nDesign state: draft; 2 planned test files absent; no product/review/human/live claim.",
+      "log_path": ".playbook-artifacts/pai-validation-20261009-105/matrix.log",
+      "log_sha256": "3ac8f22e48d470d88352af228e77b3edaba0f68bb886426d78cfa2f534c79c0a"
+    },
+    {
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "result": "",
+      "log_path": ".playbook-artifacts/pai-validation-20261009-105/diff.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "changed_files": [
+    "docs/CODEX_PROMPT.md",
+    "docs/adr/ADR-013-pa-durable-runtime.md",
+    "docs/design/PAI.design.json",
+    "docs/design/PAI.md",
+    "docs/design/PAI.requirements.json",
+    "docs/tasks.md",
+    "docs/verification/PAI-next-review-packets.json",
+    "docs/verification/PAI-progress.md",
+    "src/prm/runtime/actions.py",
+    "src/prm/runtime/connections.py",
+    "src/prm/runtime/graph.py",
+    "tests/pai_runtime_fixtures.py",
+    "tests/test_pai_action_runtime.py",
+    "tests/test_pai_connections.py"
+  ],
+  "source_hashes": [
+    {
+      "path": "docs/adr/ADR-013-pa-durable-runtime.md",
+      "sha256": "3f2d0217411375d4b2b499ab61c378d6251f47468e1548ce818a5f27049da353"
+    },
+    {
+      "path": "docs/design/PAI.design.json",
+      "sha256": "308dfe8913701b034d51b16acbdc1ef40665a49dfed8f30fa559bc7b58a714dd"
+    },
+    {
+      "path": "docs/design/PAI.md",
+      "sha256": "06d6049218738378f236dfd60033bcf587f506f73d17d7fb9b66f108d1b49c26"
+    },
+    {
+      "path": "docs/design/PAI.requirements.json",
+      "sha256": "a1f8ed85ff92ce3d7a084b40c232d39ef0352710cc53afbdaca1c4ff2b8f6d7b"
+    },
+    {
+      "path": "docs/tasks.md",
+      "sha256": "5a55dfddc1e7c25254625aad2821e2a3e746f500dbb9c0556a4e508150efc83b"
+    },
+    {
+      "path": "src/prm/runtime/actions.py",
+      "sha256": "74243e8ff6b765b86bed2d61641500eda9399e9bc0359b8d1741a571ee146752"
+    },
+    {
+      "path": "src/prm/runtime/connections.py",
+      "sha256": "187519934197712fe2b0db8edaad9dfcfaf8f5ab70a90cca70597ed0f61e8d49"
+    },
+    {
+      "path": "src/prm/runtime/graph.py",
+      "sha256": "a058982b8f0d1ef81a2534b30a7df85cff89ccca73b094e38f3803193fba8ffd"
+    },
+    {
+      "path": "tests/pai_runtime_fixtures.py",
+      "sha256": "7c07ac6a99ab7b1c84d7474871340468892692cfa7180c582b944d9cf96e81a8"
+    },
+    {
+      "path": "tests/test_pai_action_runtime.py",
+      "sha256": "519be29df4b2b64d5e7a83fdffa0f3afbeb833608a9026f5749721b610742d06"
+    },
+    {
+      "path": "tests/test_pai_connections.py",
+      "sha256": "cf53ab0bbba3dc6e6be71c4e52ba4ff28323100d1121b4232f52322767794213"
+    }
+  ],
+  "actual_current_tooling_gate": ".playbook-artifacts/opencode-runs/opencode-29055ba0d75241f78f0b87bf446b71fa/result.json",
+  "remaining_gates": [
+    "independent actual105 P1 recheck107",
+    "all current four-part product/program sets",
+    "real pinned consumers",
+    "hash-bound human design approval",
+    "other governed slice/TestCritic/privacy/maintainability roles",
+    "live/account/retention/product egress/production/timer/service/release decisions",
+    "PAI-27..29; conditional30/31 measured triggers"
+  ]
+}

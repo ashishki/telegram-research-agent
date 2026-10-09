@@ -57,6 +57,7 @@ class TokenVault:
         from cryptography.fernet import Fernet
         self._cipher=Fernet(encryption_key);self.path=Path(directory)
         if not self.path.is_absolute() or self.path.is_symlink():raise StorageError('explicit private credential directory required')
+        if self.path.resolve().is_relative_to(Path(__file__).resolve().parents[3]):raise StorageError('credential storage must remain outside application code and Git')
         self.path.mkdir(parents=True,exist_ok=True,mode=0o700);self.path=self.path.resolve();os.chmod(self.path,0o700)
     def put(self,value):
         data=json.dumps(value,ensure_ascii=False).encode()

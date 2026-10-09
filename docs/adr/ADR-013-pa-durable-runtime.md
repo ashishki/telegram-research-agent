@@ -163,7 +163,7 @@ Receipt schemas, immutable identity/hash/scope/verdict checks and tooling/design
 human separation are specified in REVIEW_POLICY.md and enforced by actual native
 consumers. Full factual bindings: docs/verification/PAI-design-evidence-bindings.md.
 
-## Current tooling audit — actual native79
+## Historical tooling audit — actual native79
 
 Actual native tooling79 completed ADVISORY on committed
 88da0f54aad02b58ec1c606e0360c47223ba34e4, after the GLM/max/output changes.
@@ -260,3 +260,66 @@ authorize changing an actual service or timer. PAI-10 owns src/prm/cli.py for
 the shared chat route. Review99's PAI-12 exact security-node suggestion remains
 an open P2: its existing scoped tests and PAI-26 scenario are not relabeled as
 that missing required node. Independent recheck must assess the updated design.
+
+# Binding secret-store and reconciliation contract — review105
+
+PAI-16 TokenVault is the existing src/prm/runtime/connections.py implementation,
+not a second credential backend. One absolute private directory outside repo/
+archive/artifacts, mode0700, random opaque sealed_* files mode0600, authenticated
+Fernet encryption with the existing46.x dependency, bounded reads/writes and
+fsync. PostgreSQL stores owner/connection/account/revision and opaque references
+only; no credential payload. Only a validated connection-row lookup may resolve
+its active reference. Key bootstrap is an explicit PAI_* vault_key_env supplied
+by the operator from separately protected service credentials; no inferred key,
+automatic disk key creation, key scans, or storing key beside ciphertext.
+Fixture keys are fresh ephemeral generated values. Live location/key owner
+and retention selections remain in the PAI-27 approved-scope gate.
+
+Refresh holds the owner/connection row, commits awaiting_refresh+monotone
+revision BEFORE endpoint I/O, then rechecks same revision/account/reference
+under lock. Concurrent refresh is refused/coalesced; timeout/worker loss requires
+interactive reconnect, never replaying old rotating refresh token. Revocation
+clears active ref and increments revision before deleting encrypted credential/
+PKCE entries; provider-wide revocation remains a separate operator/provider
+operation. Cleanup retries only unreferenced metadata and never erases a ref
+active for any owner. Physical backup erase/secure erase is not falsely promised.
+
+PAI-24/25 backup/export excludes the vault and master key; restored connection
+metadata cannot revive credentials. Restores keep egress off and require explicit
+re-auth/new scope/retention; a missing/wrong key refuses access. Rotation chooses
+reconnect with a fresh separately protected key after authorized drain/disconnect;
+no automatic decrypt/re-encrypt sweep or revived grant. Any future vault backup
+needs separate encrypted backup/retention/key authority. PAI-16 required tests
+bind ciphertext/permissions/wrong-key, revoke deletion, exclusion from frozen
+export, code-directory refusal and exact same-connection concurrent refresh.
+
+PAI-20/16 Graph sendMail202 is accepted for processing, not completed nor a
+provider message ID. request-id is tracing metadata only. The mail action stays
+unknown/pending verification until an exact separately permitted SentItems
+read finds a message ID with both x-pai-attempt and x-pai-content-digest; bounded
+no-match or missing read consent proves no absence. No automatic resend, alias,
+or refund of original attempt. Choosing write with verification must visibly
+include Mail.ReadBasic/Mail.Read and a distinct app read grant bound to
+owner/connection/resource/provider/action.reconcile. Mail.ReadBasic is the
+least-privileged listing permission per Microsoft docs; local $select limits to
+id/internetMessageHeaders, never bodies/attachments. Provider token permission
+is mailbox-wide while application selection is bounded SentItems; disclose
+this distinction. If header field access is unavailable, keep unknown and
+request explicit scoped escalation; never silently select Mail.Read.
+
+Calendar create gets provider event ID or uses transactionId under an explicitly
+permitted calendar event read; update/cancel require exact original event ID/
+version. A trace ID/absent event/changed state never proves cancellation by this
+attempt. Unknown update/cancel remain unresolved until stronger evidence is
+available. Calendar scopes and application lookup grant are separate, no new
+mail/contact scope. Required PAI-20 HTTP fixtures bind202-empty-body/trace-ID,
+ACK loss with matching evidence, read-denied zero extra GETs, revoked OAuth
+scope, no-match/collision, and no replay after success or unresolved unknown.
+
+Sources checked2026-10-09: Microsoft Graph user-sendmail/message-send/list-messages/
+message-get v1.0 and Cryptography46.0.3 Fernet official docs. These fixture and
+design contracts neither select a live provider/account nor grant production,
+service/key rotation, paid product egress, human acceptance or real integration.
+
+
+Official sources (checked2026-10-09): [Graph sendMail](https://learn.microsoft.com/en-us/graph/api/user-sendmail?view=graph-rest-1.0), [Graph message send](https://learn.microsoft.com/en-us/graph/api/message-send?view=graph-rest-1.0), [Graph list messages](https://learn.microsoft.com/en-us/graph/api/user-list-messages?view=graph-rest-1.0), [Graph get message](https://learn.microsoft.com/en-us/graph/api/message-get?view=graph-rest-1.0), [Cryptography46.0.3 Fernet](https://cryptography.io/en/46.0.3/fernet/).

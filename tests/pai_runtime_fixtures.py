@@ -46,6 +46,8 @@ def pai(tmp_path):
             if self.path.startswith('/v1.0/me/'):
                 body=json.loads(raw) if raw else {};requests.append(('write',self.path,body))
                 if body.get('message',{}).get('subject')=='Synthetic ACK-loss mail':self.close_connection=True;return
+                if self.path.endswith('/sendMail'):
+                    self.send_response(202);self.send_header('request-id','synthetic_provider_request');self.end_headers();return
                 self.reply({'id':'synthetic_event_created','changeKey':'version_1'},201 if self.path.endswith('/events') else 202);return
             if self.path=='/speech/malformed':
                 requests.append(('malformed',self.path,{}));self.reply({},200);return
@@ -66,6 +68,10 @@ def pai(tmp_path):
                 self.reply({'id':parsed.path.rsplit('/',1)[-1],'subject':'Selected body','body':{'contentType':'text','content':'Synthetic selected body.'},
                     'from':{'emailAddress':{'address':'sender@example.test'}},'receivedDateTime':moment.isoformat(),'parentFolderId':'inbox',
                     'conversationId':'conversation_synthetic','webLink':'https://outlook.example.test/selected'});return
+            if parsed.path=='/v1.0/me/mailFolders/sentitems/messages':
+                sent=[{'id':'synthetic_sent_'+str(index),'internetMessageHeaders':body['message']['internetMessageHeaders']}
+                    for index,(kind,path,body) in enumerate(requests) if kind=='write' and path.endswith('/sendMail')]
+                self.reply({'value':sent[-25:]});return
             if '/messages/delta' in parsed.path or parsed.path.endswith('/messages'):
                 page=query.get('$skiptoken',['1'])[0]
                 message={'id':'message_'+page,'subject':'Selected message '+page,'from':{'emailAddress':{'address':'sender@example.test'}},

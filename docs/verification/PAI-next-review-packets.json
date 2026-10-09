@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "status": "actual102_structural_advisory_semantic_incomplete_not_p1_closure",
-  "current_approved_call_cap": 110,
-  "calls_consumed_including_failures": 102,
+  "status": "actual105_stop_p1_local_response_pending_tests_and_recheck107",
+  "current_approved_call_cap": 114,
+  "calls_consumed_including_failures": 106,
   "proposed_total_cap": 34,
   "new_calls_maximum": 3,
   "third_call": "only if an actual new finding needs independent recheck",
@@ -1894,52 +1894,52 @@
   },
   "native_design_allocations": [
     {
-      "call_number": 103,
-      "role": "program_design_review",
-      "slice_group": "product",
-      "status": "allocated_fresh_full_review99_p1_recheck_after102_placeholder"
-    },
-    {
-      "call_number": 104,
-      "role": "program_design_review",
-      "slice_group": "foundation",
-      "status": "blocked_actual103_semantic_p1_closure"
-    },
-    {
-      "call_number": 105,
+      "call_number": 107,
       "role": "program_design_review",
       "slice_group": "sources",
-      "status": "blocked_actual103_semantic_p1_closure"
-    },
-    {
-      "call_number": 106,
-      "role": "program_design_review",
-      "slice_group": "completeness",
-      "status": "blocked_actual103_semantic_p1_closure"
-    },
-    {
-      "call_number": 107,
-      "role": "product_design_review",
-      "slice_group": "foundation",
-      "status": "blocked_actual103_semantic_p1_closure"
+      "status": "allocated_actual105_p1_independent_recheck_after_scoped_commit"
     },
     {
       "call_number": 108,
-      "role": "product_design_review",
-      "slice_group": "product",
-      "status": "blocked_actual103_semantic_p1_closure"
+      "role": "program_design_review",
+      "slice_group": "foundation",
+      "status": "blocked_actual107_p1_closure"
     },
     {
       "call_number": 109,
-      "role": "product_design_review",
-      "slice_group": "sources",
-      "status": "blocked_actual103_semantic_p1_closure"
+      "role": "program_design_review",
+      "slice_group": "product",
+      "status": "blocked_actual107_p1_closure"
     },
     {
       "call_number": 110,
+      "role": "program_design_review",
+      "slice_group": "completeness",
+      "status": "blocked_actual107_p1_closure"
+    },
+    {
+      "call_number": 111,
+      "role": "product_design_review",
+      "slice_group": "foundation",
+      "status": "blocked_actual107_p1_closure"
+    },
+    {
+      "call_number": 112,
+      "role": "product_design_review",
+      "slice_group": "product",
+      "status": "blocked_actual107_p1_closure"
+    },
+    {
+      "call_number": 113,
+      "role": "product_design_review",
+      "slice_group": "sources",
+      "status": "blocked_actual107_p1_closure"
+    },
+    {
+      "call_number": 114,
       "role": "product_design_review",
       "slice_group": "completeness",
-      "status": "blocked_actual103_semantic_p1_closure"
+      "status": "blocked_actual107_p1_closure"
     }
   ],
   "native_tooling_recheck_66": {
@@ -2569,5 +2569,71 @@
     "structural_consumer_exit": 0,
     "semantic_usable": false,
     "reason": "summary=placeholder, finding.fix=test, not_verified=[x]; no meaningful P1 disposition or scoped coverage summary. Genuine report unchanged; no P1/governed/human closure inferred."
-  }
+  },
+  "actual103_semantic_quality": {
+    "receipt_ref": "docs/verification/PAI-review-continuation-103.json",
+    "verdict": "ADVISORY",
+    "usable_full_scoped_summary": true,
+    "critical_findings": 0,
+    "open_p2_count": 4,
+    "human_approval": false
+  },
+  "native_design_allocation_history_103_106": [
+    {
+      "call_number": 103,
+      "role": "program_design_review",
+      "slice_group": "product",
+      "status": "native_design_phase_completed"
+    },
+    {
+      "call_number": 104,
+      "role": "program_design_review",
+      "slice_group": "foundation",
+      "status": "native_design_phase_completed"
+    },
+    {
+      "call_number": 105,
+      "role": "program_design_review",
+      "slice_group": "sources",
+      "status": "native_design_phase_completed"
+    },
+    {
+      "call_number": 106,
+      "role": "program_design_review",
+      "slice_group": "completeness",
+      "status": "native_design_phase_completed"
+    },
+    {
+      "call_number": 107,
+      "role": "product_design_review",
+      "slice_group": "foundation",
+      "status": "allocated_after_actual103_no_p0_p1"
+    },
+    {
+      "call_number": 108,
+      "role": "product_design_review",
+      "slice_group": "product",
+      "status": "allocated_after_actual103_no_p0_p1"
+    },
+    {
+      "call_number": 109,
+      "role": "product_design_review",
+      "slice_group": "sources",
+      "status": "allocated_after_actual103_no_p0_p1"
+    },
+    {
+      "call_number": 110,
+      "role": "product_design_review",
+      "slice_group": "completeness",
+      "status": "allocated_after_actual103_no_p0_p1"
+    }
+  ],
+  "actual106_semantic_quality": {
+    "receipt_ref": "docs/verification/PAI-review-continuation-106.json",
+    "provider_verdict": "ADVISORY",
+    "summary": "Incomplete.",
+    "usable_complete_part": false,
+    "human_approval": false
+  },
+  "allocation_107_114_reason": "Actual105 two P1 design response, genuine sources recheck107, then complete fresh phase sets under ongoing necessary-review authority. All current103/104/105/106 become historical when binding source design changes;106 explicitly incomplete. No automatic retry/fallback."
 }

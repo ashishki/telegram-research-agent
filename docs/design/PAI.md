@@ -77,7 +77,7 @@ no arbitrary network or provider secrets. All interfaces call shared use cases.
 | pa_memory facts, preferences, deletion_requests | Memory repository | explicit confirmation/provenance; version CAS; deletion propagation |
 
 Foreign keys are owner/scoped, not bare provider object IDs. Token storage is
-outside these tables under a separately designed secret-store reference.
+outside these tables; ADR-013 binds TokenVault, keys and reconciliation scopes.
 Public logs/metrics use opaque IDs, counts and reason codes. Never credentials,
 mail text, chat text, report payloads or DSNs. Payload limits and schemas reject
 unrecognized fields/versions and nonfinite values, including corrupted storage.
@@ -295,7 +295,7 @@ Project brief/planning depth are selected. Exact hash-bound feature design,
 live account/retention/cost/provider decisions and conditional scaling remain
 pending; neither time nor a configured key supplies them.
 
-Requirements-matrix-SHA256: 230d62f7f8b43323480cc74fc39444d2326880a5b74c4ea6cba037669e51463d
+Requirements-matrix-SHA256: a1f8ed85ff92ce3d7a084b40c232d39ef0352710cc53afbdaca1c4ff2b8f6d7b
 
 ## 9. Human Approval
 

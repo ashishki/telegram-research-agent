@@ -1098,7 +1098,9 @@
       ],
       "expected_interfaces": [
         "PA requirement coverage: PA-02, PA-10, PA-11, PA-17",
-        "docs/PA_IMPLEMENTATION_TASKS.md#pai-16"
+        "docs/PA_IMPLEMENTATION_TASKS.md#pai-16",
+        "REQUIRED security-path node: tests/test_pai_connections.py::test_secret_store_binding_protects_at_rest_revoke_and_export",
+        "REQUIRED security-path node: tests/test_pai_connections.py::test_same_connection_refresh_is_serialized_before_http"
       ],
       "forbidden_files": [
         ".env",
@@ -1110,7 +1112,7 @@
       ],
       "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
       "rollback": "disconnect и запрет refresh/egress; сохранность/удаление токенов согласно выбранной политике, не через вывод в отчёт.",
-      "scope": "конкретный OAuth flow для первого выбранного Graph provider; state/PKCE/redirect validation, owner/connection binding, минимальные scopes, защищённое token storage, refresh/revoke/rotation. Concurrent refresh сериализуется. Secrets никогда не являются payload/log/fixture value. UI различает ширину provider token и фильтр приложения. Fake OAuth server проверяет реальный callback/client; новые providers не нужны без выбора.",
+      "scope": "конкретный OAuth flow для первого выбранного Graph provider; state/PKCE/redirect validation, owner/connection binding, минимальные scopes, защищённое token storage, refresh/revoke/rotation. Concurrent refresh сериализуется. Secrets никогда не являются payload/log/fixture value. UI различает ширину provider token и фильтр приложения. Fake OAuth server проверяет реальный callback/client; новые providers не нужны без выбора. Binding secret-store contract: ADR-013 secret-store/reconciliation section; reuse TokenVault in connections.py, external private ciphertext files/Fernet with operator-supplied key, reference-only PG, serialized refresh, revoke deletion, vault/key excluded from restore/export; re-auth after restore/key loss. No separate secret backend.",
       "slice_id": "PAI-16",
       "status": "planned",
       "user_visible_outcome": "пользователь видит scope подключения, может подтвердить его, проверить состояние, отозвать и удалить производные данные.",
@@ -1127,6 +1129,19 @@
           ],
           "expected_exit_code": 0,
           "id": "acceptance",
+          "required": true,
+          "timeout_seconds": 600
+        },
+        {
+          "argv": [
+            "{python}",
+            "tools/run_pai_acceptance.py",
+            "-q",
+            "tests/test_pai_connections.py::test_secret_store_binding_protects_at_rest_revoke_and_export",
+            "tests/test_pai_connections.py::test_same_connection_refresh_is_serialized_before_http"
+          ],
+          "expected_exit_code": 0,
+          "id": "security_path_acceptance",
           "required": true,
           "timeout_seconds": 600
         }
@@ -1335,7 +1350,10 @@
         "tests/test_pai_delivery.py",
         "tests/test_prm_post_answer_actions.py",
         "tests/fixtures/assistant/**",
-        "tools/test_tiers.py"
+        "tools/test_tiers.py",
+        "src/prm/runtime/actions.py",
+        "src/prm/runtime/graph.py",
+        "tests/pai_runtime_fixtures.py"
       ],
       "change_budget": "files<=24",
       "dependencies": [
@@ -1346,7 +1364,10 @@
       ],
       "expected_interfaces": [
         "PA requirement coverage: PA-13",
-        "docs/PA_IMPLEMENTATION_TASKS.md#pai-20"
+        "docs/PA_IMPLEMENTATION_TASKS.md#pai-20",
+        "REQUIRED security-path node: tests/test_pai_action_runtime.py::test_mail_202_and_ack_loss_need_separate_exact_reconciliation_read",
+        "REQUIRED security-path node: tests/test_pai_action_runtime.py::test_mail_reconciliation_denies_missing_oauth_scope_before_http",
+        "REQUIRED security-path node: tests/test_pai_action_runtime.py::test_mail_reconciliation_mismatched_digest_keeps_unknown"
       ],
       "forbidden_files": [
         ".env",
@@ -1358,7 +1379,7 @@
       ],
       "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
       "rollback": "отключить executor, оставить preview и reconciliation существующих attempts; не удалять receipts.",
-      "scope": "конкретные executor/reconcile adapters для выбранных mail и calendar операций. Перед отправкой проверить account, recipient, thread, content digest, version/ETag и free/busy где нужно. Provider draft тоже write. Показать последствия, expiry и изменённый preview; старое подтверждение не переиспользовать. Семантику idempotency/reconciliation проверить по официальному API, не переносить её с другого провайдера.",
+      "scope": "конкретные executor/reconcile adapters для выбранных mail и calendar операций. Перед отправкой проверить account, recipient, thread, content digest, version/ETag и free/busy где нужно. Provider draft тоже write. Показать последствия, expiry и изменённый preview; старое подтверждение не переиспользовать. Семантику idempotency/reconciliation проверить по официальному API, не переносить её с другого провайдера. Binding reconciliation: ADR-013 secret-store/reconciliation section. Graph202/trace request-id never equals completed effect or provider object ID. Mail SentItems exact attempt+digest lookup needs separately disclosed OAuth Mail.ReadBasic (or explicit escalation) AND app action.reconcile read scope; missing consent/no match remains unknown/no replay. Calendar evidence separately scoped; no alias/reset of unknown attempts.",
       "slice_id": "PAI-20",
       "status": "planned",
       "user_visible_outcome": "находка превращается в редактируемое предложение, точное подтверждение и проверяемую квитанцию выполнения.",
@@ -1375,6 +1396,20 @@
           ],
           "expected_exit_code": 0,
           "id": "acceptance",
+          "required": true,
+          "timeout_seconds": 600
+        },
+        {
+          "argv": [
+            "{python}",
+            "tools/run_pai_acceptance.py",
+            "-q",
+            "tests/test_pai_action_runtime.py::test_mail_202_and_ack_loss_need_separate_exact_reconciliation_read",
+            "tests/test_pai_action_runtime.py::test_mail_reconciliation_denies_missing_oauth_scope_before_http",
+            "tests/test_pai_action_runtime.py::test_mail_reconciliation_mismatched_digest_keeps_unknown"
+          ],
+          "expected_exit_code": 0,
+          "id": "security_path_acceptance",
           "required": true,
           "timeout_seconds": 600
         }

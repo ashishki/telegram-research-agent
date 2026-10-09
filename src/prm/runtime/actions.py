@@ -57,7 +57,11 @@ class GraphActionAdapter:
             if not content.get('etag'):raise CapabilityDenied('current provider ETag required for existing event writes')
             headers['If-Match']=content['etag']
         value,receipt=self.transport.raw_request(action=action,path=path,method=method,body=body,headers=headers)
-        provider_ref=value.get('id') or receipt['request_id']
+        # Graph202 acknowledges processing only, with no provider object ID.
+        # A tracing request-id never establishes the completed external effect.
+        if receipt['status']==202:
+            return ExecutionOutcome('unknown',error_code='provider_accepted_pending_verification')
+        provider_ref=value.get('id')
         if not provider_ref:return ExecutionOutcome('unknown',error_code='provider_operation_reference_unavailable')
         return ExecutionOutcome('succeeded',provider_operation_ref=provider_ref)
 
@@ -78,7 +82,8 @@ class GraphActionAdapter:
         elif proposal.action_code=='calendar.create':
             path='/v1.0/me/calendars/'+quote(proposal.content['calendar_ref'],safe='')+'/events?'+urlencode({'$top':'100','$select':'id,transactionId'})
         else:return ExecutionOutcome('unknown',error_code='update_outcome_not_authoritatively_identifiable')
-        value,_=self.transport._guarded_http(path=path,method='GET',body=None,headers=None)
+        required={'Mail.ReadBasic','Mail.Read','Mail.ReadWrite'} if proposal.action_code=='mail.send' else {'Calendars.Read','Calendars.ReadWrite'}
+        value,_=self.transport._guarded_http(path=path,method='GET',body=None,headers=None,required_oauth_scopes=required)
         for item in value.get('value',()):
             if proposal.action_code=='mail.send':
                 headers={entry.get('name','').casefold():entry.get('value') for entry in item.get('internetMessageHeaders',())}

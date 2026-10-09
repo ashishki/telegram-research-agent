@@ -338,7 +338,11 @@
         "tests/test_assistant_egress.py"
       ],
       "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
-      "evidence_status": "planned; no implementation or review acceptance implied"
+      "evidence_status": "planned; no implementation or review acceptance implied",
+      "security_test_nodes": [
+        "tests/test_pai_connections.py::test_secret_store_binding_protects_at_rest_revoke_and_export",
+        "tests/test_pai_connections.py::test_same_connection_refresh_is_serialized_before_http"
+      ]
     },
     "PAI-17": {
       "expected_paths": [
@@ -404,7 +408,10 @@
         "src/prm/runtime/effects.py",
         "src/prm/application.py",
         "src/bot/callbacks.py",
-        "src/prm/runtime/composition.py"
+        "src/prm/runtime/composition.py",
+        "src/prm/runtime/actions.py",
+        "src/prm/runtime/graph.py",
+        "tests/pai_runtime_fixtures.py"
       ],
       "verification_refs": [
         "PAI-20/acceptance"
@@ -416,7 +423,12 @@
         "tests/test_prm_post_answer_actions.py"
       ],
       "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
-      "evidence_status": "planned; no implementation or review acceptance implied"
+      "evidence_status": "planned; no implementation or review acceptance implied",
+      "security_test_nodes": [
+        "tests/test_pai_action_runtime.py::test_mail_202_and_ack_loss_need_separate_exact_reconciliation_read",
+        "tests/test_pai_action_runtime.py::test_mail_reconciliation_denies_missing_oauth_scope_before_http",
+        "tests/test_pai_action_runtime.py::test_mail_reconciliation_mismatched_digest_keeps_unknown"
+      ]
     },
     "PAI-21": {
       "expected_paths": [
