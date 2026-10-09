@@ -42,11 +42,13 @@ VERDICT_SCHEMA = {
                 "severity": {"type": "string", "enum": ["P0", "P1", "P2"]},
                 "title": {"type": "string", "minLength": 1, "maxLength": 140},
                 "issue": {"type": "string", "minLength": 1, "maxLength": 800},
-                "fix": {"type": "string", "minLength": 1, "maxLength": 600},
+                "fix": {"type": "string", "minLength": 1, "maxLength": 600,
+                    "description": "Actionable correction tied to the finding; never a placeholder such as test or TODO."},
             },
         }},
         "not_verified": {"type": "array", "maxItems": 8, "items": {"type": "string", "maxLength": 240}},
-        "summary": {"type": "string", "minLength": 1, "maxLength": 1600},
+        "summary": {"type": "string", "minLength": 1, "maxLength": 1600,
+            "description": "Substantive scoped conclusion: reviewed surfaces, P0/P1 disposition and remaining evidence limits. Never placeholder, Incomplete, or a reference to this summary field."},
     },
 }
 PACKET_REFS = (
@@ -358,7 +360,9 @@ def prepare_packet(root: Path, task: str, feature: str, role: str, tooling_revie
         "If more than twelve independent blockers remain, return STOP_SHIP and "
         "state the remaining unreviewed risk in not_verified; never call it PASS. "
         "Table JSON is lossless: resolve $N strings with symbols and map table rows to columns.\n"
-        "Use the requested max reasoning effort; return a complete final JSON with a nonempty summary. "
+        "Use the requested max reasoning effort; return complete final JSON. The summary must describe the reviewed scope, "
+        "the P0/P1 conclusion and remaining evidence limits. Findings need actionable fixes and specific limitations. "
+        "Never use placeholder values, an Incomplete-only summary, test-only fixes, or a self-reference such as See summary field. "
         "For each blocker cite the exact function and a concrete reachable failing case. "
         "Verify the alleged case against all existing guards; missing tests alone do not prove a runtime defect.\n"
     )
@@ -399,8 +403,15 @@ def parse_response(payload: dict, requested_model: str) -> dict:
         raise ReviewBlocked("invalid verdict")
     if not isinstance(verdict["summary"], str) or not verdict["summary"].strip():
         raise ReviewBlocked("missing summary")
+    def placeholder(value):
+        normalized = re.sub(r"\s+", " ", value).strip(" .:;!?").casefold()
+        return normalized in {"placeholder", "incomplete", "see summary field", "see the summary field", "see summary", "todo", "tbd", "x"}
+    if placeholder(verdict["summary"]):
+        raise ReviewBlocked("placeholder review summary")
     if not isinstance(verdict["not_verified"], list) or not all(isinstance(v, str) for v in verdict["not_verified"]):
         raise ReviewBlocked("invalid limitations")
+    if any(placeholder(v) for v in verdict["not_verified"]):
+        raise ReviewBlocked("placeholder review limitations")
     findings = verdict["findings"]
     if not isinstance(findings, list) or len(findings) > 12:
         raise ReviewBlocked("invalid findings")
@@ -409,6 +420,8 @@ def parse_response(payload: dict, requested_model: str) -> dict:
             raise ReviewBlocked("invalid finding")
         if item["severity"] not in {"P0", "P1", "P2"} or not all(isinstance(item[k], str) and item[k].strip() for k in ("title", "issue", "fix")):
             raise ReviewBlocked("invalid finding severity/content")
+        if placeholder(item["fix"]) or item["fix"].strip(" .:;!?").casefold() == "test":
+            raise ReviewBlocked("placeholder review fix")
     if any(f["severity"] in {"P0", "P1"} for f in findings) and verdict["verdict"] != "STOP_SHIP":
         raise ReviewBlocked("critical findings cannot receive acceptable verdict")
     return verdict

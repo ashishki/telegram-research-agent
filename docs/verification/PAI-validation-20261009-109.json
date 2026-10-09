@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-09",
+  "base_commit": "a063833c9090d7b9d8a26c7043fd12db73121441",
+  "status": "placeholder_quality_guard_locally_verified_independent_tooling110_required",
+  "checks": [
+    {
+      "argv": [
+        ".venv-pai/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_opencode_role_review.py",
+        "tests/test_playbook_bridge.py",
+        "tests/test_pai_plan.py",
+        "tests/test_pai_acceptance_guard.py"
+      ],
+      "environment": {
+        "PYTHONPATH": "src",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"
+      },
+      "exit_code": 0,
+      "result": "185 passed in 7.68s",
+      "log_path": ".playbook-artifacts/pai-validation-20261009-109/tooling.log",
+      "log_sha256": "7e771a8dc82498ed17d156e6c7ec2e4a44374ada55870ca8323f0e880bd22bbd"
+    },
+    {
+      "argv": [
+        ".venv-pai/bin/python",
+        "tools/playbook.py",
+        "--check-pin"
+      ],
+      "exit_code": 0,
+      "result": "Playbook pin verified; no model, hook or application runtime enabled.",
+      "log_path": ".playbook-artifacts/pai-validation-20261009-109/pin.log",
+      "log_sha256": "a0bbdfed39cb015f3a6cad3c4c848a2ca577566ca3bc06104a9d61639e50d0c0"
+    },
+    {
+      "argv": [
+        ".venv-pai/bin/python",
+        "tools/check_pai_plan.py"
+      ],
+      "exit_code": 0,
+      "result": "PAI plan: 32 registered packets; dependency/acceptance/PA coverage and pinned schema checks passed.\nSpec coverage: 69 exact requirement IDs, 10 mandatory scenarios; planned evidence is not a PASS.\nDesign state: draft; 2 planned test files absent; no product/review/human/live claim.",
+      "log_path": ".playbook-artifacts/pai-validation-20261009-109/matrix.log",
+      "log_sha256": "3ac8f22e48d470d88352af228e77b3edaba0f68bb886426d78cfa2f534c79c0a"
+    },
+    {
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "result": "",
+      "log_path": ".playbook-artifacts/pai-validation-20261009-109/diff.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "actual_old_tooling_gate": "correctly_stale_after_critical_source_changes",
+  "changed_files": [
+    "docs/CODEX_PROMPT.md",
+    "docs/verification/PAI-next-review-packets.json",
+    "docs/verification/PAI-progress.md",
+    "tests/test_opencode_role_review.py",
+    "tools/opencode_role_review.py"
+  ],
+  "source_hashes": [
+    {
+      "path": "tests/test_opencode_role_review.py",
+      "sha256": "2ba43d241c14a6d6982755f680fa652f85d75086a8aea50839bf63d6a016ec29"
+    },
+    {
+      "path": "tools/opencode_role_review.py",
+      "sha256": "96f3ff7a9dc565c7202eb539ccc1ab000b7bbff2e11f90c2333165383f20dfdf"
+    }
+  ],
+  "human_approval": false
+}

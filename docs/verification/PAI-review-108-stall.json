@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "call_number": 108,
+  "reviewed_head": "a063833c9090d7b9d8a26c7043fd12db73121441",
+  "date_utc": "2026-10-09T17:26:46.113715+00:00",
+  "engineering_action": "SIGTERM only own bounded native reviewer child after verified transport inactivity",
+  "pid": 1557071,
+  "bytes_received_both_probes": 9635683,
+  "last_receive_age_ms": 1424204,
+  "complete_native_result_present": false,
+  "verdict": null,
+  "usage": null,
+  "provider_outcome": "unknown",
+  "cost": "unknown",
+  "reason": "Two own-socket probes confirmed identical received-byte count; no bytes for over20minutes. Engineering cancellation of stalled invocation, not an output/model/timeout-limit change or provider quota inference. Immutable attempt retained; never a P1 closure/complete part.",
+  "actual_helper_exit_code": -15,
+  "actual_duration_seconds": 1864.744,
+  "native_attempt_ref": ".playbook-artifacts/opencode-runs/opencode-59b7811da6f34f20912a59d92d5c77f8/attempt.json",
+  "native_attempt_sha256": "404b5a4be9e6019d60f70b1b060b3ff8c909f71c66ba4128f7eca750c0a00114",
+  "actual_call_consumed": true
+}

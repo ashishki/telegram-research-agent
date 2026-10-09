@@ -1,7 +1,7 @@
-# Current handoff — actual107 new academic-home P1 locally fixed;108 next
+# Current handoff —109 stub rejected; quality guard verified; tooling110 next
 
 2026-10-09. Assigned branch docs/personal-assistant-blueprint-playbook-20260918.
-Verified105 response atfa8aade; academic-home docs/test response ready to commit before108.
+Academic-home response ata063833; verified critical quality guard must commit before110.
 Implementer uses active default model/reasoning without overrides.
 
 Authority: owner-selected GLM-5.3/SAME OpenCode Go, public code/synthetic design
@@ -12,8 +12,8 @@ never print/copy key or scan other credentials. No model fallback/automatic retr
 private/live/product-provider/production scope. Use .venv-pai/bin/python,
 PYTHONPATH=src, PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 and pinned tools/playbook.py.
 
-Real tooling93 ADVISORY9098d0c passes require_tooling_audit with unchanged critical
-hashes. Runtime design changes do not accept themselves. Review99 busy P1 local
+Historical tooling93 ADVISORY9098d0c covered the prior critical hashes. New
+quality parser/prompt/tests invalidate it; actual independent110 is required. Review99 busy P1 local
 fix has87-pass scoped evidence and usable full program/product103 ADVISORY at
 1fd2452.102's placeholder summary/fix and106's Incomplete. summary are structural
 ADVISORY only, never full parts/P1 closure.104 foundation usable ADVISORY;
@@ -47,15 +47,30 @@ first.21 strict scoped cases31.84s/zero skips,48 plan2.55s,pin/32/69/ten/diff pa
 Scheduler-path P2 allegation disproved at rawfa8aade (already allowed), original
 report retained. PAI-design-107-response.md and PAI-validation-20261009-107.json
 bind actual report/commands/source hashes/open P2; no implementer acceptance.
-107 consumed; none running. Commit current verified docs/test response, then ONE:
-    .venv-pai/bin/python .playbook-artifacts/pai-native-design-once.py --call-number 108 --role program_design_review --group sources
-Allocation115 under ongoing authority. If108 supplies usable no-P0/P1 full scoped
-closure: program109 foundation/110 product/111 completeness; product112..115 all
-four. Keep SAME corrected committed HEAD/design/current93 audit through fresh
-set. No placeholder/Incomplete summary as complete evidence, no auto retry or
-model fallback. Only all four genuine parts per role through real finalizer,
-then require_trusted_design_records/real pinned generic parser. On actual new
-P0/P1 stop dependent requests, fix and obtain independent closure.
+108 ended without valid verdict:9,635,683bytes received then>23minutes no
+new data, confirmed by two own-socket probes. Only own reviewer child terminated
+SIGTERM; actual exit-15/attempt preserved, model/usage/verdict/cost/outcome unknown.
+PAI-review-108-stall.json binds observations; no quota inference or fabricated
+backend failure/report.108 consumed; source HEAD/design staysa063833 unchanged.
+109 ended structural ADVISORY ata063833,599.733s/usage42536/49013/91549,
+but summary=See summary field. is unusable completion/P1 closure. Original
+four P2/report unchanged. PAI-review-109-quality.md records the failure.
+Known whole-field placeholder/self-referential/incomplete summaries and stub
+fixes/limitations are now rejected before report/generic publication. Schema/
+prompt demand substantive scoped conclusions; no broad semantic guarantee or
+rewritten reviewer text.185 scoped tooling tests7.68s;pin/32/69/ten/diff pass.
+PAI-validation-20261009-109.json binds commands/log/source hashes. Runtime source
+unchanged; prior87/163/21 evidence remains dated. Critical parser/test/prompt
+changed: actual old93 gate correctly stale, never reused. Commit before ONE:
+    .venv-pai/bin/python .playbook-artifacts/pai-native-tooling-once.py --call-number 110
+Then actual sources111 P1 recheck, program112 foundation/113 product/114
+completeness and product115..118 all four only after usable no-P0/P1 closure.
+Allocation118 uses ongoing authority.109 consumed; none running. Keep SAME
+corrected committed HEAD/design through actual tooling and all fresh parts.
+No stub/Incomplete fields as evidence, no automatic retry/model fallback.
+Only all four genuine parts per role through real finalizers, then actual
+require_trusted_design_records/real pinned generic parser. On new P0/P1 stop
+dependent work, fix and obtain independent closure; never implementer override.
 
 Full target remains all32 Chat/Search/Brief/Watch/confirmedAct packets,69 IDs/ten
 scenarios. Formal task/slice/design remain planned/draft/review_required. Human

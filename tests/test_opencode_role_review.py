@@ -42,6 +42,32 @@ def test_invalid_identity_or_verdict_cannot_be_published(change):
         review.parse_response(payload, "mimo-v2.6-pro")
 
 
+@pytest.mark.parametrize('summary',['placeholder',' Incomplete. ','See summary field.','SEE THE SUMMARY FIELD!','TBD','x'])
+def test_schema_valid_placeholder_summary_is_not_review_evidence(summary):
+    payload=response();body=json.loads(payload['choices'][0]['message']['content']);body['summary']=summary
+    payload['choices'][0]['message']['content']=json.dumps(body)
+    with pytest.raises(review.ReviewBlocked,match='placeholder review summary'):
+        review.parse_response(payload,'mimo-v2.6-pro')
+
+
+@pytest.mark.parametrize('field',['fix','not_verified'])
+def test_actual_short_placeholder_fix_or_limitations_are_rejected(field):
+    payload=response();body=json.loads(payload['choices'][0]['message']['content'])
+    if field=='fix':body['findings']=[{'severity':'P2','title':'Missing node','issue':'Required acceptance path unbound','fix':'test'}]
+    else:body['not_verified']=['x']
+    payload['choices'][0]['message']['content']=json.dumps(body)
+    with pytest.raises(review.ReviewBlocked,match='placeholder review'):
+        review.parse_response(payload,'mimo-v2.6-pro')
+
+
+def test_scoped_summary_can_explain_incomplete_live_evidence():
+    payload=response();body=json.loads(payload['choices'][0]['message']['content'])
+    body['summary']='Incomplete live evidence remains; the synthetic tooling scope has no P0/P1 after reviewing its gates.'
+    body['not_verified']=['Live provider I/O is outside the reviewed synthetic scope.']
+    payload['choices'][0]['message']['content']=json.dumps(body)
+    assert review.parse_response(payload,'mimo-v2.6-pro')['verdict']=='ADVISORY'
+
+
 def setup_run(tmp_path, monkeypatch, *, planning_block=False):
     doc = tmp_path / "design.md"
     doc.write_text("synthetic review input")
@@ -116,6 +142,25 @@ def test_one_fake_provider_call_emits_distinct_hash_bound_non_codex_evidence(tmp
     assert results[0].with_suffix(".json.sha256").read_text().strip() == review.digest(results[0].read_bytes())
     assert len(records) == 1 and records[0]["reviewer_binding"].startswith("opencode_go:")
     assert records[0]["read_only"] is True
+
+
+def test_placeholder_provider_response_keeps_usage_but_never_publishes_acceptance(tmp_path,monkeypatch):
+    args,calls,records=setup_run(tmp_path,monkeypatch)
+    def provider(**kwargs):
+        calls.append(kwargs);payload=response();body=json.loads(payload['choices'][0]['message']['content'])
+        body['summary']='See summary field.'
+        body['findings']=[{'severity':'P2','title':'Synthetic note','issue':'SYNTHETIC_PRIVATE_SENTINEL','fix':'Specify exact ownership and a required node.'}]
+        payload['choices'][0]['message']['content']=json.dumps(body);return payload
+    monkeypatch.setattr(mimo_code_review,'_call_model',provider)
+    with pytest.raises(review.ReviewBlocked,match='placeholder review summary'):review.execute(args)
+    assert len(calls)==2 and records==[]
+    assert not list((tmp_path/'.playbook-artifacts/opencode-runs').glob('*/result.json'))
+    failure_path=next((tmp_path/'.playbook-artifacts/opencode-runs').glob('*/failure.json'))
+    failure=json.loads(failure_path.read_text())
+    assert failure['status']=='no_valid_verdict' and failure['observed_model']=='mimo-v2.6-pro'
+    assert failure['usage']=={'prompt_tokens':100,'completion_tokens':30}
+    assert failure['provider_outcome']=='unknown' and failure['cost']=='unknown'
+    assert 'summary' not in failure and 'verdict' not in failure and 'SYNTHETIC_PRIVATE_SENTINEL' not in failure_path.read_text()
 
 
 @pytest.mark.parametrize('reasoning,observed',[(0,'thinking_disabled'),(None,'unknown'),(5,'unknown'),(False,'unknown')])

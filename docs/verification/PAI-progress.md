@@ -638,3 +638,32 @@ PAI-validation-20261009-107.json bind commands/proof/open P2.107 consumed, no
 requests in flight. Allocate115 under ongoing authority: after commit ONE
 sources108 independent recheck, then all fresh109..115 only if usable closure.
 Current93 tooling gate unchanged; human/live/formal roles/production remain open.
+
+Native design review #108 allocated under ongoing authority; program_design_review/sources; HEAD a063833c9090d7b9d8a26c7043fd12db73121441; one bounded request, no automatic retry.
+
+Actual108 at a063833: no valid verdict. Own established TCP socket received
+9635683bytes then no data for>23minutes; two probes confirmed unchanged bytes.
+Only own native reviewer child1557071 terminatedSIGTERM; helper observed-15,
+immutable attempt retained, no report/model/usage, provider outcome/cost unknown.
+Engineering inactivity cancellation, not a numerical timeout/output/model change
+or quota inference.108 consumed; PAI-review-108-stall.json binds observed probes
+and actual attempt hash. Explicitly allocate ONE fresh sources109 at SAMEa063833/
+design/Go/GLM/max/input1MB/output131072/7200 under ongoing authority; no automatic
+retry/fallback. Remaining110..116 blocked until usable P1 closure. No human/live
+or full-design acceptance; no reviewed input or HEAD changed.
+
+Native design review #109 allocated under ongoing authority; program_design_review/sources; HEAD a063833c9090d7b9d8a26c7043fd12db73121441; one bounded request, no automatic retry.
+
+Actual109 sources structural ADVISORY ata063833,599.733s/usage42536/49013/91549,
+summary=See summary field.: not usable completion/P1 closure; original four P2/
+receipt/report preserved. Repeated102/106/109 literal stubs now rejected by actual
+parse_response before any report/generic record; schema/prompt request substantive
+scoped conclusion/actionable fixes/specific evidence limits, no resource/model/
+source-scope change. One fake-call negative proves failure-only artifact plus
+retained reported identity/usage and no raw sentinel leakage;185 scoped tooling
+7.68s, pin/32/69/ten/diff pass. Actual old93 gate correctly stale after critical
+changes; independent tooling110 required, then sources111 and full fresh112..118
+only if clear at one committed design/audit.109 consumed; allocation118 under
+ongoing authority; no actual new call yet. PAI-review-109-quality.md and
+PAI-validation-20261009-109.json preserve exact evidence. No runtime source changes,
+formal task/human/live/production/service/timer/release acceptance invented.
