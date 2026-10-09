@@ -18,8 +18,8 @@ The remaining queue connects the existing contracts into one durable
 Chat/Search/Brief/Watch/Act application, including selected mail/calendar/
 academic sources, memory/media, private reading and measured operations.
 Local fixtures, provider integration and owner acceptance remain distinct.
-No new MVP or restarted report timers. Engineering progress is separate from
-the original PA registry and its historical approvals.
+No MVP reduction or restarted timers; engineering progress preserves historical
+PA registry/approvals.
 
 ## 2. Existing System Context
 
@@ -29,8 +29,8 @@ watch_jobs, confirmed_actions, mail/schedule/media connectors, memory_library,
 model_cost and operations. Existing policy/action receipts are partly in memory;
 the watch store has explicit-path SQLite and a tested locked-send contract.
 The application has injection seams but does not wire all these contracts into
-the default ingress. Do not infer deployed state from templates or fixtures.
-Read the full PERSONAL_ASSISTANT_SPEC.md for product/program design reviews.
+the default ingress. Deployed state remains unverified.
+Design reviewers read full PERSONAL_ASSISTANT_SPEC.md.
 The companion registry binds each PAI packet to an executable formal task;
 PA-Refs preserve stage coverage; PAI.requirements.json maps all 69 binding spec
 IDs and ten verbatim §13.2 scenarios to slices, expected paths, acceptance
@@ -42,11 +42,18 @@ PAI-00's owner-authorized local maintenance scope is separate from PAI-01
 feature authorship: runner/transport/checker/finalizer/strict-acceptance changes
 are reviewed in a distinct read-only tooling packet. They cannot validate
 themselves. Before any new design request or generic design record is trusted,
-require_tooling_audit checks an actual independent Mimo PASS/ADVISORY, complete
+require_tooling_audit checks an actual independent PASS/ADVISORY from the current
+owner-selected reviewer recorded in REVIEW_POLICY (currently GLM-5.3), complete
 critical-source manifest, immutable result/report hashes and unchanged current
 code/tests/REVIEW_POLICY. Any such change invalidates that gate; re-audit before
 consuming design receipts. Bootstrap diagnostics/historical provisional reports
 remain evidence only. No tooling reviewer grants human feature completion.
+
+Current native79: ADVISORY at88da0f5, observed glm-5.3,0 P0/0 P1/4 P2.
+Actual require_tooling_audit accepted unchanged critical hashes; full result/
+report/command bindings are in ADR-013 §Current tooling audit and
+PAI-review-continuation-79.json. Audit78 remains an incomplete historical
+attempt, not the current gate. This wording change does not alter audited tooling.
 
 ## 3. System Impact
 
@@ -87,11 +94,10 @@ The existing src/assistant/prm_post_answer_actions.py remains a compatibility
 adapter for owner/result/version-bound post-answer callbacks; src/prm owns
 policy/proposal/receipt semantics. This reuse boundary delegates to the shared
 use cases and cannot create a second action engine or inherit a later topic.
-No application code or DB migration is implemented by this packet. PAI-00
-owns the bounded reviewer/checker/phase-finalizer tooling and owner strategy
-document. Its draft file budget is 72, covering the named instruction/tooling scope in
-docs/verification/PAI-00-file-manifest.json, not all programme publications; this draft rescope is
-subject to the same independent reviews and human approval.
+This design packet activates no code/migration. PAI-00 owns reviewer/checker/
+finalizer tooling and owner strategy; draft files<=72 covers the named scope in
+docs/verification/PAI-00-file-manifest.json. PAI-01 owns design publication, B..F
+runtime. Scope/acceptance remain independently reviewed and human-gated.
 
 ### Interfaces and invariants
 
@@ -101,7 +107,8 @@ checkpoint(lease, expected_version, object_ref) -> applied/unavailable;
 heartbeat(lease, expected_generation, token) -> extended/stale;
 recover_expired(now_from_db) -> safe_checkpoint_requeued/quarantined/awaiting_reconciliation;
 verify_input(owner, object_id, version, digest) -> current/denied;
-cancel(owner, job_ref, expected_version) -> pending_stopped/already_started;
+cancel(owner, job_ref, expected_version) -> pending_stopped/already_started/
+completed/failed/cancelled/quarantined/awaiting_reconciliation/unavailable;
 authorize_and_reserve(tx, typed_request) -> current scope-bound reservation;
 prepare_effect(tx, exact_confirmation, reservation) -> unique AttemptRef;
 dispatch(attempt_ref, fake_or_authorized_transport) -> receipt/unknown;
@@ -118,6 +125,9 @@ a backend/runtime compatibility mismatch before intake.
 Jobs: queued -> leased -> running -> result_ready -> completed.
 Read-only failures may retry via retry_wait within bounds, else failed.
 Cancellation stops unstarted steps and moves safe work to cancelled.
+Cancellation reports existing terminal states accurately; an unresolved external
+attempt keeps awaiting_reconciliation even when later unstarted work is cancelled.
+Missing/currently unavailable state is not described as already-started work.
 Durable effects are separate: prepared -> succeeded/known_no_effect/unknown.
 Dispatching/dispatch_started is an in-flight transaction marker, not a separately
 committed observable state: locks remain held through the bounded call. Crash
@@ -149,6 +159,8 @@ source-deadline recalculation reuse PA-09 domain rules. Catch-up coalesces one
 current brief per scope; expired occurrences record skipped reasons, never a
 burst of historic messages. Deadline notifications require fresh source checks.
 Background collection/delivery grants remain distinct from foreground reads.
+Reservation timing and proven-unused release are specified in ADR-013
+§Scheduler reservation lifecycle; prepared/unknown spend never refunds from status.
 
 ### Synthetic defaults and load profile
 
@@ -292,28 +304,21 @@ Human-required, hash-bound workflow; no approval fields supplied by the author.
 Review the paired Markdown/JSON and ADR-013, complete independent product/program
 reviews through an agreed compliant runner, then approve in pinned workflow.
 This draft registers scope only; original PA review_required state is preserved.
-PAI-02..26 depend on that gate. Prepare independent authorized maintenance and
-review/access packets while waiting; no product design bypass.
+Formal acceptance/completion depends on that gate. ADR-014/015 and the current
+IMPLEMENTATION_CONTRACT separately authorize local PAI-02..26 implementation
+with synthetic sources while design reviews/human acceptance remain open;
+ADR-015 sequences the completed local pass before tests/reviews. This is explicit
+owner sequencing, not invented design acceptance. No live/release authority.
 
 
-## 10. Concrete bindings (review65 follow-through)
+## 10. Concrete evidence bindings
 
-PAI-00 tests/test_prm_product_ux_eval.py and tests/test_opencode_role_review.py already occur in BOTH slice argv and matrix.test_files;
-all seven named regression files exist. check_pai_plan validates full69 IDs,
-exact ten scenario/recovery bindings, hashes, dependencies and case identity;
-run_pai_acceptance requires actual named cases/zero skips, not planned evidence.
-Baseline PAI-00-reconciliation.md binds exact clock-fixture failures, commands,
-causes and corrections at 8faee4; old PA-00 UX was already repaired.
-PAI-00-file-manifest.json mechanically binds 66 paths<=72, uniqueness/existence/
-allowed scope and rollback boundaries; feature-design/source publications belong
-to PAI-01/B..F. Manifest SHA256: 87f7ba6178da7fed20781debccde9b979cd863f001bcc61b184d7ef2785f4852.
-Future human records: .playbook-artifacts/workflows/PAI/approval.json (real pinned
-TTY, human identity/date/design hashes/role refs); controlled PAI-29/owner-acceptance.json
-(candidateSHA/date/owner/per69ID+tenScenario live/visual/usefulness evidence hashes).
-Do not forge future date/SHA. Controlled PAI-27/approved-scope.json and durable
-expiring CapabilityGrants separately bind exact live account/provider/operation/
-egress/bounds; policy checks before credentials/transport/final effects. PAI-28/
-cutover-approval.json binds production SHA/target/window/rollback. No live approval.
-Receipt schemas, immutable identity/hash/scope/verdict checks and tooling/design/
-human separation are specified in REVIEW_POLICY.md and enforced by actual native
-consumers. Full factual bindings: docs/verification/PAI-design-evidence-bindings.md.
+ADR-013 §Concrete evidence bindings retains the full baseline/manifest/test/
+human/live record contract. PAI-00 reconciliation_regression explicitly runs
+{python} tools/run_pai_acceptance.py -q tests/test_playbook_bridge.py
+ tests/test_assistant_conversation.py tests/test_prm_product_ux_eval.py
+ tests/test_pai_plan.py tests/test_opencode_role_review.py tests/test_memory_research.py
+ tests/test_pai_acceptance_guard.py; all seven exist and are matrix-bound.
+This exact argv at88da0f5 refutes the alleged omitted bridge/memory suites;
+no changed argv or claimed new run. Formal planned state remains distinct from
+local implementation/dated synthetic runtime evidence; see ADR-013 bindings.

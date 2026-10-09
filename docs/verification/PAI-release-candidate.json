@@ -1709,10 +1709,10 @@
     }
   ],
   "formal_review": {
-    "program_design_review": "pending_native_complete_aggregation",
+    "program_design_review": "phase80 STOP preserved; stale reviewer design wording locally corrected; fresh foundation81 independent recheck next, complete81..84 set not accepted",
     "product_design_review": "pending_native_complete_aggregation",
     "slice_test_critic_privacy_maintainability": "non-Codex governed adapter/receipts remain pending; advisory source rechecks are not substituted",
-    "tooling": "GLM audit78 at1719bb7 attempted: observed glm-5.3, length at16000 output, no verdict. Explicit owner-requested max and larger-cap authority guard locally prepared; fresh audit79 not invoked, numerical output choice pending."
+    "tooling": "Actual native GLM79 ADVISORY at88da0f5; current real gate accepted;0 P0/0 P1/4 P2 retained; requested max, output131072,7200s; observed glm-5.3/effort unknown."
   },
   "live_provider_evidence": false,
   "human_design_approval": false,
@@ -2065,5 +2065,14 @@
     "calls_consumed": 78,
     "human_design_approval": false,
     "output_limit_decision": "pending"
+  },
+  "continuation_20261009_maximum": {
+    "tooling_review_ref": "docs/verification/PAI-review-continuation-79.json",
+    "reviewed_head": "88da0f54aad02b58ec1c606e0360c47223ba34e4",
+    "tooling_verdict": "ADVISORY",
+    "tooling_gate": "accepted_current_unchanged_sources",
+    "design_parts": "fresh81..88 allocated after80 STOP; first81 required independent P1 recheck",
+    "calls_consumed": 80,
+    "human_design_approval": false
   }
 }

@@ -117,3 +117,62 @@ safe compute recovery and version quarantine are explicit PAI interfaces.
 PAI-05 precedes PAI-06 to establish shared conversation/object contracts.
 The existing src/assistant/prm_post_answer_actions.py is a compatibility adapter
 calling shared src/prm action semantics; it is not a separate action engine.
+
+## Scheduler reservation lifecycle — review80 clarification
+
+Scheduler enqueue records intent and a unique occurrence, not a paid reservation
+for every due schedule. Workers reserve for the next bounded external step after
+claim/current-grant validation and before dispatch; the reservation and that
+step's durable attempt/enqueue changes share a transaction when applicable.
+ADR-013's shared transaction requirement does not mandate reserving at schedule
+enqueue. Cancellation/pause/revocation before any billable invocation or durable
+prepared/unknown attempt settles a held unused reservation once at zero and
+releases its upper bound. Already measured usage is settled as measured; possible
+invocation/prepared/unknown spend stays conservative and cannot be refunded from
+job status alone. PAI-03/08/26 must verify both unused release and unknown fences.
+
+## Concrete evidence bindings — full PAI compact-map companion
+
+PAI-00 tests/test_prm_product_ux_eval.py and tests/test_opencode_role_review.py already occur in BOTH slice argv and matrix.test_files;
+all seven named regression files exist. check_pai_plan validates full69 IDs,
+exact ten scenario/recovery bindings, hashes, dependencies and case identity;
+run_pai_acceptance requires actual named cases/zero skips, not planned evidence.
+The actual PAI-00 reconciliation_regression argv is {python}
+tools/run_pai_acceptance.py -q tests/test_playbook_bridge.py
+tests/test_assistant_conversation.py tests/test_prm_product_ux_eval.py
+tests/test_pai_plan.py tests/test_opencode_role_review.py tests/test_memory_research.py
+tests/test_pai_acceptance_guard.py. Both alleged missing files are explicitly
+registered at88da0f5 and unchanged here; no fabricated run or weakened guard.
+Formal planned slice status does not imply absent local implementation evidence:
+the separate runtime snapshot caf97a7 has320 synthetic cases/69 requirement IDs/
+ten scenarios, as bound in PAI-release-candidate.json. That dated runtime evidence
+is neither current tooling verification nor real provider/human product acceptance.
+Baseline PAI-00-reconciliation.md binds exact clock-fixture failures, commands,
+causes and corrections at 8faee4; old PA-00 UX was already repaired.
+PAI-00-file-manifest.json mechanically binds 66 paths<=72, uniqueness/existence/
+allowed scope and rollback boundaries; feature-design/source publications belong
+to PAI-01/B..F. Manifest SHA256: 87f7ba6178da7fed20781debccde9b979cd863f001bcc61b184d7ef2785f4852.
+Future human records: .playbook-artifacts/workflows/PAI/approval.json (real pinned
+TTY, human identity/date/design hashes/role refs); controlled PAI-29/owner-acceptance.json
+(candidateSHA/date/owner/per69ID+tenScenario live/visual/usefulness evidence hashes).
+Do not forge future date/SHA. Controlled PAI-27/approved-scope.json and durable
+expiring CapabilityGrants separately bind exact live account/provider/operation/
+egress/bounds; policy checks before credentials/transport/final effects. PAI-28/
+cutover-approval.json binds production SHA/target/window/rollback. No live approval.
+Receipt schemas, immutable identity/hash/scope/verdict checks and tooling/design/
+human separation are specified in REVIEW_POLICY.md and enforced by actual native
+consumers. Full factual bindings: docs/verification/PAI-design-evidence-bindings.md.
+
+## Current tooling audit — actual native79
+
+Actual native tooling79 completed ADVISORY on committed
+88da0f54aad02b58ec1c606e0360c47223ba34e4, after the GLM/max/output changes.
+Result: .playbook-artifacts/opencode-runs/opencode-64253758e95a49e488ae30255d4ed3e3/result.json;
+SHA256: 28cabae0ee814f9033272aef279af712e82671fe9642a8db4cf059e3d6d808d2.
+Report SHA256: d909d9223e5e67cc0ca00f9f011926478644bb6adba4e0c865a89b4c4e432d0a.
+Observed model glm-5.3; requested max, observed effort unknown;0 P0/0 P1/4 P2.
+The actual require_tooling_audit consumer accepted its unchanged critical hashes;
+PAI-review-continuation-79.json and PAI-native-tooling-79-response.md preserve
+command/input/usage/provenance/findings. Audit78's length failure and prior STOPs
+remain unchanged historical evidence, not the current gate. This design-only
+wording correction does not alter audited tooling/policy or promote a role record.

@@ -1,4 +1,4 @@
-# Current handoff — maximum GLM review authorized; audit79 next
+# Current handoff — actual native79 ADVISORY accepted; design80..87 underway
 
 2026-10-09. Assigned branch docs/personal-assistant-blueprint-playbook-20260918.
 GLM cutover committed1719bb7; later max/cap/evidence preparation follows that
@@ -27,7 +27,7 @@ watchdog7200s permits full output instead of the previous900s cutoff. Same
 OpenCode Go/public code/synthetic design; ongoing necessary-review budget persists.
 Authority/interpretation: PAI-maximum-review-authority-20261009.md, recorded in
 PAI-next-review-packets.json before keys/HTTP. No repeated numeric confirmation.
-Current allocation87 includes audit79 and eight conditional design80..87, uninvoked.
+Current allocation87 includes consumed audit79 and eight design80..87; read actual counts/receipts before requests.
 
 Transport keeps default/legacy8MiB wire; larger GLM requests64MiB; event64KiB,
 final text1MiB, GLM watchdog7200s, one request/no retry/fallback, discarded reasoning.
@@ -41,10 +41,28 @@ never full historical pytest. Use .venv-pai/bin/python/PYTHONPATH=src and
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1. Subsequent exact results are in the validation
 record; do not project old runtime results onto this new tooling.
 
-Next: verify scoped maximum-output/deadline tests and packet, commit exact known
-inputs, then ONE fresh native audit79. Preserve HEAD/critical sources until return:
+Native79 completed genuine ADVISORY at88da0f5 after601.788s; usage46484 input/
+31947 completion/78431 total. Observed glm-5.3, requested max/observed unknown;
+no P0/P1, four P2 retained in PAI-native-tooling-79-response.md. Actual pinned
+require_tooling_audit accepts current unchanged sources.154 scoped tests passed
+6.52s; complete eight prepare-only design packets159325..188969 bytes, no provider.
+Critical tooling/REVIEW_POLICY remain unchanged. Commit corrected design before81,
+then preserve its new HEAD/design for the full81..88 phase set.
 
-    .venv-pai/bin/python tools/run_codex_role.py run --provider opencode-go --model glm-5.3 --root . --task PAI-00 --feature-id PAI --role program_design_review --tooling-review --reasoning-effort max --allow-provider-egress --call-cap 1 --output-token-cap 131072 --timeout-seconds 7200 --key-file /srv/openclaw-you/workspace/Georgia-Community-Navigator/secrets/openrouter_api_key
+Actual foundation80 returned STOP_SHIP on88da0f5 (1 P1/4 P2),512.188s;
+usage35439/29341/64780. Preserve result/receipt. PAI-design-80-response.md records
+stale Mimo normative wording repair and supplied genuine79 bindings; exact existing
+bridge/memory argv refutes the alleged missing suites. Budget/cancel/sequencing
+clarifications are design-only; no runtime closure invented. Full detail moved to
+always-reviewed ADR-013; compact map19966 chars, planning and30 scoped tests pass.
+Critical tooling/policy unchanged; accepted79 gate remains valid. The old80 result
+cannot fill a current role set. Full fresh allocation81..88;80 consumed so far.
+
+Next: genuine program/foundation81 recheck on the corrected committed design,
+max/131072/7200. No dependent requests until P1 independently resolved. Then the
+remaining independent groups may run in parallel per batch on ONE unchanged
+HEAD/design. All four actual parts PER role, existing finalizer; no fixture
+substitution. Read receipts/processes before launching; no duplicate/retry.
 
 Key location already authorized; never print/copy value or scan credentials.
 Log/count actual attempts including length/timeout/error. P0/P1 blocks dependent

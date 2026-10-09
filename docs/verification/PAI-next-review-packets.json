@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "status": "owner_maximum_authorized_native79_allocated_not_invoked",
-  "current_approved_call_cap": 87,
-  "calls_consumed_including_failures": 78,
+  "status": "native80_stop_preserved_design_wording_fixed_recheck81_next",
+  "current_approved_call_cap": 88,
+  "calls_consumed_including_failures": 80,
   "proposed_total_cap": 34,
   "new_calls_maximum": 3,
   "third_call": "only if an actual new finding needs independent recheck",
@@ -1894,52 +1894,52 @@
   },
   "native_design_allocations": [
     {
-      "call_number": 80,
-      "role": "program_design_review",
-      "slice_group": "foundation",
-      "status": "blocked_current_tooling_gate_not_invoked"
-    },
-    {
       "call_number": 81,
       "role": "program_design_review",
-      "slice_group": "product",
-      "status": "blocked_current_tooling_gate_not_invoked"
+      "slice_group": "foundation",
+      "status": "allocated_not_invoked_current_design80_wording_recheck"
     },
     {
       "call_number": 82,
       "role": "program_design_review",
-      "slice_group": "sources",
-      "status": "blocked_current_tooling_gate_not_invoked"
+      "slice_group": "product",
+      "status": "allocated_not_invoked_current_design80_wording_recheck"
     },
     {
       "call_number": 83,
       "role": "program_design_review",
-      "slice_group": "completeness",
-      "status": "blocked_current_tooling_gate_not_invoked"
+      "slice_group": "sources",
+      "status": "allocated_not_invoked_current_design80_wording_recheck"
     },
     {
       "call_number": 84,
-      "role": "product_design_review",
-      "slice_group": "foundation",
-      "status": "blocked_current_tooling_gate_not_invoked"
+      "role": "program_design_review",
+      "slice_group": "completeness",
+      "status": "allocated_not_invoked_current_design80_wording_recheck"
     },
     {
       "call_number": 85,
       "role": "product_design_review",
-      "slice_group": "product",
-      "status": "blocked_current_tooling_gate_not_invoked"
+      "slice_group": "foundation",
+      "status": "allocated_not_invoked_current_design80_wording_recheck"
     },
     {
       "call_number": 86,
       "role": "product_design_review",
-      "slice_group": "sources",
-      "status": "blocked_current_tooling_gate_not_invoked"
+      "slice_group": "product",
+      "status": "allocated_not_invoked_current_design80_wording_recheck"
     },
     {
       "call_number": 87,
       "role": "product_design_review",
+      "slice_group": "sources",
+      "status": "allocated_not_invoked_current_design80_wording_recheck"
+    },
+    {
+      "call_number": 88,
+      "role": "product_design_review",
       "slice_group": "completeness",
-      "status": "blocked_current_tooling_gate_not_invoked"
+      "status": "allocated_not_invoked_current_design80_wording_recheck"
     }
   ],
   "native_tooling_recheck_66": {
@@ -2045,7 +2045,7 @@
   },
   "native_tooling_recheck_79": {
     "call_number": 79,
-    "status": "allocated_not_invoked",
+    "status": "native_tooling_completed",
     "model": "glm-5.3",
     "requested_effort": "max",
     "purpose": "fresh tooling audit of explicit max and separately authorized output bounds",
@@ -2082,5 +2082,69 @@
     "model": "glm-5.3",
     "maximum_seconds": 7200,
     "interpretation": "Engineering watchdog selected under the instruction to remove tight limits; allows full max output. Not an owner-quoted numerical value."
-  }
+  },
+  "current_tooling_audit": {
+    "call_number": 79,
+    "verdict": "ADVISORY",
+    "result_ref": ".playbook-artifacts/opencode-runs/opencode-64253758e95a49e488ae30255d4ed3e3/result.json",
+    "reviewed_head": "88da0f54aad02b58ec1c606e0360c47223ba34e4",
+    "finding_counts": {
+      "P0": 0,
+      "P1": 0,
+      "P2": 4
+    },
+    "observed_model": "glm-5.3",
+    "requested_effort": "max",
+    "observed_effort": "unknown"
+  },
+  "native_design_allocation_history_80_stop": [
+    {
+      "call_number": 80,
+      "role": "program_design_review",
+      "slice_group": "foundation",
+      "status": "native_design_phase_completed"
+    },
+    {
+      "call_number": 81,
+      "role": "program_design_review",
+      "slice_group": "product",
+      "status": "ready_current_native79_tooling_advisory_not_invoked"
+    },
+    {
+      "call_number": 82,
+      "role": "program_design_review",
+      "slice_group": "sources",
+      "status": "ready_current_native79_tooling_advisory_not_invoked"
+    },
+    {
+      "call_number": 83,
+      "role": "program_design_review",
+      "slice_group": "completeness",
+      "status": "ready_current_native79_tooling_advisory_not_invoked"
+    },
+    {
+      "call_number": 84,
+      "role": "product_design_review",
+      "slice_group": "foundation",
+      "status": "ready_current_native79_tooling_advisory_not_invoked"
+    },
+    {
+      "call_number": 85,
+      "role": "product_design_review",
+      "slice_group": "product",
+      "status": "ready_current_native79_tooling_advisory_not_invoked"
+    },
+    {
+      "call_number": 86,
+      "role": "product_design_review",
+      "slice_group": "sources",
+      "status": "ready_current_native79_tooling_advisory_not_invoked"
+    },
+    {
+      "call_number": 87,
+      "role": "product_design_review",
+      "slice_group": "completeness",
+      "status": "ready_current_native79_tooling_advisory_not_invoked"
+    }
+  ]
 }
