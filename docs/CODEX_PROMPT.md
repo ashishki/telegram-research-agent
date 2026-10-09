@@ -1,4 +1,4 @@
-# Current handoff — actual91 argv P1 fixed; native92 recheck next
+# Current handoff — actual92 ADVISORY; canonical-ID alias fixed; native93 next
 
 2026-10-09. Assigned branch docs/personal-assistant-blueprint-playbook-20260918.
 Committed base84155e2; current corrected design/tests/tooling/public evidence
@@ -45,10 +45,10 @@ planned test files absent. Use .venv-pai/bin/python, PYTHONPATH=src and
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1. No full historical pytest or broad rerun.
 
 Critical tooling/policy changed for full input/nonempty schema/max hint/cadence/
-honest brief projection. Old79 is now stale: actual91 STOP requires independent tooling92 after its fixes.91 actual calls
-consumed;100 allocated under ongoing authority. New full set:93 product/product
-P1 recheck first, then94..97 program all four,98 product/foundation,99 product/
-sources,100 product/completeness. Old records
+honest brief projection. Old79 is now stale: actual92 ADVISORY independently closes91. Additional canonical-ID alias
+correction requires fresh93.92 actual calls consumed;101 allocated under ongoing
+authority. New full set94 product/product P1 recheck,95..98 program all four,
+99 product/foundation,100 product/sources,101 product/completeness. Old records
 cannot fill new slots. Stop dependent requests for actual P0/P1, fix and obtain
 independent closure; no implementer override. Preserve one unchanged committed
 HEAD/design through accepted tooling and the full fresh design set.
@@ -61,9 +61,18 @@ post-call drift records unknown failure without verdict content.168 scoped tests
 passed7.67s, pin/32/69/ten planning passed. PAI-native-tooling-91-response.md binds
 proof, exact command/log hash and all original findings. No independent closure.
 
+Actual92 ADVISORY at9337faf/no P0/P1,935.685s, usage50820/47418/98238.
+Readonly root probe found absolute feature ID resolves PAI while audit was skipped;
+only mock upstream execution, no approval. Prepared separately until92 completed,
+then canonical ASCII-ID enforcement/path/whitespace/traversal tests added. Generic
+bridge legacy run_codex_role permits verify/help only, matching current reviewer
+policy.175 final scoped tests passed7.20s; pin/32/69/ten/check-diff passed.
+PAI-native-tooling-92-response.md preserves actual verdict/P2/probe/log hashes.
+Independent93 required for NEW changes; no implementer acceptance.
+
 Next ONE actual command after scoped commit:
 
-    .venv-pai/bin/python .playbook-artifacts/pai-native-tooling-once.py --call-number 92
+    .venv-pai/bin/python .playbook-artifacts/pai-native-tooling-once.py --call-number 93
 
 Canonical native route tools/run_codex_role.py run --provider opencode-go --model
 glm-5.3 --root . --task PAI-00 --feature-id PAI --role program_design_review

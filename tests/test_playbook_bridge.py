@@ -188,6 +188,10 @@ def test_pai_human_approval_cannot_bypass_current_independent_tooling(tmp_path, 
     ['--root','/other','--root','.', 'approve','--feature-id','PAI'],
     ['--root=/other','--root=.', 'approve','--feature-id','PAI'],
     ['approve','--feature','PAI'],
+    ['approve','--feature-id','../PAI'],
+    ['approve','--feature-id',str(ROOT/'docs/design/PAI')],
+    ['approve','--feature-id','PAI/../PAI'],
+    ['approve','--feature-id',' PAI '],
     ['approve','--feature-id','PAI','--','--help'],
     ['approve','--feature-id','PAI','--','-h'],
 ])
@@ -216,4 +220,12 @@ def test_actual_pinned_parser_last_wins_is_blocked_by_bridge():
     assert actual.feature_id=='PAI' and actual.root==ROOT
     with patch.object(bridge,'verified_upstream',return_value=ROOT/'.playbook/upstream'),patch.object(bridge.subprocess,'run') as run:
         assert bridge.main(['feature_workflow',*args])==2
+        run.assert_not_called()
+
+
+@pytest.mark.parametrize('args',[[],['run'],['--root','.','run']])
+def test_generic_bridge_cannot_launch_legacy_codex_reviewer(tmp_path,args):
+    upstream,_=fixture(tmp_path)
+    with patch.object(bridge,'ROOT',tmp_path),patch.object(bridge,'verified_upstream',return_value=upstream),patch.object(bridge.subprocess,'run') as run:
+        assert bridge.main(['run_codex_role',*args])==2
         run.assert_not_called()

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import argparse
+import re
 import json
 import subprocess
 import sys
@@ -112,7 +113,10 @@ def approval_arguments(args: list[str]):
     sub=parser.add_subparsers(dest='command',required=True)
     approve=sub.add_parser('approve',allow_abbrev=False)
     approve.add_argument('--feature-id',required=True)
-    return parser.parse_args(args)
+    parsed=parser.parse_args(args)
+    if not re.fullmatch(r'[A-Za-z][A-Za-z0-9._-]*',parsed.feature_id):
+        raise ValueError('Approval requires a canonical feature ID, not a path or alias')
+    return parsed
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -130,6 +134,8 @@ def main(argv: list[str] | None = None) -> int:
         if name == '--check-pin':
             print('Playbook pin verified; no model, hook or application runtime enabled.')
             return 0
+        if name == 'run_codex_role' and (not args or args[0] not in {'verify','--help','-h'}):
+            raise ValueError('Fresh reviews require the local --provider opencode-go route')
         if name == 'verify_project':
             verifier = load_generated_verifier(upstream)
             previous_argv = sys.argv

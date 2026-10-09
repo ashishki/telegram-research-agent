@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "status": "native91_stop_preserved_cli_p1_fixed_recheck92_next",
-  "current_approved_call_cap": 100,
-  "calls_consumed_including_failures": 91,
+  "status": "native92_advisory_preserved_additional_alias_p1_fixed_recheck93_next",
+  "current_approved_call_cap": 101,
+  "calls_consumed_including_failures": 92,
   "proposed_total_cap": 34,
   "new_calls_maximum": 3,
   "third_call": "only if an actual new finding needs independent recheck",
@@ -1894,52 +1894,52 @@
   },
   "native_design_allocations": [
     {
-      "call_number": 93,
+      "call_number": 94,
       "role": "product_design_review",
       "slice_group": "product",
-      "status": "blocked_actual_tooling92_then_product_p1_recheck93"
-    },
-    {
-      "call_number": 94,
-      "role": "program_design_review",
-      "slice_group": "foundation",
-      "status": "blocked_actual_tooling92_then_product_p1_recheck93"
+      "status": "blocked_actual_tooling93_then_product_p1_recheck94"
     },
     {
       "call_number": 95,
       "role": "program_design_review",
-      "slice_group": "product",
-      "status": "blocked_actual_tooling92_then_product_p1_recheck93"
+      "slice_group": "foundation",
+      "status": "blocked_actual_tooling93_then_product_p1_recheck94"
     },
     {
       "call_number": 96,
       "role": "program_design_review",
-      "slice_group": "sources",
-      "status": "blocked_actual_tooling92_then_product_p1_recheck93"
+      "slice_group": "product",
+      "status": "blocked_actual_tooling93_then_product_p1_recheck94"
     },
     {
       "call_number": 97,
       "role": "program_design_review",
-      "slice_group": "completeness",
-      "status": "blocked_actual_tooling92_then_product_p1_recheck93"
+      "slice_group": "sources",
+      "status": "blocked_actual_tooling93_then_product_p1_recheck94"
     },
     {
       "call_number": 98,
-      "role": "product_design_review",
-      "slice_group": "foundation",
-      "status": "blocked_actual_tooling92_then_product_p1_recheck93"
+      "role": "program_design_review",
+      "slice_group": "completeness",
+      "status": "blocked_actual_tooling93_then_product_p1_recheck94"
     },
     {
       "call_number": 99,
       "role": "product_design_review",
-      "slice_group": "sources",
-      "status": "blocked_actual_tooling92_then_product_p1_recheck93"
+      "slice_group": "foundation",
+      "status": "blocked_actual_tooling93_then_product_p1_recheck94"
     },
     {
       "call_number": 100,
       "role": "product_design_review",
+      "slice_group": "sources",
+      "status": "blocked_actual_tooling93_then_product_p1_recheck94"
+    },
+    {
+      "call_number": 101,
+      "role": "product_design_review",
       "slice_group": "completeness",
-      "status": "blocked_actual_tooling92_then_product_p1_recheck93"
+      "status": "blocked_actual_tooling93_then_product_p1_recheck94"
     }
   ],
   "native_tooling_recheck_66": {
@@ -2337,11 +2337,20 @@
   ],
   "native_tooling_recheck_92": {
     "call_number": 92,
-    "status": "allocated_not_invoked",
+    "status": "native_tooling_completed",
     "model": "glm-5.3",
     "requested_effort": "max",
     "output_cap": 131072,
     "timeout": 7200,
     "purpose": "independent recheck of actual91 duplicated-option P1 and tier/drift receipt fixes"
+  },
+  "native_tooling_recheck_93": {
+    "call_number": 93,
+    "status": "allocated_not_invoked",
+    "model": "glm-5.3",
+    "requested_effort": "max",
+    "output_cap": 131072,
+    "timeout": 7200,
+    "purpose": "independent canonical-feature-ID alias recheck and legacy-run bridge policy closure"
   }
 }
