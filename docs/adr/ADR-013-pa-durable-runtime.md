@@ -185,8 +185,11 @@ source-before-subscription order BEFORE entering any retained SQLite locked-send
 Keep those same PG locks through the ENTIRE SQLite transaction and bounded sender
 callback; SQLite commits/closes before releasing PG. Never check PG, release it,
 then enter SQLite. No SQLite-first/PG-second path. Synthetic SQLite busy_timeout
-is500ms, below the transport bound; a lock failure after a prepared attempt keeps
-unknown, never auto-resends or proves no effect. Revoke-wins-lock means no sender;
+is500ms, below the transport bound. A trusted live adapter that fails acquiring
+SQLite before ENTERING the sender callback proves known_no_effect: report not_sent
+with transport_not_started, preserve the original attempt, and do not auto-resend.
+Failure at/after callback entry, worker loss or a prepared record alone stays
+unknown; a SQLite rollback/empty local ledger never proves no external effect. Revoke-wins-lock means no sender;
 dispatch-wins means revoke acknowledgement waits until the bounded sender exits.
 PAI-09 registers test_postgres_authority_spans_legacy_sqlite_send for both outcomes.
 
@@ -204,3 +207,56 @@ New tests exercise actual SQLite retrieval/HTTP/PostgreSQL policy and durable jo
 using synthetic inputs, not keyword-only assertions or fabricated role approval.
 PAI-09/15 explicitly own composition-root registration; PAI-12 local acceptance
 uses fake I/O and existing credential patterns, with no implicit private access.
+
+## Pre-dispatch busy and controlled continuation — review99
+
+One serial effect executor dispatches all durable foreground/background delivery; bot/
+read workers enqueue effects, never call retained SQLite send independently.
+Legacy external_watch timers remain disabled; PAI-28 owns explicit writer/cutover
+coordination, not implicit coexistence. Unrelated archive ingestion may still
+hold a SQLite writer lock, so serialization does not eliminate busy failures.
+
+KnownDeliveryNotStarted is trusted adapter evidence for the CURRENT attempt:
+SQLite BEGIN IMMEDIATE fails before any provider callback entry. It yields
+known_no_effect/not_sent; UI states the send did not begin. Confirmation/attempt
+identity is never silently replayed. An owner-requested new delivery needs a new
+attempt identity and fresh current scope/schedule/source/budget checks; confirmed
+Act additionally needs a fresh single-use confirmation. A known-not-sent result
+is visible and can be continued explicitly; it is not permanent unknown-send.
+
+After provider callback entry, commit/lock errors or absence of a SQLite row keep
+unknown and conservative spend. No automatic retry/refund; original fences
+survive. No Telegram receipt/search API or owner 'I did not see it' assertion is
+invented as proof of non-delivery. If evidence is unavailable, keep unresolved
+unknown and allow unrelated new work, not replay of the unknown effect.
+
+PAI-09's REQUIRED exact test node test_sqlite_busy_boundary_distinguishes_no_send
+covers a real held SQLite writer BEFORE sender entry (zero external calls,
+not_sent) and a held reader causing COMMIT busy AFTER a synthetic provider accepts
+(one call, unknown/no replay). Existing PG revoke races and unknown ACK-loss tests
+remain mandatory. Fixtures do not grant operator/live or new role acceptance.
+
+For multipart replies, the live first-part known-no-effect result also makes the
+aggregate not_sent. Once any earlier part was accepted, later known-no-effect
+does not establish absence for the aggregate: preserve its partial/unknown fence
+and per-part receipts. An interrupted aggregate with no child record remains
+unknown; absence of a child is never substituted for live adapter evidence.
+REQUIRED test_multipart_not_started_does_not_claim_absence_after_prior_send binds
+both outcomes. The UI describes transport_not_started as locally not started,
+without claiming a provider supplied absence evidence.
+
+Controlled continuation does not reset a terminal delivery or its operation
+fence. A new owner-requested answer/result uses a new request/job/effect identity;
+a new requested digest uses a fresh authorized occurrence and current schedule
+constraints. An unresolved unknown effect cannot be replayed by creating an
+alias for that same effect. The current Telegram sender supplies acceptance
+receipts only; no lookup evidence is implemented or claimed. Unsupported
+reconciliation stays visibly unresolved, and does not prevent unrelated work.
+Provider lookup, if added, requires its own exact read scope/evidence binding.
+
+PAI-28 explicitly owns src/external_watch/** stop/rewire coordination and the
+singleton serial dispatcher cutover; local design/file ownership does not
+authorize changing an actual service or timer. PAI-10 owns src/prm/cli.py for
+the shared chat route. Review99's PAI-12 exact security-node suggestion remains
+an open P2: its existing scoped tests and PAI-26 scenario are not relabeled as
+that missing required node. Independent recheck must assess the updated design.

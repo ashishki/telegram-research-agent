@@ -1,0 +1,173 @@
+{
+  "schema_version": 1,
+  "base_commit": "9098d0c3a0dac4f395cda82a3bf2348bb2d11f69",
+  "date": "2026-10-09",
+  "scope": "review99 P1 response; scoped synthetic verification only",
+  "source_hashes": [
+    {
+      "path": "docs/adr/ADR-013-pa-durable-runtime.md",
+      "sha256": "c90f6d71b87eeb9da703fb647e9632de231f740584814b4e00c4b35ff440500e"
+    },
+    {
+      "path": "docs/design/PAI.design.json",
+      "sha256": "b136eebcf4916a81cfa1a96e09e56730445b052376d19dc0573fd0de59f27b00"
+    },
+    {
+      "path": "docs/design/PAI.md",
+      "sha256": "b60ad5ccfdb22d60b6936f1f0e1e6482905ae5bcab55a9b5f26a2ebca9c4dde2"
+    },
+    {
+      "path": "docs/design/PAI.requirements.json",
+      "sha256": "c87254f2fde85cc110d746011e64e3445aaa9aab0bad2bc73b136b3fd3a3f845"
+    },
+    {
+      "path": "docs/tasks.md",
+      "sha256": "70dd6aa20103da5b32d36c45c87c8dfa7be5b8e6337458c176737264fcc88ac8"
+    },
+    {
+      "path": "src/prm/runtime/delivery.py",
+      "sha256": "82f9ff2c012ce0b7677bbd0e9a499038f31cffa79a4a4b7062bd46e0777c67b8"
+    },
+    {
+      "path": "tests/test_pai_delivery.py",
+      "sha256": "4caa7ecc4ccc5152a8e15348fd9afc523884f57d96a0414e4db07b1fb5770021"
+    }
+  ],
+  "checks": [
+    {
+      "argv": [
+        ".venv-pai/bin/python",
+        "tools/run_pai_acceptance.py",
+        "-q",
+        "tests/test_pai_delivery.py",
+        "tests/test_assistant_jobs.py",
+        "tests/test_assistant_actions.py",
+        "tests/test_assistant_egress.py"
+      ],
+      "environment": {
+        "PYTHONPATH": "src",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"
+      },
+      "exit_code": 0,
+      "duration_seconds": 42.014,
+      "log_path": ".playbook-artifacts/pai-validation-20261009-99-current/affected.log",
+      "log_sha256": "22a96d1a0f1cab2d7dc4106ff0446bc96d5ccdf7abb238cd8ac3ae638a9a8e62",
+      "result": "87 passed in 40.95s; strict scoped verification, zero skips/failures"
+    },
+    {
+      "argv": [
+        ".venv-pai/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_pai_plan.py",
+        "tests/test_playbook_bridge.py"
+      ],
+      "environment": {
+        "PYTHONPATH": "src",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"
+      },
+      "exit_code": 1,
+      "duration_seconds": 3.063,
+      "log_path": ".playbook-artifacts/pai-validation-20261009-99-current/plan.log",
+      "log_sha256": "f60b9cfce43ba2e7adce4d3362373133cfa1bf24256f825dc10aa82efe802eba",
+      "result": "4 failed, 44 passed in 2.64s; compact map exceeded pinned 20000-character limit"
+    },
+    {
+      "argv": [
+        ".venv-pai/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_pai_plan.py",
+        "tests/test_playbook_bridge.py"
+      ],
+      "environment": {
+        "PYTHONPATH": "src",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"
+      },
+      "exit_code": 0,
+      "result": "48 passed in 3.41s",
+      "log_path": ".playbook-artifacts/pai-validation-20261009-99-current/plan-corrected.log",
+      "log_sha256": "a24136d008204f8957ab8219e24be0ebd487da342fa3b6d6c7ff5881c24c4748"
+    },
+    {
+      "argv": [
+        ".venv-pai/bin/python",
+        "tools/playbook.py",
+        "--check-pin"
+      ],
+      "exit_code": 0,
+      "log_path": ".playbook-artifacts/pai-validation-20261009-99-current/pin.log",
+      "log_sha256": "a0bbdfed39cb015f3a6cad3c4c848a2ca577566ca3bc06104a9d61639e50d0c0",
+      "result": "Playbook pin verified; no model, hook or application runtime enabled."
+    },
+    {
+      "argv": [
+        ".venv-pai/bin/python",
+        "tools/check_pai_plan.py"
+      ],
+      "exit_code": 0,
+      "log_path": ".playbook-artifacts/pai-validation-20261009-99-current/matrix.log",
+      "log_sha256": "3ac8f22e48d470d88352af228e77b3edaba0f68bb886426d78cfa2f534c79c0a",
+      "result": "PAI plan: 32 registered packets; dependency/acceptance/PA coverage and pinned schema checks passed.\nSpec coverage: 69 exact requirement IDs, 10 mandatory scenarios; planned evidence is not a PASS.\nDesign state: draft; 2 planned test files absent; no product/review/human/live claim."
+    },
+    {
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "log_path": ".playbook-artifacts/pai-validation-20261009-99-current/diff.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": ""
+    }
+  ],
+  "status": "local_response_verified_independent102_required",
+  "preserved_prior_logs": [
+    {
+      "path": ".playbook-artifacts/pai-validation-20261009-99/affected.log",
+      "sha256": "fed767faea496d56a1ea0249be0a579a631a90e8f46c174babaa603885b83920",
+      "command_provenance": "prior turn did not bind argv; retained as dated evidence only"
+    },
+    {
+      "path": ".playbook-artifacts/pai-validation-20261009-99/corrected.log",
+      "sha256": "b4ce9d9c218c28d88924704c37d181ede3628becd10d255ce77808dcdc36bf38",
+      "command_provenance": "prior turn did not bind argv; retained as dated evidence only"
+    },
+    {
+      "path": ".playbook-artifacts/pai-validation-20261009-99/plan.log",
+      "sha256": "f1d486f8c7ac337f2bc838fad92c00f8e72d947af6e9b385d8b2c6665dd839db",
+      "command_provenance": "prior turn did not bind argv; retained as dated evidence only"
+    },
+    {
+      "path": ".playbook-artifacts/pai-validation-20261009-99/targeted.log",
+      "sha256": "9f8c7f007d842660586ef8bb13f3b86770ca7739741fcd4598b5ad1a1c4dd7b2",
+      "command_provenance": "prior turn did not bind argv; retained as dated evidence only"
+    }
+  ],
+  "changed_files": [
+    "docs/CODEX_PROMPT.md",
+    "docs/adr/ADR-013-pa-durable-runtime.md",
+    "docs/design/PAI.design.json",
+    "docs/design/PAI.md",
+    "docs/design/PAI.requirements.json",
+    "docs/tasks.md",
+    "docs/verification/PAI-next-review-packets.json",
+    "docs/verification/PAI-progress.md",
+    "src/prm/runtime/delivery.py",
+    "tests/test_pai_delivery.py"
+  ],
+  "actual_current_tooling_gate": ".playbook-artifacts/opencode-runs/opencode-29055ba0d75241f78f0b87bf446b71fa/result.json",
+  "review99_receipt_ref": "docs/verification/PAI-review-continuation-99.json",
+  "remaining_gates": [
+    "independent P1 recheck102",
+    "complete current four-part product/program sets",
+    "real pinned consumers",
+    "hash-bound human design approval",
+    "other governed roles/slices",
+    "live accounts/product paid egress/production/services/timers/release",
+    "PAI-27..29; conditional30/31 measured triggers"
+  ]
+}

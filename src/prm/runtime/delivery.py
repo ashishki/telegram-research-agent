@@ -67,6 +67,14 @@ class KnownDeliveryRejection(Exception):
     """Adapter proves the exact effect was rejected before acceptance."""
 
 
+class KnownDeliveryNotStarted(KnownDeliveryRejection):
+    """Trusted adapter proves no provider call started in this live invocation.
+
+    Only raise at a pre-callback boundary; a crash, missing receipt or failure
+    after callback entry cannot establish this outcome.
+    """
+
+
 class DeliveryExecutor:
     def __init__(self, target, *, registry: DurableCapabilityRegistry, sender):
         if type(registry) is not DurableCapabilityRegistry or registry.store.target != target:
@@ -123,7 +131,14 @@ class DeliveryExecutor:
             part={**payload,'text':'['+str(index+1)+'/'+str(len(parts))+']\n'+text,'part':index+1,'parts':len(parts)}
             attempt=self._deliver(owner=owner,delivery_id=delivery_id+'_part_'+str(index+1),kind='answer',source_ref=job_id,
                 destination_ref=destination_ref,payload=part,upper_bound=upper_bound,effect_lease=effect_lease)
-            if attempt['status']!='sent':return self.attempt(owner=owner,delivery_id=delivery_id)
+            if attempt['status']!='sent':
+                if index == 0 and attempt['status'] == 'not_sent':
+                    # This invocation stopped before any part was accepted.
+                    # Later-part failure cannot prove absence of earlier effects.
+                    with self.store.transaction() as tx:
+                        tx.conn.execute("UPDATE pa_delivery.attempts SET status='not_sent',reason=%s WHERE owner=%s AND id=%s AND status='unknown'",
+                            (attempt['reason'],owner,delivery_id))
+                return self.attempt(owner=owner,delivery_id=delivery_id)
             receipts.append(attempt['provider_receipt'])
         with self.store.transaction() as tx:
             tx.conn.execute("UPDATE pa_delivery.attempts SET status='sent',provider_receipt=%s,reason='all_parts_provider_accepted' WHERE owner=%s AND id=%s AND status='unknown'",
@@ -240,7 +255,9 @@ class DeliveryExecutor:
             for group in groups:group[0].reservation.abandon_before_transport()
             raise
         status, receipt, reason = 'unknown', '', 'transport_outcome_unknown'
+        known_adapter_outcome = None
         def transport():
+            nonlocal known_adapter_outcome
             with self.store.transaction() as tx:
                 if kind == 'answer':
                     from .deletion import lineage_lock
@@ -259,7 +276,14 @@ class DeliveryExecutor:
                 row = tx.conn.execute('SELECT * FROM pa_delivery.attempts WHERE owner=%s AND id=%s FOR UPDATE', (owner, delivery_id)).fetchone()
                 if row['status'] != 'unknown' or row['digest'] != digest:
                     raise CapabilityDenied('attempt already settled or changed')
-                result = self.sender(destination_ref, payload['text'], row['attempt_ref'])
+                try:
+                    result = self.sender(destination_ref, payload['text'], row['attempt_ref'])
+                except KnownDeliveryNotStarted:
+                    known_adapter_outcome = 'transport_not_started'
+                    raise
+                except KnownDeliveryRejection:
+                    known_adapter_outcome = 'provider_rejected'
+                    raise
                 if tx.conn.closed:
                     raise StorageError('final scope connection lost; retain unknown attempt')
                 return result
@@ -268,10 +292,16 @@ class DeliveryExecutor:
             if type(result) is not TransportReceipt or not isinstance(result.provider_receipt, str) or not 0 < len(result.provider_receipt) <= 256:
                 raise StorageError('typed actual provider receipt required')
             status, receipt, reason = 'sent', result.provider_receipt, 'provider_accepted'
+        except KnownDeliveryNotStarted:
+            status, reason = 'not_sent', 'transport_not_started'
         except KnownDeliveryRejection:
             status, reason = 'not_sent', 'provider_rejected'
         except Exception:
-            pass
+            # Shared policy deliberately wraps transport errors as unknown.
+            # Preserve only typed evidence captured from this exact adapter call;
+            # absence of a local row/receipt or arbitrary error text proves nothing.
+            if known_adapter_outcome is not None:
+                status, reason = 'not_sent', known_adapter_outcome
         with self.store.transaction() as tx:
             row = tx.conn.execute('SELECT status FROM pa_delivery.attempts WHERE owner=%s AND id=%s FOR UPDATE', (owner, delivery_id)).fetchone()
             if row['status'] == 'unknown':
@@ -390,5 +420,7 @@ class DeliveryExecutor:
         attempt = self.attempt(owner=owner, delivery_id=delivery_id)
         if attempt is None:
             return 'Попытка доставки не найдена.'
+        if attempt['status'] == 'not_sent' and attempt['reason'] == 'transport_not_started':
+            return 'Отправка не началась. Автоматического повтора нет.'
         return {'unknown': 'Исход доставки неизвестен. Повтор заблокирован; нужна сверка с провайдером.',
                 'sent': 'Доставка подтверждена провайдером.', 'not_sent': 'Провайдер подтвердил отсутствие доставки. Автоматического повтора нет.'}[attempt['status']]

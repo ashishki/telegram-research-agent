@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "status": "native92_advisory_preserved_additional_alias_p1_fixed_recheck93_next",
-  "current_approved_call_cap": 101,
-  "calls_consumed_including_failures": 92,
+  "status": "actual99_stop_p1_local_response_verified_recheck102_required",
+  "current_approved_call_cap": 109,
+  "calls_consumed_including_failures": 101,
   "proposed_total_cap": 34,
   "new_calls_maximum": 3,
   "third_call": "only if an actual new finding needs independent recheck",
@@ -1894,52 +1894,52 @@
   },
   "native_design_allocations": [
     {
-      "call_number": 94,
-      "role": "product_design_review",
-      "slice_group": "product",
-      "status": "blocked_actual_tooling93_then_product_p1_recheck94"
-    },
-    {
-      "call_number": 95,
-      "role": "program_design_review",
-      "slice_group": "foundation",
-      "status": "blocked_actual_tooling93_then_product_p1_recheck94"
-    },
-    {
-      "call_number": 96,
+      "call_number": 102,
       "role": "program_design_review",
       "slice_group": "product",
-      "status": "blocked_actual_tooling93_then_product_p1_recheck94"
+      "status": "allocated_review99_p1_independent_recheck"
     },
     {
-      "call_number": 97,
+      "call_number": 103,
+      "role": "program_design_review",
+      "slice_group": "foundation",
+      "status": "blocked_actual102_p1_closure"
+    },
+    {
+      "call_number": 104,
       "role": "program_design_review",
       "slice_group": "sources",
-      "status": "blocked_actual_tooling93_then_product_p1_recheck94"
+      "status": "blocked_actual102_p1_closure"
     },
     {
-      "call_number": 98,
+      "call_number": 105,
       "role": "program_design_review",
       "slice_group": "completeness",
-      "status": "blocked_actual_tooling93_then_product_p1_recheck94"
+      "status": "blocked_actual102_p1_closure"
     },
     {
-      "call_number": 99,
+      "call_number": 106,
       "role": "product_design_review",
       "slice_group": "foundation",
-      "status": "blocked_actual_tooling93_then_product_p1_recheck94"
+      "status": "blocked_actual102_p1_closure"
     },
     {
-      "call_number": 100,
+      "call_number": 107,
+      "role": "product_design_review",
+      "slice_group": "product",
+      "status": "blocked_actual102_p1_closure"
+    },
+    {
+      "call_number": 108,
       "role": "product_design_review",
       "slice_group": "sources",
-      "status": "blocked_actual_tooling93_then_product_p1_recheck94"
+      "status": "blocked_actual102_p1_closure"
     },
     {
-      "call_number": 101,
+      "call_number": 109,
       "role": "product_design_review",
       "slice_group": "completeness",
-      "status": "blocked_actual_tooling93_then_product_p1_recheck94"
+      "status": "blocked_actual102_p1_closure"
     }
   ],
   "native_tooling_recheck_66": {
@@ -2346,11 +2346,171 @@
   },
   "native_tooling_recheck_93": {
     "call_number": 93,
-    "status": "allocated_not_invoked",
+    "status": "native_tooling_completed",
     "model": "glm-5.3",
     "requested_effort": "max",
     "output_cap": 131072,
     "timeout": 7200,
     "purpose": "independent canonical-feature-ID alias recheck and legacy-run bridge policy closure"
-  }
+  },
+  "native_design_allocation_history_94_eof": [
+    {
+      "call_number": 94,
+      "role": "product_design_review",
+      "slice_group": "product",
+      "status": "native_design_no_valid_verdict"
+    },
+    {
+      "call_number": 95,
+      "role": "program_design_review",
+      "slice_group": "foundation",
+      "status": "blocked_actual_tooling93_then_product_p1_recheck94"
+    },
+    {
+      "call_number": 96,
+      "role": "program_design_review",
+      "slice_group": "product",
+      "status": "blocked_actual_tooling93_then_product_p1_recheck94"
+    },
+    {
+      "call_number": 97,
+      "role": "program_design_review",
+      "slice_group": "sources",
+      "status": "blocked_actual_tooling93_then_product_p1_recheck94"
+    },
+    {
+      "call_number": 98,
+      "role": "program_design_review",
+      "slice_group": "completeness",
+      "status": "blocked_actual_tooling93_then_product_p1_recheck94"
+    },
+    {
+      "call_number": 99,
+      "role": "product_design_review",
+      "slice_group": "foundation",
+      "status": "blocked_actual_tooling93_then_product_p1_recheck94"
+    },
+    {
+      "call_number": 100,
+      "role": "product_design_review",
+      "slice_group": "sources",
+      "status": "blocked_actual_tooling93_then_product_p1_recheck94"
+    },
+    {
+      "call_number": 101,
+      "role": "product_design_review",
+      "slice_group": "completeness",
+      "status": "blocked_actual_tooling93_then_product_p1_recheck94"
+    }
+  ],
+  "native_design_allocation_history_95_eof_diagnostic96": [
+    {
+      "call_number": 95,
+      "role": "product_design_review",
+      "slice_group": "product",
+      "status": "native_design_no_valid_verdict"
+    },
+    {
+      "call_number": 96,
+      "role": "program_design_review",
+      "slice_group": "foundation",
+      "status": "blocked_product95_p1_closure"
+    },
+    {
+      "call_number": 97,
+      "role": "program_design_review",
+      "slice_group": "product",
+      "status": "blocked_product95_p1_closure"
+    },
+    {
+      "call_number": 98,
+      "role": "program_design_review",
+      "slice_group": "sources",
+      "status": "blocked_product95_p1_closure"
+    },
+    {
+      "call_number": 99,
+      "role": "program_design_review",
+      "slice_group": "completeness",
+      "status": "blocked_product95_p1_closure"
+    },
+    {
+      "call_number": 100,
+      "role": "product_design_review",
+      "slice_group": "foundation",
+      "status": "blocked_product95_p1_closure"
+    },
+    {
+      "call_number": 101,
+      "role": "product_design_review",
+      "slice_group": "sources",
+      "status": "blocked_product95_p1_closure"
+    },
+    {
+      "call_number": 102,
+      "role": "product_design_review",
+      "slice_group": "completeness",
+      "status": "blocked_product95_p1_closure"
+    }
+  ],
+  "diagnostic96": {
+    "status": "complete_transport_only_semantic_unreliable",
+    "purpose": "small exact P1 source extracts to diagnose repeated early EOF with same max limits",
+    "governed_role_receipt": false,
+    "human_approval": false,
+    "result_ref": "docs/verification/PAI-review-continuation-96.json",
+    "verdict": "ADVISORY",
+    "semantic_quality": "Invented pkg/parc/task.py, unsupplied PAI05/06 claims and inconsistent timeout numbers; no factual P1 closure/human/governed acceptance inferred."
+  },
+  "native_design_allocation_history_98_101": [
+    {
+      "call_number": 97,
+      "role": "product_design_review",
+      "slice_group": "product",
+      "status": "native_design_phase_completed"
+    },
+    {
+      "call_number": 98,
+      "role": "program_design_review",
+      "slice_group": "foundation",
+      "status": "native_design_phase_completed"
+    },
+    {
+      "call_number": 99,
+      "role": "program_design_review",
+      "slice_group": "product",
+      "status": "native_design_phase_completed"
+    },
+    {
+      "call_number": 100,
+      "role": "program_design_review",
+      "slice_group": "sources",
+      "status": "native_design_no_valid_verdict"
+    },
+    {
+      "call_number": 101,
+      "role": "program_design_review",
+      "slice_group": "completeness",
+      "status": "native_design_no_valid_verdict"
+    },
+    {
+      "call_number": 102,
+      "role": "product_design_review",
+      "slice_group": "foundation",
+      "status": "blocked_diagnostic96_then_full_product97_p1_closure"
+    },
+    {
+      "call_number": 103,
+      "role": "product_design_review",
+      "slice_group": "sources",
+      "status": "blocked_diagnostic96_then_full_product97_p1_closure"
+    },
+    {
+      "call_number": 104,
+      "role": "product_design_review",
+      "slice_group": "completeness",
+      "status": "blocked_diagnostic96_then_full_product97_p1_closure"
+    }
+  ],
+  "allocation_102_109_reason": "Necessary independent review99 P1 recheck plus complete fresh four-part sets at one corrected committed design. Ongoing owner-authorized review budget increases; no automatic retry or fallback. Historical97/98 changed-design records cannot fill current slots;100/101 timed out and count as consumed."
 }

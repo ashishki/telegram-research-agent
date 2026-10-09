@@ -542,3 +542,36 @@ Native91 STOP actualf64c504,995.972s, observed glm-5.3/requested max/observed un
 Native tooling review #92 reserved under ongoing authority at 9337faf3e5f65eb958558a1745922e26f2f98c41; one bounded request, max, no automatic retry.
 
 Actual92 ADVISORY9337faf,935.685s, usage50820/47418/98238 independently closes91. Readonly real-parser/mock-executor probe separately proved absolute feature-id alias skips PAI audit while resolving PAI registry; no real approval. Canonical ASCII-ID/path/traversal/whitespace guard added after92 returned; generic bridge now historical verify/help only for legacy Codex runner.175 final scoped tests7.20s/pin/32/69/ten passed; no tests weakened.92 consumed; fresh93 required for new alias/policy source,101 count allocation includes full design94..101, first94 actual88 P1 recheck. Original ADVISORY/STOP/failures retained; no human/live/release approval.
+
+Native tooling review #93 reserved under ongoing authority at 9098d0c3a0dac4f395cda82a3bf2348bb2d11f69; one bounded request, max, no automatic retry.
+
+Native design review #94 allocated under ongoing authority; product_design_review/product; HEAD 9098d0c3a0dac4f395cda82a3bf2348bb2d11f69; one bounded request, no automatic retry.
+
+Actual93 ADVISORY9098d0c,705.182s, usage51072/38957/90029, observed glm-5.3/requested max/observed unknown; no P0/P1. Genuine current tooling gate accepted; duplicate/canonical-ID/legacy-route corrections independently covered. Three P2 notes retained (tier bridge-test coverage, manual matrix label, mutable authority provenance); no critical-source change while fresh design set runs. Next actual product94 P1 recheck in flight at SAME9098d0c, then program95..98/product99..101 if clear; all actual four-part sets required, no human/live/release approval.93 consumed before94.
+
+Actual94 product/product P1 recheck at9098d0c ended EOF35.535s, wire399232/final0/finish none, no verdict/model/usage; not token/deadline limit. Original failure/unknown cost retained,94 consumed. Root inspected exact failure; allocate ONE fresh standalone95 same scope/max/input1MB/output131072/watchdog7200, no automatic retry/model fallback; remaining full groups96..102 only after P1 closure. Current genuine tooling93 remains accepted; no source/HEAD changes.
+
+Native design review #95 allocated under ongoing authority; product_design_review/product; HEAD 9098d0c3a0dac4f395cda82a3bf2348bb2d11f69; one bounded request, no automatic retry.
+
+Actual95 also premature EOF25.471s, wire334541/final0/finish none, no model/usage/verdict;95 consumed, failure unchanged. No automatic third identical full request. One explicit smaller exact public P1 diagnostic96 started with SAME max/output131072/7200, actual committed source hashes, actual current93 gate, no governed/human acceptance. Provider Go docs list rolling5h/weekly/monthly limits, but account quota/exhaustion is UNVERIFIED and not inferred from EOF. Allocation104 includes diagnostic96 and conditional full product97/program98..101/product102..104 only after stable provider/current P1 closure; no model change or permission loop.
+
+Native design review #97 allocated under ongoing authority; product_design_review/product; HEAD 9098d0c3a0dac4f395cda82a3bf2348bb2d11f69; one bounded request, no automatic retry.
+
+Diagnostic96 returned complete schema-valid ADVISORY238.149s, observed glm-5.3/requested max/observed effort unknown, usage2888/14624/17512; transport completion only. Its invented pkg/parc/task.py/unsupplied PAI05/06 claims/inconsistent bounds make the semantic text unreliable; original report retained, no factual P1/governed/human closure inferred.96 consumed. One actual full product97 P1 recheck now in flight at unchanged9098d0c with complete206038-byte packet and max/131072/7200; no diagnostic substituted.
+
+Native design batch98..101 reserved at9098d0c3a0dac4f395cda82a3bf2348bb2d11f69; independent parts, each max/131072/7200, one request each/no retry; no human authority.
+
+Actual FULL product/product97 ADVISORY9098d0c after752.238s, observed glm-5.3/requested max/observed unknown, usage43743/47106/90849, no P0/P1; current full packet independently verifies corrected PG->SQLite and security mapping/node registrations. Smaller96 never substituted; actual97 P2/limitations kept.97 consumed before new program98..101 independent batch at SAME9098d0c, then remaining product102..104 if clear; no human/full-release approval.
+
+2026-10-09 continuation reconciled completed98..101:98 ADVISORY;99 STOP1P1/3P2;
+100/101 watchdog failures at7202s, no verdict/usage/identity, unknown outcome/cost.
+101 consumed including failures; no reviews still running. Review99 local response
+binds trusted pre-callback not_sent vs post-callback unknown, honest UI, multipart
+first-part absence vs prior accepted-part fences; no automatic resend/refund.
+PAI-10 CLI/PAI-28 legacy-writer ownership clarified; PAI-12 exact security node stays
+open P2. Current scoped87passed40.95s/zero skips, corrected plan48passed3.41s,
+pin/32/69/ten/diff pass; initial plan4fail/44pass and prior typed-wrapper failure
+preserved. PAI-validation-20261009-99.json and PAI-design-99-response.md bind facts.
+Actual current-tooling93 gate passes unchanged hashes; fresh corrected design
+requires102 independent program/product P1 recheck, then103..109 all remaining
+parts at one HEAD. Allocate109 under ongoing authority; none new invoked yet.

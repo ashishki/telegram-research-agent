@@ -816,7 +816,7 @@ Acceptance-Criteria:
   - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
 Verification:
   - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_delivery.py tests/test_assistant_jobs.py tests/test_assistant_actions.py tests/test_assistant_egress.py
-  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_delivery.py::test_postgres_authority_spans_legacy_sqlite_send
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_delivery.py::test_postgres_authority_spans_legacy_sqlite_send tests/test_pai_delivery.py::test_sqlite_busy_boundary_distinguishes_no_send tests/test_pai_delivery.py::test_multipart_not_started_does_not_claim_absence_after_prior_send
 Context-Refs:
   - docs/PA_IMPLEMENTATION_TASKS.md#pai-09
   - docs/design/PAI.md

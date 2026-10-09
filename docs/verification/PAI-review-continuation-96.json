@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "call_number": 96,
+  "status": "advisory_diagnostic_complete",
+  "purpose": "inspect recurring94/95 early EOF with smaller exact public P1 extracts, same max, no automatic retry",
+  "provider": "opencode_go",
+  "requested_model": "glm-5.3",
+  "requested_effort": "max",
+  "observed_effort": "unknown",
+  "head_sha": "9098d0c3a0dac4f395cda82a3bf2348bb2d11f69",
+  "input_sha256": "9cc8e5d2dcc14a49603e5bc98d600aa146d901db6407d9d0cd16beddf3ae8fac",
+  "input_bytes": 11416,
+  "output_token_cap": 131072,
+  "timeout_seconds": 7200,
+  "call_cap": 1,
+  "read_only": true,
+  "human_authority": false,
+  "governed_role_receipt": false,
+  "design_approval_record": false,
+  "verdict": "ADVISORY",
+  "observed_model": "glm-5.3",
+  "usage": {
+    "prompt_tokens": 2888,
+    "completion_tokens": 14624,
+    "total_tokens": 17512,
+    "prompt_tokens_details": {
+      "audio_tokens": null,
+      "cached_tokens": 12
+    }
+  },
+  "report_path": ".playbook-artifacts/pai-diagnostic96/report.json",
+  "report_sha256": "d7086de20834940103b0a17724543def81b476df176deee3d03d0fcba2812969",
+  "provider_call_attempted": true,
+  "duration_seconds": 238.149
+}

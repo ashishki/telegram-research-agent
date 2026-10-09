@@ -584,7 +584,8 @@
         "tests/test_assistant_egress.py",
         "tests/fixtures/assistant/**",
         "tools/test_tiers.py",
-        "src/prm/runtime/composition.py"
+        "src/prm/runtime/composition.py",
+        "src/prm/runtime/delivery.py"
       ],
       "change_budget": "files<=24",
       "dependencies": [
@@ -595,7 +596,9 @@
       "expected_interfaces": [
         "PA requirement coverage: PA-02, PA-09, PA-13",
         "docs/PA_IMPLEMENTATION_TASKS.md#pai-09",
-        "Explicit security-path acceptance: tests/test_pai_delivery.py::test_postgres_authority_spans_legacy_sqlite_send"
+        "Explicit security-path acceptance: tests/test_pai_delivery.py::test_postgres_authority_spans_legacy_sqlite_send",
+        "Trusted pre-callback SQLite busy => not_sent/transport_not_started; post-callback busy => unknown/no replay: tests/test_pai_delivery.py::test_sqlite_busy_boundary_distinguishes_no_send",
+        "Multipart first-part known-no-effect is not_sent; any accepted earlier part keeps the aggregate fenced: tests/test_pai_delivery.py::test_multipart_not_started_does_not_claim_absence_after_prior_send"
       ],
       "forbidden_files": [
         ".env",
@@ -607,7 +610,7 @@
       ],
       "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
       "rollback": "stop новых effects, reconciliation/read-only оставить доступными.",
-      "scope": "подключить durable attempts/receipts к foreground/background delivery; отдельные purposes сохранить. Выполнить согласованное в PAI-01 упорядочивание pause/revoke/send. Не выносить `sender` из SQLite transaction без эквивалентного доказанного поведения. Ввести provider reconciliation adapter и UI для unknown; receipts выдаются после реального transport результата. PG authority rows lock before SQLite; hold across the entire retained locked-send and bounded transport. Recheck quiet hours at actual delivery; durable prepared/unknown reply fences are preserved.",
+      "scope": "подключить durable attempts/receipts к foreground/background delivery; отдельные purposes сохранить. Выполнить согласованное в PAI-01 упорядочивание pause/revoke/send. Не выносить `sender` из SQLite transaction без эквивалентного доказанного поведения. Ввести provider reconciliation adapter и UI для unknown; receipts выдаются после реального transport результата. PG authority rows lock before SQLite; hold across the entire retained locked-send and bounded transport. Recheck quiet hours at actual delivery; durable prepared/unknown reply fences are preserved. Known pre-callback SQLite busy is not_sent, not unknown; callback-entry/worker-loss uncertainty remains fenced. All durable foreground/background sends use one effect executor; explicit new authorized attempts only, no blind resend.",
       "slice_id": "PAI-09",
       "status": "planned",
       "user_visible_outcome": "ответ, Watch и действие проходят один контракт последнего разрешения и правдиво показывают исход.",
@@ -633,7 +636,9 @@
             "{python}",
             "tools/run_pai_acceptance.py",
             "-q",
-            "tests/test_pai_delivery.py::test_postgres_authority_spans_legacy_sqlite_send"
+            "tests/test_pai_delivery.py::test_postgres_authority_spans_legacy_sqlite_send",
+            "tests/test_pai_delivery.py::test_sqlite_busy_boundary_distinguishes_no_send",
+            "tests/test_pai_delivery.py::test_multipart_not_started_does_not_claim_absence_after_prior_send"
           ],
           "expected_exit_code": 0,
           "required": true,
@@ -661,7 +666,8 @@
         "tests/test_openai_provider.py",
         "tests/test_llm_client.py",
         "tests/fixtures/assistant/**",
-        "tools/test_tiers.py"
+        "tools/test_tiers.py",
+        "src/prm/cli.py"
       ],
       "change_budget": "files<=24",
       "dependencies": [
@@ -1891,7 +1897,8 @@
         "docs/PA_IMPLEMENTATION_TASKS.md",
         "docs/design/PAI.md",
         "docs/design/PAI.design.json",
-        "docs/adr/ADR-01*.md"
+        "docs/adr/ADR-01*.md",
+        "src/external_watch/**"
       ],
       "change_budget": "files<=24",
       "dependencies": [
@@ -1912,7 +1919,7 @@
       ],
       "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
       "rollback": "утверждённый runbook с сохранением новых receipts/unknown/tombstones; старый snapshot автоматически не восстанавливать.",
-      "scope": " External gate: no live effect, paid call, service or production change without its separate scoped authority. Structure checks alone cannot complete this card; refine exact canary/runbook commands at PAI-26.",
+      "scope": " External gate: no live effect, paid call, service or production change without its separate scoped authority. Structure checks alone cannot complete this card; refine exact canary/runbook commands at PAI-26. Own the approved stop/rewire coordination for legacy external_watch timers/writers before durable delivery cutover; no simultaneous legacy/new delivery writers. Default cutover has one serial effect dispatcher. Prepare the patch/runbook locally; actual timers/services still need separate scoped cutover authority.",
       "slice_id": "PAI-28",
       "status": "planned",
       "user_visible_outcome": "нужный SHA работает в назначенной среде с проверенной БД, worker, scheduler и управляемыми capabilities.",

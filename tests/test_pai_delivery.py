@@ -186,6 +186,66 @@ def test_postgres_authority_spans_legacy_sqlite_send(case,tmp_path,monkeypatch,w
     with sqlite3.connect(path) as conn:assert conn.execute('SELECT count(*) FROM sent').fetchone()[0]==(1 if winner=='dispatch' else 0)
 
 
+@pytest.mark.parametrize('boundary',['before_sender','after_sender'])
+def test_sqlite_busy_boundary_distinguishes_no_send(case,tmp_path,boundary):
+    import sqlite3
+    from prm.runtime.delivery import KnownDeliveryNotStarted
+    scheduler,registry,sub,clock,actor=case
+    grants(case);notification=pending_watch(case)[0];path=tmp_path/'busy-send.sqlite';calls=[]
+    with sqlite3.connect(path) as conn:conn.execute('CREATE TABLE sent(attempt TEXT PRIMARY KEY)')
+    blocker=sqlite3.connect(path,isolation_level=None)
+    blocker.execute('BEGIN IMMEDIATE' if boundary=='before_sender' else 'BEGIN')
+    if boundary=='after_sender':blocker.execute('SELECT count(*) FROM sent').fetchone()
+    def sender(destination,text,attempt):
+        conn=sqlite3.connect(path,timeout=.1)
+        try:
+            try:conn.execute('BEGIN IMMEDIATE')
+            except sqlite3.OperationalError:
+                # At this exact boundary no provider callback has been entered.
+                raise KnownDeliveryNotStarted() from None
+            calls.append(attempt)  # Synthetic provider accepted, outside SQLite durability.
+            conn.execute('INSERT INTO sent VALUES(?)',(attempt,));conn.commit()
+            return TransportReceipt('synthetic_busy_receipt')
+        finally:conn.close()
+    executor=DeliveryExecutor(scheduler.queue.store.target,registry=registry,sender=sender)
+    try:result=executor.deliver_watch(owner=sub.owner_ref,notification_id=notification,upper_bound=1)
+    finally:blocker.rollback();blocker.close()
+    if boundary=='before_sender':
+        assert result['status']=='not_sent' and result['reason']=='transport_not_started' and not calls
+        assert executor.describe(owner=sub.owner_ref,delivery_id=result['id'])=='Отправка не началась. Автоматического повтора нет.'
+    else:
+        assert result['status']=='unknown' and len(calls)==1
+    # Empty SQLite state cannot erase a possible accepted provider effect.
+    with sqlite3.connect(path) as conn:assert conn.execute('SELECT count(*) FROM sent').fetchone()[0]==0
+    again=executor.deliver_watch(owner=sub.owner_ref,notification_id=notification,upper_bound=1)
+    assert again['attempt_ref']==result['attempt_ref'] and len(calls)==(0 if boundary=='before_sender' else 1)
+
+
+@pytest.mark.parametrize('accepted_parts',[0,1])
+def test_multipart_not_started_does_not_claim_absence_after_prior_send(case,accepted_parts):
+    from prm.runtime.delivery import KnownDeliveryNotStarted
+    scheduler,registry,sub,clock,actor=case
+    grants(case);store=scheduler.queue.store
+    item=store.put(sub.owner_ref,'conversation','input_multipart_not_started',{'query':'Synthetic'},expected_version=0)
+    job=scheduler.queue.enqueue(owner=sub.owner_ref,idempotency_key='multipart_not_started',deadline=datetime.now(timezone.utc)+timedelta(minutes=5),
+        payload={'schema_version':1,'input_namespace':'conversation','input_ref':item.object_id,'input_version':1,'input_digest':item.digest,
+            'connection_ref':None,'resource_ref':'resource_multipart','purpose':'local.assistant','consent_revision':1})
+    scheduler.queue.complete(scheduler.queue.claim(owner=sub.owner_ref),{'text':'Synthetic '*800,'data_class':'private_archive'})
+    calls=[]
+    def sender(destination,text,attempt):
+        if len(calls)==accepted_parts:raise KnownDeliveryNotStarted()
+        calls.append(attempt)
+        return TransportReceipt('synthetic_part_'+str(len(calls)))
+    executor=DeliveryExecutor(store.target,registry=registry,sender=sender)
+    result=executor.deliver_result(owner=sub.owner_ref,job_id=job,destination_ref='destination_private',upper_bound=1)
+    assert result['status']==('not_sent' if accepted_parts==0 else 'unknown')
+    assert len(calls)==accepted_parts
+    child=executor.attempt(owner=sub.owner_ref,delivery_id=result['id']+'_part_'+str(accepted_parts+1))
+    assert child['status']=='not_sent' and child['reason']=='transport_not_started'
+    assert executor.deliver_result(owner=sub.owner_ref,job_id=job,destination_ref='destination_private',upper_bound=1)['attempt_ref']==result['attempt_ref']
+    assert len(calls)==accepted_parts
+
+
 def test_revoke_winning_before_final_send_and_foreground_scope_separation(case, monkeypatch):
     scheduler, registry, sub, clock, actor = case
     grants(case); job = completed(case); calls = []

@@ -49,11 +49,10 @@ code/tests/REVIEW_POLICY. Any such change invalidates that gate; re-audit before
 consuming design receipts. Bootstrap diagnostics/historical provisional reports
 remain evidence only. No tooling reviewer grants human feature completion.
 
-Current native79: ADVISORY at88da0f5, observed glm-5.3,0 P0/0 P1/4 P2.
-Actual require_tooling_audit accepted unchanged critical hashes; full result/
-report/command bindings are in ADR-013 §Current tooling audit and
-PAI-review-continuation-79.json. Audit78 remains an incomplete historical
-attempt, not the current gate. This wording change does not alter audited tooling.
+Current native93: ADVISORY at9098d0c, observed glm-5.3, no P0/P1.
+Actual require_tooling_audit checks current critical hashes; exact evidence:
+PAI-review-continuation-93.json. Native79 retains historical sources. Requested
+max/unknown observed effort and fixtures do not grant human design approval.
 
 ## 3. System Impact
 
@@ -296,7 +295,7 @@ Project brief/planning depth are selected. Exact hash-bound feature design,
 live account/retention/cost/provider decisions and conditional scaling remain
 pending; neither time nor a configured key supplies them.
 
-Requirements-matrix-SHA256: d0075efd8970da25348c3aab2dd573b1fd535f5105025ccf02dd57ae227cd119
+Requirements-matrix-SHA256: c87254f2fde85cc110d746011e64e3445aaa9aab0bad2bc73b136b3fd3a3f845
 
 ## 9. Human Approval
 
