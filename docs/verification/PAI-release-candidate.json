@@ -4,14 +4,16 @@
   "candidate_head": "ea9d36acc7a53a49e3c228956661927ac2a5c68f",
   "runtime_change_commit": "caf97a7",
   "canonical_matrix_ref": "docs/design/PAI.requirements.json",
-  "canonical_matrix_sha256": "32d8dbbc05cb690887a37ba3cc63f5510108b0bc785ef7ea118330363e5a5ee7",
+  "canonical_matrix_sha256": "d0075efd8970da25348c3aab2dd573b1fd535f5105025ccf02dd57ae227cd119",
   "synthetic_full_tier": {
     "status": "passed",
     "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/test_tiers.py pai-complete",
     "log_path": ".playbook-artifacts/pai-validation-20261008/pai-complete-caf97a7.log",
     "result": "320 passed in 962.74 s; exact69 requirements/ten scenarios; zero skips/failures",
     "source_snapshot": "caf97a7 runtime",
-    "log_sha256": "e4dcb89291785c7958a3f87f6979bfdcc89d1092878ee1ea5cc7a1436a66ddd5"
+    "log_sha256": "e4dcb89291785c7958a3f87f6979bfdcc89d1092878ee1ea5cc7a1436a66ddd5",
+    "matrix_sha256_at_observed_run": "32d8dbbc05cb690887a37ba3cc63f5510108b0bc785ef7ea118330363e5a5ee7",
+    "current_matrix_reconciliation": "new SEC bindings not a rerun of the full tier; scoped62 actual cases passed; prior320 remains dated"
   },
   "requirements": [
     {
@@ -1709,10 +1711,10 @@
     }
   ],
   "formal_review": {
-    "program_design_review": "phase80 STOP preserved; stale reviewer design wording locally corrected; fresh foundation81 independent recheck next, complete81..84 set not accepted",
-    "product_design_review": "pending_native_complete_aggregation",
+    "program_design_review": "historical full32/spec0..15 ADVISORY84155e2, stale for corrected current design; fresh93..96 pending",
+    "product_design_review": "87/89/90 ADVISORY and88 STOP preserved; concrete2P1 fixes62 scoped cases/157 tooling tests verified; independent92/current full set pending",
     "slice_test_critic_privacy_maintainability": "non-Codex governed adapter/receipts remain pending; advisory source rechecks are not substituted",
-    "tooling": "Actual native GLM79 ADVISORY at88da0f5; current real gate accepted;0 P0/0 P1/4 P2 retained; requested max, output131072,7200s; observed glm-5.3/effort unknown."
+    "tooling": "historical79 ADVISORY; new input/schema/policy changes require genuine91, not invoked before scoped commit"
   },
   "live_provider_evidence": false,
   "human_design_approval": false,
@@ -2071,8 +2073,8 @@
     "reviewed_head": "88da0f54aad02b58ec1c606e0360c47223ba34e4",
     "tooling_verdict": "ADVISORY",
     "tooling_gate": "accepted_current_unchanged_sources",
-    "design_parts": "fresh81..88 allocated after80 STOP; first81 required independent P1 recheck",
-    "calls_consumed": 80,
+    "design_parts": "fresh92..99 allocated; first92 product/product P1 recheck after actual91 tooling",
+    "calls_consumed": 90,
     "human_design_approval": false
   }
 }

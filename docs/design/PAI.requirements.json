@@ -168,10 +168,12 @@
         "src/prm/watch_jobs.py",
         "src/prm/confirmed_actions.py",
         "src/bot/telegram_delivery.py",
-        "src/bot/prm_handlers.py"
+        "src/bot/prm_handlers.py",
+        "src/prm/runtime/composition.py"
       ],
       "verification_refs": [
-        "PAI-09/acceptance"
+        "PAI-09/acceptance",
+        "PAI-09/security_path_acceptance"
       ],
       "test_files": [
         "tests/test_pai_delivery.py",
@@ -191,7 +193,8 @@
         "src/bot/bot.py"
       ],
       "verification_refs": [
-        "PAI-10/acceptance"
+        "PAI-10/acceptance",
+        "PAI-10/security_path_acceptance"
       ],
       "test_files": [
         "tests/test_pai_chat_runtime.py",
@@ -213,7 +216,8 @@
         "src/prm/runtime/composition.py"
       ],
       "verification_refs": [
-        "PAI-11/acceptance"
+        "PAI-11/acceptance",
+        "PAI-11/security_path_acceptance"
       ],
       "test_files": [
         "tests/test_pai_archive_search.py",
@@ -254,7 +258,8 @@
         "src/prm/research_worker.py"
       ],
       "verification_refs": [
-        "PAI-13/acceptance"
+        "PAI-13/acceptance",
+        "PAI-13/security_path_acceptance"
       ],
       "test_files": [
         "tests/test_pai_deep_research.py",
@@ -292,7 +297,8 @@
         "src/prm/runtime/reader.py",
         "src/bot/prm_handlers.py",
         "src/prm/briefs.py",
-        "src/prm/pdf_inspection.py"
+        "src/prm/pdf_inspection.py",
+        "src/prm/runtime/composition.py"
       ],
       "verification_refs": [
         "PAI-15/acceptance"
@@ -1564,7 +1570,9 @@
     {
       "spec_id": "SEC-01",
       "slices": [
+        "PAI-11",
         "PAI-12",
+        "PAI-13",
         "PAI-17",
         "PAI-19",
         "PAI-21",
@@ -1581,7 +1589,11 @@
         "PAI-26/acceptance",
         "PAI-26/focused-prm",
         "PAI-26/retrofit-boundaries",
-        "PAI-26/project_verifier"
+        "PAI-26/project_verifier",
+        "PAI-11/acceptance",
+        "PAI-11/security_path_acceptance",
+        "PAI-13/acceptance",
+        "PAI-13/security_path_acceptance"
       ],
       "review_roles": [
         "slice_review",
@@ -1589,12 +1601,17 @@
         "privacy_review"
       ],
       "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
-      "status": "planned"
+      "status": "planned",
+      "security_test_nodes": [
+        "tests/test_pai_archive_search.py::test_retrieved_archive_injection_cannot_create_authority_or_effects",
+        "tests/test_pai_deep_research.py::test_research_tool_result_injection_cannot_create_authority_or_effects"
+      ]
     },
     {
       "spec_id": "SEC-02",
       "slices": [
         "PAI-03",
+        "PAI-10",
         "PAI-16",
         "PAI-22"
       ],
@@ -1602,7 +1619,9 @@
       "verification_refs": [
         "PAI-03/acceptance",
         "PAI-16/acceptance",
-        "PAI-22/acceptance"
+        "PAI-22/acceptance",
+        "PAI-10/acceptance",
+        "PAI-10/security_path_acceptance"
       ],
       "review_roles": [
         "slice_review",
@@ -1610,7 +1629,10 @@
         "privacy_review"
       ],
       "human_gate": "PAI-29 / PA-18 exact owner acceptance; synthetic/live/visual evidence separate",
-      "status": "planned"
+      "status": "planned",
+      "security_test_nodes": [
+        "tests/test_pai_chat_runtime.py::test_chat_fallback_provider_without_data_class_grant_is_not_called"
+      ]
     },
     {
       "spec_id": "SEC-03",
@@ -2035,7 +2057,10 @@
       "scenario_id": "SC13.2-09",
       "source_text": "prompt injection из каждого типа источников, секреты в ошибках, приватный текст в веб-запросе, недопустимый резервный провайдер;",
       "slices": [
+        "PAI-10",
+        "PAI-11",
         "PAI-12",
+        "PAI-13",
         "PAI-16",
         "PAI-17",
         "PAI-19",
@@ -2052,7 +2077,12 @@
         "privacy_review"
       ],
       "human_evidence": "PAI-27/29 actual authorized provider/render/operator observations",
-      "status": "planned"
+      "status": "planned",
+      "security_test_nodes": [
+        "tests/test_pai_chat_runtime.py::test_chat_fallback_provider_without_data_class_grant_is_not_called",
+        "tests/test_pai_archive_search.py::test_retrieved_archive_injection_cannot_create_authority_or_effects",
+        "tests/test_pai_deep_research.py::test_research_tool_result_injection_cannot_create_authority_or_effects"
+      ]
     },
     {
       "scenario_id": "SC13.2-10",

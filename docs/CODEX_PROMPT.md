@@ -1,84 +1,81 @@
-# Current handoff — actual native79 ADVISORY accepted; design80..87 underway
+# Current handoff — max resources; review88 P1 fixes verified; native91 next
 
 2026-10-09. Assigned branch docs/personal-assistant-blueprint-playbook-20260918.
-GLM cutover committed1719bb7; later max/cap/evidence preparation follows that
-commit. Current session permits Git writes/network; older read-only restrictions
-are preserved historical evidence, no longer the blocker.
+Committed base84155e2; current corrected design/tests/tooling/public evidence
+will be committed before actual native91. Active session Git/network permitted.
+Use current implementer default model/reasoning; no implementer override.
 
-Owner selected GLM-5.3 on the SAME OpenCode Go endpoint (“давай”), authorized
-necessary review budget increases (“разврешаю увеличивать по потребности”), then
-explicitly rejected lower effort: “нет, делай макс, неп роблема”. Fresh reviewers
-must request reasoning_effort=max. Do not request low/high, disable GLM thinking,
-change models/providers, or repeat per-call count/model permission questions.
-Use the active session's default implementer model/reasoning without override.
+Owner selected GLM-5.3 on SAME OpenCode Go (“давай”), authorized necessary review
+budget increases (“разврешаю увеличивать по потребности”), insisted on max effort
+(“нет, делай макс, неп роблема”), then maximum resources (“не ставь такие ограничения
+жетские, нам нуежен резальутат делай максимум”). No repeated cap/model permission.
+Requested max; output131072 (documented exact128Ki ceiling), engineering watchdog
+7200s. Full fixed public/synthetic packets now engineering input ceiling1MB, with
+separate recorded authority before keys above200000. Same sources/provider/privacy
+scope. Interpretation: PAI-maximum-review-authority-20261009.md; actual owner quote
+is not a fabricated numerical answer. Soft6000 analysis hint removed; existing
+nonempty consumer requirements declared in provider schema. Never fake identity,
+summary, costs, human approval or actual completed parts; no auto retry/fallback.
 
-Actual native tooling78 reviewed1719bb7 at187605 input bytes,238.047s, exit2.
-Provider-reported model glm-5.3; finish_reason=length at16000 output tokens.
-Usage43859 input/16000 completion/59859 total; requested effort not_requested,
-observed effort/cost unknown. No complete verdict or report/design record.
-PAI-review-continuation-78.json references actual immutable failure/log hashes.
-78 calls consumed including failures. Preserve prior Mimo STOP/failure receipts.
-No tooling gate is unlocked by model identity, fixture evidence or interpretation.
+Actual tooling79 ADVISORY at88da0f5 (31,947 completion tokens,601.788s) was accepted
+by the real gate; old78 length and Mimo STOP/failures preserved. Actual program
+parts81/85/83/86 ADVISORY at84155e2 aggregated by real pinned writer, full32/spec0..15:
+.playbook-artifacts/opencode-complete/79a8346800324526a74b20241f64ff20/result.json.
+This is historical prior-design evidence after the current changes, not acceptance
+of the corrected design. Product87/89/90 ADVISORY;88 STOP with2 P1.82's complete
+empty-summary rejection and84's EOF/no-final-text failure retained/charged.
 
-Owner now directs “не ставь такие ограничения жетские, нам нуежен резальутат
-делай максимум”. This resolves/supersedes the previous output-choice question:
-use reasoning=max and exact documented maximum131072 output tokens. Engineering
-watchdog7200s permits full output instead of the previous900s cutoff. Same
-OpenCode Go/public code/synthetic design; ongoing necessary-review budget persists.
-Authority/interpretation: PAI-maximum-review-authority-20261009.md, recorded in
-PAI-next-review-packets.json before keys/HTTP. No repeated numeric confirmation.
-Current allocation87 includes consumed audit79 and eight design80..87; read actual counts/receipts before requests.
+Review88 local response: PAI-design-88-response.md/PAI-validation-20261009-88.json.
+PG authority holds through ENTIRE nested SQLite locked-send; real PG/SQLite
+revoke-wins/in-flight-dispatch races pass. SEC-01 now binds11/13, SEC-02 binds10;
+SC13.2-09 includes all three. REQUIRED exact-node security_path_acceptance entries
+registered before tests in registry/task/matrix; real FTS/archive HTTP, durable
+research and denied mixed-provider private scope cases added. Canonical SEC01/02
+and scenario09 execute them. Runtime source unmodified, reply/unknown fences kept.
+09/15 own composition registration;12 local fake I/O/known-secret boundary explicit.
 
-Transport keeps default/legacy8MiB wire; larger GLM requests64MiB; event64KiB,
-final text1MiB, GLM watchdog7200s, one request/no retry/fallback, discarded reasoning.
-Only requested effort is known without telemetry. Historical Mimo cap stays16000.
-No upstream/pin/consumer approval weakening. Public code/synthetic design only.
-PAI-native-tooling-78-response.md and PAI-validation-20261009-max.json contain
-changed paths, commands, initial3 fixture-only failures/corrections, test/log/source
-hashes and preparation evidence. Initial max-only140passed8.48s; expanded scoped
-147passed7.85s before final documentation. Run only the indicated focused tier;
-never full historical pytest. Use .venv-pai/bin/python/PYTHONPATH=src and
-PYTEST_DISABLE_PLUGIN_AUTOLOAD=1. Subsequent exact results are in the validation
-record; do not project old runtime results onto this new tooling.
+Verification: targeted8passed39.54s; strict affected62passed255.00s, zero skips/
+failures (scoped, full-spec not checked); plan/bridge30passed2.56s; final tooling
+157passed6.82s. Initial three tests progressed then SQLite backup stalled before
+source commit; own test/process/sole matching synthetic cluster stopped, fixture
+commit ordering corrected; initial log retained. No assertion/checker weakening.
+Prepare at old200k denied before keys/HTTP; complete packets preserved with1MB
+capacity. Pin/32 packets/69 exact IDs/ten scenarios passed, only conditional30/31
+planned test files absent. Use .venv-pai/bin/python, PYTHONPATH=src and
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1. No full historical pytest or broad rerun.
 
-Native79 completed genuine ADVISORY at88da0f5 after601.788s; usage46484 input/
-31947 completion/78431 total. Observed glm-5.3, requested max/observed unknown;
-no P0/P1, four P2 retained in PAI-native-tooling-79-response.md. Actual pinned
-require_tooling_audit accepts current unchanged sources.154 scoped tests passed
-6.52s; complete eight prepare-only design packets159325..188969 bytes, no provider.
-Critical tooling/REVIEW_POLICY remain unchanged. Commit corrected design before81,
-then preserve its new HEAD/design for the full81..88 phase set.
+Critical tooling/policy changed for full input/nonempty schema/max hint/cadence/
+honest brief projection. Old79 is now stale: new actual tooling91 MUST precede
+new design calls.90 actual calls consumed;99 allocated under ongoing authority.
+New full set:92 product/product P1 recheck first, then93..96 program all four,
+97 product/foundation,98 product/sources,99 product/completeness. Old records
+cannot fill new slots. Stop dependent requests for actual P0/P1, fix and obtain
+independent closure; no implementer override. Preserve one unchanged committed
+HEAD/design through accepted tooling and the full fresh design set.
 
-Actual foundation80 returned STOP_SHIP on88da0f5 (1 P1/4 P2),512.188s;
-usage35439/29341/64780. Preserve result/receipt. PAI-design-80-response.md records
-stale Mimo normative wording repair and supplied genuine79 bindings; exact existing
-bridge/memory argv refutes the alleged missing suites. Budget/cancel/sequencing
-clarifications are design-only; no runtime closure invented. Full detail moved to
-always-reviewed ADR-013; compact map19966 chars, planning and30 scoped tests pass.
-Critical tooling/policy unchanged; accepted79 gate remains valid. The old80 result
-cannot fill a current role set. Full fresh allocation81..88;80 consumed so far.
+Next ONE actual command after scoped commit:
 
-Next: genuine program/foundation81 recheck on the corrected committed design,
-max/131072/7200. No dependent requests until P1 independently resolved. Then the
-remaining independent groups may run in parallel per batch on ONE unchanged
-HEAD/design. All four actual parts PER role, existing finalizer; no fixture
-substitution. Read receipts/processes before launching; no duplicate/retry.
+    .venv-pai/bin/python .playbook-artifacts/pai-native-tooling-once.py --call-number 91
 
-Key location already authorized; never print/copy value or scan credentials.
-Log/count actual attempts including length/timeout/error. P0/P1 blocks dependent
-work and requires independent resolution. Only after genuine accepted current
-native tooling audit, run all four actual phase parts PER role at one unchanged
-HEAD/design and aggregate through tools/finalize_opencode_design_reviews.py.
-Independent reviewers cannot fix/commit/push or grant human acceptance.
-Unsupported governed slice/TestCritic/privacy/maintainability adapters stay open.
+Canonical native route tools/run_codex_role.py run --provider opencode-go --model
+glm-5.3 --root . --task PAI-00 --feature-id PAI --role program_design_review
+--tooling-review --reasoning-effort max --allow-provider-egress --call-cap 1
+--output-token-cap 131072 --timeout-seconds 7200 --key-file
+/srv/openclaw-you/workspace/Georgia-Community-Navigator/secrets/openrouter_api_key.
+Known key location already authorized; never print/copy value or scan credentials.
+Helpers record actual immutable native artifacts, no fabricated receipt. Inspect
+existing processes/receipts before any new request. Batch helper supports up to4
+independent parts, counts actual start dirs and uses atomic budget bookkeeping;
+no automatic retries. Only aggregate all four actual parts per role with existing
+finalizer, then real require_trusted_design_records/pinned generic parser.
 
-Runtime baseline unchanged: caf97a7 pai-complete320passed962.74s, all69 exact
-requirements/ten mandatory scenarios/no skips; retrofit150passed23.11s.
-Focused-prm678passed147.72s at0110ec0. Latest edits are tooling/tests/public docs.
-All32 slices remain required: Chat/Search/Brief/Watch/confirmedAct; no MVP
-reduction. Registry/tasks remain draft/review_required/planned. Exact hash-bound
-human design approval, private/live/product paid egress, source grants/retention,
-PAI-27/28/29 canary/cutover/pilot, production/services/timers/release are separate
-open gates. PAI-30/31 triggers unmeasured. Universal upstream consumer-hook/new
-pin is separately proposed and unapproved; upstream/master/UTD/Astra untouched.
-Old goal API remains blocked/no resume; no duplicate goal or false done.
+Runtime baseline caf97a7:320 synthetic cases/69 IDs/ten scenarios962.74s; retrofit
+150passed23.11s; focused-prm678passed147.72s at0110ec0. These are dated evidence,
+not new-matrix/full current runtime verification. New matrix digest is in PAI.md;
+no PAI/task status changed from draft/review_required/planned or missing slice done.
+Full Chat/Search/Brief/Watch/confirmedAct/all32 target retained; no MVP reduction.
+Exact hash-bound human design approval, other governed slice/TestCritic/privacy/
+maintainability adapters, live account/retention/product paid egress, PAI27/28/29,
+production/services/timers/release stay open. Conditional30/31 triggers unmeasured.
+No master/UTD/Astra/upstream pin changes; upstream hook proposal unapproved.
+Old goal API remains blocked/no resume; no duplicate/false goal completion.

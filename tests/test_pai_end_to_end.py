@@ -81,6 +81,12 @@ def test_source_injection_secret_query_and_fallback_denials(pai):
     assert result['status']=='provider_egress_required' and len(pai.requests)==count
     with pytest.raises(ValueError):ActionProposal('proposal_bad',pai.root.owner_ref,'connection_fixture','provider_microsoft_graph','payment.send',
         'resource_fixture',1,{'amount':100},('source_fixture',),pai.now,pai.now+timedelta(minutes=10))
+    from tests.test_pai_archive_search import test_retrieved_archive_injection_cannot_create_authority_or_effects
+    from tests.test_pai_deep_research import test_research_tool_result_injection_cannot_create_authority_or_effects
+    from tests.test_pai_chat_runtime import test_chat_fallback_provider_without_data_class_grant_is_not_called
+    test_retrieved_archive_injection_cannot_create_authority_or_effects(pai)
+    test_research_tool_result_injection_cannot_create_authority_or_effects(pai)
+    test_chat_fallback_provider_without_data_class_grant_is_not_called(pai)
 
 
 def test_restore_migration_revoke_delete_and_cache(pai):

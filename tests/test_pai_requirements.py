@@ -379,6 +379,8 @@ def test_requirement_sec_02(pai):
     before=len(pai.requests);request(pai,1,'Привет')
     assert len(pai.requests)==before
     assert pai.root.model_endpoint.synthetic_http and not pai.root.model_endpoint.token
+    from tests.test_pai_chat_runtime import test_chat_fallback_provider_without_data_class_grant_is_not_called
+    test_chat_fallback_provider_without_data_class_grant_is_not_called(pai)
 
 
 def test_requirement_sec_03(pai):

@@ -176,3 +176,31 @@ PAI-review-continuation-79.json and PAI-native-tooling-79-response.md preserve
 command/input/usage/provenance/findings. Audit78's length failure and prior STOPs
 remain unchanged historical evidence, not the current gate. This design-only
 wording correction does not alter audited tooling/policy or promote a role record.
+
+## Cross-store delivery and security-path bindings — product review88
+
+PostgreSQL is the authority for source grants, delivery consent/subscription,
+proposal and reservation. Acquire PG authority rows in the existing deterministic
+source-before-subscription order BEFORE entering any retained SQLite locked-send.
+Keep those same PG locks through the ENTIRE SQLite transaction and bounded sender
+callback; SQLite commits/closes before releasing PG. Never check PG, release it,
+then enter SQLite. No SQLite-first/PG-second path. Synthetic SQLite busy_timeout
+is500ms, below the transport bound; a lock failure after a prepared attempt keeps
+unknown, never auto-resends or proves no effect. Revoke-wins-lock means no sender;
+dispatch-wins means revoke acknowledgement waits until the bounded sender exits.
+PAI-09 registers test_postgres_authority_spans_legacy_sqlite_send for both outcomes.
+
+PAI-09 rechecks quiet hours/time windows at actual delivery (queue delay/recovery
+cannot turn a routine digest into an urgent exception). Foreground replies retain
+existing durable prepared/unknown semantics and permission checks; proposed
+latency targets do not justify weaker replay/reconciliation fences.
+
+SEC-01 now explicitly binds PAI-11 archive synthesis and PAI-13 tool-result
+synthesis; SEC-02 binds PAI-10's provider/data-class refusal. Each has a REQUIRED
+security_path_acceptance entry with an exact test node in the existing registered
+file. SC13.2-09 binds10/11/13 as well and runs those behaviours in its real synthetic
+scenario. The unique69 requirement identities and ten scenarios are retained.
+New tests exercise actual SQLite retrieval/HTTP/PostgreSQL policy and durable jobs
+using synthetic inputs, not keyword-only assertions or fabricated role approval.
+PAI-09/15 explicitly own composition-root registration; PAI-12 local acceptance
+uses fake I/O and existing credential patterns, with no implicit private access.

@@ -1,0 +1,122 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-09",
+  "status": "review88_p1_local_fixes_verified_new_tooling91_required",
+  "base_commit": "84155e23b09c2614c80b2252b4ce6bde434fb875",
+  "checks": [
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python -m pytest -q tests/test_pai_delivery.py::test_postgres_authority_spans_legacy_sqlite_send tests/test_pai_archive_search.py::test_retrieved_archive_injection_cannot_create_authority_or_effects tests/test_pai_deep_research.py::test_research_tool_result_injection_cannot_create_authority_or_effects tests/test_pai_chat_runtime.py::test_chat_fallback_provider_without_data_class_grant_is_not_called tests/test_pai_end_to_end.py::test_source_injection_secret_query_and_fallback_denials tests/test_pai_requirements.py::test_requirement_sec_01 tests/test_pai_requirements.py::test_requirement_sec_02",
+      "exit_code": 0,
+      "result": "8 passed in 39.54s",
+      "log_path": ".playbook-artifacts/pai-validation-20261009-88/targeted.log",
+      "log_sha256": "4d5d1575940cbdb6d1ccae5ce22c9d249aa9fcef0f7bf1e4deacb0f8314e6116"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/run_pai_acceptance.py -q tests/test_pai_archive_search.py tests/test_pai_deep_research.py tests/test_pai_chat_runtime.py tests/test_pai_delivery.py tests/test_pai_end_to_end.py tests/test_pai_requirements.py::test_requirement_sec_01 tests/test_pai_requirements.py::test_requirement_sec_02",
+      "exit_code": 0,
+      "result": "PAI scoped test verification (full-spec coverage not checked): 62 acceptance cases, zero skips/failures",
+      "log_path": ".playbook-artifacts/pai-validation-20261009-88/affected.log",
+      "log_sha256": "bc461cb58cf696d4bc4c22e565fc8194030c1d7a8ceb79ca4a83305191dedb85"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python -m pytest -q tests/test_pai_plan.py tests/test_playbook_bridge.py",
+      "exit_code": 0,
+      "result": "30 passed in 2.56s",
+      "log_path": ".playbook-artifacts/pai-validation-20261009-88/plan.log",
+      "log_sha256": "12e93d2061cd1808ed4442bba48c11c82fb049b3ea39f52510a902e3fd1bf2d7"
+    },
+    {
+      "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python -m pytest -q tests/test_opencode_role_review.py tests/test_pai_acceptance_guard.py tests/test_playbook_bridge.py tests/test_pai_plan.py",
+      "exit_code": 0,
+      "result": "157 passed in 6.82s",
+      "log_path": ".playbook-artifacts/pai-validation-20261009-88/tooling-final.log",
+      "log_sha256": "9ee29852e795042f0a00da62a3d03e27a23ddf2ad39f9b2e4d1ff01881dd0f32"
+    }
+  ],
+  "initial_failure": {
+    "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python -m pytest -q tests/test_pai_delivery.py::test_postgres_authority_spans_legacy_sqlite_send tests/test_pai_archive_search.py::test_retrieved_archive_injection_cannot_create_authority_or_effects tests/test_pai_deep_research.py::test_research_tool_result_injection_cannot_create_authority_or_effects tests/test_pai_chat_runtime.py::test_chat_fallback_provider_without_data_class_grant_is_not_called tests/test_pai_end_to_end.py::test_source_injection_secret_query_and_fallback_denials",
+    "result": "three progress dots then native SQLite backup stalled; owned process SIGTERM exit143 after ineffective SIGINT; fixture commit ordering corrected",
+    "log_path": ".playbook-artifacts/pai-validation-20261009-88/initial-targeted.log",
+    "log_sha256": "ab5df625bc76dbd4e163bed2dd888df828f90159bb93556525c31821b6541d46",
+    "owned_synthetic_cluster_cleanup": "one matching test cluster stopped, no other instances selected"
+  },
+  "prepare_failure": {
+    "command": "native product/product --prepare-only at200000-byte bound",
+    "exit_code": 2,
+    "provider_call": false,
+    "result": "packet exceeds authorized input bound; no truncation"
+  },
+  "matrix_sha256": "d0075efd8970da25348c3aab2dd573b1fd535f5105025ccf02dd57ae227cd119",
+  "scoped_only": true,
+  "full_spec_tier_current": "not_rerun; earlier caf97a7 remains dated evidence",
+  "review_ref": "docs/verification/PAI-review-continuation-88.json",
+  "response_ref": "docs/verification/PAI-design-88-response.md",
+  "calls_consumed": 90,
+  "next": "commit known paths then genuine native tooling91 max/131072/7200/input1MB; only accepted current audit permits corrected product92 and complete fresh93..99 set",
+  "human_design_approval": false,
+  "live_production_release": false,
+  "changed_files": [
+    "docs/CODEX_PROMPT.md",
+    "docs/REVIEW_POLICY.md",
+    "docs/adr/ADR-013-pa-durable-runtime.md",
+    "docs/design/PAI.design.json",
+    "docs/design/PAI.md",
+    "docs/design/PAI.requirements.json",
+    "docs/tasks.md",
+    "docs/verification/PAI-design-88-response.md",
+    "docs/verification/PAI-maximum-review-authority-20261009.md",
+    "docs/verification/PAI-next-review-packets.json",
+    "docs/verification/PAI-progress.md",
+    "docs/verification/PAI-release-candidate.json",
+    "docs/verification/PAI-release-candidate.md",
+    "docs/verification/PAI-review-continuation-81.json",
+    "docs/verification/PAI-review-continuation-82.json",
+    "docs/verification/PAI-review-continuation-83.json",
+    "docs/verification/PAI-review-continuation-84.json",
+    "docs/verification/PAI-review-continuation-85.json",
+    "docs/verification/PAI-review-continuation-86.json",
+    "docs/verification/PAI-review-continuation-87.json",
+    "docs/verification/PAI-review-continuation-88.json",
+    "docs/verification/PAI-review-continuation-89.json",
+    "docs/verification/PAI-review-continuation-90.json",
+    "docs/verification/PAI-validation-20261009-88.json",
+    "tests/test_opencode_role_review.py",
+    "tests/test_pai_archive_search.py",
+    "tests/test_pai_chat_runtime.py",
+    "tests/test_pai_deep_research.py",
+    "tests/test_pai_delivery.py",
+    "tests/test_pai_end_to_end.py",
+    "tests/test_pai_requirements.py",
+    "tools/opencode_role_review.py"
+  ],
+  "current_source_hashes": [
+    {
+      "path": "tools/opencode_role_review.py",
+      "sha256": "5678c167bcf59d4b557fefcda4f83d440beb65e5446206fa1276644e7e21b7f4"
+    },
+    {
+      "path": "docs/REVIEW_POLICY.md",
+      "sha256": "6be471350fe356832e3e92d1fa99f57b18df249528ac6e1556d902568cb310ad"
+    },
+    {
+      "path": "tests/test_opencode_role_review.py",
+      "sha256": "10be93015eba953fa7afc861fed6e85d2285eac2764fab2f731a035de0464fa8"
+    },
+    {
+      "path": "docs/design/PAI.md",
+      "sha256": "07dc0bb4bf942f045fb08969e4498526bd368d9e4aa9072539ce4f0e34dbad2a"
+    },
+    {
+      "path": "docs/design/PAI.design.json",
+      "sha256": "00a4357ccaf1f16a6e77a166d950998194d8162dff15ef19402a68e97967e94b"
+    },
+    {
+      "path": "docs/design/PAI.requirements.json",
+      "sha256": "d0075efd8970da25348c3aab2dd573b1fd535f5105025ccf02dd57ae227cd119"
+    },
+    {
+      "path": "docs/adr/ADR-013-pa-durable-runtime.md",
+      "sha256": "ad39707e268ee9ac9e93c5e48e27e5a16b7b602fc71e0e9d4fcd684018516ff2"
+    }
+  ]
+}

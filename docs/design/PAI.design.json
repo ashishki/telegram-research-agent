@@ -583,7 +583,8 @@
         "tests/test_assistant_actions.py",
         "tests/test_assistant_egress.py",
         "tests/fixtures/assistant/**",
-        "tools/test_tiers.py"
+        "tools/test_tiers.py",
+        "src/prm/runtime/composition.py"
       ],
       "change_budget": "files<=24",
       "dependencies": [
@@ -593,7 +594,8 @@
       ],
       "expected_interfaces": [
         "PA requirement coverage: PA-02, PA-09, PA-13",
-        "docs/PA_IMPLEMENTATION_TASKS.md#pai-09"
+        "docs/PA_IMPLEMENTATION_TASKS.md#pai-09",
+        "Explicit security-path acceptance: tests/test_pai_delivery.py::test_postgres_authority_spans_legacy_sqlite_send"
       ],
       "forbidden_files": [
         ".env",
@@ -605,7 +607,7 @@
       ],
       "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
       "rollback": "stop новых effects, reconciliation/read-only оставить доступными.",
-      "scope": "подключить durable attempts/receipts к foreground/background delivery; отдельные purposes сохранить. Выполнить согласованное в PAI-01 упорядочивание pause/revoke/send. Не выносить `sender` из SQLite transaction без эквивалентного доказанного поведения. Ввести provider reconciliation adapter и UI для unknown; receipts выдаются после реального transport результата.",
+      "scope": "подключить durable attempts/receipts к foreground/background delivery; отдельные purposes сохранить. Выполнить согласованное в PAI-01 упорядочивание pause/revoke/send. Не выносить `sender` из SQLite transaction без эквивалентного доказанного поведения. Ввести provider reconciliation adapter и UI для unknown; receipts выдаются после реального transport результата. PG authority rows lock before SQLite; hold across the entire retained locked-send and bounded transport. Recheck quiet hours at actual delivery; durable prepared/unknown reply fences are preserved.",
       "slice_id": "PAI-09",
       "status": "planned",
       "user_visible_outcome": "ответ, Watch и действие проходят один контракт последнего разрешения и правдиво показывают исход.",
@@ -624,6 +626,18 @@
           "id": "acceptance",
           "required": true,
           "timeout_seconds": 600
+        },
+        {
+          "id": "security_path_acceptance",
+          "argv": [
+            "{python}",
+            "tools/run_pai_acceptance.py",
+            "-q",
+            "tests/test_pai_delivery.py::test_postgres_authority_spans_legacy_sqlite_send"
+          ],
+          "expected_exit_code": 0,
+          "required": true,
+          "timeout_seconds": 180
         }
       ]
     },
@@ -658,7 +672,8 @@
       ],
       "expected_interfaces": [
         "PA requirement coverage: PA-03, PA-16",
-        "docs/PA_IMPLEMENTATION_TASKS.md#pai-10"
+        "docs/PA_IMPLEMENTATION_TASKS.md#pai-10",
+        "Explicit security-path acceptance: tests/test_pai_chat_runtime.py::test_chat_fallback_provider_without_data_class_grant_is_not_called"
       ],
       "forbidden_files": [
         ".env",
@@ -670,7 +685,7 @@
       ],
       "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
       "rollback": "отключить модельный маршрут; доступный локальный поиск сохранить.",
-      "scope": "единый runtime composition root внедряет model access/provider в Telegram/CLI/application. Provider/model config явные, без hardcoded «лучшая модель»; реальный HTTP adapter тестируется fake server. Бounded history и object followups собираются только в разрешённом data scope. Privacy-safe fallback, timeouts, отмена и usage settlement обязательны.",
+      "scope": "единый runtime composition root внедряет model access/provider в Telegram/CLI/application. Provider/model config явные, без hardcoded «лучшая модель»; реальный HTTP adapter тестируется fake server. Бounded history и object followups собираются только в разрешённом data scope. Privacy-safe fallback, timeouts, отмена и usage settlement обязательны. SEC-02: an alternate model provider without the exact data-class grant is denied before HTTP; no privacy downgrade.",
       "slice_id": "PAI-10",
       "status": "planned",
       "user_visible_outcome": "приветствие, объяснение и редактирование текста проходят реальный model route и возвращаются в ту же беседу.",
@@ -690,6 +705,18 @@
           "id": "acceptance",
           "required": true,
           "timeout_seconds": 600
+        },
+        {
+          "id": "security_path_acceptance",
+          "argv": [
+            "{python}",
+            "tools/run_pai_acceptance.py",
+            "-q",
+            "tests/test_pai_chat_runtime.py::test_chat_fallback_provider_without_data_class_grant_is_not_called"
+          ],
+          "expected_exit_code": 0,
+          "required": true,
+          "timeout_seconds": 180
         }
       ]
     },
@@ -721,7 +748,8 @@
       ],
       "expected_interfaces": [
         "PA requirement coverage: PA-04",
-        "docs/PA_IMPLEMENTATION_TASKS.md#pai-11"
+        "docs/PA_IMPLEMENTATION_TASKS.md#pai-11",
+        "Explicit security-path acceptance: tests/test_pai_archive_search.py::test_retrieved_archive_injection_cannot_create_authority_or_effects"
       ],
       "forbidden_files": [
         ".env",
@@ -733,7 +761,7 @@
       ],
       "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
       "rollback": "прежний FTS/evidence fallback; канонический архив не переписывается.",
-      "scope": "соединить FTS retrieval, bounded evidence, paired request/context authorization и archive synthesis с ingress. Зафиксировать RU/EN holdout до настройки; отдельно измерять recall, unsupported claims, false refusals, пропущенные важные материалы. Сохранить source IDs, negation/conflict и insufficient evidence. Не добавлять vector DB без отдельного measured ADR.",
+      "scope": "соединить FTS retrieval, bounded evidence, paired request/context authorization и archive synthesis с ingress. Зафиксировать RU/EN holdout до настройки; отдельно измерять recall, unsupported claims, false refusals, пропущенные важные материалы. Сохранить source IDs, negation/conflict и insufficient evidence. Не добавлять vector DB без отдельного measured ADR. SEC-01: actual FTS excerpts remain untrusted model data and cannot create grants, proposals or effects.",
       "slice_id": "PAI-11",
       "status": "planned",
       "user_visible_outcome": "запрос на русском/английском находит нужные материалы и даёт синтез с проверяемыми основаниями.",
@@ -752,6 +780,18 @@
           "id": "acceptance",
           "required": true,
           "timeout_seconds": 600
+        },
+        {
+          "id": "security_path_acceptance",
+          "argv": [
+            "{python}",
+            "tools/run_pai_acceptance.py",
+            "-q",
+            "tests/test_pai_archive_search.py::test_retrieved_archive_injection_cannot_create_authority_or_effects"
+          ],
+          "expected_exit_code": 0,
+          "required": true,
+          "timeout_seconds": 180
         }
       ]
     },
@@ -796,7 +836,7 @@
       ],
       "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
       "rollback": "отключить конкретный adapter, честно сохранить локальный ответ/пробел.",
-      "scope": "реализовать конкретный search adapter, безопасный fetch/extract и GitHub read adapter; внедрить в composition root. Выбор провайдера и API подтвердить официальной документацией при реализации. Public query отдельно минимизируется и не наследует private text. Ограничить DNS/redirect/actual connection, size/time/content type; untrusted text не выдаёт инструментам прав.",
+      "scope": "реализовать конкретный search adapter, безопасный fetch/extract и GitHub read adapter; внедрить в composition root. Выбор провайдера и API подтвердить официальной документацией при реализации. Public query отдельно минимизируется и не наследует private text. Ограничить DNS/redirect/actual connection, size/time/content type; untrusted text не выдаёт инструментам прав. All local acceptance uses fake servers/fixtures only; existing env/documented-secret pattern, no new secret storage or assumed private-repository access before PAI-16 authority.",
       "slice_id": "PAI-12",
       "status": "planned",
       "user_visible_outcome": "приложение умеет проверить свежий факт и сравнить его с материалами владельца/выбранным ref репозитория.",
@@ -845,7 +885,8 @@
       ],
       "expected_interfaces": [
         "PA requirement coverage: PA-06",
-        "docs/PA_IMPLEMENTATION_TASKS.md#pai-13"
+        "docs/PA_IMPLEMENTATION_TASKS.md#pai-13",
+        "Explicit security-path acceptance: tests/test_pai_deep_research.py::test_research_tool_result_injection_cannot_create_authority_or_effects"
       ],
       "forbidden_files": [
         ".env",
@@ -857,7 +898,7 @@
       ],
       "review_checkpoint": "Independent risk review at the declared PAI phase boundary; immediate safety trigger review before use; exact human/runtime gates remain.",
       "rollback": "запрет новых deep jobs; уже готовые checkpoints/results доступны.",
-      "scope": "перенести ограниченный research plan/gather/gap-check/synthesis/ verify в checkpoints worker. Параллелить только независимые reads в пределах общего бюджета; отсутствие источника даёт объяснимый partial outcome. Сохранять evidence versions и расход, не повторять оплаченный завершённый step без основания. Внешние side effects в research не разрешать.",
+      "scope": "перенести ограниченный research plan/gather/gap-check/synthesis/ verify в checkpoints worker. Параллелить только независимые reads в пределах общего бюджета; отсутствие источника даёт объяснимый partial outcome. Сохранять evidence versions и расход, не повторять оплаченный завершённый step без основания. Внешние side effects в research не разрешать. SEC-01: gathered tool/archival results remain untrusted through synthesis; no model-derived authority/effect.",
       "slice_id": "PAI-13",
       "status": "planned",
       "user_visible_outcome": "большой вопрос переживает рестарт, показывает прогресс и заканчивается синтезом, а не списком ссылок.",
@@ -875,6 +916,18 @@
           "id": "acceptance",
           "required": true,
           "timeout_seconds": 600
+        },
+        {
+          "id": "security_path_acceptance",
+          "argv": [
+            "{python}",
+            "tools/run_pai_acceptance.py",
+            "-q",
+            "tests/test_pai_deep_research.py::test_research_tool_result_injection_cannot_create_authority_or_effects"
+          ],
+          "expected_exit_code": 0,
+          "required": true,
+          "timeout_seconds": 180
         }
       ]
     },
@@ -964,7 +1017,8 @@
         "tests/test_pdf_inspection.py",
         "tests/fixtures/assistant/**",
         "tools/test_tiers.py",
-        "src/prm/pdf_inspection.py"
+        "src/prm/pdf_inspection.py",
+        "src/prm/runtime/composition.py"
       ],
       "change_budget": "files<=24",
       "dependencies": [

@@ -146,6 +146,46 @@ def test_dispatch_winning_holds_scope_until_pause_ack(case):
     assert results[0]['status'] == 'sent' and paused.is_set()
 
 
+@pytest.mark.parametrize('winner',['revoke','dispatch'])
+def test_postgres_authority_spans_legacy_sqlite_send(case,tmp_path,monkeypatch,winner):
+    import sqlite3
+    scheduler,registry,sub,clock,actor=case
+    grants(case);notification=pending_watch(case)[0];path=tmp_path/'legacy-send.sqlite'
+    with sqlite3.connect(path) as conn:conn.execute('CREATE TABLE sent(attempt TEXT PRIMARY KEY)')
+    entered,release,revoking,revoked=Event(),Event(),Event(),Event();results=[];errors=[]
+    def sender(destination,text,attempt):
+        with sqlite3.connect(path,timeout=.5) as conn:
+            conn.execute('PRAGMA busy_timeout=500');conn.execute('BEGIN IMMEDIATE')
+            entered.set();assert release.wait(timeout=5)
+            conn.execute('INSERT INTO sent VALUES(?)',(attempt,))
+        return TransportReceipt('synthetic_nested_sqlite_receipt')
+    executor=DeliveryExecutor(scheduler.queue.store.target,registry=registry,sender=sender)
+    if winner=='revoke':
+        prepare=registry._commit_durable_transport
+        def prepare_then_revoke(group,**kwargs):
+            result=prepare(group,**kwargs);registry.revoke_grant('grant_watch',owner_ref=sub.owner_ref);return result
+        monkeypatch.setattr(registry,'_commit_durable_transport',prepare_then_revoke)
+        result=executor.deliver_watch(owner=sub.owner_ref,notification_id=notification,upper_bound=1)
+        assert result['status']=='unknown' and not entered.is_set()
+    else:
+        def dispatch():
+            try:results.append(executor.deliver_watch(owner=sub.owner_ref,notification_id=notification,upper_bound=1))
+            except Exception as error:errors.append(error)
+        def revoke():
+            try:
+                revoking.set();registry.revoke_grant('grant_watch',owner_ref=sub.owner_ref);revoked.set()
+            except Exception as error:errors.append(error)
+        worker=Thread(target=dispatch);worker.start();assert entered.wait(timeout=5)
+        controller=Thread(target=revoke);controller.start()
+        try:
+            assert revoking.wait(timeout=5) and not revoked.wait(timeout=.2)
+        finally:
+            release.set();worker.join(timeout=5);controller.join(timeout=5)
+        assert not worker.is_alive() and not controller.is_alive() and not errors
+        assert results[0]['status']=='sent' and revoked.is_set()
+    with sqlite3.connect(path) as conn:assert conn.execute('SELECT count(*) FROM sent').fetchone()[0]==(1 if winner=='dispatch' else 0)
+
+
 def test_revoke_winning_before_final_send_and_foreground_scope_separation(case, monkeypatch):
     scheduler, registry, sub, clock, actor = case
     grants(case); job = completed(case); calls = []

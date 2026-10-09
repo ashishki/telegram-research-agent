@@ -95,6 +95,39 @@ def test_shortening_private_connector_response_keeps_its_origin(pai):
     assert not root.conversations.history_for_model('42')
 
 
+def test_chat_fallback_provider_without_data_class_grant_is_not_called(pai):
+    from dataclasses import replace
+    from prm.capabilities import AuthorizationRequest,CapabilityDenied
+    from tests.pai_runtime_fixtures import allow,request
+    root=pai.root;alternate=replace(root.model_endpoint,provider_ref='provider_mimo')
+    allow(pai,'model.generate',root.model_resource_ref,'user_provided','answer.request',provider='provider_mimo')
+    allow(pai,'model.context_egress',root.archive_resource_ref,'private_archive','answer.context')
+    def reserve(provider,capability,resource,data_class,purpose,operation):
+        return root.registry.authorize_and_reserve(AuthorizationRequest(owner_ref=root.owner_ref,connection_ref='connection_fixture',
+            provider_ref=provider,capability=capability,resource_ref=resource,operation='model_egress',data_class=data_class,
+            purpose=purpose,operation_ref=operation),upper_bound=1)
+    text=reserve('provider_mimo','model.generate',root.model_resource_ref,'user_provided','answer.request','fallback_text_scope')
+    context=reserve('provider_openai','model.context_egress',root.archive_resource_ref,'private_archive','answer.context','fallback_private_scope')
+    assert text.allowed and context.allowed
+    private='Synthetic private archive excerpt for a provider with no private grant.'
+    count=len(pai.requests)
+    client=root.scoped_client(alternate,groups=((text,),(context,)),task_ref='fallback_privacy',attempt_ref='fallback_privacy',
+        history=({'role':'user','content':private},))
+    try:
+        with pytest.raises(CapabilityDenied,match='share owner, connection, provider'):
+            client.complete_with_receipt(prompt='Summarize the selected source',system='Use the supplied source.',max_tokens=100,
+                category='chat',authorization=text,data_class='user_provided',owner_ref=root.owner_ref,
+                connection_ref='connection_fixture',resource_ref=root.model_resource_ref)
+        assert len(pai.requests)==count
+    finally:text.reservation.abandon_before_transport();context.reservation.abandon_before_transport()
+    state=root.conversations.record_response('42',text=private,topic='',item_texts=(private,))
+    root.conversations.record_origin(state.object_refs[0].response_ref,('private_archive',))
+    root.model_endpoint=alternate
+    assert request(pai,8810,'/chat Explain a new generic topic')[1]['status']=='ok'
+    sent=[row for row in pai.requests[count:] if row[0]=='model']
+    assert len(sent)==1 and private not in json.dumps(sent[0][2])
+
+
 def test_unknown_model_call_has_logical_fence_across_fresh_reservations(pai):
     from dataclasses import replace
     from tests.pai_runtime_fixtures import allow

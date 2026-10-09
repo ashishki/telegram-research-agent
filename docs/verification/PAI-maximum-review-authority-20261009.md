@@ -26,3 +26,15 @@ Allocate audit79 first; actual P0/P1 blocks dependent work until independent
 recheck. Accepted current tooling precedes four genuine parts per design role.
 No human exact design/live/private/product-provider/production/service/timer/
 release authority is implied. Maximum settings grant resources, not acceptance.
+
+Later full review88 found two design P1s. Their exact required test-node bindings
+and explicit cross-store delivery contract made the complete product packet
+exceed the old200000-byte limit. The same owner's maximum-resource instruction
+is applied to capacity, with an engineering ceiling1,000,000 input bytes for the
+same fixed public/synthetic sources; Z.ai documents a1M-token context. This byte
+limit is an engineering interpretation, not an owner-quoted number. Bigger native
+GLM packets require recorded per_call_input_authority before credentials; no
+new source/private/account/provider scope. No silent truncation. The legacy6000-
+token analysis hint is removed, and schema minLength matches existing nonempty
+consumer checks (no acceptance guard relaxed). Genuine fresh tooling audit91 is
+required before corrected product P1 recheck92 and the full new phase set.

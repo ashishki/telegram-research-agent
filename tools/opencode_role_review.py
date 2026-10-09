@@ -23,7 +23,7 @@ ROLES = {
     "product_design_review": "PRODUCT_DESIGN_REVIEW",
     "program_design_review": "PROGRAM_DESIGN_REVIEW",
 }
-MAX_INPUT_BYTES = 200_000
+MAX_INPUT_BYTES = 1_000_000
 REVIEW_GROUPS = {"foundation": range(0, 7), "product": range(7, 16),
                  "sources": range(16, 21), "completeness": range(21, 32)}
 SPEC_GROUPS = {"foundation": {0, 2, 9, 10, 11, 14, 15},
@@ -40,13 +40,13 @@ VERDICT_SCHEMA = {
             "required": ["severity", "title", "issue", "fix"],
             "properties": {
                 "severity": {"type": "string", "enum": ["P0", "P1", "P2"]},
-                "title": {"type": "string", "maxLength": 140},
-                "issue": {"type": "string", "maxLength": 800},
-                "fix": {"type": "string", "maxLength": 600},
+                "title": {"type": "string", "minLength": 1, "maxLength": 140},
+                "issue": {"type": "string", "minLength": 1, "maxLength": 800},
+                "fix": {"type": "string", "minLength": 1, "maxLength": 600},
             },
         }},
         "not_verified": {"type": "array", "maxItems": 8, "items": {"type": "string", "maxLength": 240}},
-        "summary": {"type": "string", "maxLength": 1600},
+        "summary": {"type": "string", "minLength": 1, "maxLength": 1600},
     },
 }
 PACKET_REFS = (
@@ -148,6 +148,21 @@ def extended_review_authority(root,args,output_cap):
                 raise ReviewBlocked('larger output requires separately recorded owner authority')
         return {'path':str(path.relative_to(root)),'sha256':digest(raw),'authority':record['ongoing_review_budget_authority']}
     except (OSError,ValueError,TypeError):raise ReviewBlocked('extended review authority missing or outside scope') from None
+
+
+def larger_input_authority(root, model, input_bytes):
+    if input_bytes <= 200_000: return None
+    try:
+        path=root/'docs/verification/PAI-next-review-packets.json'
+        raw=path.read_bytes();record=json.loads(raw);authority=record.get('per_call_input_authority')
+        if (model != CURRENT_REVIEW_MODEL or not isinstance(authority, dict)
+            or authority.get('model') != model or authority.get('provider') != 'opencode_go'
+            or not authority.get('owner_message') or type(authority.get('maximum_bytes')) is not int
+            or authority['maximum_bytes'] < input_bytes or input_bytes > MAX_INPUT_BYTES):
+            raise ReviewBlocked('larger input outside recorded owner scope')
+        return {'path':str(path.relative_to(root)),'sha256':digest(raw),'authority':authority}
+    except (OSError,ValueError,TypeError):
+        raise ReviewBlocked('larger input outside recorded owner scope') from None
 
 
 def verify_stored_packet(root,result,run_dir):
@@ -321,7 +336,7 @@ def prepare_packet(root: Path, task: str, feature: str, role: str, tooling_revie
         if role == "program_design_review" and ref == "docs/PROJECT_BRIEF.md":
             # Its full intent is already in the feature brief/spec. Keep the
             # exact authority hash and drift guard while avoiding repetition.
-            content = "Authority hash retained in manifest; full feature brief/spec included."
+            content = "Project brief text omitted; its original hash is retained in the manifest. Feature brief and declared specification sections are supplied."
         manifest[-1]['rendered_sha256']=digest(content.encode('utf-8'))
         manifest[-1]['rendered_bytes']=len(content.encode('utf-8'))
         manifest[-1]['representation']=('AST executable-source normalization; comments and original formatting omitted; original hash retained'
@@ -342,7 +357,7 @@ def prepare_packet(root: Path, task: str, feature: str, role: str, tooling_revie
         "If more than twelve independent blockers remain, return STOP_SHIP and "
         "state the remaining unreviewed risk in not_verified; never call it PASS. "
         "Table JSON is lossless: resolve $N strings with symbols and map table rows to columns.\n"
-        "Budget internal analysis to at most 6000 tokens and reserve room for the final JSON. "
+        "Use the requested max reasoning effort; return a complete final JSON with a nonempty summary. "
         "For each blocker cite the exact function and a concrete reachable failing case. "
         "Verify the alleged case against all existing guards; missing tests alone do not prove a runtime defect.\n"
     )
@@ -426,6 +441,7 @@ def execute(args):
     if not args.allow_provider_egress or args.call_cap != 1:
         raise ReviewBlocked("explicit provider scope and exactly one budgeted call required")
     model_authority=reviewer_model_authority(root,args.model)
+    input_authority=larger_input_authority(root,args.model,len(packet.encode('utf-8')))
     if getattr(args,'thinking_disabled',False) and args.model!='mimo-v2.6-pro':
         raise ReviewBlocked('thinking-disabled mode is supported only for historical Mimo scope')
     effort = getattr(args, 'reasoning_effort', None)
@@ -457,6 +473,7 @@ def execute(args):
         "run_id": run_id, "role": args.role, "task": args.task,
         "reviewed_head": head, "requested_model": args.model,
         "reviewer_model_authority":model_authority,
+        "input_authority":input_authority,
         "input_sha256": digest(packet.encode()), "input_bytes": len(packet.encode()),
         "call_cap": 1, "output_token_cap": output_cap, "timeout_seconds": args.timeout_seconds,
         "transport": "sse",

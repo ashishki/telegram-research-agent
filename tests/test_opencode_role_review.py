@@ -1094,6 +1094,29 @@ def test_glm_full_output_deadline_requires_owner_scope(tmp_path, monkeypatch, au
     else: assert calls == []
 
 
+@pytest.mark.parametrize('scope', ['missing', 'mimo', 'approved'])
+def test_large_complete_packet_needs_owner_scope_before_keys(tmp_path, monkeypatch, scope):
+    args,calls,records=setup_run(tmp_path,monkeypatch)
+    if scope != 'mimo':select_glm_fixture(tmp_path,args)
+    original=review.prepare_packet
+    def packet(*arguments):
+        _,manifest,design=original(*arguments);return 'synthetic ' * 21000,manifest,design
+    monkeypatch.setattr(review,'prepare_packet',packet)
+    path=tmp_path/'docs/verification/PAI-next-review-packets.json';data=json.loads(path.read_text())
+    if scope != 'missing':data['per_call_input_authority']={'owner_message':'synthetic maximum instruction','provider':'opencode_go','model':args.model,'maximum_bytes':1000000}
+    path.write_text(json.dumps(data))
+    def provider(**kwargs):
+        calls.append(kwargs);payload=response();payload['model']=args.model;return payload
+    monkeypatch.setattr(mimo_code_review,'_call_model',provider)
+    if scope == 'approved':
+        assert review.execute(args)==0 and len(calls[1]['prompt'].encode())>200000
+        evidence=json.loads(next((tmp_path/'.playbook-artifacts/opencode-runs').glob('*/attempt.json')).read_text())
+        assert evidence['input_authority']['authority']['maximum_bytes']==1000000
+    else:
+        with pytest.raises(review.ReviewBlocked,match='larger input'):review.execute(args)
+        assert calls==[] and records==[]
+
+
 @pytest.mark.parametrize('mixed',[False,True])
 def test_glm_complete_record_requires_four_same_model_parts(tmp_path,monkeypatch,mixed):
     import finalize_opencode_design_reviews as complete

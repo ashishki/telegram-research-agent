@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "status": "native80_stop_preserved_design_wording_fixed_recheck81_next",
-  "current_approved_call_cap": 88,
-  "calls_consumed_including_failures": 80,
+  "status": "native88_stop_preserved_full_packet_tooling91_then_p1_recheck92",
+  "current_approved_call_cap": 99,
+  "calls_consumed_including_failures": 90,
   "proposed_total_cap": 34,
   "new_calls_maximum": 3,
   "third_call": "only if an actual new finding needs independent recheck",
@@ -1894,52 +1894,52 @@
   },
   "native_design_allocations": [
     {
-      "call_number": 81,
-      "role": "program_design_review",
-      "slice_group": "foundation",
-      "status": "allocated_not_invoked_current_design80_wording_recheck"
-    },
-    {
-      "call_number": 82,
-      "role": "program_design_review",
-      "slice_group": "product",
-      "status": "allocated_not_invoked_current_design80_wording_recheck"
-    },
-    {
-      "call_number": 83,
-      "role": "program_design_review",
-      "slice_group": "sources",
-      "status": "allocated_not_invoked_current_design80_wording_recheck"
-    },
-    {
-      "call_number": 84,
-      "role": "program_design_review",
-      "slice_group": "completeness",
-      "status": "allocated_not_invoked_current_design80_wording_recheck"
-    },
-    {
-      "call_number": 85,
-      "role": "product_design_review",
-      "slice_group": "foundation",
-      "status": "allocated_not_invoked_current_design80_wording_recheck"
-    },
-    {
-      "call_number": 86,
+      "call_number": 92,
       "role": "product_design_review",
       "slice_group": "product",
-      "status": "allocated_not_invoked_current_design80_wording_recheck"
+      "status": "blocked_new_tooling91_and_product_p1_recheck92"
     },
     {
-      "call_number": 87,
+      "call_number": 93,
+      "role": "program_design_review",
+      "slice_group": "foundation",
+      "status": "blocked_new_tooling91_and_product_p1_recheck92"
+    },
+    {
+      "call_number": 94,
+      "role": "program_design_review",
+      "slice_group": "product",
+      "status": "blocked_new_tooling91_and_product_p1_recheck92"
+    },
+    {
+      "call_number": 95,
+      "role": "program_design_review",
+      "slice_group": "sources",
+      "status": "blocked_new_tooling91_and_product_p1_recheck92"
+    },
+    {
+      "call_number": 96,
+      "role": "program_design_review",
+      "slice_group": "completeness",
+      "status": "blocked_new_tooling91_and_product_p1_recheck92"
+    },
+    {
+      "call_number": 97,
+      "role": "product_design_review",
+      "slice_group": "foundation",
+      "status": "blocked_new_tooling91_and_product_p1_recheck92"
+    },
+    {
+      "call_number": 98,
       "role": "product_design_review",
       "slice_group": "sources",
-      "status": "allocated_not_invoked_current_design80_wording_recheck"
+      "status": "blocked_new_tooling91_and_product_p1_recheck92"
     },
     {
-      "call_number": 88,
+      "call_number": 99,
       "role": "product_design_review",
       "slice_group": "completeness",
-      "status": "allocated_not_invoked_current_design80_wording_recheck"
+      "status": "blocked_new_tooling91_and_product_p1_recheck92"
     }
   ],
   "native_tooling_recheck_66": {
@@ -2146,5 +2146,143 @@
       "slice_group": "completeness",
       "status": "ready_current_native79_tooling_advisory_not_invoked"
     }
-  ]
+  ],
+  "native_design_allocation_history_82_84": [
+    {
+      "call_number": 81,
+      "role": "program_design_review",
+      "slice_group": "foundation",
+      "status": "native_design_phase_completed"
+    },
+    {
+      "call_number": 82,
+      "role": "program_design_review",
+      "slice_group": "product",
+      "status": "native_design_no_valid_verdict"
+    },
+    {
+      "call_number": 83,
+      "role": "program_design_review",
+      "slice_group": "sources",
+      "status": "native_design_phase_completed"
+    },
+    {
+      "call_number": 84,
+      "role": "program_design_review",
+      "slice_group": "completeness",
+      "status": "native_design_no_valid_verdict"
+    },
+    {
+      "call_number": 85,
+      "role": "product_design_review",
+      "slice_group": "foundation",
+      "status": "allocated_not_invoked_current_design80_wording_recheck"
+    },
+    {
+      "call_number": 86,
+      "role": "product_design_review",
+      "slice_group": "product",
+      "status": "allocated_not_invoked_current_design80_wording_recheck"
+    },
+    {
+      "call_number": 87,
+      "role": "product_design_review",
+      "slice_group": "sources",
+      "status": "allocated_not_invoked_current_design80_wording_recheck"
+    },
+    {
+      "call_number": 88,
+      "role": "product_design_review",
+      "slice_group": "completeness",
+      "status": "allocated_not_invoked_current_design80_wording_recheck"
+    }
+  ],
+  "actual_complete_program_review": {
+    "status": "complete_independent_record_written",
+    "verdict": "ADVISORY",
+    "reviewed_head": "84155e23b09c2614c80b2252b4ce6bde434fb875",
+    "parts": [
+      81,
+      85,
+      83,
+      86
+    ],
+    "result_path": ".playbook-artifacts/opencode-complete/79a8346800324526a74b20241f64ff20/result.json",
+    "result_sha256": "c309bde368d69da22f6f8011dcdf2ee277cbffdc04f542bd56c49f5a1dcc9125",
+    "human_design_approval": false
+  },
+  "per_call_input_authority": {
+    "date": "2026-10-09",
+    "owner_message": "не ставь такие ограничения жетские, нам нуежен резальутат делай максимум",
+    "provider": "opencode_go",
+    "model": "glm-5.3",
+    "maximum_bytes": 1000000,
+    "interpretation": "Engineering capacity for full fixed public/synthetic packets under the maximum-resource directive; no new sources/data classes/private scope. Model documents1M-token context, this byte ceiling is conservative.",
+    "decision_ref": "docs/verification/PAI-maximum-review-authority-20261009.md"
+  },
+  "native_design_allocation_history_87_90": [
+    {
+      "call_number": 81,
+      "role": "program_design_review",
+      "slice_group": "foundation",
+      "status": "native_design_phase_completed"
+    },
+    {
+      "call_number": 83,
+      "role": "program_design_review",
+      "slice_group": "sources",
+      "status": "native_design_phase_completed"
+    },
+    {
+      "call_number": 85,
+      "role": "program_design_review",
+      "slice_group": "product",
+      "status": "native_design_phase_completed",
+      "purpose": "fresh missing program-product part after inspected complete-but-rejected native82 response; no automatic retry"
+    },
+    {
+      "call_number": 86,
+      "role": "program_design_review",
+      "slice_group": "completeness",
+      "status": "native_design_phase_completed",
+      "purpose": "fresh missing-part request after individually inspected EOF, no automatic retry"
+    },
+    {
+      "call_number": 87,
+      "role": "product_design_review",
+      "slice_group": "foundation",
+      "status": "native_design_phase_completed",
+      "purpose": "fresh missing-part request after individually inspected EOF, no automatic retry"
+    },
+    {
+      "call_number": 88,
+      "role": "product_design_review",
+      "slice_group": "product",
+      "status": "native_design_phase_completed",
+      "purpose": "fresh missing-part request after individually inspected EOF, no automatic retry"
+    },
+    {
+      "call_number": 89,
+      "role": "product_design_review",
+      "slice_group": "sources",
+      "status": "native_design_phase_completed",
+      "purpose": "fresh missing-part request after individually inspected EOF, no automatic retry"
+    },
+    {
+      "call_number": 90,
+      "role": "product_design_review",
+      "slice_group": "completeness",
+      "status": "native_design_phase_completed",
+      "purpose": "fresh missing-part request after individually inspected EOF, no automatic retry"
+    }
+  ],
+  "native_tooling_recheck_91": {
+    "call_number": 91,
+    "status": "allocated_not_invoked",
+    "model": "glm-5.3",
+    "requested_effort": "max",
+    "output_cap": 131072,
+    "timeout": 7200,
+    "purpose": "independent full-input/schema/max-prompt tooling audit before corrected88 design use"
+  }
 }

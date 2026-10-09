@@ -66,6 +66,14 @@ public-code/synthetic review scope. Provenance and interpretation:
 verification/PAI-maximum-review-authority-20261009.md. No repeated limit confirmation.
 Legacy Mimo stays16000/900. Larger GLM streams have a64MiB wire bound; final text
 1MiB, event64KiB, single-call/no-retry/private exclusions persist.
+The same maximum-resource directive authorizes the engineering capacity needed
+for complete fixed public/synthetic packets: native GLM input ceiling1,000,000
+bytes, separate recorded input authority before keys for anything above200000.
+Source allowlists/privacy/committed-byte guards are unchanged; Mimo/advisory
+transport scope is not expanded. The former6000-token analysis hint is removed;
+fresh reviews request max and complete JSON. Nonempty summary/finding fields are
+now declared in the provider schema as already required by the consumer. This
+tooling change requires a fresh actual independent audit before design use.
 
 ## Roles, runners and receipt compatibility
 
@@ -111,6 +119,10 @@ Codex. Legacy verify/help remains available for historical receipt inspection.
 PAI phase boundaries: A=00..01, B=02..06, C=07..09, D=10..15,
 E=16..20, F=21..26, G=27..29. Required reviews examine accumulated changes and
 specific acceptance evidence; do not launch all reviewers for every small patch.
+This is engineering cadence. Complete design review instead uses four independent
+groups per role: foundation00..06, product07..15, sources16..20, completeness21..31;
+the last includes the two measured-trigger conditional cards. All four are required
+by the aggregator; neither grouping replaces engineering gates or human approval.
 Immediate review applies before exercising new egress, OAuth/secrets, retention,
 confirmation/writes, scheduling or recovery boundaries. Resolve P0/P1 and obtain
 an independent recheck before dependent work. Preserve unreviewed limitations.

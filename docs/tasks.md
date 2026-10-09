@@ -816,6 +816,7 @@ Acceptance-Criteria:
   - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
 Verification:
   - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_delivery.py tests/test_assistant_jobs.py tests/test_assistant_actions.py tests/test_assistant_egress.py
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_delivery.py::test_postgres_authority_spans_legacy_sqlite_send
 Context-Refs:
   - docs/PA_IMPLEMENTATION_TASKS.md#pai-09
   - docs/design/PAI.md
@@ -841,6 +842,7 @@ Acceptance-Criteria:
   - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
 Verification:
   - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_chat_runtime.py tests/test_assistant_conversation.py tests/test_prm_application.py tests/test_openai_provider.py tests/test_llm_client.py
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_chat_runtime.py::test_chat_fallback_provider_without_data_class_grant_is_not_called
 Context-Refs:
   - docs/PA_IMPLEMENTATION_TASKS.md#pai-10
   - docs/design/PAI.md
@@ -866,6 +868,7 @@ Acceptance-Criteria:
   - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
 Verification:
   - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_archive_search.py tests/test_archive_search.py tests/test_prm_synthesis.py tests/test_prm_intent_archive_contract.py
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_archive_search.py::test_retrieved_archive_injection_cannot_create_authority_or_effects
 Context-Refs:
   - docs/PA_IMPLEMENTATION_TASKS.md#pai-11
   - docs/design/PAI.md
@@ -916,6 +919,7 @@ Acceptance-Criteria:
   - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
 Verification:
   - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_deep_research.py tests/test_assistant_research.py tests/test_prm_research_planner.py
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_deep_research.py::test_research_tool_result_injection_cannot_create_authority_or_effects
 Context-Refs:
   - docs/PA_IMPLEMENTATION_TASKS.md#pai-13
   - docs/design/PAI.md
