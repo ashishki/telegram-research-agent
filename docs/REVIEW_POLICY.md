@@ -56,11 +56,16 @@ and reasoning as always enabled (https://docs.z.ai/guides/llm/glm-5.3).
 OpenCode Go forwarding/actual effort is unverified; requested max never becomes
 observed max without provider telemetry. Audit78 actually returned model glm-5.3
 and finish_reason=length at16000 output, without a verdict; preserve that failure.
-The CLI supports larger GLM output caps64000/128000, but requests above16000
+The CLI supports larger GLM output caps64000/128000/131072, but requests above16000
 require separately recorded per_call_output_authority and the configured maximum
-before credentials. That numerical choice is pending; max reasoning alone does
-not raise it. Legacy Mimo remains capped at16000. Larger GLM streams have a64MiB
-wire bound; final text1MiB, event64KiB, deadline/no-retry/private exclusions persist.
+before credentials. The owner subsequently instructed “не ставь такие ограничения
+жетские, нам нуежен резальутат делай максимум”: use the documented maximum131072
+with reasoning=max and a generous7200s engineering watchdog. This supersedes the
+pending numerical question and previous GLM16000/900 ceiling, within the same
+public-code/synthetic review scope. Provenance and interpretation:
+verification/PAI-maximum-review-authority-20261009.md. No repeated limit confirmation.
+Legacy Mimo stays16000/900. Larger GLM streams have a64MiB wire bound; final text
+1MiB, event64KiB, single-call/no-retry/private exclusions persist.
 
 ## Roles, runners and receipt compatibility
 

@@ -433,7 +433,7 @@ def execute(args):
         raise ReviewBlocked('reasoning effort outside bounded GLM review scope')
     tooling_audit_ref = None if tooling_review else require_tooling_audit(root)
     output_cap = getattr(args, "output_token_cap", 8000)
-    if output_cap not in (8000, 16000, 64000, 128000) or (output_cap > 16000 and args.model != CURRENT_REVIEW_MODEL):
+    if output_cap not in (8000, 16000, 64000, 128000, 131072) or (output_cap > 16000 and args.model != CURRENT_REVIEW_MODEL):
         raise ReviewBlocked("unsupported review output cap")
     authority=extended_review_authority(root,args,output_cap)
     dependencies=runtime_dependencies()
@@ -582,9 +582,9 @@ def main(argv=None):
     parser.add_argument("--model", choices=sorted(SUPPORTED_REVIEW_MODELS), default=CURRENT_REVIEW_MODEL)
     parser.add_argument("--key-file", default=os.environ.get("OPENCODE_API_KEY_FILE", ""))
     parser.add_argument("--timeout-seconds", type=int, default=300,
-                        help="up to 900 requires the owner's separately approved design/recheck scope")
+                        help="extended deadlines require recorded owner scope; GLM supports up to 7200 seconds")
     parser.add_argument("--call-cap", type=int, default=0)
-    parser.add_argument("--output-token-cap", type=int, choices=[8000, 16000, 64000, 128000], default=8000,
+    parser.add_argument("--output-token-cap", type=int, choices=[8000, 16000, 64000, 128000, 131072], default=8000,
                         help="extended caps require recorded owner scope; above 16000 requires separate output authority")
     parser.add_argument("--allow-provider-egress", action="store_true")
     parser.add_argument("--prepare-only", action="store_true")
@@ -600,7 +600,7 @@ def main(argv=None):
     if args.model == CURRENT_REVIEW_MODEL and args.reasoning_effort is None:
         args.reasoning_effort = 'max'
     try:
-        if not 30 <= args.timeout_seconds <= 900:
+        if not 30 <= args.timeout_seconds <= (7200 if args.model == CURRENT_REVIEW_MODEL else 900):
             raise ReviewBlocked("timeout outside bounded review scope")
         return execute(args)
     except Exception as exc:

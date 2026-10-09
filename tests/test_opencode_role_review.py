@@ -1017,7 +1017,7 @@ def test_unrequested_effort_modes_are_denied_before_keys_and_transport(tmp_path,
     assert calls == []
 
 
-@pytest.mark.parametrize('cap', [64000, 128000])
+@pytest.mark.parametrize('cap', [64000, 128000, 131072])
 @pytest.mark.parametrize('authority', ['old_cap', 'missing_output_authority', 'approved'])
 def test_larger_glm_output_needs_separate_authority_before_credentials(tmp_path, monkeypatch, cap, authority):
     args, calls, records = setup_run(tmp_path, monkeypatch)
@@ -1043,7 +1043,8 @@ def test_larger_glm_output_needs_separate_authority_before_credentials(tmp_path,
         assert calls[1]['max_output_tokens'] == cap and calls[1]['reasoning_effort'] == 'max'
 
 
-def test_extended_glm_transport_keeps_final_text_and_legacy_bounds(monkeypatch):
+@pytest.mark.parametrize('cap', [64000, 131072])
+def test_extended_glm_transport_keeps_final_text_and_legacy_bounds(monkeypatch, cap):
     import time
     captured = []
     events = [stream_event({'reasoning_content': 'x' * 60000}, model='glm-5.3')] * 140
@@ -1052,9 +1053,9 @@ def test_extended_glm_transport_keeps_final_text_and_legacy_bounds(monkeypatch):
         captured.append(json.loads(request.data)); return stream_response(events)
     monkeypatch.setattr(mimo_code_review, 'urlopen', open_fake)
     result = mimo_code_review._call_model(api_key='synthetic', base_url='https://opencode.ai/zen/go/v1',
-        model='glm-5.3', prompt='synthetic', timeout=900, max_output_tokens=64000, reasoning_effort='max', stream=True)
+        model='glm-5.3', prompt='synthetic', timeout=900, max_output_tokens=cap, reasoning_effort='max', stream=True)
     assert result['choices'][0]['message']['content'] == '{}'
-    assert captured[0]['max_tokens'] == 64000 and len(captured) == 1
+    assert captured[0]['max_tokens'] == cap and len(captured) == 1
     with pytest.raises(ValueError, match='invalid_review_output_bound'):
         mimo_code_review._call_model(api_key='synthetic', base_url='https://opencode.ai/zen/go/v1',
             model='mimo-v2.6-pro', prompt='synthetic', timeout=900, max_output_tokens=64000)
@@ -1074,6 +1075,23 @@ def test_native_glm_cli_defaults_to_owner_requested_max(tmp_path, monkeypatch):
     assert review.main(['run', '--root', str(tmp_path), '--task', 'T1', '--feature-id', 'F',
         '--role', 'program_design_review', '--model', 'glm-5.3', '--allow-provider-egress', '--call-cap', '1']) == 0
     assert calls[1]['reasoning_effort'] == 'max'
+
+
+@pytest.mark.parametrize('authorized', [False, True])
+def test_glm_full_output_deadline_requires_owner_scope(tmp_path, monkeypatch, authorized):
+    _, calls, _ = setup_run(tmp_path, monkeypatch); select_glm_fixture(tmp_path)
+    path = tmp_path/'docs/verification/PAI-next-review-packets.json'
+    data = json.loads(path.read_text())
+    if authorized: data['per_call_timeout_seconds_maximum'] = 7200
+    path.write_text(json.dumps(data))
+    def provider(**kwargs):
+        calls.append(kwargs); result = response(); result['model'] = 'glm-5.3'; return result
+    monkeypatch.setattr(mimo_code_review, '_call_model', provider)
+    assert review.main(['run', '--root', str(tmp_path), '--task', 'T1', '--feature-id', 'F',
+        '--role', 'program_design_review', '--model', 'glm-5.3', '--timeout-seconds', '7200',
+        '--allow-provider-egress', '--call-cap', '1']) == (0 if authorized else 2)
+    if authorized: assert calls[1]['timeout'] == 7200 and calls[1]['reasoning_effort'] == 'max'
+    else: assert calls == []
 
 
 @pytest.mark.parametrize('mixed',[False,True])

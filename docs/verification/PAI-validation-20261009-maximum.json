@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-09",
+  "status": "maximum_glm_authorized_locally_verified_native79_next",
+  "base_commit": "5102dd85c03c975590fa1383b2eca0e405e55e7f",
+  "changed_files": [
+    "docs/CODEX_PROMPT.md",
+    "docs/REVIEW_POLICY.md",
+    "docs/verification/PAI-maximum-review-authority-20261009.md",
+    "docs/verification/PAI-next-review-packets.json",
+    "docs/verification/PAI-progress.md",
+    "docs/verification/PAI-validation-20261009-maximum.json",
+    "tests/test_opencode_role_review.py",
+    "tools/mimo_code_review.py",
+    "tools/opencode_role_review.py"
+  ],
+  "owner_message": "не ставь такие ограничения жетские, нам нуежен резальутат делай максимум",
+  "interpretation_ref": "docs/verification/PAI-maximum-review-authority-20261009.md",
+  "requested_model": "glm-5.3",
+  "requested_effort": "max",
+  "output_token_cap": 131072,
+  "timeout_seconds": 7200,
+  "sources": [
+    {
+      "path": "docs/REVIEW_POLICY.md",
+      "sha256": "0c2fa5dcf7572db3ad533b9aba3c83505484442d141d064cd2fd64b131ee5282"
+    },
+    {
+      "path": "tools/mimo_code_review.py",
+      "sha256": "f851cda852149eeaf0c8431b9e1ddd4b566911a4cf6f9630147008df4dc0933f"
+    },
+    {
+      "path": "tools/opencode_role_review.py",
+      "sha256": "40a45769a90578aa506398916cde2815e2911a3f95267033cd0184f41ba79601"
+    },
+    {
+      "path": "tests/test_opencode_role_review.py",
+      "sha256": "4e6640f61673331f50487b0172be62cc3cb51246d1aa56f3a301226459ee1d32"
+    }
+  ],
+  "scoped_tests": {
+    "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python -m pytest -q tests/test_opencode_role_review.py tests/test_pai_acceptance_guard.py tests/test_playbook_bridge.py tests/test_pai_plan.py",
+    "exit_code": 0,
+    "result": "154 passed in 6.52s",
+    "log_path": ".playbook-artifacts/pai-validation-20261009-maximum/scoped.log",
+    "log_sha256": "d0de56cca14832c53ac373e59e82cd2e28201ac0c3c045ce62230d2eb7d739af"
+  },
+  "prepare_only": {
+    "bytes": 198240,
+    "input_sha256": "e8ea9da79ee2fefad90ffc7e79d92adee959f4f25beb22941bce69225192ef7f",
+    "planning_gate": null,
+    "provider_call": false
+  },
+  "pin_command": ".venv-pai/bin/python tools/playbook.py --check-pin",
+  "pin_exit_code": 0,
+  "plan_command": ".venv-pai/bin/python tools/check_pai_plan.py",
+  "plan_exit_code": 0,
+  "plan_result": "32 packets/69 IDs/ten scenarios; draft, two conditional planned test files absent",
+  "actual_provider_review": "not yet invoked; actual result will be referenced in PAI-review-continuation-79.json",
+  "human_design_approval": false,
+  "production_release": false
+}

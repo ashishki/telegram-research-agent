@@ -1,4 +1,4 @@
-# Current handoff — GLM audit78 incomplete; explicit max prepared
+# Current handoff — maximum GLM review authorized; audit79 next
 
 2026-10-09. Assigned branch docs/personal-assistant-blueprint-playbook-20260918.
 GLM cutover committed1719bb7; later max/cap/evidence preparation follows that
@@ -20,17 +20,17 @@ PAI-review-continuation-78.json references actual immutable failure/log hashes.
 78 calls consumed including failures. Preserve prior Mimo STOP/failure receipts.
 No tooling gate is unlocked by model identity, fixture evidence or interpretation.
 
-Local preparation now supports explicit GLM max and output caps64000/128000.
-Above16000 requires BOTH configured maximum and separate per_call_output_authority
-with an actual owner message/provider/model/numerical maximum before keys/HTTP.
-Current authorized maximum is STILL16000. An async owner question asks64000,
-128000 or keeping16000. No answer has been recorded: wait for the numerical
-choice before dependent provider work; silence is not approval. No new call
-or output authority was fabricated. Current count allocation87 includes fresh
-native audit79 and eight conditional design parts80..87, all uninvoked.
+Owner now directs “не ставь такие ограничения жетские, нам нуежен резальутат
+делай максимум”. This resolves/supersedes the previous output-choice question:
+use reasoning=max and exact documented maximum131072 output tokens. Engineering
+watchdog7200s permits full output instead of the previous900s cutoff. Same
+OpenCode Go/public code/synthetic design; ongoing necessary-review budget persists.
+Authority/interpretation: PAI-maximum-review-authority-20261009.md, recorded in
+PAI-next-review-packets.json before keys/HTTP. No repeated numeric confirmation.
+Current allocation87 includes audit79 and eight conditional design80..87, uninvoked.
 
 Transport keeps default/legacy8MiB wire; larger GLM requests64MiB; event64KiB,
-final text1MiB, bounded900s, one request/no retry/fallback, discarded reasoning.
+final text1MiB, GLM watchdog7200s, one request/no retry/fallback, discarded reasoning.
 Only requested effort is known without telemetry. Historical Mimo cap stays16000.
 No upstream/pin/consumer approval weakening. Public code/synthetic design only.
 PAI-native-tooling-78-response.md and PAI-validation-20261009-max.json contain
@@ -41,11 +41,10 @@ never full historical pytest. Use .venv-pai/bin/python/PYTHONPATH=src and
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1. Subsequent exact results are in the validation
 record; do not project old runtime results onto this new tooling.
 
-Next: record the actual numerical answer in PAI-next-review-packets.json and
-REVIEW_POLICY, set audit79's exact output cap, commit all known scoped inputs,
-then ONE fresh bounded command (CAP is the owner's actual answer):
+Next: verify scoped maximum-output/deadline tests and packet, commit exact known
+inputs, then ONE fresh native audit79. Preserve HEAD/critical sources until return:
 
-    .venv-pai/bin/python tools/run_codex_role.py run --provider opencode-go --model glm-5.3 --root . --task PAI-00 --feature-id PAI --role program_design_review --tooling-review --reasoning-effort max --allow-provider-egress --call-cap 1 --output-token-cap CAP --timeout-seconds 900 --key-file /srv/openclaw-you/workspace/Georgia-Community-Navigator/secrets/openrouter_api_key
+    .venv-pai/bin/python tools/run_codex_role.py run --provider opencode-go --model glm-5.3 --root . --task PAI-00 --feature-id PAI --role program_design_review --tooling-review --reasoning-effort max --allow-provider-egress --call-cap 1 --output-token-cap 131072 --timeout-seconds 7200 --key-file /srv/openclaw-you/workspace/Georgia-Community-Navigator/secrets/openrouter_api_key
 
 Key location already authorized; never print/copy value or scan credentials.
 Log/count actual attempts including length/timeout/error. P0/P1 blocks dependent

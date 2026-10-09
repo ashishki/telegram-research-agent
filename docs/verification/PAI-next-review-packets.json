@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "status": "explicit_glm_max_prepared_larger_output_decision_pending",
+  "status": "owner_maximum_authorized_native79_allocated_not_invoked",
   "current_approved_call_cap": 87,
   "calls_consumed_including_failures": 78,
   "proposed_total_cap": 34,
@@ -9,8 +9,8 @@
   "provider": "opencode_go",
   "model": "glm-5.3",
   "mode": "fresh read-only; explicitly requested GLM max reasoning; strict JSON schema; no retry/model fallback",
-  "per_call_output_tokens_maximum": 16000,
-  "per_call_timeout_seconds_maximum": 900,
+  "per_call_output_tokens_maximum": 131072,
+  "per_call_timeout_seconds_maximum": 7200,
   "source_exclusions": [
     "actual private corpus",
     "live account payload",
@@ -2045,12 +2045,12 @@
   },
   "native_tooling_recheck_79": {
     "call_number": 79,
-    "status": "prepared_output_cap_decision_pending_not_invoked",
+    "status": "allocated_not_invoked",
     "model": "glm-5.3",
     "requested_effort": "max",
     "purpose": "fresh tooling audit of explicit max and separately authorized output bounds",
-    "output_cap": null,
-    "timeout": 900
+    "output_cap": 131072,
+    "timeout": 7200
   },
   "proposed_per_call_output_extension": {
     "choices": [
@@ -2058,10 +2058,29 @@
       128000
     ],
     "current_maximum": 16000,
-    "status": "owner_numerical_choice_pending",
+    "status": "superseded_owner_maximum_directive_recorded",
     "requested_effort": "max",
     "provider": "opencode_go",
     "model": "glm-5.3",
-    "automatic_retry": false
+    "automatic_retry": false,
+    "resolved_maximum": 131072
+  },
+  "per_call_output_authority": {
+    "date": "2026-10-09",
+    "owner_message": "не ставь такие ограничения жетские, нам нуежен резальутат делай максимум",
+    "provider": "opencode_go",
+    "model": "glm-5.3",
+    "maximum_tokens": 131072,
+    "decision_ref": "docs/verification/PAI-maximum-review-authority-20261009.md",
+    "interpretation": "Owner directs maximum after the explicit64000/128000 question; choose the documented exact128Ki-token ceiling131072.",
+    "docs_ref": "https://docs.z.ai/api-reference/llm/chat-completion"
+  },
+  "per_call_timeout_authority": {
+    "date": "2026-10-09",
+    "owner_message": "не ставь такие ограничения жетские, нам нуежен резальутат делай максимум",
+    "provider": "opencode_go",
+    "model": "glm-5.3",
+    "maximum_seconds": 7200,
+    "interpretation": "Engineering watchdog selected under the instruction to remove tight limits; allows full max output. Not an owner-quoted numerical value."
   }
 }
