@@ -490,5 +490,110 @@
     "branch": "docs/personal-assistant-blueprint-playbook-20260918",
     "observed_remote_range": "5d6d0f2..ea9d36a",
     "later_changes": "publication receipt documentation only; no code/test/policy changes"
+  },
+  "continuation_20261009": {
+    "status": "glm_cutover_local_verified_environment_blocks_commit_and_provider_audit",
+    "committed_base": "ba3fffb175946fa62b619823c1848136be5ce284",
+    "working_tree_sources": [
+      {
+        "path": "docs/REVIEW_POLICY.md",
+        "sha256": "4e17ca273d962533beebfac5b5c78690fb742b7da81c26e6fbf3f15b332397b0",
+        "bytes": 9338
+      },
+      {
+        "path": "tools/opencode_role_review.py",
+        "sha256": "fb0515dd036effc5e5283a47918732e617e19553464c1aae88e0237924798652",
+        "bytes": 38149
+      },
+      {
+        "path": "tools/mimo_code_review.py",
+        "sha256": "a7b7938ad197e5e6ce628a502ff9fe7231a6566e10625abd1414d85e99925efa",
+        "bytes": 16599
+      },
+      {
+        "path": "tools/finalize_opencode_design_reviews.py",
+        "sha256": "9c567ddeb54991ff8268f65d3dd18b2f97cfe2d8bb2298467a6d259312440913",
+        "bytes": 7280
+      },
+      {
+        "path": "tests/test_opencode_role_review.py",
+        "sha256": "0edacfe0c630bf71d2fe62a5be42bb41f8b662782769f2d174394db58a6a4ab8",
+        "bytes": 57880
+      }
+    ],
+    "checks": [
+      {
+        "date": "2026-10-09",
+        "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python -m pytest -q tests/test_opencode_role_review.py tests/test_pai_acceptance_guard.py tests/test_playbook_bridge.py tests/test_pai_plan.py",
+        "result": "5 failed, 117 passed in 7.59 s; preserved fixture/default-selection failures, corrected without weakening guards",
+        "exit_code": 1,
+        "log_path": ".playbook-artifacts/pai-validation-20261009/initial-failures.log",
+        "log_sha256": "2fb98f5ce3b7c6e80baa8253cc254d8eda6b16ae6faae4d623ced5cc5cf87a69"
+      },
+      {
+        "date": "2026-10-09",
+        "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python -m pytest -q tests/test_opencode_role_review.py tests/test_pai_acceptance_guard.py tests/test_playbook_bridge.py tests/test_pai_plan.py",
+        "result": "132 passed in 8.33 s",
+        "exit_code": 0,
+        "log_path": ".playbook-artifacts/pai-validation-20261009/intermediate-132.log",
+        "log_sha256": "1d125b38e1b1b3492eb3462599b91ed2b3b1eb7a1a160ba730aacbafaadd9574"
+      },
+      {
+        "date": "2026-10-09",
+        "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python -m pytest -q tests/test_opencode_role_review.py tests/test_pai_acceptance_guard.py tests/test_playbook_bridge.py tests/test_pai_plan.py",
+        "result": "134 passed in 9.16 s",
+        "exit_code": 0,
+        "log_path": ".playbook-artifacts/pai-validation-20261009/intermediate-134.log",
+        "log_sha256": "22d10edbf976578f5cef26d0198f895bdf58908dd0b86a4b9428d16a4f87fc1c"
+      },
+      {
+        "date": "2026-10-09",
+        "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python -m pytest -q tests/test_opencode_role_review.py tests/test_pai_acceptance_guard.py tests/test_playbook_bridge.py tests/test_pai_plan.py",
+        "result": "135 passed in 8.12 s",
+        "exit_code": 0,
+        "log_path": ".playbook-artifacts/pai-validation-20261009/final-135.log",
+        "log_sha256": "a9301dae3823bfc681370fe7a7514c531071a1f8e773893e40f3f19e0383ccce"
+      }
+    ],
+    "prepared_packet": {
+      "status": "prepared_only",
+      "input_sha256": "80033044007c389380331cd60d3effbad2536ecb710b25781e21c57bf3fd3315",
+      "bytes": 187605,
+      "provider_call": false,
+      "planning_gate": null
+    },
+    "preflight": {
+      "command": ".venv-pai/bin/python tools/run_codex_role.py run --provider opencode-go --model glm-5.3 --root . --task PAI-00 --feature-id PAI --role program_design_review --tooling-review --allow-provider-egress --call-cap 1 --output-token-cap 16000 --timeout-seconds 900",
+      "exit_code": 2,
+      "result": "review inputs must match captured committed HEAD",
+      "provider_call_attempted": false,
+      "credential_lookup_reached": false,
+      "paid_calls_consumed": 0,
+      "log_path": ".playbook-artifacts/pai-validation-20261009/preflight-blocked.log",
+      "log_sha256": "24c7e614769112fd000052f5601cfb4a8d759b57aa13de3bd928cf60b4fdf893"
+    },
+    "environment": {
+      "repo_git": "read-only by current session policy",
+      "network": "restricted",
+      "approval_policy": "never"
+    },
+    "independent_audit": "not_run; no GLM observed model, effort, usage or verdict",
+    "human_design_approval": false,
+    "remaining_gate": "Commit verified cutover in assigned branch in a session permitting Git writes, then run allocated native GLM audit78 with authorized OpenCode Go network access.",
+    "followup_20261009": {
+      "request": "делай дальше",
+      "repo_git_writable": false,
+      "known_verified_sources_unchanged": true,
+      "public_provider_catalog": {
+        "tool": "web__run.open",
+        "url": "https://opencode.ai/zen/go/v1/models",
+        "observed_id": "glm-5.3",
+        "observed_object": "model",
+        "observed_owned_by": "opencode",
+        "authenticated_account_check": false,
+        "model_inference_request": false
+      },
+      "action": "Prepare single exact scoped patch against committed base; Git/network permission requirements unchanged. No code change/new paid call/repeated test run."
+    }
   }
 }

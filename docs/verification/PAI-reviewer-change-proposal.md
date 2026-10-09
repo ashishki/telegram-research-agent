@@ -1,4 +1,4 @@
-# Concrete reviewer protocol decision — not approved or enabled
+# Reviewer protocol decision — owner accepted 2026-10-09; integration pending
 
 Current source candidate: e1c86ef, plus two new synthetic real-consumer finalizer cases. Native tooling77 is STOP_SHIP; no governed design, human design, live or release approval exists. Implementer cannot replace the independent verdict with its own PASS.
 
@@ -28,3 +28,7 @@ Proposed first command AFTER implementation/authority/tests (not supported or ex
     .venv-pai/bin/python tools/run_codex_role.py run --provider opencode-go --model glm-5.3 --root . --task PAI-00 --feature-id PAI --role program_design_review --tooling-review --allow-provider-egress --call-cap 1 --output-token-cap 16000 --timeout-seconds 900
 
 Credentials remain at the previously owner-authorized external file, passed without printing/copying value. Source/private-account/provider-product/production/service/timer/release exclusions persist. A different reviewer may expose real defects; this is not a way to discard findings or manufacture approval.
+
+Owner acceptance2026-10-09: exact reply “давай” to the explicit GLM-5.3 change question. Same provider/data/limits/exclusions; no exact human design/live/release approval. Local cutover is implemented and under scoped test verification; actual GLM integration/identity/schema remain unverified until a complete authorized request.
+
+Local implementation2026-10-09 verified:135 scoped tests passed8.12s, including authorized GLM receipt identity, omitted Mimo thinking field, mismatched/unapproved selection denied before keys, real pinned-consumer four-part GLM publication, changed-part denial and mixed-model aggregation refusal. Audit preflight exit2 denies uncommitted inputs before keys/HTTP; current .git is read-only and network restricted. Actual GLM model/schema/usage/effort/verdict remain unverified. No need to reapprove model selection or numerical call cap.

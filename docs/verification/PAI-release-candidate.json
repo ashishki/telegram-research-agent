@@ -1712,7 +1712,7 @@
     "program_design_review": "pending_native_complete_aggregation",
     "product_design_review": "pending_native_complete_aggregation",
     "slice_test_critic_privacy_maintainability": "non-Codex governed adapter/receipts remain pending; advisory source rechecks are not substituted",
-    "tooling": "native77 STOP at e1c86ef; actual packet contains aggregate publication; real pinned-consumer publication/altered-part cases pass; independent model-selection decision pending, no implementer override"
+    "tooling": "GLM replacement owner-authorized20261009; local cutover135 tests passed; audit78 preflight blocked on uncommitted inputs in read-only Git session, no API call or verdict"
   },
   "live_provider_evidence": false,
   "human_design_approval": false,
@@ -2025,5 +2025,37 @@
     "status": "observed_success",
     "later_changes": "publication receipt documentation only"
   },
-  "review_protocol_proposal": "docs/verification/PAI-reviewer-change-proposal.md"
+  "review_protocol_proposal": "docs/verification/PAI-reviewer-change-proposal.md",
+  "working_tree_cutover": {
+    "date": "2026-10-09",
+    "base_sha": "ba3fffb175946fa62b619823c1848136be5ce284",
+    "sources": [
+      {
+        "path": "docs/REVIEW_POLICY.md",
+        "sha256": "4e17ca273d962533beebfac5b5c78690fb742b7da81c26e6fbf3f15b332397b0",
+        "bytes": 9338
+      },
+      {
+        "path": "tools/opencode_role_review.py",
+        "sha256": "fb0515dd036effc5e5283a47918732e617e19553464c1aae88e0237924798652",
+        "bytes": 38149
+      },
+      {
+        "path": "tools/mimo_code_review.py",
+        "sha256": "a7b7938ad197e5e6ce628a502ff9fe7231a6566e10625abd1414d85e99925efa",
+        "bytes": 16599
+      },
+      {
+        "path": "tools/finalize_opencode_design_reviews.py",
+        "sha256": "9c567ddeb54991ff8268f65d3dd18b2f97cfe2d8bb2298467a6d259312440913",
+        "bytes": 7280
+      },
+      {
+        "path": "tests/test_opencode_role_review.py",
+        "sha256": "0edacfe0c630bf71d2fe62a5be42bb41f8b662782769f2d174394db58a6a4ab8",
+        "bytes": 57880
+      }
+    ],
+    "result": "135 passed8.12s; unchanged provider/data/per-call bounds; actual GLM integration unverified"
+  }
 }

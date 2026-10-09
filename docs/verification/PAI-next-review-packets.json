@@ -1,14 +1,14 @@
 {
   "schema_version": 1,
-  "status": "native77_STOP_factual_contradiction_pending_review_protocol_decision",
-  "current_approved_call_cap": 85,
+  "status": "glm_cutover_local_verified_audit78_preflight_blocked_no_provider_call",
+  "current_approved_call_cap": 86,
   "calls_consumed_including_failures": 77,
   "proposed_total_cap": 34,
   "new_calls_maximum": 3,
   "third_call": "only if an actual new finding needs independent recheck",
   "provider": "opencode_go",
-  "model": "mimo-v2.6-pro",
-  "mode": "fresh read-only; explicit thinking-disabled or provider-default reasoning recorded per request; strict JSON schema",
+  "model": "glm-5.3",
+  "mode": "fresh read-only; provider-default reasoning; strict JSON schema; no model fallback",
   "per_call_output_tokens_maximum": 16000,
   "per_call_timeout_seconds_maximum": 900,
   "source_exclusions": [
@@ -1894,49 +1894,49 @@
   },
   "native_design_allocations": [
     {
-      "call_number": 78,
-      "role": "program_design_review",
-      "slice_group": "foundation",
-      "status": "blocked_current_tooling_gate_not_invoked"
-    },
-    {
       "call_number": 79,
       "role": "program_design_review",
-      "slice_group": "product",
+      "slice_group": "foundation",
       "status": "blocked_current_tooling_gate_not_invoked"
     },
     {
       "call_number": 80,
       "role": "program_design_review",
-      "slice_group": "sources",
+      "slice_group": "product",
       "status": "blocked_current_tooling_gate_not_invoked"
     },
     {
       "call_number": 81,
       "role": "program_design_review",
-      "slice_group": "completeness",
+      "slice_group": "sources",
       "status": "blocked_current_tooling_gate_not_invoked"
     },
     {
       "call_number": 82,
-      "role": "product_design_review",
-      "slice_group": "foundation",
+      "role": "program_design_review",
+      "slice_group": "completeness",
       "status": "blocked_current_tooling_gate_not_invoked"
     },
     {
       "call_number": 83,
       "role": "product_design_review",
-      "slice_group": "product",
+      "slice_group": "foundation",
       "status": "blocked_current_tooling_gate_not_invoked"
     },
     {
       "call_number": 84,
       "role": "product_design_review",
-      "slice_group": "sources",
+      "slice_group": "product",
       "status": "blocked_current_tooling_gate_not_invoked"
     },
     {
       "call_number": 85,
+      "role": "product_design_review",
+      "slice_group": "sources",
+      "status": "blocked_current_tooling_gate_not_invoked"
+    },
+    {
+      "call_number": 86,
       "role": "product_design_review",
       "slice_group": "completeness",
       "status": "blocked_current_tooling_gate_not_invoked"
@@ -2007,5 +2007,31 @@
     "output_cap": 16000,
     "timeout": 900
   },
-  "pending_review_protocol_decision": "docs/verification/PAI-reviewer-change-proposal.md"
+  "pending_review_protocol_decision": "owner_accepted_20261009",
+  "reviewer_model_authority": {
+    "date": "2026-10-09",
+    "owner_message": "давай",
+    "provider": "opencode_go",
+    "model": "glm-5.3",
+    "decision_ref": "docs/verification/PAI-reviewer-change-proposal.md",
+    "context": "Acceptance of the explicit preceding request to replace Mimo with GLM-5.3 via the same OpenCode Go and existing limits.",
+    "scope": "read-only public repository code/synthetic design local PAI reviews only",
+    "human_design_approval": false,
+    "live_or_release_approval": false
+  },
+  "native_tooling_recheck_78": {
+    "call_number": 78,
+    "status": "blocked_commit_required_not_invoked",
+    "model": "glm-5.3",
+    "purpose": "first independently authorized GLM audit of reviewer model cutover",
+    "output_cap": 16000,
+    "timeout": 900
+  },
+  "glm_cutover_preflight": {
+    "date": "2026-10-09",
+    "exit_code": 2,
+    "provider_call_attempted": false,
+    "paid_calls_consumed": 0,
+    "reason": "dirty reviewer inputs cannot match committed HEAD; .git currently read-only"
+  }
 }

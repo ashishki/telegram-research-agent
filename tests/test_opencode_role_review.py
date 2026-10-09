@@ -77,6 +77,15 @@ def setup_run(tmp_path, monkeypatch, *, planning_block=False):
     return args, calls, records
 
 
+def select_glm_fixture(root, args=None):
+    budget=root/'docs/verification/PAI-next-review-packets.json'
+    record=json.loads(budget.read_text());record['model']='glm-5.3'
+    record['reviewer_model_authority']={'model':'glm-5.3','provider':'opencode_go',
+        'owner_message':'synthetic approved selection','decision_ref':'docs/verification/PAI-reviewer-change-proposal.md'}
+    budget.write_text(json.dumps(record))
+    if args is not None:args.model='glm-5.3'
+
+
 @pytest.mark.parametrize("gate", ["planning", "egress", "budget", "prepare_only"])
 def test_real_gates_precede_credential_lookup_and_provider_call(tmp_path, monkeypatch, gate):
     args, calls, records = setup_run(tmp_path, monkeypatch, planning_block=gate == "planning")
@@ -166,7 +175,7 @@ def test_real_tooling_packet_manifest_hashes_exact_rendered_sections():
 def test_design_review_deadline_bounds_reach_actual_transport(tmp_path, monkeypatch, timeout, expected):
     _, calls, records = setup_run(tmp_path, monkeypatch)
     assert review.main(["run", "--root", str(tmp_path), "--task", "T1", "--feature-id", "F",
-                        "--role", "program_design_review", "--allow-provider-egress", "--call-cap", "1",
+                        "--role", "program_design_review", "--model", "mimo-v2.6-pro", "--allow-provider-egress", "--call-cap", "1",
                         "--timeout-seconds", str(timeout)]) == expected
     if expected == 0:
         assert calls[1]["timeout"] == timeout
@@ -588,7 +597,10 @@ def test_missing_independent_tooling_audit_denies_before_provider(tmp_path, monk
     assert calls == [] and records == []
 
 
-def test_real_tooling_gate_rejects_changed_source_and_verdict_disagreement(tmp_path,monkeypatch):
+@pytest.mark.parametrize('model',['mimo-v2.6-pro','glm-5.3'])
+def test_real_tooling_gate_rejects_changed_source_and_verdict_disagreement(tmp_path,monkeypatch,model):
+    setup_run(tmp_path,monkeypatch)
+    if model=='glm-5.3':select_glm_fixture(tmp_path)
     import importlib.util
     spec = importlib.util.spec_from_file_location('fresh_review_gate', review.__file__)
     fresh = importlib.util.module_from_spec(spec)
@@ -606,7 +618,7 @@ def test_real_tooling_gate_rejects_changed_source_and_verdict_disagreement(tmp_p
     report = run / 'report.md'
     report.write_text('# Independent synthetic audit\n\nPROGRAM_DESIGN_REVIEW: ADVISORY\n\n' + response()['choices'][0]['message']['content'])
     payload = {'review_scope': 'tooling', 'role': 'program_design_review', 'provider': 'opencode_go',
-               'read_only': True, 'requested_model': 'mimo-v2.6-pro', 'observed_model': 'mimo-v2.6-pro',
+               'read_only': True, 'requested_model': model, 'observed_model': model,
                'verdict': 'ADVISORY', 'documents': manifest, 'report_sha256': fresh.digest(report.read_bytes())}
     payload['pinned_gate_modules']=[{'path':str(module_file),'sha256':fresh.digest(module_file.read_bytes())}]
     payload['runtime_dependencies']=fresh.runtime_dependencies()
@@ -661,7 +673,7 @@ def test_legacy_deep_review_stays_bounded_and_records_observed_identity(tmp_path
     monkeypatch.setattr(mimo_code_review, '_api_key', lambda path: calls.append('key') or 'synthetic-key')
     verdict = {'verdict': 'SHIP_OK', 'findings': [], 'summary': 'No P0/P1 in the synthetic diff.', 'not_verified': ['live I/O']}
     if change == 'critical': verdict['findings'] = [{'severity': 'P1', 'title': 'Replay'}]
-    payload = {'model': 'other-model' if change == 'model' else 'mimo-v2.6-pro',
+    payload = {'model': 'other-model' if change == 'model' else 'glm-5.3',
         'choices': [{'finish_reason': 'length' if change == 'truncated' else 'stop', 'message': {'content': json.dumps(verdict)}}]}
     monkeypatch.setattr(mimo_code_review, '_call_model', lambda **kwargs: calls.append(kwargs) or payload)
     output = tmp_path / 'deep-review.json'
@@ -676,7 +688,7 @@ def test_legacy_deep_review_stays_bounded_and_records_observed_identity(tmp_path
         assert calls[1]['max_output_tokens'] == 8000 and calls[1]['stream'] is True
     if change == 'valid':
         report = json.loads(output.read_text())
-        assert report['observed_model'] == report['requested_model'] == 'mimo-v2.6-pro'
+        assert report['observed_model'] == report['requested_model'] == 'glm-5.3'
         assert report['read_only'] is True and report['cost'] == 'unknown'
     else:
         assert not output.exists() or json.loads(output.read_text()).get('status') != 'reviewed'
@@ -787,7 +799,8 @@ def test_tooling_scope_cannot_be_promoted_to_complete_design(tmp_path,monkeypatc
 
 def test_extended_review_limits_require_record_before_key_or_http(tmp_path,monkeypatch):
     args,calls,records=setup_run(tmp_path,monkeypatch);args.timeout_seconds=900
-    (tmp_path/'docs/verification/PAI-next-review-packets.json').unlink()
+    budget=tmp_path/'docs/verification/PAI-next-review-packets.json'
+    data=json.loads(budget.read_text());del data['ongoing_review_budget_authority'];budget.write_text(json.dumps(data))
     with pytest.raises(review.ReviewBlocked,match='extended review authority'):review.execute(args)
     assert calls==[] and records==[]
 
@@ -872,9 +885,15 @@ def test_exact_eof_after_complete_json_cannot_publish_native_review(tmp_path,mon
 
 
 @pytest.mark.parametrize('altered',[False,True])
-def test_four_phase_finalizer_publishes_through_real_pinned_consumer(tmp_path,monkeypatch,altered):
+@pytest.mark.parametrize('model',['mimo-v2.6-pro','glm-5.3'])
+def test_four_phase_finalizer_publishes_through_real_pinned_consumer(tmp_path,monkeypatch,altered,model):
     import finalize_opencode_design_reviews as complete
     args,calls,_=setup_run(tmp_path,monkeypatch)
+    if model=='glm-5.3':
+        select_glm_fixture(tmp_path,args)
+        def provider(**kwargs):
+            calls.append(kwargs);result=response();result['model']=model;return result
+        monkeypatch.setattr(mimo_code_review,'_call_model',provider)
     from playbook import verified_upstream,ROOT
     sys.path.insert(0,str(verified_upstream(ROOT)/'tools'))
     import feature_design_lib
@@ -908,3 +927,68 @@ def test_four_phase_finalizer_publishes_through_real_pinned_consumer(tmp_path,mo
         assert record['reviewer_binding'].startswith('opencode_go_complete:') and 'approved_by' not in record
         aggregate=json.loads((tmp_path/record['reviewer_binding'].split(':',1)[1]).read_text())
         assert len(aggregate['parts'])==4 and len(aggregate['coverage']['slices'])==32
+
+
+@pytest.mark.parametrize('change',['missing_amendment','wrong_provider','wrong_requested','wrong_selection','wrong_observed','thinking_disabled','valid'])
+def test_glm_selection_guards_precede_keys_and_exact_identity_controls_publication(tmp_path,monkeypatch,change):
+    args,calls,records=setup_run(tmp_path,monkeypatch);select_glm_fixture(tmp_path,args)
+    budget=tmp_path/'docs/verification/PAI-next-review-packets.json';data=json.loads(budget.read_text())
+    if change=='missing_amendment':del data['reviewer_model_authority']
+    if change=='wrong_provider':data['reviewer_model_authority']['provider']='other'
+    if change=='wrong_selection':data['model']='mimo-v2.6-pro';args.model='mimo-v2.6-pro'
+    budget.write_text(json.dumps(data))
+    if change=='wrong_requested':args.model='mimo-v2.6-pro'
+    if change=='thinking_disabled':args.thinking_disabled=True
+    def provider(**kwargs):
+        calls.append(kwargs);result=response();result['model']='mimo-v2.6-pro' if change=='wrong_observed' else 'glm-5.3';return result
+    monkeypatch.setattr(mimo_code_review,'_call_model',provider)
+    if change=='valid':
+        assert review.execute(args)==0
+        evidence=json.loads(next((tmp_path/'.playbook-artifacts/opencode-runs').glob('*/result.json')).read_text())
+        assert evidence['requested_model']==evidence['observed_model']=='glm-5.3'
+        assert evidence['reviewer_model_authority']['authority']['model']=='glm-5.3'
+        assert evidence['requested_effort']=='not_requested' and evidence['observed_effort']=='unknown'
+        assert calls[1]['thinking_disabled'] is False and len(records)==1
+    else:
+        with pytest.raises(review.ReviewBlocked):review.execute(args)
+        assert records==[] and not list((tmp_path/'.playbook-artifacts/opencode-runs').glob('*/result.json'))
+        if change!='wrong_observed':assert calls==[]
+
+
+def test_glm_transport_keeps_native_metadata_and_omits_mimo_thinking_parameter(monkeypatch):
+    captured=[]
+    def open_fake(request,timeout):
+        captured.append(json.loads(request.data))
+        return stream_response([stream_event({'content':response()['choices'][0]['message']['content']},model='glm-5.3'),stream_event(finish='stop',model='glm-5.3'),'[DONE]'])
+    monkeypatch.setattr(mimo_code_review,'urlopen',open_fake)
+    kwargs={'api_key':'synthetic','base_url':'https://opencode.ai/zen/go/v1','model':'glm-5.3','prompt':'synthetic','timeout':300,'stream':True}
+    result=mimo_code_review._call_model(**kwargs)
+    assert result['model']=='glm-5.3' and captured[0]['model']=='glm-5.3' and 'thinking' not in captured[0]
+    with pytest.raises(ValueError,match='invalid_review_thinking_mode'):
+        mimo_code_review._call_model(**kwargs,thinking_disabled=True)
+    assert len(captured)==1
+
+
+@pytest.mark.parametrize('mixed',[False,True])
+def test_glm_complete_record_requires_four_same_model_parts(tmp_path,monkeypatch,mixed):
+    import finalize_opencode_design_reviews as complete
+    args,calls,records=setup_run(tmp_path,monkeypatch);select_glm_fixture(tmp_path,args)
+    def provider(**kwargs):
+        calls.append(kwargs);result=response();result['model']='glm-5.3';return result
+    monkeypatch.setattr(mimo_code_review,'_call_model',provider)
+    (tmp_path/'docs/design').mkdir(parents=True)
+    (tmp_path/'docs/design/F.design.json').write_text(json.dumps({'slices':[{'slice_id':f'PAI-{n:02}'} for n in range(32)]}))
+    for group in review.REVIEW_GROUPS:
+        args.slice_group=group;assert review.execute(args)==0
+    results=sorted((tmp_path/'.playbook-artifacts/opencode-runs').glob('*/result.json'))
+    monkeypatch.setattr(complete,'pinned_modules',review.pinned_modules)
+    if mixed:
+        bad=results[0];data=json.loads(bad.read_text());data.update(requested_model='mimo-v2.6-pro',observed_model='mimo-v2.6-pro');bad.write_text(json.dumps(data));bad.with_suffix('.json.sha256').write_text(review.digest(bad.read_bytes()))
+        with pytest.raises(review.ReviewBlocked,match='identity/scope'):
+            complete.finalize(tmp_path,'F',args.role,results)
+        assert records==[] and not (tmp_path/'.playbook-artifacts/opencode-complete').exists()
+    else:
+        assert complete.finalize(tmp_path,'F',args.role,results)==0
+        aggregate=json.loads(next((tmp_path/'.playbook-artifacts/opencode-complete').glob('*/result.json')).read_text())
+        assert aggregate['requested_model']==aggregate['observed_model']=='glm-5.3'
+        assert len(aggregate['parts'])==4 and len(records)==1

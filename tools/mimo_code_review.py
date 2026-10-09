@@ -26,7 +26,9 @@ from urllib.request import Request, HTTPRedirectHandler, build_opener
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_BASE_URL = os.environ.get("OPENCODE_GO_BASE_URL", "https://opencode.ai/zen/go/v1")
-DEFAULT_MODEL = os.environ.get("MIMO_REVIEW_MODEL", "mimo-v2.6-pro")
+CURRENT_REVIEW_MODEL = "glm-5.3"
+SUPPORTED_REVIEW_MODELS = frozenset({"mimo-v2.6-pro", CURRENT_REVIEW_MODEL})
+DEFAULT_MODEL = os.environ.get("OPENCODE_REVIEW_MODEL", CURRENT_REVIEW_MODEL)
 MAX_INPUT_BYTES = 200_000
 
 
@@ -83,11 +85,13 @@ def _call_model(*, api_key: str, base_url: str, model: str, prompt: str, timeout
                 max_output_tokens: int = 8000, response_schema: dict | None = None,
                 session_id: str | None = None, stream: bool = False,
                 thinking_disabled: bool = False) -> dict[str, Any]:
-    if base_url.rstrip('/')!='https://opencode.ai/zen/go/v1' or model!='mimo-v2.6-pro':
+    if base_url.rstrip('/')!='https://opencode.ai/zen/go/v1' or model not in SUPPORTED_REVIEW_MODELS:
         raise ValueError('outside_authorized_review_provider')
     if type(max_output_tokens) is not int or not 1 <= max_output_tokens <= 16000:
         raise ValueError("invalid_review_output_bound")
     if type(thinking_disabled) is not bool:
+        raise ValueError("invalid_review_thinking_mode")
+    if thinking_disabled and model!='mimo-v2.6-pro':
         raise ValueError("invalid_review_thinking_mode")
     body = {
         "model": model,
@@ -287,7 +291,7 @@ def main() -> int:
     user = f"Reviewed range: {base_sha}..{head_sha}\nCommits:\n{log}\n\nDiff:\n{diff}"
     prompt = PROMPT + "\n\n" + user
     if (args.base_url.rstrip('/') != 'https://opencode.ai/zen/go/v1'
-        or args.model != 'mimo-v2.6-pro' or not 30 <= args.timeout <= 300
+        or args.model != CURRENT_REVIEW_MODEL or not 30 <= args.timeout <= 300
         or len(prompt.encode()) > MAX_INPUT_BYTES):
         print(json.dumps({"status": "outside_bounded_review_scope"}))
         return 1

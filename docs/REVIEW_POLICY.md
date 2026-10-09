@@ -1,6 +1,6 @@
 # Review Policy — PA / PAI
 
-Updated: 2026-10-08. Pin: d570163ab17ec3b4245187c778f1e8d89af9690f.
+Updated: 2026-10-09. Pin: d570163ab17ec3b4245187c778f1e8d89af9690f.
 
 ## Authority and provenance
 
@@ -8,7 +8,7 @@ The current implementer uses the active session model/reasoning mode with no
 programme override. It never reviews its own work. Independent reviewers are
 fresh and read-only, do not fix/commit/push, and cannot grant human acceptance.
 The owner’s [2026-09-23 amendment](CODEX_PROMPT.before-pai-20261006.md#owner-amendment-2026-09-23--solution-first-non-codex-judge)
-selects a non-Codex reviewer via OpenCode Go, default mimo-v2.6-pro, and batches
+selected a non-Codex reviewer via OpenCode Go, then mimo-v2.6-pro, and batches
 review at phase boundaries. It supersedes the older Terra/high prescription in
 AGENTS/adoption/prompts. This is reviewer selection, not a new paid-call budget
 or permission to send private data. The 2026-10-06 Sol prompt explicitly keeps
@@ -34,6 +34,21 @@ native OpenCode route; record requested mode separately from actual telemetry.
 These amendments grant neither product-provider spending nor human design,
 live account, background runtime, production or release authority.
 
+## Owner reviewer amendment — 2026-10-09
+
+The owner answered “давай” to the explicit GLM-5.3 replacement question and the
+concrete verification/PAI-reviewer-change-proposal.md. Fresh reviews now use
+GLM-5.3 (glm-5.3) on the SAME OpenCode Go endpoint, public code/synthetic design
+only, existing200000 input-byte/16000 output-token/900s maximums. Ongoing necessary
+review-call budget authority persists. There is no automatic retry/model fallback
+and no Mimo thinking-disabled parameter on GLM. Record requested/observed identity
+and effort separately; unknown metadata remains unknown. Historical Mimo reports
+and STOP/failure records remain unchanged, never relabeled as GLM or accepted.
+This model-selection amendment grants no human design, private/live product
+provider, production, background job, service, timer or release authority.
+The recorded current selection is checked before credentials/provider calls and
+when consuming tooling/phase records; mixed-model phase sets cannot aggregate.
+
 ## Roles, runners and receipt compatibility
 
 | Role | Required route/evidence | Current integration |
@@ -45,7 +60,8 @@ live account, background runtime, production or release authority.
 
 Do not label a Mimo verdict as a successful Role Runner execution or synthesize
 runner telemetry/approval fields. Rendering a role prompt is preparation only.
-The owner retained Mimo on 2026-10-06. The local Role Runner now routes
+The owner retained Mimo on 2026-10-06 and explicitly approved its replacement
+with GLM-5.3 on 2026-10-09. The local Role Runner now routes
 explicit --provider opencode-go to tools/opencode_role_review.py for product/
 program design roles. It checks the real pinned task/feature/planning gate,
 bounded input, one explicit budgeted call, observed model/complete JSON,

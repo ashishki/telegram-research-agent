@@ -18,6 +18,7 @@ def finalize(root: Path, feature: str, role: str, results: list[Path]):
     design = json.loads(registry_path.read_text())
     current_hashes = lib.design_hashes(root, design)
     head = workflow.git_commit(root)
+    model = review.reviewer_model_authority(root)['model']
     by_group = {}
     for path in results:
         path = path.resolve()
@@ -33,8 +34,8 @@ def finalize(root: Path, feature: str, role: str, results: list[Path]):
         if (result.get("feature_id") != feature or result.get("role") != role
             or result.get('schema_version')!='assistant.opencode_design_review.v1' or result.get('review_scope')!='complete_design'
             or result.get("provider") != "opencode_go" or result.get("read_only") is not True
-            or result.get("requested_model") != "mimo-v2.6-pro"
-            or result.get("observed_model") != "mimo-v2.6-pro"):
+            or result.get("requested_model") != model
+            or result.get("observed_model") != model):
             raise ReviewBlocked("phase reviewer identity/scope mismatch")
         if result.get("reviewed_head") != head or result.get("design_hashes") != current_hashes:
             raise ReviewBlocked("phase reviewed a different HEAD or design")
@@ -77,6 +78,7 @@ def finalize(root: Path, feature: str, role: str, results: list[Path]):
     run_dir.mkdir(parents=True, exist_ok=False)
     manifest = {"schema_version":"assistant.opencode_complete_review.v1","role":role,
                 "feature_id":feature,"reviewed_head":head,"design_hashes":current_hashes,
+                "requested_model":model,"observed_model":model,
                 "verdict":verdict,"tooling_audit_ref":tooling_audit_ref,
                 "evidence_integrity":"trusted workspace/Git; local hashes are not signed or append-only; privileged wholesale replacement is outside guarantees",
                 "coverage":{"slices":sorted(slices),"spec_sections":sorted(sections)},

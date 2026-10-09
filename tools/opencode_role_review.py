@@ -17,6 +17,7 @@ from importlib.metadata import version
 from collections import Counter
 
 from playbook import ROOT, verified_upstream
+from mimo_code_review import CURRENT_REVIEW_MODEL, SUPPORTED_REVIEW_MODELS
 
 ROLES = {
     "product_design_review": "PRODUCT_DESIGN_REVIEW",
@@ -110,13 +111,31 @@ def runtime_dependencies():
         **{name:version(name) for name in ('jsonschema','PyYAML','pytest')}}
 
 
+def reviewer_model_authority(root: Path, requested_model: str | None = None):
+    path=root/'docs/verification/PAI-next-review-packets.json'
+    try:
+        raw=path.read_bytes();record=json.loads(raw);model=record.get('model')
+        if (record.get('provider')!='opencode_go' or model not in SUPPORTED_REVIEW_MODELS
+            or requested_model is not None and requested_model!=model):
+            raise ReviewBlocked('reviewer model outside recorded owner scope')
+        amendment=record.get('reviewer_model_authority')
+        if (amendment is not None or model==CURRENT_REVIEW_MODEL) and (not isinstance(amendment,dict)
+            or amendment.get('model')!=model or amendment.get('provider')!='opencode_go'
+            or not amendment.get('owner_message')
+            or amendment.get('decision_ref')!='docs/verification/PAI-reviewer-change-proposal.md'):
+            raise ReviewBlocked('reviewer model selection authority missing')
+        return {'path':str(path.relative_to(root)),'sha256':digest(raw),'model':model,'authority':amendment}
+    except (OSError,ValueError,TypeError):
+        raise ReviewBlocked('reviewer model selection authority missing or outside scope') from None
+
+
 def extended_review_authority(root,args,output_cap):
     if args.timeout_seconds<=300 and output_cap<=8000:return None
     path=root/'docs/verification/PAI-next-review-packets.json'
     try:
         raw=path.read_bytes();record=json.loads(raw)
         if (not record.get('ongoing_review_budget_authority',{}).get('owner_message')
-            or record.get('provider')!='opencode_go' or record.get('model')!='mimo-v2.6-pro'
+            or record.get('provider')!='opencode_go' or record.get('model')!=args.model
             or args.timeout_seconds>record.get('per_call_timeout_seconds_maximum',0)
             or output_cap>record.get('per_call_output_tokens_maximum',0)):
             raise ReviewBlocked('extended review authority missing or outside scope')
@@ -188,6 +207,7 @@ def pinned_modules(root: Path):
 
 def require_tooling_audit(root: Path) -> str:
     """Only independent, unchanged, complete tooling evidence unlocks design records."""
+    model=reviewer_model_authority(root)['model']
     matching=[]
     for path in sorted((root / ".playbook-artifacts/opencode-runs").glob("*/result.json"), reverse=True):
         try:
@@ -203,7 +223,7 @@ def require_tooling_audit(root: Path) -> str:
             if result.get('pinned_gate_modules')!=actual_modules:continue
             if (result.get("review_scope") != "tooling" or result.get("role") != "program_design_review"
                 or result.get("provider") != "opencode_go" or result.get("read_only") is not True
-                or result.get("requested_model") != "mimo-v2.6-pro" or result.get("observed_model") != "mimo-v2.6-pro"
+                or result.get("requested_model") != model or result.get("observed_model") != model
                 or result.get("verdict") not in {"PASS", "ADVISORY",'STOP_SHIP'}): continue
             manifest = {item["path"]: item for item in result["documents"]}
             if set(manifest)!=set(TOOLING_REFS)|{'docs/ASSISTANT_BOUNDARIES.md','docs/IMPLEMENTATION_CONTRACT.md'}:continue
@@ -398,6 +418,9 @@ def execute(args):
         raise ReviewBlocked('PAI design requires four phase reviews and complete aggregation')
     if not args.allow_provider_egress or args.call_cap != 1:
         raise ReviewBlocked("explicit provider scope and exactly one budgeted call required")
+    model_authority=reviewer_model_authority(root,args.model)
+    if getattr(args,'thinking_disabled',False) and args.model!='mimo-v2.6-pro':
+        raise ReviewBlocked('thinking-disabled mode is supported only for historical Mimo scope')
     tooling_audit_ref = None if tooling_review else require_tooling_audit(root)
     output_cap = getattr(args, "output_token_cap", 8000)
     if output_cap not in (8000, 16000): raise ReviewBlocked("unsupported review output cap")
@@ -422,6 +445,7 @@ def execute(args):
         "schema_version": "assistant.opencode_review_attempt.v1",
         "run_id": run_id, "role": args.role, "task": args.task,
         "reviewed_head": head, "requested_model": args.model,
+        "reviewer_model_authority":model_authority,
         "input_sha256": digest(packet.encode()), "input_bytes": len(packet.encode()),
         "call_cap": 1, "output_token_cap": output_cap, "timeout_seconds": args.timeout_seconds,
         "transport": "sse",
@@ -504,6 +528,7 @@ def execute(args):
         "evidence_integrity": "trusted workspace/Git; local hashes are not signed or append-only; privileged wholesale replacement is outside guarantees",
         "source_snapshot": "captured committed HEAD; unrelated dirty files allowed, dirty inputs denied",
         "extended_review_authority":authority,"runtime_dependencies":dependencies,
+        "reviewer_model_authority":model_authority,
         "requested_effort": request_evidence['requested_effort'],
         "observed_effort": "thinking_disabled" if getattr(args,'thinking_disabled',False) and
             isinstance(raw_usage,dict) and isinstance(raw_usage.get('completion_tokens_details'),dict) and
@@ -542,7 +567,7 @@ def main(argv=None):
     parser.add_argument("--task", required=True)
     parser.add_argument("--feature-id", required=True)
     parser.add_argument("--role", choices=sorted(ROLES), required=True)
-    parser.add_argument("--model", choices=["mimo-v2.6-pro"], default="mimo-v2.6-pro")
+    parser.add_argument("--model", choices=sorted(SUPPORTED_REVIEW_MODELS), default=CURRENT_REVIEW_MODEL)
     parser.add_argument("--key-file", default=os.environ.get("OPENCODE_API_KEY_FILE", ""))
     parser.add_argument("--timeout-seconds", type=int, default=300,
                         help="up to 900 requires the owner's separately approved design/recheck scope")
