@@ -229,7 +229,8 @@ def test_long_editorial_pdf_uses_flow_layout_instead_of_clipping_sources():
     story=replace(story,explanation=('Синтетическое длинное объяснение с сохранёнными ограничениями. '*15)[:850],
         why_selected=('Причина выбора требует аккуратной проверки источника. '*6)[:280],
         next_step=('Проверить исходные материалы перед использованием вывода. '*6)[:280],
-        caveat=('Измеренного результата нет; нужно сохранить эту оговорку. '*6)[:280])
+        caveat=('Измеренного результата нет; нужно сохранить эту оговорку. '*6)[:280],
+        anchors=story.anchors*4)
     document=replace(document,editorial=replace(document.editorial,stories=(story,)))
     with pytest.raises(BriefReportRenderError,match='page_overflow'):
         _render_with_weasyprint(str(render_paginated_html(document).body))
