@@ -44,3 +44,5 @@ unless merge changes runtime bytes. No tokens/private account data in Git.
 After integration stop at source/pilot gates. Next safe command:
 `PYTHONPATH=src .venv-pai/bin/python -m prm.cli --help`.
 Use current merge receipt for branch/ref. Do not rerun immutable115/116/117 scripts.
+
+Integration observed:master/origin anchor36a1cf4 published,both remote CI runs successful;final receipt metadata follows normally. Documentation complete. Stop at the selected-source/pilot gates;do not repeat historical tasks/reviews.

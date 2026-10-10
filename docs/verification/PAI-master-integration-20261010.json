@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "date": "2026-10-10",
-  "status": "prepared_not_yet_merged",
+  "status": "merged_and_published_anchor_verified",
   "authority": "owner explicit comprehensive docs and master merge; ADR-019",
   "before": {
     "local_master": "cee8baae3b8a41f571bd689f2dadf7e6e981863f",
@@ -140,7 +140,7 @@
   ],
   "raw_contract": "exact51 missing approvals remains, zero warnings; expected rejection only, not full project pass",
   "historical_remote_master_CI": "cc105b run35328205490 failure observed; not relabeled as current",
-  "current_remote_CI": "not yet run on new publication",
+  "current_remote_CI": "both published-anchor workflows observed completed/success",
   "merge_strategy": "normal fast-forward if current origin/master is ancestor; preserve all history/worktrees; no force/reset",
   "source_branch_history_commits_since_local_master_before": 307,
   "deployment_performed": false,
@@ -213,5 +213,42 @@
     "broken_links": [],
     "portable_artifact_hashes_checked": 48,
     "runtime_unchanged": true
+  },
+  "published_anchor": "36a1cf45cea9958f8da0d4ba55462bf7bba8410a",
+  "local_master_observed": "36a1cf45cea9958f8da0d4ba55462bf7bba8410a",
+  "origin_master_observed": "36a1cf45cea9958f8da0d4ba55462bf7bba8410a",
+  "merge_observed": "git switch master;git merge --ff-only docs/personal-assistant-blueprint-playbook-20260918;git push origin master",
+  "remote_CI": [
+    {
+      "id": 38039600477,
+      "name": "CI",
+      "head_sha": "36a1cf45cea9958f8da0d4ba55462bf7bba8410a",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/ashishki/telegram-research-agent/actions/runs/38039600477",
+      "created_at": "2026-10-10T08:56:04Z",
+      "updated_at": "2026-10-10T08:57:17Z"
+    },
+    {
+      "id": 38039600476,
+      "name": "Playbook adoption and PA plan",
+      "head_sha": "36a1cf45cea9958f8da0d4ba55462bf7bba8410a",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/ashishki/telegram-research-agent/actions/runs/38039600476",
+      "created_at": "2026-10-10T08:56:04Z",
+      "updated_at": "2026-10-10T08:56:25Z"
+    }
+  ],
+  "final_receipt_commit": "This receipt is a subsequent metadata-only working-branch commit, fast-forwarded/pushed normally; determine its containing commit through Git. No circular self-SHA claimed.",
+  "portable_artifact_files": 58,
+  "after_checks": {
+    "runtime_and_workflow_bytes_match_0fbcfd1": true,
+    "CI_guard_and_tests_match_4c2656c": true,
+    "worktree_clean_after_anchor_merge": true,
+    "pin_after_merge": "passed",
+    "history_rewritten": false,
+    "force_push": false,
+    "other_worktree_changed": false
   }
 }
