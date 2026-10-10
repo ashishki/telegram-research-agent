@@ -438,7 +438,9 @@ def test_expanded_editorial_preserves_long_source_urls(length):
         parser = Links()
         parser.feed(render_brief_document(document, view=view, item_number=1))
         assert url in parser.urls
-    assert "Источник — в полном брифе" in render_brief_document(document, view="short")
+    short=render_brief_document(document,view="short")
+    parser=Links();parser.feed(short)
+    assert url in parser.urls and len(short)<3800
 
 
 @pytest.mark.parametrize("restart", [False, True])

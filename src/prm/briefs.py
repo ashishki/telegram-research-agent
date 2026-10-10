@@ -2416,7 +2416,7 @@ def _render_editorial(
                     block.append(_telegram_html(note, 300))
         if any(ref in conflict.evidence_refs for ref in refs for conflict in document.conflicts):
             block.append("⚠️ Источники расходятся; это расхождение пока не разрешено.")
-        if len("\n".join(lines + block)) > (2000 if compact else 22000):
+        if len("\n".join(lines + block)) > (3500 if compact else 22000):
             break
         lines.extend(block)
         shown += 1
@@ -2482,8 +2482,6 @@ def _render_editorial_item_continuation(
 def _telegram_card_source_link(source_ref: str, *, compact: bool = False) -> str:
     """Keep the card compact while preserving a safe direct source link."""
 
-    if compact and len(source_ref) > 240:
-        return "Источник — в полном брифе"
     label = _short(_telegram_source_identity(source_ref), 40)
     return f'Источник: <a href="{_html_escape(source_ref, quote=True)}">{_html_escape(label, quote=True)}</a>'
 

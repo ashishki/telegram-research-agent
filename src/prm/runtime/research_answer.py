@@ -36,7 +36,7 @@ def accepted_answer(text, evidence):
             source_prefix=re.match(r'^([^:\n]{1,60}):',quote.strip())
             if claim_prefix and source_prefix and claim_prefix[1].casefold()!=source_prefix[1].casefold():return None
             sentences=[part.strip() for part in re.split(r'(?<=[.!?])\s+|[\r\n]+',statement) if part.strip()]
-            line='\n'.join(part+' ('+url+').' for part in sentences)
+            line='\n'.join(part.rstrip('.!? ')+' ('+url+').' for part in sentences)
             anchored=[{**item,'support_span':quote} for item in selected]
             check=verify_answer_against_evidence(line,_atomic_evidence(anchored))
             if not _supported(check):return None

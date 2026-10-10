@@ -82,7 +82,8 @@ def test_durable_synthesis_accepts_structured_model_and_never_repeats(pai,monkey
 def test_deletion_removes_internal_synthesis_snapshot(pai,monkeypatch,parent):
     worker,plan,lease,completed=prepare(pai)
     result=worker._synthesize(plan,completed,lease)
-    assert result['status']=='evidence_only' and result['synthesis_outcome']=='rejected_by_verifier'
+    # The shared HTTP fixture echoes the selected exact span and URL.
+    assert result['status']=='synthesized_verified' and result['synthesis_outcome']=='verified'
     from prm.runtime.deletion import delete_derived_in
     ref=completed[0]['ref'] if parent=='source' else 'result_'+lease.job_id
     with pai.root.queue.store.transaction() as tx:delete_derived_in(tx,owner=pai.root.owner_ref,namespace='result',object_ref=ref)
