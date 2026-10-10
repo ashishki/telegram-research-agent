@@ -2409,7 +2409,7 @@ def _render_editorial(
         refs = tuple(dict.fromkeys(anchor.evidence_ref for anchor in story.anchors))
         for ref in refs:
             source = sources[ref]
-            block.append(_telegram_card_source_link(source.source_ref, compact=compact))
+            block.append(_telegram_card_source_link(source.source_ref, compact=compact,preserve_link=True))
             if not compact:
                 note = _telegram_human_time_label(source)
                 if note:
@@ -2479,9 +2479,11 @@ def _render_editorial_item_continuation(
     return "\n".join(lines)
 
 
-def _telegram_card_source_link(source_ref: str, *, compact: bool = False) -> str:
+def _telegram_card_source_link(source_ref: str, *, compact: bool = False,preserve_link: bool = False) -> str:
     """Keep the card compact while preserving a safe direct source link."""
 
+    if compact and not preserve_link and len(source_ref)>240:
+        return 'Источник — в полном брифе'
     label = _short(_telegram_source_identity(source_ref), 40)
     return f'Источник: <a href="{_html_escape(source_ref, quote=True)}">{_html_escape(label, quote=True)}</a>'
 

@@ -208,7 +208,7 @@ def render_html(document: BriefDocument) -> BriefReportArtifact:
         )
         for item in document.coverage_manifest.sources
     )
-    limitation = "".join(f"<li>{_html_text(item)}</li>" for item in document.coverage_manifest.limitations)
+    limitation = "".join(f"<li>{_html_text(_limitation_name(item))}</li>" for item in document.coverage_manifest.limitations)
     source_rows = "".join(
         "<article class=\"source-card\"><h3>{title}</h3>{summary}<p>{source}</p>"
         "<dl><dt>Время</dt><dd>{time}</dd><dt>Состояние</dt><dd>{state}</dd>"
@@ -299,7 +299,7 @@ def render_designed_html(document: BriefDocument) -> BriefReportArtifact:
         )
         for evidence in document.evidence
     )
-    limitation = "".join(f"<li>{_html_text(item)}</li>" for item in document.coverage_manifest.limitations)
+    limitation = "".join(f"<li>{_html_text(_limitation_name(item))}</li>" for item in document.coverage_manifest.limitations)
     coverage_rows = "".join(
         '<tr><td data-label="Источник">{source}</td><td data-label="Состояние">{state}</td><td data-label="Ограничение">{reason}</td></tr>'.format(
             source=_html_source_label(_coverage_source_name(item.source_ref)),
@@ -1588,6 +1588,6 @@ th { background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
 .source-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
 a { color: var(--accent); }
 @media (prefers-color-scheme: dark) { :root { --bg: #121716; --panel: #1c2422; --ink: #edf3f0; --muted: #b7c2bd; --line: #43514c; --accent: #7dd7c1; --caveat: #ffc47b; } }
-@media (max-width: 760px) { .brief-report { width: min(100% - 20px, 680px); padding: 18px 0 32px; } .hero, .brief-report > section { padding: 18px 0; } .story, .source-card { padding: 14px; } .timeline li { grid-template-columns: 1fr; gap: 4px; } .identity { grid-template-columns: 1fr; gap: 1px; } .table-wrap { overflow: visible; } .table-wrap thead { display: none; } .table-wrap tr { display: block; padding: 8px 12px; border-bottom: 1px solid var(--line); } .table-wrap td { display: grid; grid-template-columns: 105px minmax(0,1fr); gap: 10px; padding: 5px 0; border: 0; } .table-wrap td::before { content: attr(data-label); font-weight: 700; color: var(--muted); } }
+@media (max-width: 760px) { .brief-report { width: min(100% - 20px, 680px); padding: 18px 0 32px; } .hero, .brief-report > section { padding: 18px 0; } .story, .source-card { padding: 14px; } .timeline li { grid-template-columns: 1fr; gap: 4px; } .identity { grid-template-columns: 1fr; gap: 1px; } .table-wrap { overflow: visible; } .table-wrap thead { display: none; } .table-wrap tr { display: block; padding: 8px 12px; border-bottom: 1px solid var(--line); } .table-wrap td { display: grid; grid-template-columns: 120px minmax(0,1fr); gap: 10px; padding: 5px 0; border: 0; } .table-wrap td::before { content: attr(data-label); font-weight: 700; color: var(--muted); } }
 @media print { body { background: #fff; color: #111; } .source-grid { display: block; } .story, .source-card { font-size: 10.5pt; } .story .takeaway { font-size: 11pt; } .table-wrap + h3 { margin-top: 18px; } .brief-report { width: auto; padding: 0; } .story, .source-card { background: #fff; } a { color: #111; text-decoration: underline; } }
 """
