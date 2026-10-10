@@ -1,7 +1,7 @@
 """Source identity survives mobile/print presentation improvements."""
 from html.parser import HTMLParser
 import re
-from prm.report_exports import render_designed_html,render_html,render_markdown,render_paginated_pdf
+from prm.report_exports import render_designed_html,render_html,render_markdown,render_paginated_pdf,render_paginated_html
 from prm.briefs import render_brief_document
 from tests.test_assistant_report_exports import _editorial_document
 
@@ -41,3 +41,22 @@ def test_equal_source_title_and_summary_are_not_repeated_inside_card():
     cards=re.findall(r'<article class="source-card">(.*?)</article>',body,re.S)
     assert len(cards)==len(evidence)
     for card,item in zip(cards,evidence):assert card.count(item.summary)==1
+
+
+def test_paginated_sources_preserve_the_end_of_long_titles():
+    from dataclasses import replace
+    document=_editorial_document()
+    title='Синтетический источник: '+('подтверждение ' * 10)+'конец исходного заголовка.'
+    document=replace(document,evidence=tuple(replace(e,title=title) for e in document.evidence))
+    body=str(render_paginated_html(document).body)
+    titles=re.findall(r'<span class="source-title">(.*?)</span>',body,re.S)
+    assert len(titles)==len(document.evidence) and all(t==title for t in titles)
+
+
+def test_html_and_pdf_cover_metrics_describe_the_same_facts():
+    document=_editorial_document()
+    html=render_designed_html(document);print_html=render_paginated_html(document)
+    def metrics(body):
+        return re.findall(r'<span class="kpi-value">(.*?)</span>\s*<span class="kpi-label">(.*?)</span>',str(body),re.S)
+    assert len(metrics(html.body))==4 and metrics(html.body)==metrics(print_html.body)
+    assert html.identity==print_html.identity

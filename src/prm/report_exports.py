@@ -308,12 +308,7 @@ def render_designed_html(document: BriefDocument) -> BriefReportArtifact:
         )
         for item in document.coverage_manifest.sources
     )
-    kpis = (
-        ("items", len(document.items), "пунктов"),
-        ("sources", len(document.evidence), "источников"),
-        ("conflicts", len(document.conflicts), "конфликтов дат"),
-        ("coverage", "в выборке" if document.coverage_manifest.complete else "частичное", "покрытие"),
-    )
+    kpis = _brief_kpis(document)
     kpi_html = "".join(
         f'<div class="kpi"><span class="kpi-value">{_html_text(value)}</span>'
         f'<span class="kpi-label">{_html_text(label)}</span></div>'
@@ -458,15 +453,7 @@ def render_paginated_html(
         lead = f'<p class="cover-lead">{_html_text(document.editorial.stories[0].summary)}</p>'
     stories = document.editorial.stories if document.editorial is not None else ()
     shown = len(stories) if stories else len(document.items)
-    try:
-        days = max(1, (document.window.end_at - document.window.start_at).days)
-    except Exception:
-        days = 7
-    kpis = (
-        ("sources", len(document.evidence), "материалов"),
-        ("stories", shown, "тем"),
-        ("days", days, "дней"),
-    )
+    kpis = _brief_kpis(document)
     kpi_html = "".join(
         f'<div class="kpi"><span class="kpi-value">{_html_text(value)}</span>'
         f'<span class="kpi-label">{_html_text(label)}</span></div>'
@@ -1103,8 +1090,6 @@ def _reader_source_card_blocks(document: BriefDocument) -> list[str]:
     rows = []
     for index, evidence in enumerate(document.evidence, start=1):
         title = " ".join(str(evidence.title or "").split())
-        if len(title) > 110:
-            title = (title[:110].rsplit(" ", 1)[0] or title[:110]) + "…"
         rows.append(
             '<div class="source-row"><span class="source-num">{number}</span>'
             '<span class="source-title">{title}</span>'
@@ -1115,6 +1100,16 @@ def _reader_source_card_blocks(document: BriefDocument) -> list[str]:
             )
         )
     return rows
+
+
+def _brief_kpis(document: BriefDocument):
+    """Use the same factual cover metrics in responsive and paginated exports."""
+    return (
+        ("items", len(document.items), "пунктов"),
+        ("sources", len(document.evidence), "источников"),
+        ("conflicts", len(document.conflicts), "конфликтов дат"),
+        ("coverage", "в выборке" if document.coverage_manifest.complete else "частичное", "покрытие"),
+    )
 
 
 def _html_story_or_item_sections(document: BriefDocument) -> str:

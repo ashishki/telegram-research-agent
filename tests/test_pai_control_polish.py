@@ -140,6 +140,48 @@ def test_delivery_records_and_emits_markup_on_last_part_only(pai):
     assert parts[-1]['payload']['telegram_navigation']['keyboard'][0][0]['text']=='Отправить письмо'
 
 
+@pytest.mark.parametrize('html,navigation', [(True, True), (False, True), (True, False)])
+@pytest.mark.parametrize('last_outcome', ['delivered', 'not_delivered'])
+def test_multipart_reconciliation_preserves_html_boundaries_and_last_controls(pai,html,navigation,last_outcome):
+    from prm.runtime.delivery import ReconciliationObservation
+    root=pai.root;sent=[]
+    sender=lambda destination,text,attempt:(sent.append(text) or TransportReceipt('synthetic_part_'+str(len(sent))))
+    executor=DeliveryExecutor(pai.pg.app,registry=root.registry,sender=sender)
+    for capability,data_class,purpose,operation in [
+        ('assistant.result_delivery','user_provided','answer.delivery','deliver'),
+        ('assistant.delivery_reconciliation','private_connector_metadata','delivery.reconcile','read')]:
+        allow(pai,capability,'destination_private',data_class,purpose,provider='provider_telegram',connection=None,operation=operation)
+    item=root.queue.store.put(root.owner_ref,'conversation','input_reconcile_html',{'query':'synthetic long answer'},expected_version=0)
+    job=root.queue.enqueue(owner=root.owner_ref,idempotency_key='reconcile_html',kind='compute.assistant',deadline=pai.now+timedelta(minutes=3),
+        payload={'schema_version':1,'input_namespace':'conversation','input_ref':item.object_id,'input_version':1,'input_digest':item.digest,'connection_ref':None,'resource_ref':'resource_local_request','purpose':'local.assistant','consent_revision':1})
+    options={}
+    if html:options['telegram_parse_mode']='HTML'
+    if navigation:options['telegram_navigation']=keyboard('Проверить результат действия')
+    text='<b>'+'a'*7000+'</b>' if html else 'a'*7800
+    root.queue.complete(root.queue.claim(owner=root.owner_ref,kinds=('compute.assistant',)),
+        {'text':text,'data_class':'user_provided','data_classes':['user_provided'],'payload':options})
+    outcome=executor.deliver_result(owner=root.owner_ref,job_id=job,destination_ref='destination_private',upper_bound=0)
+    assert outcome['status']=='sent' and len(sent)==3
+    # A crash can leave the precommitted aggregate/last receipt unknown after
+    # provider acceptance. The exact child payloads survive the restart.
+    with root.queue.store.transaction() as tx:
+        tx.conn.execute("UPDATE pa_delivery.attempts SET status='unknown',provider_receipt='' WHERE owner=%s AND id=ANY(%s)",
+            (root.owner_ref,[outcome['id'],outcome['id']+'_part_3']))
+    seen=[]
+    def observe(child):
+        seen.append(child['id'])
+        return ReconciliationObservation(child['attempt_ref'],child['destination_ref'],child['digest'],last_outcome,'synthetic_exact_receipt',
+            'synthetic_final_part' if last_outcome=='delivered' else '')
+    restarted=DeliveryExecutor(pai.pg.app,registry=root.registry,sender=sender)
+    assert restarted.deliver_result(owner=root.owner_ref,job_id=job,destination_ref='destination_private',upper_bound=0)['status']=='unknown'
+    reconciled=restarted.reconcile(owner=root.owner_ref,delivery_id=outcome['id'],adapter=observe,upper_bound=0)
+    assert reconciled['status']==('sent' if last_outcome=='delivered' else 'unknown')
+    assert seen==[outcome['id']+'_part_3'] and len(sent)==3
+    assert restarted.attempt(owner=root.owner_ref,delivery_id=outcome['id']+'_part_3')['status']==('sent' if last_outcome=='delivered' else 'not_sent')
+    assert restarted.deliver_result(owner=root.owner_ref,job_id=job,destination_ref='destination_private',upper_bound=0)['status']==reconciled['status']
+    assert len(sent)==3
+
+
 def test_voice_or_foreign_button_is_not_confirmation(pai):
     root=action(pai);delivered(pai,83001,preview(pai))
     incoming=inbound(83002,'');incoming['message'].pop('text');incoming['message']['voice_transcript']='Отправить письмо'

@@ -75,6 +75,22 @@ class KnownDeliveryNotStarted(KnownDeliveryRejection):
     """
 
 
+def _multipart_payloads(payload):
+    """Reconstruct the exact payloads used by both dispatch and reconciliation."""
+    text=payload['text']
+    if len(text)>32000:raise StorageError('bounded answer exceeds delivery size')
+    if payload.get('telegram_parse_mode')=='HTML':
+        from .presentation import split_html_messages
+        texts=split_html_messages(text)
+    else:texts=[text[index:index+3600] for index in range(0,len(text),3600)]
+    parts=[]
+    for index,text in enumerate(texts):
+        part={**payload,'text':'['+str(index+1)+'/'+str(len(texts))+']\n'+text,'part':index+1,'parts':len(texts)}
+        if index!=len(texts)-1:part.pop('telegram_navigation',None)
+        parts.append(part)
+    return parts
+
+
 class DeliveryExecutor:
     def __init__(self, target, *, registry: DurableCapabilityRegistry, sender):
         if type(registry) is not DurableCapabilityRegistry or registry.store.target != target:
@@ -131,14 +147,9 @@ class DeliveryExecutor:
             tx.conn.execute('''INSERT INTO pa_delivery.attempts(owner,id,attempt_ref,kind,source_ref,destination_ref,digest,payload,status)
                 VALUES(%s,%s,%s,'answer',%s,%s,%s,%s,'unknown')''',
                 (owner,delivery_id,'attempt_'+uuid.uuid4().hex,job_id,destination_ref,digest,Jsonb(payload)))
-        if payload.get('telegram_parse_mode')=='HTML':
-            from .presentation import split_html_messages
-            parts=split_html_messages(payload['text'])
-        else:parts=[payload['text'][index:index+3600] for index in range(0,len(payload['text']),3600)]
+        parts=_multipart_payloads(payload)
         receipts=[]
-        for index,text in enumerate(parts):
-            part={**payload,'text':'['+str(index+1)+'/'+str(len(parts))+']\n'+text,'part':index+1,'parts':len(parts)}
-            if index!=len(parts)-1:part.pop('telegram_navigation',None)
+        for index,part in enumerate(parts):
             attempt=self._deliver(owner=owner,delivery_id=delivery_id+'_part_'+str(index+1),kind='answer',source_ref=job_id,
                 destination_ref=destination_ref,payload=part,upper_bound=upper_bound,effect_lease=effect_lease)
             if attempt['status']!='sent':
@@ -333,13 +344,11 @@ class DeliveryExecutor:
             return pending
         if pending['digest']!=_canonical(pending['payload'])[1]:raise StateConflict('reconciliation payload integrity differs')
         if pending['kind']=='answer' and len(pending['payload'].get('text',''))>3800:
-            payload=pending['payload'];text=payload['text']
-            parts=[text[index:index+3600] for index in range(0,len(text),3600)];receipts=[]
-            for index,part in enumerate(parts):
+            parts=_multipart_payloads(pending['payload']);receipts=[]
+            for index,expected in enumerate(parts):
                 child_id=delivery_id+'_part_'+str(index+1)
                 child=self.attempt(owner=owner,delivery_id=child_id)
                 if child is None:return pending  # No evidence for an unattempted part.
-                expected={**payload,'text':'['+str(index+1)+'/'+str(len(parts))+']\n'+part,'part':index+1,'parts':len(parts)}
                 if (child['digest']!=_canonical(expected)[1] or child['destination_ref']!=pending['destination_ref']
                     or child['source_ref']!=pending['source_ref']):raise StateConflict('aggregate part binding differs')
                 child=self.reconcile(owner=owner,delivery_id=child_id,adapter=adapter,upper_bound=upper_bound)
