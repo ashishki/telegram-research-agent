@@ -1,0 +1,1126 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-10",
+  "assignment": "ADR-017; all four points then one accumulated topic block",
+  "code_candidate": "2e541af8e9928e1b1002110e055bd615aa8b5434",
+  "check_results": {
+    "p1": {
+      "topic": "p1",
+      "argv": [
+        ".venv-pai/bin/python",
+        "tools/run_pai_acceptance.py",
+        "-q",
+        "tests/test_pai_product_sessions.py::test_large_verified_result_is_losslessly_chunked_and_scope_projection_preserved"
+      ],
+      "environment": {
+        "PYTHONPATH": "src",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"
+      },
+      "source_head": "97b9388805d3ed5e709705d37e5eca139e18e48b",
+      "started_at": "2026-10-10T05:05:30.113000+00:00",
+      "status": "passed",
+      "private_data": false,
+      "human_acceptance": false,
+      "scope": "owner four points, one accumulated block; no historical full suite",
+      "exit_code": 0,
+      "duration_seconds": 17.815,
+      "finished_at": "2026-10-10T05:05:47.929090+00:00",
+      "log_sha256": "6fcbc43d453067e6e79fc876271a847c7997cb83b04a2c1c2bedc2f51c12c54c",
+      "pytest_cases": 2,
+      "pytest_seconds": 16.29
+    },
+    "search": {
+      "topic": "search",
+      "argv": [
+        ".venv-pai/bin/python",
+        "tools/run_pai_acceptance.py",
+        "-q",
+        "tests/test_pai_search_polish.py",
+        "tests/test_pai_deep_research.py",
+        "tests/test_pai_archive_search.py",
+        "tests/test_pai_web_github.py",
+        "tests/test_assistant_research.py"
+      ],
+      "environment": {
+        "PYTHONPATH": "src",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"
+      },
+      "source_head": "aa2002d68012503602d655805264c02f9b26ec59",
+      "started_at": "2026-10-10T05:09:29.553370+00:00",
+      "status": "passed",
+      "private_data": false,
+      "human_acceptance": false,
+      "scope": "owner four points, one accumulated block; no historical full suite",
+      "exit_code": 0,
+      "duration_seconds": 84.513,
+      "finished_at": "2026-10-10T05:10:54.066989+00:00",
+      "log_sha256": "7b6260573cc440c9e4b10a0bab6a516b49cdeb1ba3291a8a11a044e5ca896c4c",
+      "pytest_cases": 58,
+      "pytest_seconds": 83.59
+    },
+    "watch_act": {
+      "topic": "watch_act",
+      "argv": [
+        ".venv-pai/bin/python",
+        "tools/run_pai_acceptance.py",
+        "-q",
+        "tests/test_pai_control_polish.py",
+        "tests/test_pai_scheduler.py",
+        "tests/test_pai_watch_wiring.py",
+        "tests/test_pai_action_runtime.py",
+        "tests/test_pai_delivery.py"
+      ],
+      "environment": {
+        "PYTHONPATH": "src",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"
+      },
+      "source_head": "97b9388805d3ed5e709705d37e5eca139e18e48b",
+      "started_at": "2026-10-10T05:05:30.140796+00:00",
+      "status": "passed",
+      "private_data": false,
+      "human_acceptance": false,
+      "scope": "owner four points, one accumulated block; no historical full suite",
+      "exit_code": 0,
+      "duration_seconds": 132.755,
+      "finished_at": "2026-10-10T05:07:42.896940+00:00",
+      "log_sha256": "88df6dce39d04fbd5450d67d5e96d9f5c8641bc915b4fa58cddac1fe90890358",
+      "pytest_cases": 61,
+      "pytest_seconds": 131.67
+    },
+    "brief": {
+      "topic": "brief",
+      "argv": [
+        ".venv-pai/bin/python",
+        "tools/run_pai_acceptance.py",
+        "-q",
+        "tests/test_pai_brief_polish.py",
+        "tests/test_pai_brief_runtime.py",
+        "tests/test_pai_report_runtime.py",
+        "tests/test_assistant_report_exports.py",
+        "tests/test_assistant_brief_editorial.py"
+      ],
+      "source_head": "2e541af8e9928e1b1002110e055bd615aa8b5434",
+      "recorder_pid": 1855041,
+      "recorder_pgid": 1855041,
+      "started_at": "2026-10-10T05:44:00.888595+00:00",
+      "status": "passed",
+      "private_data": false,
+      "human_acceptance": false,
+      "environment": {
+        "PYTHONPATH": "src",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"
+      },
+      "scope": "one-shot synthetic verification of the owner four-point assignment; no historical full suite/service/timer",
+      "test_tier_pid": 1855045,
+      "exit_code": 0,
+      "finished_at": "2026-10-10T05:44:40.941402+00:00",
+      "duration_seconds": 40.053,
+      "log_sha256": "a5c32443e55033ffd20982a1f4be08172038ca9dd3bbdd075a6f0c57c7fabc21",
+      "pytest_cases": 55,
+      "pytest_seconds": 38.82
+    },
+    "pai-complete": {
+      "topic": "pai-complete",
+      "argv": [
+        ".venv-pai/bin/python",
+        "tools/test_tiers.py",
+        "pai-complete"
+      ],
+      "source_head": "2e541af8e9928e1b1002110e055bd615aa8b5434",
+      "recorder_pid": 1855040,
+      "recorder_pgid": 1855040,
+      "started_at": "2026-10-10T05:44:00.876727+00:00",
+      "status": "passed",
+      "private_data": false,
+      "human_acceptance": false,
+      "environment": {
+        "PYTHONPATH": "src",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"
+      },
+      "scope": "one-shot synthetic verification of the owner four-point assignment; no historical full suite/service/timer",
+      "test_tier_pid": 1855043,
+      "exit_code": 0,
+      "finished_at": "2026-10-10T05:58:33.481145+00:00",
+      "duration_seconds": 872.604,
+      "log_sha256": "3151d072f4cd989dc721df7e00f298749b4ec71c743d7fc0618871a92277b60b",
+      "pytest_cases": 390,
+      "pytest_seconds": 871.25
+    },
+    "focused-prm": {
+      "topic": "focused-prm",
+      "argv": [
+        ".venv-pai/bin/python",
+        "tools/test_tiers.py",
+        "focused-prm"
+      ],
+      "environment": {
+        "PYTHONPATH": "src",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"
+      },
+      "source_head": "1f97b8cd2780c4dbeabb2a78c23d0f85a428fdc3",
+      "started_at": "2026-10-10T05:12:27.927301+00:00",
+      "status": "passed",
+      "private_data": false,
+      "human_acceptance": false,
+      "scope": "owner four points, one accumulated block; no historical full suite",
+      "exit_code": 0,
+      "duration_seconds": 106.631,
+      "finished_at": "2026-10-10T05:14:14.558852+00:00",
+      "log_sha256": "5190741c45f4bc20e77eaa9d7133311221b0887f178f59b736c1befb305d5c02",
+      "pytest_cases": 736,
+      "pytest_seconds": 105.21
+    },
+    "retrofit-boundaries": {
+      "topic": "retrofit-boundaries",
+      "argv": [
+        ".venv-pai/bin/python",
+        "tools/test_tiers.py",
+        "retrofit-boundaries"
+      ],
+      "environment": {
+        "PYTHONPATH": "src",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"
+      },
+      "source_head": "aa2002d68012503602d655805264c02f9b26ec59",
+      "started_at": "2026-10-10T05:09:30.746085+00:00",
+      "status": "passed",
+      "private_data": false,
+      "human_acceptance": false,
+      "scope": "owner four points, one accumulated block; no historical full suite",
+      "exit_code": 0,
+      "duration_seconds": 11.163,
+      "finished_at": "2026-10-10T05:09:41.910002+00:00",
+      "log_sha256": "6708857608a04430a28746950f718b712ba849e53a3a36bacefcd2e772a60e46",
+      "pytest_cases": 150,
+      "pytest_seconds": 10.12
+    }
+  },
+  "required_project_checks": {
+    "project_playbook_contract": {
+      "topic": "project_playbook_contract",
+      "argv": [
+        ".venv-pai/bin/python",
+        "tools/playbook.py",
+        "playbook_validate",
+        "--root",
+        ".",
+        "--check",
+        "tasks",
+        "--check",
+        "readiness",
+        "--check",
+        "delivery",
+        "--check",
+        "references"
+      ],
+      "environment": {
+        "PYTHONPATH": "src",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"
+      },
+      "source_head": "1f97b8cd2780c4dbeabb2a78c23d0f85a428fdc3",
+      "started_at": "2026-10-10T05:22:01.531960+00:00",
+      "status": "failed",
+      "private_data": false,
+      "human_acceptance": false,
+      "scope": "owner four points, one accumulated block; no historical full suite",
+      "exit_code": 1,
+      "duration_seconds": 3.508,
+      "finished_at": "2026-10-10T05:22:05.040852+00:00",
+      "log_sha256": "c9947cbd0b84e91d56496eea4b1d976350be5508031cfe98be19fcd24f0b1b9b"
+    },
+    "project_pa_plan": {
+      "topic": "project_pa_plan",
+      "argv": [
+        ".venv-pai/bin/python",
+        "tools/check_personal_assistant_plan.py"
+      ],
+      "environment": {
+        "PYTHONPATH": "src",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"
+      },
+      "source_head": "1f97b8cd2780c4dbeabb2a78c23d0f85a428fdc3",
+      "started_at": "2026-10-10T05:22:01.541874+00:00",
+      "status": "passed",
+      "private_data": false,
+      "human_acceptance": false,
+      "scope": "owner four points, one accumulated block; no historical full suite",
+      "exit_code": 0,
+      "duration_seconds": 0.978,
+      "finished_at": "2026-10-10T05:22:02.520619+00:00",
+      "log_sha256": "0c24cfa4ff23fc2417805ef5127f64dadf4b07f75fc94501afbd69f66e739964"
+    },
+    "project_pai_plan": {
+      "topic": "project_pai_plan",
+      "argv": [
+        ".venv-pai/bin/python",
+        "tools/check_pai_plan.py"
+      ],
+      "environment": {
+        "PYTHONPATH": "src",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"
+      },
+      "source_head": "1f97b8cd2780c4dbeabb2a78c23d0f85a428fdc3",
+      "started_at": "2026-10-10T05:22:01.636915+00:00",
+      "status": "passed",
+      "private_data": false,
+      "human_acceptance": false,
+      "scope": "owner four points, one accumulated block; no historical full suite",
+      "exit_code": 0,
+      "duration_seconds": 1.28,
+      "finished_at": "2026-10-10T05:22:02.917741+00:00",
+      "log_sha256": "3ac8f22e48d470d88352af228e77b3edaba0f68bb886426d78cfa2f534c79c0a"
+    },
+    "project_playbook_bridge": {
+      "topic": "project_playbook_bridge",
+      "argv": [
+        ".venv-pai/bin/python",
+        "-m",
+        "pytest",
+        "tests/test_playbook_bridge.py",
+        "-q"
+      ],
+      "environment": {
+        "PYTHONPATH": "src",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"
+      },
+      "source_head": "1f97b8cd2780c4dbeabb2a78c23d0f85a428fdc3",
+      "started_at": "2026-10-10T05:22:01.621229+00:00",
+      "status": "passed",
+      "private_data": false,
+      "human_acceptance": false,
+      "scope": "owner four points, one accumulated block; no historical full suite",
+      "exit_code": 0,
+      "duration_seconds": 3.924,
+      "finished_at": "2026-10-10T05:22:05.546497+00:00",
+      "log_sha256": "0fe124dae4abe3eaf0146460c535718362a7b2cf715b8128649f557b48731532"
+    },
+    "project_mat_safety": {
+      "topic": "project_mat_safety",
+      "argv": [
+        ".venv-pai/bin/python",
+        "tools/prm_mat_eval.py",
+        "--check",
+        "safety"
+      ],
+      "environment": {
+        "PYTHONPATH": "src",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"
+      },
+      "source_head": "1f97b8cd2780c4dbeabb2a78c23d0f85a428fdc3",
+      "started_at": "2026-10-10T05:22:01.666407+00:00",
+      "status": "passed",
+      "private_data": false,
+      "human_acceptance": false,
+      "scope": "owner four points, one accumulated block; no historical full suite",
+      "exit_code": 0,
+      "duration_seconds": 0.157,
+      "finished_at": "2026-10-10T05:22:01.824144+00:00",
+      "log_sha256": "a815c0c066a4352e24ef358ee3cef396650353dd8dbff94335af1b8c70defacf"
+    }
+  },
+  "full_project_verifier": "required commands executed separately as this block; formal playbook contract fails51 missing approvals; no original manifest weakening or substituted pass",
+  "overflow_fixture_retest": {
+    "cases": 1,
+    "seconds": 3.81,
+    "runtime_change": false,
+    "reason": "new typography fits previous specimen;8 allowed anchors preserve actual overflow coverage"
+  },
+  "overlapping_not_unique_total": true,
+  "independent_deletion_closure": {
+    "call_number": 114,
+    "kind": "single_independent_P1_closure_recheck; not programme/design batch",
+    "provider": "opencode_go",
+    "requested_model": "glm-5.3",
+    "requested_effort": "max",
+    "source_head": "6467c503c7d196926632da03cf5dce49ed181d2e",
+    "base_head": "cbab0fbf005754884422c3c372373d6b23748bbf",
+    "diff_sha256": "5c31977fdef2be94ff1f0507efbc5449784d67df52a3b08393f1e70b45199bf3",
+    "input_sha256": "2640a5c7acfd30f86eae91555c17ab86773ad393a03db4d46de1f8e549be0a4a",
+    "input_bytes": 80712,
+    "input_bound": 1000000,
+    "input_authority": "existing2026-10-09 owner maximum-resource public-code directive recorded in PAI-maximum-review-authority-20261009.md",
+    "private_content": false,
+    "source_paths": [
+      "src/prm/application.py",
+      "src/prm/conversation.py",
+      "src/prm/report_exports.py",
+      "src/prm/routing.py",
+      "src/prm/runtime/brief.py",
+      "src/prm/runtime/composition.py",
+      "src/prm/runtime/ingress.py",
+      "src/prm/runtime/model.py",
+      "src/prm/runtime/result_payloads.py",
+      "src/prm/storage/conversations.py",
+      "src/prm/storage/policy.py",
+      "src/prm/storage/postgres.py",
+      "tests/test_pai_product_sessions.py",
+      "tools/test_tiers.py"
+    ],
+    "context_paths": [
+      "src/prm/runtime/result_payloads.py",
+      "src/prm/conversation.py",
+      "src/prm/storage/jobs.py",
+      "src/prm/runtime/deletion.py",
+      "tests/test_pai_product_sessions.py"
+    ],
+    "maximum_calls": 1,
+    "automatic_retry": false,
+    "timeout_seconds": 7200,
+    "output_maximum": 131072,
+    "authority": "owner ongoing necessary scoped reviews plus2026-10-09 product testing; phase safety check",
+    "formal_design_or_human_acceptance": false,
+    "status": "failed_unknown",
+    "cost": "unknown",
+    "error_type": "HTTPError",
+    "http_status": 429,
+    "retry_after": "156472",
+    "duration_seconds": 0.536,
+    "provider_outcome": "unknown"
+  },
+  "reviewer_replacement": "one read-only Codex choice pending; no approval inferred",
+  "search_session": {
+    "source_head": "1f97b8cd2780c4dbeabb2a78c23d0f85a428fdc3",
+    "privacy": "public_synthetic_only",
+    "real_provider_calls": 0,
+    "key_read": false,
+    "runtime": "native worker, real isolated PG, canonical synthetic archive, actual loopback structured model HTTP",
+    "status": "synthesized_verified",
+    "visible_answer": "Аврора: тест slugify добавлен (https://t.me/source/1002).\nРезультат пока не измерен (https://t.me/source/1002).\n\nАврора: тест normalize_email проверяет пробелы и нижний регистр (https://t.me/source/1001).\n\nПокрытие: проверено 1 из 1 запланированных поисковых шагов; найдено материалов: 2; процитировано: 2. Это ограниченная выборка по запросу, а не проверка всего архива или интернета.\nЕсли источник не сообщает о результате измерения, результат остаётся неизвестным.",
+    "verification": {
+      "claims": [
+        {
+          "claim_id": "claim:1faed1b3fb4c",
+          "freshness": "unknown",
+          "claim_text": "Аврора: тест slugify добавлен ()",
+          "claim_type": "source_fact",
+          "confidence": "low",
+          "evidence_refs": [
+            "https://t.me/source/1002"
+          ],
+          "support_status": "supported",
+          "citation_support": {
+            "https://t.me/source/1002": "supported"
+          },
+          "matched_evidence": [
+            "https://t.me/source/1002",
+            "https://t.me/source/1002",
+            "https://t.me/source/1002"
+          ],
+          "project_relevance": "unknown",
+          "entailment_verdict": "entailed",
+          "exact_evidence_snippets": [
+            {
+              "source_url": "https://t.me/source/1002",
+              "evidence_id": "research:8f374a9dcaeb11e86bb5f3a6",
+              "support_span": "Аврора: тест slugify добавлен. Результат пока не измерен."
+            },
+            {
+              "source_url": "https://t.me/source/1002",
+              "evidence_id": "research:8f374a9dcaeb11e86bb5f3a6",
+              "support_span": "Аврора: тест slugify добавлен."
+            },
+            {
+              "source_url": "https://t.me/source/1001",
+              "evidence_id": "research:f067b938638c2015aac52b6e",
+              "support_span": "Аврора: тест normalize_email проверяет пробелы и нижний регистр."
+            }
+          ],
+          "independent_source_groups": [],
+          "operator_action_relevance": "evidence"
+        },
+        {
+          "claim_id": "claim:3e36e268ab0e",
+          "freshness": "unknown",
+          "claim_text": "Результат пока не измерен ()",
+          "claim_type": "source_fact",
+          "confidence": "low",
+          "evidence_refs": [
+            "https://t.me/source/1002"
+          ],
+          "support_status": "supported",
+          "citation_support": {
+            "https://t.me/source/1002": "supported"
+          },
+          "matched_evidence": [
+            "https://t.me/source/1002",
+            "https://t.me/source/1002",
+            "https://t.me/source/1002"
+          ],
+          "project_relevance": "unknown",
+          "entailment_verdict": "entailed",
+          "exact_evidence_snippets": [
+            {
+              "source_url": "https://t.me/source/1002",
+              "evidence_id": "research:8f374a9dcaeb11e86bb5f3a6",
+              "support_span": "Аврора: тест slugify добавлен. Результат пока не измерен."
+            },
+            {
+              "source_url": "https://t.me/source/1002",
+              "evidence_id": "research:8f374a9dcaeb11e86bb5f3a6",
+              "support_span": "Результат пока не измерен."
+            }
+          ],
+          "independent_source_groups": [],
+          "operator_action_relevance": "evidence"
+        },
+        {
+          "claim_id": "claim:375ca5d16c82",
+          "freshness": "unknown",
+          "claim_text": "Аврора: тест normalize_email проверяет пробелы и нижний регистр ()",
+          "claim_type": "source_fact",
+          "confidence": "low",
+          "evidence_refs": [
+            "https://t.me/source/1001"
+          ],
+          "support_status": "supported",
+          "citation_support": {
+            "https://t.me/source/1001": "supported"
+          },
+          "matched_evidence": [
+            "https://t.me/source/1001",
+            "https://t.me/source/1001"
+          ],
+          "project_relevance": "unknown",
+          "entailment_verdict": "entailed",
+          "exact_evidence_snippets": [
+            {
+              "source_url": "https://t.me/source/1001",
+              "evidence_id": "research:f067b938638c2015aac52b6e",
+              "support_span": "Аврора: тест normalize_email проверяет пробелы и нижний регистр."
+            },
+            {
+              "source_url": "https://t.me/source/1001",
+              "evidence_id": "research:f067b938638c2015aac52b6e",
+              "support_span": "Аврора: тест normalize_email проверяет пробелы и нижний регистр."
+            },
+            {
+              "source_url": "https://t.me/source/1002",
+              "evidence_id": "research:8f374a9dcaeb11e86bb5f3a6",
+              "support_span": "Аврора: тест slugify добавлен. Результат пока не измерен."
+            }
+          ],
+          "independent_source_groups": [],
+          "operator_action_relevance": "evidence"
+        }
+      ],
+      "metrics": {
+        "claim_count": 3,
+        "schema_version": "prm_claim_grounding_metrics.v1",
+        "technical_leaks": 0,
+        "citation_integrity": 1.0,
+        "citation_precision": 1.0,
+        "partial_claim_rate": 0.0,
+        "supported_claim_rate": 1.0,
+        "citation_completeness": 1.0,
+        "verification_complete": true,
+        "unsupported_claim_rate": 0.0,
+        "current_fact_violations": 0,
+        "unverified_tail_claim_count": 0
+      },
+      "claim_count": 3,
+      "schema_version": "prm_answer_claim_verification.v1",
+      "candidate_claim_count": 3,
+      "verification_complete": true,
+      "claim_extraction_source": "rendered_final_answer"
+    },
+    "fixture_http_model_calls": 1,
+    "live_model_quality_grade": false
+  },
+  "control_sessions": {
+    "source_head": "1f97b8cd2780c4dbeabb2a78c23d0f85a428fdc3",
+    "privacy": "public_synthetic_only",
+    "real_provider_calls": 0,
+    "key_read": false,
+    "actual_accounts_or_messages": false,
+    "runtime": "native ingress/worker/current-visible confirmation/real PG; fake HTTP Graph and synthetic delivery",
+    "cases": [
+      {
+        "topic": "act",
+        "turns": [
+          {
+            "user": "/actpreview {\"action_code\": \"mail.send\", \"resource_ref\": \"resource_selected_mail\", \"content\": {\"to\": [\"recipient@example.test\"], \"subject\": \"Учебная Аврора\", \"body\": \"Работа будет готова завтра утром.\"}}",
+            "assistant": "Предпросмотр письма\nИз выбранного подключённого аккаунта Microsoft.\nКому: recipient@example.test\nТема: Учебная Аврора\n\nТекст письма:\nРабота будет готова завтра утром.\n\nПодтверждение действует до 10.10 07:25 (Europe/Berlin).\nПроверь полный текст и параметры. Нажми «Отправить письмо» или ответь «да».",
+            "status": "preview",
+            "text_keyboard": {
+              "kind": "reply_keyboard",
+              "keyboard": [
+                [
+                  {
+                    "text": "Отправить письмо"
+                  }
+                ]
+              ],
+              "resize_keyboard": true,
+              "one_time_keyboard": true
+            }
+          },
+          {
+            "user": "Отправить письмо",
+            "assistant": "Провайдер принял запрос, но выполнение ещё не подтверждено. Автоматически повторять его не буду. Нажми «Проверить результат действия» для отдельной сверки.",
+            "status": "unknown",
+            "text_keyboard": {
+              "kind": "reply_keyboard",
+              "keyboard": [
+                [
+                  {
+                    "text": "Проверить результат действия"
+                  }
+                ]
+              ],
+              "resize_keyboard": true,
+              "one_time_keyboard": true
+            }
+          },
+          {
+            "user": "Проверить результат действия",
+            "assistant": "Письмо найдено в «Отправленных». Получение письма адресатом этим не подтверждается.\nИдентификатор объекта у провайдера: synthetic_sent_2",
+            "status": "succeeded",
+            "text_keyboard": {
+              "kind": "reply_keyboard",
+              "keyboard": [
+                [
+                  {
+                    "text": "Проверить результат действия"
+                  }
+                ]
+              ],
+              "resize_keyboard": true,
+              "one_time_keyboard": true
+            }
+          },
+          {
+            "user": "Отправить письмо",
+            "assistant": "Повторное подтверждение уже использовано; нового действия не было.\nПровайдер подтвердил операцию с письмом. Получение письма адресатом этим не подтверждается.\nИдентификатор объекта у провайдера: synthetic_sent_2",
+            "status": "succeeded",
+            "text_keyboard": {
+              "kind": "reply_keyboard",
+              "keyboard": [
+                [
+                  {
+                    "text": "Проверить результат действия"
+                  }
+                ]
+              ],
+              "resize_keyboard": true,
+              "one_time_keyboard": true
+            }
+          }
+        ],
+        "synthetic_graph_write_count": 1
+      },
+      {
+        "topic": "watch",
+        "turns": [
+          {
+            "user": "/watch resource_archive",
+            "assistant": "Предпросмотр наблюдения\nИсточник: архив Telegram\nПроверка: каждые 5 мин.\nСообщать: содержательные изменения\nЧасовой пояс: Europe/Berlin\nНе больше 3 сообщений в день. Тихие часы: 22:00–08:00.\nДо: 2026-11-09T05:15:12.125511+00:00\nНаблюдение ещё не включено. Нажми «Подтвердить наблюдение».",
+            "text_keyboard": {
+              "kind": "reply_keyboard",
+              "keyboard": [
+                [
+                  {
+                    "text": "Подтвердить наблюдение"
+                  }
+                ]
+              ],
+              "resize_keyboard": true,
+              "one_time_keyboard": true
+            }
+          },
+          {
+            "user": "Подтвердить наблюдение",
+            "assistant": "Подписка сохранена. Работа планировщика пока не подтверждена; её состояние можно проверить кнопкой.",
+            "text_keyboard": {
+              "kind": "reply_keyboard",
+              "keyboard": [
+                [
+                  {
+                    "text": "Проверить наблюдение"
+                  }
+                ],
+                [
+                  {
+                    "text": "Приостановить наблюдение"
+                  }
+                ]
+              ],
+              "resize_keyboard": true,
+              "one_time_keyboard": true
+            }
+          },
+          {
+            "user": "Проверить наблюдение",
+            "assistant": "Подписка сохранена: активна. Работа планировщика пока не подтверждена. Последняя проверка: проверки ещё не было.",
+            "text_keyboard": {
+              "kind": "reply_keyboard",
+              "keyboard": [
+                [
+                  {
+                    "text": "Проверить наблюдение"
+                  }
+                ],
+                [
+                  {
+                    "text": "Приостановить наблюдение"
+                  }
+                ]
+              ],
+              "resize_keyboard": true,
+              "one_time_keyboard": true
+            }
+          },
+          {
+            "user": "Приостановить наблюдение",
+            "assistant": "Подписка приостановлена: новые сборы и отправки остановлены. Уже начатый запрос мог продолжиться.",
+            "text_keyboard": {
+              "kind": "reply_keyboard",
+              "keyboard": [
+                [
+                  {
+                    "text": "Проверить наблюдение"
+                  }
+                ],
+                [
+                  {
+                    "text": "Возобновить наблюдение"
+                  }
+                ]
+              ],
+              "resize_keyboard": true,
+              "one_time_keyboard": true
+            }
+          },
+          {
+            "user": "Проверить наблюдение",
+            "assistant": "Подписка сохранена: приостановлена. Работа планировщика пока не подтверждена. Последняя проверка: наблюдение приостановлено.",
+            "text_keyboard": {
+              "kind": "reply_keyboard",
+              "keyboard": [
+                [
+                  {
+                    "text": "Проверить наблюдение"
+                  }
+                ],
+                [
+                  {
+                    "text": "Возобновить наблюдение"
+                  }
+                ]
+              ],
+              "resize_keyboard": true,
+              "one_time_keyboard": true
+            }
+          },
+          {
+            "user": "Возобновить наблюдение",
+            "assistant": "Подписка возобновлена. Фактическую работу планировщика можно проверить кнопкой.",
+            "text_keyboard": {
+              "kind": "reply_keyboard",
+              "keyboard": [
+                [
+                  {
+                    "text": "Проверить наблюдение"
+                  }
+                ]
+              ],
+              "resize_keyboard": true,
+              "one_time_keyboard": true
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "render": {
+    "status": "rendered",
+    "runtime": "native scoped BriefRuntime and PrivateReportRuntime isolated renderer",
+    "source_head": "2e541af8e9928e1b1002110e055bd615aa8b5434",
+    "captured_session_sha256": "436edfce4d85f5be74469c1708b01d2d8635d13f888da4fe216811c4807b4e29",
+    "editorial_content": "exact observed MiMo Flash story JSON reused; not a new paid inference",
+    "synthetic_source_reconstruction": "exact captured source texts/IDs/URLs/publication times; fresh synthetic runtime, same requested window",
+    "new_model_calls": 0,
+    "real_account_or_messages": false,
+    "assets": [
+      {
+        "format": "html",
+        "path": ".playbook-artifacts/pai-four-point-20261010/brief-render-current/product-brief.html",
+        "sha256": "ddb870aa43637b23874ac239a4e7b06479c2ad30097cf4e2a04ab9676550bd68",
+        "media_type": "text/html; charset=utf-8",
+        "synthetic": true
+      },
+      {
+        "format": "pdf",
+        "path": ".playbook-artifacts/pai-four-point-20261010/brief-render-current/product-brief.pdf",
+        "sha256": "3ac99e6413e3984074a9ee806033e3ff25fd056c76d5f582f493d4b107e250af",
+        "media_type": "application/pdf",
+        "synthetic": true
+      },
+      {
+        "format": "markdown",
+        "path": ".playbook-artifacts/pai-four-point-20261010/brief-render-current/product-brief.md",
+        "sha256": "a6f8eead0236892177ac443cd20e8dd43cf9e1521a8662101fd53de0e8faba47",
+        "media_type": "text/markdown; charset=utf-8",
+        "synthetic": true
+      }
+    ],
+    "code_sha256": "959228f20f377f362654844d6ee6fc6a1357d1bb6874f08897eaf63318f498d2"
+  },
+  "visual_inspection": {
+    "synthetic_only": true,
+    "html_sha256": "ddb870aa43637b23874ac239a4e7b06479c2ad30097cf4e2a04ab9676550bd68",
+    "pdf_sha256": "3ac99e6413e3984074a9ee806033e3ff25fd056c76d5f582f493d4b107e250af",
+    "browser": "Chromium1243 via Playwright1.63.0",
+    "actual_external_browser_requests": false,
+    "screens": [
+      {
+        "case": "desktop-light",
+        "errors": [],
+        "dimensions": {
+          "viewport": 1280,
+          "document": 1280,
+          "body": 1280,
+          "background": "rgb(245, 245, 240)",
+          "overflows": [],
+          "chart_value_font_sizes": [
+            "16px",
+            "16px"
+          ],
+          "chart_values_visible": [
+            "none",
+            "none"
+          ],
+          "coverage_cell_labels": [
+            "Источник",
+            "Состояние",
+            "Ограничение"
+          ]
+        },
+        "screenshot": "desktop-light.png"
+      },
+      {
+        "case": "mobile-light",
+        "errors": [],
+        "dimensions": {
+          "viewport": 390,
+          "document": 390,
+          "body": 390,
+          "background": "rgb(245, 245, 240)",
+          "overflows": [],
+          "chart_value_font_sizes": [
+            "16px",
+            "16px"
+          ],
+          "chart_values_visible": [
+            "block",
+            "block"
+          ],
+          "coverage_cell_labels": [
+            "Источник",
+            "Состояние",
+            "Ограничение"
+          ],
+          "coverage_label_widths": [
+            {
+              "label": "Источник",
+              "column": 128,
+              "text": 87.25
+            },
+            {
+              "label": "Состояние",
+              "column": 128,
+              "text": 95.875
+            },
+            {
+              "label": "Ограничение",
+              "column": 128,
+              "text": 121.4296875
+            }
+          ]
+        },
+        "screenshot": "mobile-light.png"
+      },
+      {
+        "case": "mobile-dark",
+        "errors": [],
+        "dimensions": {
+          "viewport": 390,
+          "document": 390,
+          "body": 390,
+          "background": "rgb(18, 23, 22)",
+          "overflows": [],
+          "chart_value_font_sizes": [
+            "16px",
+            "16px"
+          ],
+          "chart_values_visible": [
+            "block",
+            "block"
+          ],
+          "coverage_cell_labels": [
+            "Источник",
+            "Состояние",
+            "Ограничение"
+          ],
+          "coverage_label_widths": [
+            {
+              "label": "Источник",
+              "column": 128,
+              "text": 87.25
+            },
+            {
+              "label": "Состояние",
+              "column": 128,
+              "text": 95.875
+            },
+            {
+              "label": "Ограничение",
+              "column": 128,
+              "text": 121.4296875
+            }
+          ]
+        },
+        "screenshot": "mobile-dark.png"
+      }
+    ],
+    "pdf_pages": 3,
+    "pdf_out_of_page_text": [],
+    "human_acceptance": false
+  },
+  "real_provider_model_or_account_calls_in_final_block": 0,
+  "provider_unavailability": "actual114 HTTP429/Retry-After156472, no retry",
+  "human_or_release_acceptance": false,
+  "private_content": false,
+  "utd_api": "owner-deferred",
+  "remaining_gates": [
+    "independent P1 closure and changed-range review unavailable on selected GLM; alternate one Codex permission pending",
+    "new live model-quality evaluation unavailable under Go429",
+    "real mailbox/calendar/Telegram operator integration not authorized by this assignment",
+    "Brave discovery credential not selected",
+    "formal design/role/human/production gates unchanged"
+  ],
+  "quota_diagnosis": {
+    "observed_http_status": 429,
+    "retry_after_seconds": 156472,
+    "provider_hint_until_utc": "2026-10-12T00:00:00Z",
+    "provider_hint_until_berlin": "2026-10-12T02:00:00+02:00",
+    "inference": "likely weekly per-model GLM quota; not confirmed account billing",
+    "actual_plan": "unknown",
+    "error_response_body": "not retained",
+    "official_usage_limits": "https://opencode.ai/docs/go/#usage-limits",
+    "additional_model_calls": 0
+  },
+  "independent_review_coverage": {
+    "last_actual_code_review_head": "cbab0fbf005754884422c3c372373d6b23748bbf",
+    "last_verdict": "STOP/P1; original112 retained",
+    "closure_requested_head": "6467c503c7d196926632da03cf5dce49ed181d2e",
+    "current_candidate_independently_closed": false,
+    "requested_model": "glm-5.3",
+    "requested_effort": "max",
+    "observed_model_after_429": "unknown",
+    "observed_effort_after_429": "unknown",
+    "actual114_report": "none",
+    "actual114_usage": "unknown"
+  },
+  "retained_failure_receipts": {
+    "search": {
+      "topic": "search",
+      "argv": [
+        ".venv-pai/bin/python",
+        "tools/run_pai_acceptance.py",
+        "-q",
+        "tests/test_pai_search_polish.py",
+        "tests/test_pai_deep_research.py",
+        "tests/test_pai_archive_search.py",
+        "tests/test_pai_web_github.py",
+        "tests/test_assistant_research.py"
+      ],
+      "environment": {
+        "PYTHONPATH": "src",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"
+      },
+      "source_head": "97b9388805d3ed5e709705d37e5eca139e18e48b",
+      "started_at": "2026-10-10T05:05:30.090773+00:00",
+      "status": "failed",
+      "private_data": false,
+      "human_acceptance": false,
+      "scope": "owner four points, one accumulated block; no historical full suite",
+      "exit_code": 1,
+      "duration_seconds": 85.327,
+      "finished_at": "2026-10-10T05:06:55.418979+00:00",
+      "log_sha256": "6019aea6d290951c23449ccac60e9eb72ec8ba0e4f954edfd6938dc4b2edaad2"
+    },
+    "brief": {
+      "topic": "brief",
+      "argv": [
+        ".venv-pai/bin/python",
+        "tools/run_pai_acceptance.py",
+        "-q",
+        "tests/test_pai_brief_polish.py",
+        "tests/test_pai_brief_runtime.py",
+        "tests/test_pai_report_runtime.py",
+        "tests/test_assistant_report_exports.py",
+        "tests/test_assistant_brief_editorial.py"
+      ],
+      "environment": {
+        "PYTHONPATH": "src",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"
+      },
+      "source_head": "97b9388805d3ed5e709705d37e5eca139e18e48b",
+      "started_at": "2026-10-10T05:05:30.181837+00:00",
+      "status": "failed",
+      "private_data": false,
+      "human_acceptance": false,
+      "scope": "owner four points, one accumulated block; no historical full suite",
+      "exit_code": 1,
+      "duration_seconds": 54.099,
+      "finished_at": "2026-10-10T05:06:24.281340+00:00",
+      "log_sha256": "bb19edddcf14539b0940220ff6748002e96db9d5d3d9247c567b0ae61836b648"
+    },
+    "brief-corrected": {
+      "topic": "brief",
+      "argv": [
+        ".venv-pai/bin/python",
+        "tools/run_pai_acceptance.py",
+        "-q",
+        "tests/test_pai_brief_polish.py",
+        "tests/test_pai_brief_runtime.py",
+        "tests/test_pai_report_runtime.py",
+        "tests/test_assistant_report_exports.py",
+        "tests/test_assistant_brief_editorial.py"
+      ],
+      "environment": {
+        "PYTHONPATH": "src",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"
+      },
+      "source_head": "aa2002d68012503602d655805264c02f9b26ec59",
+      "started_at": "2026-10-10T05:09:29.551772+00:00",
+      "status": "failed",
+      "private_data": false,
+      "human_acceptance": false,
+      "scope": "owner four points, one accumulated block; no historical full suite",
+      "exit_code": 1,
+      "duration_seconds": 55.849,
+      "finished_at": "2026-10-10T05:10:25.401183+00:00",
+      "log_sha256": "6f42d86db055db2365a4879c44fbe5e3e83116dc1aa0ffc3fc09f92a531d699c"
+    },
+    "focused-prm": {
+      "topic": "focused-prm",
+      "argv": [
+        ".venv-pai/bin/python",
+        "tools/test_tiers.py",
+        "focused-prm"
+      ],
+      "environment": {
+        "PYTHONPATH": "src",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"
+      },
+      "source_head": "aa2002d68012503602d655805264c02f9b26ec59",
+      "started_at": "2026-10-10T05:09:30.735063+00:00",
+      "status": "failed",
+      "private_data": false,
+      "human_acceptance": false,
+      "scope": "owner four points, one accumulated block; no historical full suite",
+      "exit_code": 1,
+      "duration_seconds": 113.657,
+      "finished_at": "2026-10-10T05:11:24.392420+00:00",
+      "log_sha256": "e9de250763e2ad2095dfb3efc31cf1aa6585e92a3ce72271e7dce73a8ce29261"
+    },
+    "obsolete-full-interruption": {
+      "source_head": "aa2002d",
+      "reason": "source superseded by reproduced Brief comparison/coverage fixes; final full run on1f97b8c is running",
+      "runner_pid": 1796717,
+      "pytest_pids": [
+        1796729
+      ],
+      "signal": "SIGINT",
+      "scope": "only verified descendants of this obsolete owned test recorder; no other process or DB touched"
+    }
+  },
+  "handoff_document_paths": [
+    "docs/CODEX_PROMPT.md",
+    "docs/verification/PAI-progress.md",
+    "docs/verification/PAI-four-point-20261010.md",
+    "docs/verification/PAI-four-point-20261010.json"
+  ],
+  "deletion_core_identity": {
+    "fixed_sha": "6467c503c7d196926632da03cf5dce49ed181d2e",
+    "candidate": "2e541af8e9928e1b1002110e055bd615aa8b5434",
+    "files": [
+      {
+        "path": "src/prm/runtime/result_payloads.py",
+        "sha256": "e57f05f2f72dd0e7bc42db7cd082edace4023287b59da19a216a368e25f56c84",
+        "matches_fixed_6467c50": true
+      },
+      {
+        "path": "src/prm/runtime/deletion.py",
+        "sha256": "12ce6cf1397e7b67bc4f5b1f515bab9d870c3a4f26bf4e2a3709f94782315c04",
+        "matches_fixed_6467c50": true
+      },
+      {
+        "path": "src/prm/conversation.py",
+        "sha256": "79519b19c9a7035e6ea22835cbf894cea9f735f42ebb5c6a2dbbd4f8e431fecb",
+        "matches_fixed_6467c50": true
+      }
+    ]
+  },
+  "prior_full_runs": {
+    "pai-complete-final": {
+      "topic": "pai-complete",
+      "argv": [
+        ".venv-pai/bin/python",
+        "tools/test_tiers.py",
+        "pai-complete"
+      ],
+      "environment": {
+        "PYTHONPATH": "src",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"
+      },
+      "source_head": "1f97b8cd2780c4dbeabb2a78c23d0f85a428fdc3",
+      "started_at": "2026-10-10T05:12:27.943178+00:00",
+      "status": "failed",
+      "private_data": false,
+      "human_acceptance": false,
+      "scope": "owner four points, one accumulated block; no historical full suite",
+      "exit_code": 1,
+      "duration_seconds": 983.918,
+      "finished_at": "2026-10-10T05:28:51.861696+00:00",
+      "log_sha256": "5eef39fbca4cad46fd5a036c21c4f645ab5883c0722e7091ca11abd6682be297"
+    },
+    "pai-complete-complete": {
+      "topic": "pai-complete",
+      "argv": [
+        ".venv-pai/bin/python",
+        "tools/test_tiers.py",
+        "pai-complete"
+      ],
+      "environment": {
+        "PYTHONPATH": "src",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"
+      },
+      "source_head": "af087f21f5ba175c383bdf478feee8614b3329af",
+      "started_at": "2026-10-10T05:27:30.867535+00:00",
+      "status": "interrupted",
+      "private_data": false,
+      "human_acceptance": false,
+      "scope": "owner four points, one accumulated block; no historical full suite",
+      "observed_session_exit_code": 143,
+      "termination": "SIGTERM observed from exec session; sender/reason unknown; no completed pytest/spec verdict",
+      "finished_observed_at": "2026-10-10T05:43:23.001637+00:00",
+      "log_sha256": "bf675358142fc15c805b74a20cc6d3a3bfd2117259e02844b080c2e52904649a",
+      "progress_dots": 304
+    }
+  },
+  "terminated_run_sandbox_cleanup": {
+    "pid": 1854431,
+    "root": "/tmp/pai-postgres-hjl0av14/db",
+    "synthetic_marker": true,
+    "started_at": "2026-10-10T05:41:59+00:00",
+    "full_run_start": "2026-10-10T05:27:30.867535+00:00",
+    "full_run_stop_observed": "2026-10-10T05:43:23.001637+00:00",
+    "attribution": "only active synthetic harness run; exact ephemeral sandbox marker/initialization inside own run window; all own pytest wrappers exited143",
+    "stop_exit_code": 0,
+    "production_service_touched": false,
+    "data_directory_removed": false
+  },
+  "next_safe_command": ".venv-pai/bin/python tools/mimo_code_review.py --help"
+}

@@ -735,3 +735,33 @@ No phase/slice/design/human/live/release acceptance inferred. Current stop point
 independent P1 closure after provider recovery; prepared separate114 is not run.
 
 Independent engineering call114 allocated: one scoped repaired-runtime safety check at 6467c503c7d196926632da03cf5dce49ed181d2e; not the superseded programme/design batch114. Public code/synthetic only,GLM5.3/max, one call/no retry. Product-session judge has a separate advisory workload count.
+
+2026-10-10 four-point assignment (ADR-017): verified code 2e541af8e9928e1b1002110e055bd615aa8b5434.
+
+| Topic | Code | Wiring | Tests | Independent review | Live | Human acceptance |
+| --- | --- | --- | --- | --- | --- | --- |
+| Deletion P1 | fixed6467c50; core bytes unchanged | existing lineage lock/source/main-result | 2 passed / 16.29s | OPEN: actual114 HTTP429; original112 STOP retained | not exercised | absent |
+| Search | strict anchored findings/coverage | native worker + synthetic model HTTP/PG | 58 passed / 83.59s | current range unreviewed | fresh inference unavailable | absent |
+| Watch/Act | natural exact previews/states/text controls | native ingress/delivery + loopback transport; one fake Graph write | 61 passed / 131.67s | current range unreviewed | real account absent | absent |
+| Brief | citations, mobile values/table, print/duplication | native private renderer/offline Chromium/PDF | 55 passed / 38.82s | new model grade unavailable | previous real editorial replayed only | absent |
+
+Complete active PAI 390 passed / 871.25s, zero skips/failures, all69 IDs/10
+scenarios; PRM 736 passed / 105.21s; retrofit 150 passed / 10.12s.
+Layers overlap; per-layer SHA/argv/env/exits/log hashes are preserved in
+PAI-four-point-20261010.md/.json. Original citation/link/comparison failures,
+389-pass/1-overflow-fixture-failure run, corrected overflow leaf1/3.81s and
+304-dot incomplete SIGTERM run are retained. Final one-shot detached recorder
+finished on the committed candidate; no service/timer or live account action.
+Offline desktop/mobile390 light/dark: no JS/horizontal overflow; visible16px
+chart values; coverage label121.43px fits128px; PDF3 pages/0 out-of-page text.
+
+Actual114 consumed (not programme/design batch114): frozen6467c50, GLM5.3/max,
+HTTP429/Retry-After156472/0.536s, no report/usage. Hint until2026-10-12 00:00 UTC;
+weekly quota is an inference; account plan/error body unknown. Provider calls
+stopped. One independent read-only Codex choice remains pending, never inferred.
+No current safety/model/human acceptance fabricated. Pin/plan/refs/bridge/MAT
+safety pass; formal contract still51 missing approvals, whole project verifier
+not green. UTD/API owner-deferred; real accounts/Brave/production gates unchanged.
+Next safe command: `.venv-pai/bin/python tools/mimo_code_review.py --help`; prepare
+one fresh exact-candidate review after provider recovery or explicit model choice,
+never overwrite113/114 or restart superseded design batches. No push or master edit.
