@@ -1,5 +1,9 @@
 # PRM Deployment Parity Runbook
 
+## Current PA integration boundary — 10 October2026
+
+Current source0fbcfd1 is local/test/provider benchmark verified; installed host/runtime parity is not observed. The master merge in ADR-019 publishes source/docs and runs CI; it does not perform production cutover or execute historical service commands below. Current target/private deployment/pilot gaps: [PRODUCT_STATUS](PRODUCT_STATUS.md), [cutover packet](verification/PAI-28-cutover-packet.md).
+
 Status: active read-only verification procedure
 Updated: 2026-08-16
 

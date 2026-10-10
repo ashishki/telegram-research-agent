@@ -1,0 +1,1289 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-10",
+  "kind": "documentation_projection_not_approval_registry",
+  "source_registry_sha256": "0ddd936cfa29bda4b5419968196db94d872a39764fb045118a792c5020efa80b",
+  "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+  "spec_count": 69,
+  "scenario_count": 10,
+  "full_spec_receipt": "docs/artifacts/pa-20261010/receipts/pai-complete-final.json",
+  "formal_states_changed": false,
+  "requirements": [
+    {
+      "spec_id": "ACADEMIC-01",
+      "requirement": "выполнить `docs/UTD_ACADEMIC_INBOX_RESEARCH_HANDOFF.md` как предметный модуль общего ассистента. Общая беседа, общие разрешения, общие отчёты/задачи и общий механизм доставки; отдельные академические адаптеры, типы записей и правила авторитетности. Не переиспользовать согласие публичного UTD watch как согласие на почту или Canvas.",
+      "slices": [
+        "PAI-19"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_academic_01",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "UTD/Canvas/API owner-deferred; реальный аккаунт/институциональный доступ отсутствуют.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "ACADEMIC-02",
+      "requirement": "профиль имеет явно выбранный этап: подготовка/поступление, ожидание начала, действующая учёба, завершение. Он не выводится автоматически из старой переписки. До начала учёбы полезнее административные действия и возможности; после — курсы и задания. Конкретные личные даты и аккаунты не публикуются в репозитории.",
+      "slices": [
+        "PAI-19"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_academic_02",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "UTD/Canvas/API owner-deferred; реальный аккаунт/институциональный доступ отсутствуют.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "ACADEMIC-03",
+      "requirement": "сначала selected mail и разрешённые Canvas assignments/calendar/announcements. Не собирать по умолчанию оценки, roster/данные других студентов, тексты сдач, комментарии оценивания, вложения, финансовые кабинеты или иммиграционные дела. Состояние сдачи, когда необходимо для напоминания, ограничить минимальным полем и не читать содержимое работы. Полный доступ к файлам — отдельная предметная потребность и отдельное согласие.",
+      "slices": [
+        "PAI-19"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_academic_03",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "UTD/Canvas/API owner-deferred; реальный аккаунт/институциональный доступ отсутствуют.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "ACADEMIC-04",
+      "requirement": "назначение срока из поля API, явно написанной даты и предположения — разные состояния. Неясное время остаётся неизвестным. Сохранять исходный часовой пояс и показывать эквивалент локального. Конфликт письма и Canvas показывается, а не исчезает при дедупликации. Проверка старого письма не подтверждает актуальность изменённого задания.",
+      "slices": [
+        "PAI-19"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_academic_04",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "UTD/Canvas/API owner-deferred; реальный аккаунт/институциональный доступ отсутствуют.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "ACADEMIC-05",
+      "requirement": "«готово» локально, «пользователь сообщил о выполнении» и «источник подтвердил сдачу» — разные статусы. Возможность участия/получения финансирования проверяется по условиям и этапу пользователя; совпадение ключевого слова не доказывает eligibility. Nebula допустима как источник обнаружения после проверки условий, но не подменяет первичную UTD/Canvas-запись для значимого срока.",
+      "slices": [
+        "PAI-19"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_academic_05",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "UTD/Canvas/API owner-deferred; реальный аккаунт/институциональный доступ отсутствуют.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "ACT-01",
+      "requirement": "ассистент различает предложение, подготовленный черновик, подтверждённое намерение, исполнение и неизвестный результат.",
+      "slices": [
+        "PAI-04",
+        "PAI-20"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_act_01",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Native runtime/PG наблюден; эффекты external provider синтетические, live не выполнен.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "ACT-02",
+      "requirement": "`ActionProposal` содержит тип действия, конкретные аргументы, объекты/версии, предпросмотр последствий, риск, срок подтверждения и отпечаток содержимого. `Confirmation` привязана к владельцу, предложению, версии и одному использованию. Проверить разрешения, актуальность данных и доступность исполнителя; затем выполнить и записать квитанцию с provider ID.",
+      "slices": [
+        "PAI-04",
+        "PAI-20"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_act_02",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Native runtime/PG наблюден; эффекты external provider синтетические, live не выполнен.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "ACT-03",
+      "requirement": "повторное нажатие, повтор Telegram-update, падение после отправки, истечение подтверждения, изменение адресата, отозванный аккаунт и конфликт версии не приводят к неожиданному действию. Для календаря проверять занятость и версии событий; для писем — цепочку, реальных адресатов и вложения. Модель не угадывает email по имени.",
+      "slices": [
+        "PAI-04",
+        "PAI-09",
+        "PAI-20"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_act_03",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Native runtime/PG наблюден; эффекты external provider синтетические, live не выполнен.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "ARCH-01",
+      "requirement": "модульный монолит с единым приложением, адаптерами интерфейсов и отдельным исполнителем длительных/регулярных заданий. Разделение обязанностей не требует отдельных микросервисов. Telegram, CLI, eval и веб-представление вызывают одни и те же use cases. Не переносить новые возможности в гигантский legacy handler.",
+      "slices": [
+        "PAI-01",
+        "PAI-07"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_arch_01",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Synthetic binding выполнен; отдельное полное live/operator доказательство требования отсутствует.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "ARCH-02",
+      "requirement": "отдельные производные хранилища личных источников; канонический Telegram-архив не превращать в почтовую БД. Уникальность учитывает аккаунт/источник, даже при одном пользователе. Кэши не смешивают приватные области. Выдача из устаревшего кэша обозначена и не подтверждает изменчивый факт.",
+      "slices": [
+        "PAI-02",
+        "PAI-21"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_arch_02",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Synthetic binding выполнен; отдельное полное live/operator доказательство требования отсутствует.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "BRIEF-01",
+      "requirement": "недельный обзор — основная возможность продукта, а не служебная выгрузка.",
+      "slices": [
+        "PAI-14"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_brief_01",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Частично наблюдено: выбранные synthetic native сценарии + real Go inference; не все варианты требования.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "BRIEF-02",
+      "requirement": "недельный отчёт — понятное объяснение «что произошло, что важно лично для меня и что делать дальше», а не лог, дамп постов или 40 ссылок. Доступен по запросу и по отдельно включённому расписанию. Кроме недели: день, произвольный период, тема, проект, университет, возможности и сравнение двух периодов.",
+      "slices": [
+        "PAI-14"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_brief_02",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Частично наблюдено: выбранные synthetic native сценарии + real Go inference; не все варианты требования.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "BRIEF-03",
+      "requirement": "единая структурированная версия отчёта порождает все представления. Переформатирование в PDF не должно заново придумывать содержание или незаметно обновлять факты. «Обнови отчёт» создаёт новую версию и показывает существенные изменения. У отчёта есть ID, период, часовой пояс, момент проверки, версия, источники, ограничения покрытия и ссылки на предыдущую версию.",
+      "slices": [
+        "PAI-05",
+        "PAI-14",
+        "PAI-15"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_brief_03",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Частично наблюдено: выбранные synthetic native сценарии + real Go inference; не все варианты требования.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "BRIEF-04",
+      "requirement": "сохранять объяснение отбора. Новизна, важность, личная применимость и достоверность — разные признаки. Один значимый пункт лучше пяти слабых. Показывать «важных изменений не найдено», когда это соответствует проверенным данным. Возможность открыть не вошедшие в сводку материалы защищает от чрезмерной фильтрации.",
+      "slices": [
+        "PAI-14"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_brief_04",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Частично наблюдено: выбранные synthetic native сценарии + real Go inference; не все варианты требования.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "BRIEF-05",
+      "requirement": "период задаётся полуоткрытым интервалом `[start, end)` в выбранном часовом поясе. «За неделю» уточняется один раз в настройках: предыдущая календарная неделя или последние семь дней. Различать опубликованное на неделе, событие недели и старое, впервые обнаруженное на неделе. Переходы летнего времени, запоздалые записи, удалённые сообщения и переиздания покрыть тестами.",
+      "slices": [
+        "PAI-14"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_brief_05",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Частично наблюдено: выбранные synthetic native сценарии + real Go inference; не все варианты требования.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "BRIEF-06",
+      "requirement": "отчёт хранит покрытие: какие источники проверены, какие исключены пользователем, недоступны, устарели или дали неполную страницу результатов. «Ничего важного» допустимо только в рамках такого покрытия. Повторная генерация не создаёт дубликаты уведомлений; исправленный факт виден как исправление.",
+      "slices": [
+        "PAI-14",
+        "PAI-17",
+        "PAI-19"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_brief_06",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Частично наблюдено: выбранные synthetic native сценарии + real Go inference; не все варианты требования.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "BRIEF-07",
+      "requirement": "пользователь может сказать «поясни пункт 2», «только AI», «сделай менее техническим», «сравни с прошлой неделей», «что из этого применить?». Ассистент обращается к точной версии отчёта и его источникам, а не запускает несвязанный новый поиск. Новый поиск выполняется при необходимости и явно отличает новые факты от исходного отчёта.",
+      "slices": [
+        "PAI-14"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_brief_07",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Частично наблюдено: выбранные synthetic native сценарии + real Go inference; не все варианты требования.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "CHAT-01",
+      "requirement": "обычные сообщения не требуют знания команд и внутренних режимов.",
+      "slices": [
+        "PAI-10"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_chat_01",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Частично наблюдено: выбранные synthetic native сценарии + real Go inference; не все варианты требования.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "CHAT-02",
+      "requirement": "уточнения относятся к правильному вопросу, найденному материалу, документу или ожидающему действию; смена темы не тянет за собой старый проект.",
+      "slices": [
+        "PAI-05",
+        "PAI-07",
+        "PAI-10"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_chat_02",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Частично наблюдено: выбранные synthetic native сценарии + real Go inference; не все варианты требования.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "CONNECT-01",
+      "requirement": "подключённые источники объединяются в ответе только в пределах разрешений и с сохранением происхождения данных.",
+      "slices": [
+        "PAI-17",
+        "PAI-18",
+        "PAI-19"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_connect_01",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Synthetic binding выполнен; отдельное полное live/operator доказательство требования отсутствует.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "CONNECT-02",
+      "requirement": "для каждого провайдера документировать официальные endpoint/scopes, ограничения политики учреждения, OAuth-поток, хранение/ротацию токенов, пагинацию, incremental sync, rate limits, повторные попытки, отзыв, удаление и восстановление. Проверять документацию на момент реализации, не угадывать провайдера по адресу почты. Не просить вставить токен в чат.",
+      "slices": [
+        "PAI-16",
+        "PAI-17",
+        "PAI-18"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_connect_02",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Synthetic binding выполнен; отдельное полное live/operator доказательство требования отсутствует.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "CONNECT-03",
+      "requirement": "отдельно обозначать возможности читать, создавать черновики, писать, уведомлять, передавать фрагменты внешней модели. Фильтр папки внутри приложения не называть ограничением провайдерского токена. Если права технически шире отбора, объяснить это. Для связанных писем и календарей сохранять все первичные ссылки без дублирования обязательства.",
+      "slices": [
+        "PAI-16",
+        "PAI-20"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_connect_03",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Synthetic binding выполнен; отдельное полное live/operator доказательство требования отсутствует.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "COST-01",
+      "requirement": "бюджеты на запрос, глубокое исследование, отчёт, день/месяц, фоновые задачи и разработческие eval задаются до платных вызовов. «Любые модели» не означает бесконечные циклы. Показать оценку дорогой задачи и расход по завершении в настройках/подробностях, не засоряя каждый ответ техническим футером.",
+      "slices": [
+        "PAI-03",
+        "PAI-23"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_cost_01",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Локальные guards/rehearsal; private/production/operator/billing proof остаётся отдельным.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "COST-02",
+      "requirement": "измерять стоимость успешной задачи, uncached/cached input, output, вспомогательные вызовы, повторения и время ожидания. Кэшировать стабильный префикс и неизменённые результаты извлечения; изменения разрешений инвалидируют кэш. Сбор/дедупликация делаются детерминированно, пакетная обработка допустима для несрочных задач. Разработческая экономия Playbook и стоимость работающего ассистента — разные измерения.",
+      "slices": [
+        "PAI-23"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_cost_02",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Локальные guards/rehearsal; private/production/operator/billing proof остаётся отдельным.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "DONE-01",
+      "requirement": "все пять способностей работают через одну беседу; AI-поиск действительно подключён и проверяет источники; отчёт полезен и визуально принят; выбранные реальные почта/календарь/академические источники проходят жизненный цикл; действия подтверждаются и сверяются; память управляется; мультимодальность интегрирована; эксплуатационные и приватностные тесты пройдены. Невозможность получить доступ к конкретному университетскому API отмечается как внешний блокер, а не как реализованная интеграция. Остальные части не останавливаются из-за независимого блокера.",
+      "slices": [
+        "PAI-26",
+        "PAI-27",
+        "PAI-28",
+        "PAI-29"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_done_01",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Synthetic binding выполнен; отдельное полное live/operator доказательство требования отсутствует.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "EVAL-01",
+      "requirement": "три независимых слоя доказательств: детерминированные тесты/синтетические сценарии; интеграция с реальными разрешёнными сервисами; реальная полезность и визуальная оценка владельцем. Модель-судья вспомогательная, калибруется на человеческих оценках и не имеет права подтверждать безопасность или выпуск.",
+      "slices": [
+        "PAI-23",
+        "PAI-26",
+        "PAI-27",
+        "PAI-29"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_eval_01",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Synthetic binding выполнен; отдельное полное live/operator доказательство требования отсутствует.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "EVAL-02",
+      "requirement": "сравнивать одинаковые вопросы, источники/снимки, разрешения, языки и модели/версии. Регрессия не скрывается изменением датасета. Сохранять версии промптов, инструментов, контекста, стоимости и исполнителя; различать заданную и фактически использованную модель. Тесты не должны проходить потому, что проверяют наличие слов «безопасно» или «источник».",
+      "slices": [
+        "PAI-23",
+        "PAI-26"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_eval_02",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Synthetic binding выполнен; отдельное полное live/operator доказательство требования отсутствует.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "EVAL-03",
+      "requirement": "визуальные проверки реальных рендеров и контролируемый сеанс владельца обязательны для выпуска. HTML-макет или тест рендера не считается проверкой Telegram/PDF. Не публиковать приватные screenshots. Минимальный первый контрольный сеанс 20 задач, затем несколько недель реального использования с учётом пропущенных обязательств, шумных уведомлений и оценок полезности; длительность/объём фиксируются до пилота.",
+      "slices": [
+        "PAI-15",
+        "PAI-27",
+        "PAI-29"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_eval_03",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Synthetic binding выполнен; отдельное полное live/operator доказательство требования отсутствует.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "EVIDENCE-01",
+      "requirement": "хранить для источника стабильный ID, исходный URL/ID записи, тип источника, время публикации при наличии, время события, время получения, версию/хеш, права использования и ограничения видимости. Дата сканирования не является датой новости. Для частичного доступа показывать фактическую границу.",
+      "slices": [
+        "PAI-11",
+        "PAI-12",
+        "PAI-17",
+        "PAI-19"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_evidence_01",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Synthetic binding выполнен; отдельное полное live/operator доказательство требования отсутствует.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "EVIDENCE-02",
+      "requirement": "агрегатор и перепечатка помогают обнаружить событие, но не становятся независимыми подтверждениями. Противоречия сохраняются. Для сроков, условий обучения, действий с деньгами и других значимых последствий первоисточник важнее удобства пересказа. Непроверенный срок не превращается в уверенный срочный сигнал.",
+      "slices": [
+        "PAI-11",
+        "PAI-12",
+        "PAI-19"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_evidence_02",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Synthetic binding выполнен; отдельное полное live/operator доказательство требования отсутствует.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "EVIDENCE-03",
+      "requirement": "поисковый провайдер, загрузка страницы, извлечение содержания, ранжирование и генерация — отдельные проверяемые шаги. Фрагмент поисковой выдачи не выдавать за полностью прочитанный документ. Контролировать перенаправления, адреса локальных сетей, DNS-проверку и фактическое соединение, размер, тип и время загрузки, вредоносную разметку. Не отправлять частные тексты в публичный поисковый запрос.",
+      "slices": [
+        "PAI-12"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_evidence_03",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Synthetic binding выполнен; отдельное полное live/operator доказательство требования отсутствует.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "MEDIA-01",
+      "requirement": "голос — полноценный вход в ту же беседу, с отображаемой расшифровкой и исправлением; явная настройка внешней обработки. Ответ голосом опционален, не единственный способ получить важную информацию.",
+      "slices": [
+        "PAI-22"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_media_01",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Локальные holdouts; реальный report vision judge не является product speech/OCR/upload canary.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "MEDIA-02",
+      "requirement": "пользователь может приложить изображение, PDF или документ и спросить о нём. Проверять тип/размер, архивные бомбы, активное содержимое, права и временное хранение. Сначала текстовый слой, OCR только при необходимости; страница/фрагмент источника сохраняется. Не выполнять макросы и содержимое документов. Мультимодальные данные подчиняются той же политике egress.",
+      "slices": [
+        "PAI-22"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_media_02",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Локальные holdouts; реальный report vision judge не является product speech/OCR/upload canary.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "MEDIA-03",
+      "requirement": "производимые отчёты, письма, таблицы и заметки остаются объектами беседы; версии различаются, пользователь может редактировать и экспортировать. Ввод нового формата не создаёт отдельного несогласованного агента с широкими правами.",
+      "slices": [
+        "PAI-05",
+        "PAI-15",
+        "PAI-22"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_media_03",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Локальные holdouts; реальный report vision judge не является product speech/OCR/upload canary.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "MEM-01",
+      "requirement": "хранить разговор как беседу с идентификатором, темой, сообщениями, ссылками на объекты, результатами поиска, версиями черновиков, ожидающими действиями и заданиями. Не строить универсальное общение вокруг `last_topic` или ключевых слов.",
+      "slices": [
+        "PAI-05"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_mem_01",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Synthetic binding выполнен; отдельное полное live/operator доказательство требования отсутствует.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "MEM-02",
+      "requirement": "разделить три слоя: история беседы; явно сохранённые сведения/предпочтения; данные источников. Срок хранения каждого слоя задаётся отдельно. Предложение «запомни» относится к конкретному факту, а не ко всей почте. Пользователь может посмотреть, исправить, удалить и экспортировать память. Отзыв подключения делает связанные данные и результаты поиска недоступными согласно политике удаления, не уничтожая независимый Telegram-архив.",
+      "slices": [
+        "PAI-21"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_mem_02",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Synthetic binding выполнен; отдельное полное live/operator доказательство требования отсутствует.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "MEM-03",
+      "requirement": "факты профиля имеют происхождение, время и статус подтверждения. Из письма нельзя автоматически вывести бессрочный жизненный статус. Отмечать «материал сохранён», «открыт», «пользователь отметил прочитанным» отдельно; не утверждать, что человек понял или применил материал, только потому что бот его проиндексировал.",
+      "slices": [
+        "PAI-21"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_mem_03",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Synthetic binding выполнен; отдельное полное live/operator доказательство требования отсутствует.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "MIGRATION-01",
+      "requirement": "сохранить существующий архив и идентификаторы источников; не начинать заново уже работающие механизмы. Использовать постепенное подключение новых возможностей к одной границе приложения. Не включать старые таймеры отчётов. Миграции — аддитивные, с копией тестовой БД, проверкой восстановления и отдельным разрешением на production. Исторические очереди и результаты сохраняются; изменение текущего направления не превращает их в новые выполненные задачи.",
+      "slices": [
+        "PAI-02",
+        "PAI-25"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_migration_01",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Synthetic binding выполнен; отдельное полное live/operator доказательство требования отсутствует.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "MODEL-01",
+      "requirement": "поддержать несколько провайдеров и модели по задачам, без жёсткого списка из этого документа. Фактические ID, цены, контекстные лимиты и доступность проверяются при реализации и обновлении. Владелец выбирает профиль качества: экономный, сбалансированный, максимальное качество, а также ручной выбор при необходимости.",
+      "slices": [
+        "PAI-10",
+        "PAI-23"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_model_01",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Наблюдены модели Go/actual metadata/отказы; другие provider/product profiles не приняты.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "MODEL-02",
+      "requirement": "выбирать по качеству задачи, допустимости передачи данных, задержке и стоимости. Запасной маршрут не может понижать приватность. Неизвестный тариф не считать тарифом самой дешёвой модели; стоимость отмечается неизвестной и ограничение расходов остаётся консервативным.",
+      "slices": [
+        "PAI-23"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_model_02",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Наблюдены модели Go/actual metadata/отказы; другие provider/product profiles не приняты.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "OPS-01",
+      "requirement": "длительные задачи имеют durable state, аренду исполнения, heartbeat, ограниченные retries/backoff, cancellation и восстановление после рестарта. Не держать polling-loop Telegram заблокированным исследованием или PDF. Результат и состояние отправки фиксируются раздельно. Один и тот же запрос не создаёт дубликаты фоновых заданий.",
+      "slices": [
+        "PAI-06",
+        "PAI-07",
+        "PAI-08",
+        "PAI-09"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_ops_01",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Локальные guards/rehearsal; private/production/operator/billing proof остаётся отдельным.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "OPS-02",
+      "requirement": "миграции, резервная копия/восстановление, ротация ключей, обновление модели, отзыв аккаунта, недоступность API, quota/429, заполнение диска и рассинхронизация часов входят в runbook и тесты. Внешние ошибки не снимают ограничения безопасности. У оператора есть одна понятная страница состояния и аварийное отключение автоматических действий.",
+      "slices": [
+        "PAI-24",
+        "PAI-25"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_ops_02",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Локальные guards/rehearsal; private/production/operator/billing proof остаётся отдельным.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "PERM-01",
+      "requirement": "разрешение — машинно проверяемая запись: владелец, аккаунт, источник/ресурсы, операции, классы данных, допустимые провайдеры, цели, срок действия, версия и путь отзыва. Промпт не выдаёт полномочия. Проверять разрешение до получения/отправки данных и повторно перед внешним эффектом.",
+      "slices": [
+        "PAI-03",
+        "PAI-04",
+        "PAI-09",
+        "PAI-16",
+        "PAI-20"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_perm_01",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Synthetic binding выполнен; отдельное полное live/operator доказательство требования отсутствует.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "PLAN-01",
+      "requirement": "не переписывать весь проект сразу. Сначала устранить подтверждённые текущие регрессии и сверить активные пути. Затем реализовывать законченные пользовательские сценарии с тестами, а не строить месяцы абстракций без доступного результата.",
+      "slices": [
+        "PAI-00",
+        "PAI-01",
+        "PAI-26"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_plan_01",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Synthetic binding выполнен; отдельное полное live/operator доказательство требования отсутствует.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "PLAN-02",
+      "requirement": "Standard — строгость управления; `designed_slices` — глубина проектирования. Это разные оси. Разработчик работает непосредственно в репозитории; независимый проверяющий не редактирует его же результат. Использовать актуальные `feature_workflow` и Role Runner из закреплённого Playbook, а не старые копии по совпадению имени.",
+      "slices": [
+        "PAI-00",
+        "PAI-01"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_plan_02",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Synthetic binding выполнен; отдельное полное live/operator доказательство требования отсутствует.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "PLAN-03",
+      "requirement": "экономия разработки: короткий AGENTS; один актуальный handoff; текущая задача вместо перечитывания истории; модульный дизайн; manifest с `on_demand`/`never_by_default`; адресные проверки внутри этапа и накопленное ревью на границе. Префикс контекста стабильный, дифф/доказательства отдельны. Не запускать всех ревьюеров после изменения двух слов; не снижать обязательные проверки риска. Экономию измерять относительно прежнего процесса на сопоставимых задачах; цифр для этого проекта пока нет.",
+      "slices": [
+        "PAI-00",
+        "PAI-23"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_plan_03",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Synthetic binding выполнен; отдельное полное live/operator доказательство требования отсутствует.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "QUALITY-01",
+      "requirement": "качество измеряется на пользовательских сценариях, а не числом тестов, моделей или строк кода.",
+      "slices": [
+        "PAI-23",
+        "PAI-26",
+        "PAI-29"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_quality_01",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Synthetic binding выполнен; отдельное полное live/operator доказательство требования отсутствует.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "RAG-01",
+      "requirement": "сохранить измеримый FTS baseline; добавить семантический поиск/переранжирование там, где доказан выигрыш на реальных вопросах, включая русско-английские формулировки. Разрешение на любые модели не делает внешние embeddings автоматически допустимыми для всех данных. Индекс производный и перестраиваемый; новая БД принимается только с измерением, миграцией и откатом. Не навязывать инфраструктурную бедность: при доказанном улучшении использовать подходящий инструмент.",
+      "slices": [
+        "PAI-11"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_rag_01",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Synthetic binding выполнен; отдельное полное live/operator доказательство требования отсутствует.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "SEARCH-01",
+      "requirement": "поиск реально проходит путь от запроса через разрешённый источник до человеческого ответа; наличие адаптера или макета не считается завершением.",
+      "slices": [
+        "PAI-11",
+        "PAI-12",
+        "PAI-13"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_search_01",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Частично наблюдено: выбранные synthetic native сценарии + real Go inference; не все варианты требования.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "SEARCH-02",
+      "requirement": "понимать, какая информация нужна: общая помощь без поиска; конкретная находка в личном архиве; свежий внешний факт; сравнение; исследование; сочетание источников. Пользователь может выбрать «только мои материалы», «только интернет», «только первоисточники», период и проект. Отсутствие ключевого слова «архив» не лишает его доступа к нужным материалам; отсутствие ключевого слова «сейчас» не делает заведомо изменчивый факт стабильным.",
+      "slices": [
+        "PAI-10",
+        "PAI-11",
+        "PAI-12"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_search_02",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Частично наблюдено: выбранные synthetic native сценарии + real Go inference; не все варианты требования.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "SEARCH-03",
+      "requirement": "разложить сложный вопрос на ограниченный набор подзапросов; искать параллельно там, где это независимо; объединять результаты, проверять первоисточники и останавливаться при достаточном покрытии либо честно показывать пробел. Не запускать неограниченный обход интернета. Глубина выбирается задачей/пользователем; до дорогого расширения показывается оценка затрат или запрашивается разрешение по политике.",
+      "slices": [
+        "PAI-13"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_search_03",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Частично наблюдено: выбранные synthetic native сценарии + real Go inference; не все варианты требования.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "SEARCH-04",
+      "requirement": "результат — не список ссылок и не пересказ первого совпадения. Дать прямой ответ, существенные различия, основания, неопределённости и продолжения. Различать факт из источника, вывод ассистента и рекомендацию. У каждого существенного проверяемого утверждения есть поддерживающий источник; правильный URL сам по себе не доказывает правильность утверждения.",
+      "slices": [
+        "PAI-11",
+        "PAI-12",
+        "PAI-13"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_search_04",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Частично наблюдено: выбранные synthetic native сценарии + real Go inference; не все варианты требования.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "SEC-01",
+      "requirement": "письма, страницы, документы, комментарии и посты — данные, не инструкции. Их содержимое не может расширить права, включить инструменты, назначить получателя, запросить секрет или изменить бюджет. Тесты включают скрытые инструкции, поддельные ссылки, вредоносный HTML, prompt injection через память и через результаты инструментов.",
+      "slices": [
+        "PAI-11",
+        "PAI-12",
+        "PAI-13",
+        "PAI-17",
+        "PAI-19",
+        "PAI-21",
+        "PAI-22",
+        "PAI-26"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_sec_01",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Локальные guards/rehearsal; private/production/operator/billing proof остаётся отдельным.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "SEC-02",
+      "requirement": "один механизм политики покрывает текст, голос, изображения, OCR, embeddings, reranking, генерацию и модельные проверки. Наличие API-ключа не равно согласию. Запасной провайдер допускается только для разрешённых ему классов данных. Секреты никогда не попадают в запросы модели, URL, логи, отчёты или скриншоты.",
+      "slices": [
+        "PAI-03",
+        "PAI-10",
+        "PAI-16",
+        "PAI-22"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_sec_02",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Локальные guards/rehearsal; private/production/operator/billing proof остаётся отдельным.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "SEC-03",
+      "requirement": "обычные логи содержат ID и безопасную диагностику, не переписку/полный корпус. Отдельный добровольный диагностический режим ограничен сроком, доступом и объёмом. В репозитории только синтетические/согласованно очищенные примеры. Данные и отчёты шифруются/защищаются согласно модели угроз; резервные копии также включены в retention и отзыв.",
+      "slices": [
+        "PAI-16",
+        "PAI-24"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_sec_03",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Локальные guards/rehearsal; private/production/operator/billing proof остаётся отдельным.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "SEC-04",
+      "requirement": "предлагаемые начальные сроки хранения должны быть показаны при настройке, а не приняты молча: история беседы 30 дней; временные загрузки до завершения обработки; производные факты до отзыва/выбранного срока; долговременная память до удаления. Конкретная политика и исключения фиксируются до первого сохранения. Удаление проверяется на локальных данных, индексах, очередях, кэшах и резервных копиях с честным описанием задержек и ограничений провайдера.",
+      "slices": [
+        "PAI-21",
+        "PAI-25"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_sec_04",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Локальные guards/rehearsal; private/production/operator/billing proof остаётся отдельным.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "UX-01",
+      "requirement": "первое знакомство занимает несколько понятных экранов, а не анкету из технических терминов. Ассистент объясняет, что доступно сейчас, предлагает подключить нужное и показывает пример ответа/отчёта на синтетических данных, явно отмеченных как демонстрация.",
+      "slices": [
+        "PAI-07",
+        "PAI-16"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_ux_01",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Synthetic binding выполнен; отдельное полное live/operator доказательство требования отсутствует.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "UX-02",
+      "requirement": "по умолчанию сначала прямой ответ, затем 2–5 важных оснований, потом один естественный следующий шаг. Подробности, источники и альтернативы раскрываются по запросу. Длинный ответ допустим, когда он нужен для самой задачи или явно заказан. Короткая формулировка не должна убирать необходимую оговорку.",
+      "slices": [
+        "PAI-10",
+        "PAI-11",
+        "PAI-14"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_ux_02",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Synthetic binding выполнен; отдельное полное live/operator доказательство требования отсутствует.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "UX-03",
+      "requirement": "«сделай короче» сокращает выбранный результат; «коротко объясни другую тему» начинает новую задачу. «А второе?» относится к правильному списку. «Почему это срочно?» открывает основания приоритета. «Нет, другой проект» исправляет контекст, а не добавляет старый проект в новый ответ. «Да» исполняет действие только при единственном однозначном актуальном подтверждении; иначе показать выбор. Такое подтверждение связано с конкретными версией результата и предложением действия, а не с `last_topic` или `last_project_name`: обработчик не запускает для него новый поиск/роутинг. Новая самостоятельная тема, истечение срока, другая беседа/владелец или новая версия делают текстовое «да» неоднозначным. Нажатие на старую кнопку может лишь заново показать привязанное к её серверному контексту предложение; оно не наследует проект из более позднего ответа.",
+      "slices": [
+        "PAI-05",
+        "PAI-10",
+        "PAI-14",
+        "PAI-20"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_ux_03",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Synthetic binding выполнен; отдельное полное live/operator доказательство требования отсутствует.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "UX-04",
+      "requirement": "при длительной работе показывать реальное состояние: «проверяю источники», «готовлю обзор». Пользователь может отменить задачу, задать другую, вернуться к результату. Не обещать фонового выполнения без зарегистрированного задания и работающего исполнителя. Не выводить скрытые рассуждения модели; допустимы краткий план и журнал выполненных действий.",
+      "slices": [
+        "PAI-06",
+        "PAI-07",
+        "PAI-13"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_ux_04",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Synthetic binding выполнен; отдельное полное live/operator доказательство требования отсутствует.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "UX-05",
+      "requirement": "сбой доставки не означает полученный пользователем ответ. После восстановления не повторять внешнее действие вслепую. Отмена прекращает ещё не начатые шаги и отзывает право на последующие записи; уже совершённое действие объясняется отдельно, с возможностью корректировки там, где она реально поддерживается.",
+      "slices": [
+        "PAI-07",
+        "PAI-09",
+        "PAI-20"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_ux_05",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Synthetic binding выполнен; отдельное полное live/operator доказательство требования отсутствует.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "VISUAL-01",
+      "requirement": "короткая первая карточка ориентировочно 1–2 мобильных экрана, целевой бюджет около 1 800–2 400 знаков без длинных источников. Чёткий заголовок периода, визуально различимые разделы, короткие абзацы, умеренные эмодзи, максимум несколько основных действий. Полный обзор открывается по кнопке. Не обрезать посреди ссылки или подтверждения; кнопки связаны с правильной частью результата. Превышение длины допустимо по запросу пользователя.",
+      "slices": [
+        "PAI-15"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_visual_01",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Actual offline native HTML/PDF/MD и Kimi на public synthetic renders; live Telegram/private hosted reader/operator sharing не приняты.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "VISUAL-02",
+      "requirement": "читаемый с телефона, типографическая иерархия, спокойные отступы, карточки тем, кликабельные источники, раскрываемые основания, фильтры и переход назад в разговор. Светлая и тёмная темы, достаточный контраст, управление с клавиатуры и корректные длинные слова/URL. Это приватное представление: авторизация, проверка владельца, ограниченный срок ссылок, отсутствие открытой индексации и аналитики с личными данными.",
+      "slices": [
+        "PAI-15"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_visual_02",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Actual offline native HTML/PDF/MD и Kimi на public synthetic renders; live Telegram/private hosted reader/operator sharing не приняты.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "VISUAL-03",
+      "requirement": "редакционный, а не технический вид: название/период, резюме, тематические разделы, номера страниц, подписи и кликабельные источники. Нормальная кириллица, встроенные допустимые шрифты, отсутствие обрезанных блоков/пустых страниц. Длина определяется содержанием: ориентир 4–8 страниц для обычного полного обзора плюс приложения по необходимости, не обязательная квота. Содержание не меняется относительно сохранённой версии отчёта.",
+      "slices": [
+        "PAI-15"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_visual_03",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Actual offline native HTML/PDF/MD и Kimi на public synthetic renders; live Telegram/private hosted reader/operator sharing не приняты.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "VISUAL-04",
+      "requirement": "переносимый текст со ссылками и метаданными; пользователь может получить документ, обновить стиль, сократить его, выбрать темы. Разрешение поделиться отчётом требует предпросмотра состава, адресата и скрытых личных разделов. Публичный отчёт никогда не наследует приватные почтовые цитаты по умолчанию.",
+      "slices": [
+        "PAI-15"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_visual_04",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Actual offline native HTML/PDF/MD и Kimi на public synthetic renders; live Telegram/private hosted reader/operator sharing не приняты.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "WATCH-01",
+      "requirement": "настройка показывает тему, источники, критерий изменения, частоту проверки/доставки, тихие часы, часовой пояс, срок действия, лимиты и стоимость. После подтверждения показать реальное состояние: сохранено намерение, подключено наблюдение, ожидается вход или уведомления включены. Не называть намерение работающим мониторингом.",
+      "slices": [
+        "PAI-08"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_watch_01",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Native runtime/PG наблюден; эффекты external provider синтетические, live не выполнен.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "WATCH-02",
+      "requirement": "разные поводы для доставки: изменение факта, приближение согласованного срока, обычный дайджест. Порог важности, обязательность, применимость и доказанность срока независимы. Обычная новость не перебивает тихие часы. Исключения для срочных событий заранее согласуются.",
+      "slices": [
+        "PAI-08"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_watch_02",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Native runtime/PG наблюден; эффекты external provider синтетические, live не выполнен.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "WATCH-03",
+      "requirement": "пауза, отписка, удаление, snooze, «сделано», «неактуально», «меньше похожего», отключение категории и общий стоп работают перед сбором и непосредственно перед отправкой. Отзыв прав после постановки задачи в очередь отменяет доставку. Завершение/отмена события убирает будущие напоминания, изменение срока пересчитывает их.",
+      "slices": [
+        "PAI-08",
+        "PAI-09"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_watch_03",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Native runtime/PG наблюден; эффекты external provider синтетические, live не выполнен.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    },
+    {
+      "spec_id": "WATCH-04",
+      "requirement": "квоты и ключи идемпотентности включают пользователя, подключение, объект, версию изменения и этап напоминания. При неизвестном результате отправки не повторять вслепую. Доказуемую exactly-once доставку не обещать; хранить состояния, квитанции и процедуру сверки. После перезапуска исполнителя согласованные подписки восстанавливаются без лавины старых сообщений.",
+      "slices": [
+        "PAI-08",
+        "PAI-09"
+      ],
+      "test_node": "tests/test_pai_requirements.py::test_requirement_watch_04",
+      "synthetic_status": "observed_in_398_zero_skip_full_spec_run",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "live_status": "Native runtime/PG наблюден; эффекты external provider синтетические, live не выполнен.",
+      "independent_review": "engineering116/117 scoped code safety; individual governed roles not complete",
+      "human_status": "not_accepted",
+      "formal_registry_status": "planned"
+    }
+  ],
+  "scenarios": [
+    {
+      "scenario_id": "SC13.2-01",
+      "source_text": "приветствие, переписывание письма, вопрос без поиска, 10–20 последовательных уточнений, новая тема, возврат к предыдущему результату;",
+      "slices": [
+        "PAI-10",
+        "PAI-26",
+        "PAI-29"
+      ],
+      "synthetic_test_node": "tests/test_pai_end_to_end.py::test_chat_multiturn_and_topic_return",
+      "recovery_test_node": null,
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_evidence": "PAI-27/29 actual authorized provider/render/operator observations",
+      "status": "planned",
+      "synthetic_status": "binding node executed in398-case full-spec run",
+      "live_status": "selected model/control observations are partial; complete live/operator scenario not accepted",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98"
+    },
+    {
+      "scenario_id": "SC13.2-02",
+      "source_text": "«коротко», «второй пункт», неверное название проекта, неоднозначное «да», отмена во время работы, перезапуск;",
+      "slices": [
+        "PAI-05",
+        "PAI-07",
+        "PAI-14",
+        "PAI-20",
+        "PAI-26",
+        "PAI-29"
+      ],
+      "synthetic_test_node": "tests/test_pai_end_to_end.py::test_object_followups_confirmation_cancel_restart",
+      "recovery_test_node": "tests/test_pai_load_recovery.py::test_object_followups_confirmation_cancel_restart",
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_evidence": "PAI-27/29 actual authorized provider/render/operator observations",
+      "status": "planned",
+      "synthetic_status": "binding node executed in398-case full-spec run",
+      "live_status": "selected model/control observations are partial; complete live/operator scenario not accepted",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98"
+    },
+    {
+      "scenario_id": "SC13.2-03",
+      "source_text": "архив + интернет, свежий факт, конфликт источников, только первоисточники, пустая/частичная выдача, источник недоступен;",
+      "slices": [
+        "PAI-11",
+        "PAI-12",
+        "PAI-13",
+        "PAI-26",
+        "PAI-29"
+      ],
+      "synthetic_test_node": "tests/test_pai_end_to_end.py::test_archive_web_conflicts_and_coverage",
+      "recovery_test_node": null,
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_evidence": "PAI-27/29 actual authorized provider/render/operator observations",
+      "status": "planned",
+      "synthetic_status": "binding node executed in398-case full-spec run",
+      "live_status": "selected model/control observations are partial; complete live/operator scenario not accepted",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98"
+    },
+    {
+      "scenario_id": "SC13.2-04",
+      "source_text": "недельный отчёт с разными источниками, повторными событиями, старой новостью, изменённым сроком, отсутствием новостей, ошибкой одного подключения;",
+      "slices": [
+        "PAI-14",
+        "PAI-17",
+        "PAI-19",
+        "PAI-26",
+        "PAI-29"
+      ],
+      "synthetic_test_node": "tests/test_pai_end_to_end.py::test_weekly_brief_dedup_deadline_and_outage",
+      "recovery_test_node": null,
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_evidence": "PAI-27/29 actual authorized provider/render/operator observations",
+      "status": "planned",
+      "synthetic_status": "binding node executed in398-case full-spec run",
+      "live_status": "selected model/control observations are partial; complete live/operator scenario not accepted",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98"
+    },
+    {
+      "scenario_id": "SC13.2-05",
+      "source_text": "Telegram/HTML/PDF одного отчёта: равенство фактов, мобильный просмотр, длинные URL, кириллица, тёмная тема, без обрезаний;",
+      "slices": [
+        "PAI-15",
+        "PAI-26",
+        "PAI-29"
+      ],
+      "synthetic_test_node": "tests/test_pai_end_to_end.py::test_report_views_mobile_cyrillic_dark_theme",
+      "recovery_test_node": null,
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_evidence": "PAI-27/29 actual authorized provider/render/operator observations",
+      "status": "planned",
+      "synthetic_status": "binding node executed in398-case full-spec run",
+      "live_status": "selected model/control observations are partial; complete live/operator scenario not accepted",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98"
+    },
+    {
+      "scenario_id": "SC13.2-06",
+      "source_text": "подтверждённая подписка, пауза, отписка, тихие часы, DST, отзыв доступа перед отправкой, сбой исполнителя, unknown-send;",
+      "slices": [
+        "PAI-08",
+        "PAI-09",
+        "PAI-26",
+        "PAI-29"
+      ],
+      "synthetic_test_node": "tests/test_pai_end_to_end.py::test_watch_pause_dst_revoke_and_unknown_send",
+      "recovery_test_node": "tests/test_pai_load_recovery.py::test_watch_pause_dst_revoke_and_unknown_send",
+      "review_roles": [
+        "slice_review",
+        "test_critic",
+        "privacy_review"
+      ],
+      "human_evidence": "PAI-27/29 actual authorized provider/render/operator observations",
+      "status": "planned",
+      "synthetic_status": "binding node executed in398-case full-spec run",
+      "live_status": "selected model/control observations are partial; complete live/operator scenario not accepted",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98"
+    },
+    {
+      "scenario_id": "SC13.2-07",
+      "source_text": "письмо/Canvas с разными дедлайнами, неоднозначная дата, уже сданное задание, локальное «готово», непроверенная применимость возможности;",
+      "slices": [
+        "PAI-19",
+        "PAI-26",
+        "PAI-29"
+      ],
+      "synthetic_test_node": "tests/test_pai_end_to_end.py::test_academic_deadline_conflict_local_done_and_eligibility",
+      "recovery_test_node": null,
+      "review_roles": [
+        "slice_review",
+        "test_critic"
+      ],
+      "human_evidence": "PAI-27/29 actual authorized provider/render/operator observations",
+      "status": "planned",
+      "synthetic_status": "binding node executed in398-case full-spec run",
+      "live_status": "selected model/control observations are partial; complete live/operator scenario not accepted",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98"
+    },
+    {
+      "scenario_id": "SC13.2-08",
+      "source_text": "черновик → исправление → новое подтверждение → действие; двойное нажатие, другой владелец, истечение срока и конфликт версии;",
+      "slices": [
+        "PAI-04",
+        "PAI-20",
+        "PAI-26",
+        "PAI-29"
+      ],
+      "synthetic_test_node": "tests/test_pai_end_to_end.py::test_action_edit_confirm_double_click_owner_expiry_version",
+      "recovery_test_node": "tests/test_pai_load_recovery.py::test_action_edit_confirm_double_click_owner_expiry_version",
+      "review_roles": [
+        "slice_review",
+        "test_critic",
+        "privacy_review"
+      ],
+      "human_evidence": "PAI-27/29 actual authorized provider/render/operator observations",
+      "status": "planned",
+      "synthetic_status": "binding node executed in398-case full-spec run",
+      "live_status": "selected model/control observations are partial; complete live/operator scenario not accepted",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98"
+    },
+    {
+      "scenario_id": "SC13.2-09",
+      "source_text": "prompt injection из каждого типа источников, секреты в ошибках, приватный текст в веб-запросе, недопустимый резервный провайдер;",
+      "slices": [
+        "PAI-10",
+        "PAI-11",
+        "PAI-12",
+        "PAI-13",
+        "PAI-16",
+        "PAI-17",
+        "PAI-19",
+        "PAI-21",
+        "PAI-22",
+        "PAI-26",
+        "PAI-29"
+      ],
+      "synthetic_test_node": "tests/test_pai_end_to_end.py::test_source_injection_secret_query_and_fallback_denials",
+      "recovery_test_node": "tests/test_pai_load_recovery.py::test_source_injection_secret_query_and_fallback_denials",
+      "review_roles": [
+        "slice_review",
+        "test_critic",
+        "privacy_review"
+      ],
+      "human_evidence": "PAI-27/29 actual authorized provider/render/operator observations",
+      "status": "planned",
+      "security_test_nodes": [
+        "tests/test_pai_chat_runtime.py::test_chat_fallback_provider_without_data_class_grant_is_not_called",
+        "tests/test_pai_archive_search.py::test_retrieved_archive_injection_cannot_create_authority_or_effects",
+        "tests/test_pai_deep_research.py::test_research_tool_result_injection_cannot_create_authority_or_effects"
+      ],
+      "synthetic_status": "binding node executed in398-case full-spec run",
+      "live_status": "selected model/control observations are partial; complete live/operator scenario not accepted",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98"
+    },
+    {
+      "scenario_id": "SC13.2-10",
+      "source_text": "восстановление из резервной копии, миграция вперёд/назад на копии, удаление/отзыв источника и кэшей.",
+      "slices": [
+        "PAI-21",
+        "PAI-24",
+        "PAI-25",
+        "PAI-26",
+        "PAI-29"
+      ],
+      "synthetic_test_node": "tests/test_pai_end_to_end.py::test_restore_migration_revoke_delete_and_cache",
+      "recovery_test_node": "tests/test_pai_load_recovery.py::test_restore_migration_revoke_delete_and_cache",
+      "review_roles": [
+        "slice_review",
+        "test_critic",
+        "privacy_review"
+      ],
+      "human_evidence": "PAI-27/29 actual authorized provider/render/operator observations",
+      "status": "planned",
+      "synthetic_status": "binding node executed in398-case full-spec run",
+      "live_status": "selected model/control observations are partial; complete live/operator scenario not accepted",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98"
+    }
+  ]
+}

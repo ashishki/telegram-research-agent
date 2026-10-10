@@ -1,5 +1,9 @@
 # Personal Assistant: задания для полной реализации
 
+## Наблюдённое состояние — 10 октября2026
+
+Этот документ сохраняет формальные карточки/зависимости2026-10-06. Не начинать PAI-00 заново из старого launch note. Local runtime0fbcfd1 прошёл398/69/10; original deletion и multipart P1 независимо закрыты116/117; code/wiring по каждому пакету — [PRODUCT_STATUS](PRODUCT_STATUS.md), formal acceptance остаётся draft/planned. Live27/28/29 и conditional30/31 имеют явные незакрытые границы. Последнее поручение — документировать и интегрировать master, не включать production.
+
 Дата: 2026-10-06. Основа: [стратегия](PA_SCALING_STRATEGY_2026-10-06.md),
 [полная спецификация](PERSONAL_ASSISTANT_SPEC.md), [PA-задачи](tasks.md).
 Исходный код при подготовке: `8faee4232cb30e6b6f39cfbd974c151846f79da6`.

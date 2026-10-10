@@ -1,0 +1,24 @@
+{
+  "argv": [
+    ".venv-pai/bin/python",
+    "tools/test_tiers.py",
+    "pai-complete"
+  ],
+  "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+  "environment": {
+    "PYTHONPATH": "src",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"
+  },
+  "status": "passed",
+  "started_at": "2026-10-10T07:30:06.188737+00:00",
+  "recorder_pid": 1915563,
+  "recorder_pgid": 1915563,
+  "reason": "new reproduced116 P1 and source-export repair; single complete active/spec verification of corrected candidate; no historical suite",
+  "private_data": false,
+  "human_acceptance": false,
+  "test_tier_pid": 1915565,
+  "exit_code": 0,
+  "duration_seconds": 1165.916,
+  "finished_at": "2026-10-10T07:49:32.105453+00:00",
+  "log_sha256": "a7262a71187d0c87f5c98e7dc9e1c0ae55032ba36873d015bdcb35b4f343ed2f"
+}

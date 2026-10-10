@@ -1,12 +1,21 @@
 # Active Personal Assistant Task Graph
 
 Status: active PA / PAI programme; historical PA engineering evidence is preserved; exact PA and new PAI design approval remain required.
-Updated: 2026-10-06
+Updated: 2026-10-10
 Feature: PA • Mode: standard • Planning depth: designed_slices
 
 The full target is `docs/PERSONAL_ASSISTANT_SPEC.md`. Exact slice scope, files, interfaces, dependencies, change budgets and rollback are in `docs/design/PA.design.json`. The design is review_required, not self-approved. Follow `docs/CODEX_PROMPT.md` and `docs/PLAYBOOK_ADOPTION.md`.
 
 Historical PRM-SN/RFX/UTD task records are preserved byte-for-byte at `docs/tasks.before-pa-20260918.md`; their statuses and evidence are not rewritten or imported as new PA completion. Read that snapshot only for a relevant maintenance issue. This graph is the new end-to-end goal, not permission to restart completed work or activate accounts/jobs.
+
+## Current engineering evidence — 2026-10-10
+
+Runtime0fbcfd1:398 active PAI/69 exact IDs/10 scenarios, current code safety
+ADVISORY117 after both reproduced P1 repairs. [PRODUCT_STATUS](PRODUCT_STATUS.md)
+separates code/wiring/tests/provider/visual/CI/operator/formal layers. Formal
+Status:planned below is intentionally unchanged; do not restart completed local
+work or mark missing acceptance done. Latest owner assignment documents and
+merges the active branch into master under ADR-019; live/production gates remain.
 
 ## Owner-requested execution breakdown — 2026-10-06
 

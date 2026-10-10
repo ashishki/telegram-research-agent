@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "owner_authority": "owner2026-10-10 Go pool/extra-usage full current synthetic-session assessment; ADR-018",
+  "provider": "opencode_go",
+  "model": "deepseek-v4-pro",
+  "requested_effort": "max",
+  "privacy": "public_synthetic_only",
+  "actual_private_content": false,
+  "dataset_sha256": "9e361e4ebbfdbb7df1c5203f7212086a030fd6033c2f380968e2b740ba6d0b77",
+  "input_sha256": "f6b9bf86f57b76c9ec9e6e73eccc345e6d69021982912a17ae1e6c3fd598f9c0",
+  "capture_provenance": [
+    {
+      "path": ".playbook-artifacts/pai-go-pilot-20261010/chat-v41-current/sessions.json",
+      "sha256": "5f490715c3435f6a8e43404531e69276b27b6a85230e94846e86863f2eb094e5",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "script_launch": ".playbook-artifacts/pai-go-pilot-20261010/capture_chat_v41.py.launch.json"
+    },
+    {
+      "path": ".playbook-artifacts/pai-go-pilot-20261010/capabilities-v41-current/sessions.json",
+      "sha256": "d455612c31aef903623d6aaf48741bba7bdab53445bd1c203807362720e5cbc7",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "script_launch": ".playbook-artifacts/pai-go-pilot-20261010/capture_capabilities_v41.py.launch.json"
+    },
+    {
+      "path": ".playbook-artifacts/pai-go-pilot-20261010/control-sessions.json",
+      "sha256": "4ede76b929a3d92e43a2b538bcbf9b0bdba05541c666f33f506b029ebd3f5748",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "script": ".playbook-artifacts/pai-go-pilot-20261010/capture_controls_clock_corrected.py"
+    }
+  ],
+  "maximum_calls": 1,
+  "automatic_retry": false,
+  "output_maximum": 393216,
+  "timeout_seconds": 7200,
+  "advisory_only": true,
+  "human_calibration": "not_available",
+  "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98"
+}

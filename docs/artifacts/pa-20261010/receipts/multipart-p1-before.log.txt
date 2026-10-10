@@ -1,0 +1,821 @@
+FFFFFF                                                                   [100%]
+=================================== FAILURES ===================================
+_ test_multipart_reconciliation_preserves_html_boundaries_and_last_controls[delivered-True-True] _
+
+pai = namespace(root=<prm.runtime.composition.AssistantRuntime object at 0x7fa26f8298a0>, pg=<prm.storage.testing.PostgresSa...pytest-3536/test_multipart_reconciliation_0'), ops=<prm.runtime.operations.OperationsRuntime object at 0x7fa26f9ffa90>)
+html = True, navigation = True, last_outcome = 'delivered'
+
+    @pytest.mark.parametrize('html,navigation', [(True, True), (False, True), (True, False)])
+    @pytest.mark.parametrize('last_outcome', ['delivered', 'not_delivered'])
+    def test_multipart_reconciliation_preserves_html_boundaries_and_last_controls(pai,html,navigation,last_outcome):
+        from prm.runtime.delivery import ReconciliationObservation
+        root=pai.root;sent=[]
+        sender=lambda destination,text,attempt:(sent.append(text) or TransportReceipt('synthetic_part_'+str(len(sent))))
+        executor=DeliveryExecutor(pai.pg.app,registry=root.registry,sender=sender)
+        for capability,data_class,purpose,operation in [
+            ('assistant.result_delivery','user_provided','answer.delivery','deliver'),
+            ('assistant.delivery_reconciliation','private_connector_metadata','delivery.reconcile','read')]:
+            allow(pai,capability,'destination_private',data_class,purpose,provider='provider_telegram',connection=None,operation=operation)
+        item=root.queue.store.put(root.owner_ref,'conversation','input_reconcile_html',{'query':'synthetic long answer'},expected_version=0)
+        job=root.queue.enqueue(owner=root.owner_ref,idempotency_key='reconcile_html',kind='compute.assistant',deadline=pai.now+timedelta(minutes=3),
+            payload={'schema_version':1,'input_namespace':'conversation','input_ref':item.object_id,'input_version':1,'input_digest':item.digest,'connection_ref':None,'resource_ref':'resource_local_request','purpose':'local.assistant','consent_revision':1})
+        options={}
+        if html:options['telegram_parse_mode']='HTML'
+        if navigation:options['telegram_navigation']=keyboard('Проверить результат действия')
+        text='<b>'+'a'*7000+'</b>' if html else 'a'*7800
+        root.queue.complete(root.queue.claim(owner=root.owner_ref,kinds=('compute.assistant',)),
+            {'text':text,'data_class':'user_provided','data_classes':['user_provided'],'payload':options})
+        outcome=executor.deliver_result(owner=root.owner_ref,job_id=job,destination_ref='destination_private',upper_bound=0)
+        assert outcome['status']=='sent' and len(sent)==3
+        # A crash can leave the precommitted aggregate/last receipt unknown after
+        # provider acceptance. The exact child payloads survive the restart.
+        with root.queue.store.transaction() as tx:
+            tx.conn.execute("UPDATE pa_delivery.attempts SET status='unknown',provider_receipt='' WHERE owner=%s AND id=ANY(%s)",
+                (root.owner_ref,[outcome['id'],outcome['id']+'_part_3']))
+        seen=[]
+        def observe(child):
+            seen.append(child['id'])
+            return ReconciliationObservation(child['attempt_ref'],child['destination_ref'],child['digest'],last_outcome,'synthetic_exact_receipt',
+                'synthetic_final_part' if last_outcome=='delivered' else '')
+        restarted=DeliveryExecutor(pai.pg.app,registry=root.registry,sender=sender)
+        assert restarted.deliver_result(owner=root.owner_ref,job_id=job,destination_ref='destination_private',upper_bound=0)['status']=='unknown'
+>       reconciled=restarted.reconcile(owner=root.owner_ref,delivery_id=outcome['id'],adapter=observe,upper_bound=0)
+
+tests/test_pai_control_polish.py:177:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <prm.runtime.delivery.DeliveryExecutor object at 0x7fa26f9fe050>
+
+    def reconcile(self, *, owner, delivery_id, adapter, upper_bound):
+        pending = self.attempt(owner=owner, delivery_id=delivery_id)
+        if pending is None:
+            raise StorageError('attempt unavailable')
+        if pending['status'] != 'unknown' or adapter is None:
+            return pending
+        if pending['digest']!=_canonical(pending['payload'])[1]:raise StateConflict('reconciliation payload integrity differs')
+        if pending['kind']=='answer' and len(pending['payload'].get('text',''))>3800:
+            payload=pending['payload'];text=payload['text']
+            parts=[text[index:index+3600] for index in range(0,len(text),3600)];receipts=[]
+            for index,part in enumerate(parts):
+                child_id=delivery_id+'_part_'+str(index+1)
+                child=self.attempt(owner=owner,delivery_id=child_id)
+                if child is None:return pending  # No evidence for an unattempted part.
+                expected={**payload,'text':'['+str(index+1)+'/'+str(len(parts))+']\n'+part,'part':index+1,'parts':len(parts)}
+                if (child['digest']!=_canonical(expected)[1] or child['destination_ref']!=pending['destination_ref']
+>                   or child['source_ref']!=pending['source_ref']):raise StateConflict('aggregate part binding differs')
+E                   prm.storage.postgres.StateConflict: aggregate part binding differs
+
+src/prm/runtime/delivery.py:344: StateConflict
+---------------------------- Captured stderr setup -----------------------------
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+----------------------------- Captured stderr call -----------------------------
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+_ test_multipart_reconciliation_preserves_html_boundaries_and_last_controls[delivered-False-True] _
+
+pai = namespace(root=<prm.runtime.composition.AssistantRuntime object at 0x7fa26f011ed0>, pg=<prm.storage.testing.PostgresSa...pytest-3536/test_multipart_reconciliation_1'), ops=<prm.runtime.operations.OperationsRuntime object at 0x7fa26f011ab0>)
+html = False, navigation = True, last_outcome = 'delivered'
+
+    @pytest.mark.parametrize('html,navigation', [(True, True), (False, True), (True, False)])
+    @pytest.mark.parametrize('last_outcome', ['delivered', 'not_delivered'])
+    def test_multipart_reconciliation_preserves_html_boundaries_and_last_controls(pai,html,navigation,last_outcome):
+        from prm.runtime.delivery import ReconciliationObservation
+        root=pai.root;sent=[]
+        sender=lambda destination,text,attempt:(sent.append(text) or TransportReceipt('synthetic_part_'+str(len(sent))))
+        executor=DeliveryExecutor(pai.pg.app,registry=root.registry,sender=sender)
+        for capability,data_class,purpose,operation in [
+            ('assistant.result_delivery','user_provided','answer.delivery','deliver'),
+            ('assistant.delivery_reconciliation','private_connector_metadata','delivery.reconcile','read')]:
+            allow(pai,capability,'destination_private',data_class,purpose,provider='provider_telegram',connection=None,operation=operation)
+        item=root.queue.store.put(root.owner_ref,'conversation','input_reconcile_html',{'query':'synthetic long answer'},expected_version=0)
+        job=root.queue.enqueue(owner=root.owner_ref,idempotency_key='reconcile_html',kind='compute.assistant',deadline=pai.now+timedelta(minutes=3),
+            payload={'schema_version':1,'input_namespace':'conversation','input_ref':item.object_id,'input_version':1,'input_digest':item.digest,'connection_ref':None,'resource_ref':'resource_local_request','purpose':'local.assistant','consent_revision':1})
+        options={}
+        if html:options['telegram_parse_mode']='HTML'
+        if navigation:options['telegram_navigation']=keyboard('Проверить результат действия')
+        text='<b>'+'a'*7000+'</b>' if html else 'a'*7800
+        root.queue.complete(root.queue.claim(owner=root.owner_ref,kinds=('compute.assistant',)),
+            {'text':text,'data_class':'user_provided','data_classes':['user_provided'],'payload':options})
+        outcome=executor.deliver_result(owner=root.owner_ref,job_id=job,destination_ref='destination_private',upper_bound=0)
+        assert outcome['status']=='sent' and len(sent)==3
+        # A crash can leave the precommitted aggregate/last receipt unknown after
+        # provider acceptance. The exact child payloads survive the restart.
+        with root.queue.store.transaction() as tx:
+            tx.conn.execute("UPDATE pa_delivery.attempts SET status='unknown',provider_receipt='' WHERE owner=%s AND id=ANY(%s)",
+                (root.owner_ref,[outcome['id'],outcome['id']+'_part_3']))
+        seen=[]
+        def observe(child):
+            seen.append(child['id'])
+            return ReconciliationObservation(child['attempt_ref'],child['destination_ref'],child['digest'],last_outcome,'synthetic_exact_receipt',
+                'synthetic_final_part' if last_outcome=='delivered' else '')
+        restarted=DeliveryExecutor(pai.pg.app,registry=root.registry,sender=sender)
+        assert restarted.deliver_result(owner=root.owner_ref,job_id=job,destination_ref='destination_private',upper_bound=0)['status']=='unknown'
+>       reconciled=restarted.reconcile(owner=root.owner_ref,delivery_id=outcome['id'],adapter=observe,upper_bound=0)
+
+tests/test_pai_control_polish.py:177:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <prm.runtime.delivery.DeliveryExecutor object at 0x7fa26f0100a0>
+
+    def reconcile(self, *, owner, delivery_id, adapter, upper_bound):
+        pending = self.attempt(owner=owner, delivery_id=delivery_id)
+        if pending is None:
+            raise StorageError('attempt unavailable')
+        if pending['status'] != 'unknown' or adapter is None:
+            return pending
+        if pending['digest']!=_canonical(pending['payload'])[1]:raise StateConflict('reconciliation payload integrity differs')
+        if pending['kind']=='answer' and len(pending['payload'].get('text',''))>3800:
+            payload=pending['payload'];text=payload['text']
+            parts=[text[index:index+3600] for index in range(0,len(text),3600)];receipts=[]
+            for index,part in enumerate(parts):
+                child_id=delivery_id+'_part_'+str(index+1)
+                child=self.attempt(owner=owner,delivery_id=child_id)
+                if child is None:return pending  # No evidence for an unattempted part.
+                expected={**payload,'text':'['+str(index+1)+'/'+str(len(parts))+']\n'+part,'part':index+1,'parts':len(parts)}
+                if (child['digest']!=_canonical(expected)[1] or child['destination_ref']!=pending['destination_ref']
+>                   or child['source_ref']!=pending['source_ref']):raise StateConflict('aggregate part binding differs')
+E                   prm.storage.postgres.StateConflict: aggregate part binding differs
+
+src/prm/runtime/delivery.py:344: StateConflict
+---------------------------- Captured stderr setup -----------------------------
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+----------------------------- Captured stderr call -----------------------------
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+_ test_multipart_reconciliation_preserves_html_boundaries_and_last_controls[delivered-True-False] _
+
+pai = namespace(root=<prm.runtime.composition.AssistantRuntime object at 0x7fa26f012dd0>, pg=<prm.storage.testing.PostgresSa...pytest-3536/test_multipart_reconciliation_2'), ops=<prm.runtime.operations.OperationsRuntime object at 0x7fa26ee49ae0>)
+html = True, navigation = False, last_outcome = 'delivered'
+
+    @pytest.mark.parametrize('html,navigation', [(True, True), (False, True), (True, False)])
+    @pytest.mark.parametrize('last_outcome', ['delivered', 'not_delivered'])
+    def test_multipart_reconciliation_preserves_html_boundaries_and_last_controls(pai,html,navigation,last_outcome):
+        from prm.runtime.delivery import ReconciliationObservation
+        root=pai.root;sent=[]
+        sender=lambda destination,text,attempt:(sent.append(text) or TransportReceipt('synthetic_part_'+str(len(sent))))
+        executor=DeliveryExecutor(pai.pg.app,registry=root.registry,sender=sender)
+        for capability,data_class,purpose,operation in [
+            ('assistant.result_delivery','user_provided','answer.delivery','deliver'),
+            ('assistant.delivery_reconciliation','private_connector_metadata','delivery.reconcile','read')]:
+            allow(pai,capability,'destination_private',data_class,purpose,provider='provider_telegram',connection=None,operation=operation)
+        item=root.queue.store.put(root.owner_ref,'conversation','input_reconcile_html',{'query':'synthetic long answer'},expected_version=0)
+        job=root.queue.enqueue(owner=root.owner_ref,idempotency_key='reconcile_html',kind='compute.assistant',deadline=pai.now+timedelta(minutes=3),
+            payload={'schema_version':1,'input_namespace':'conversation','input_ref':item.object_id,'input_version':1,'input_digest':item.digest,'connection_ref':None,'resource_ref':'resource_local_request','purpose':'local.assistant','consent_revision':1})
+        options={}
+        if html:options['telegram_parse_mode']='HTML'
+        if navigation:options['telegram_navigation']=keyboard('Проверить результат действия')
+        text='<b>'+'a'*7000+'</b>' if html else 'a'*7800
+        root.queue.complete(root.queue.claim(owner=root.owner_ref,kinds=('compute.assistant',)),
+            {'text':text,'data_class':'user_provided','data_classes':['user_provided'],'payload':options})
+        outcome=executor.deliver_result(owner=root.owner_ref,job_id=job,destination_ref='destination_private',upper_bound=0)
+        assert outcome['status']=='sent' and len(sent)==3
+        # A crash can leave the precommitted aggregate/last receipt unknown after
+        # provider acceptance. The exact child payloads survive the restart.
+        with root.queue.store.transaction() as tx:
+            tx.conn.execute("UPDATE pa_delivery.attempts SET status='unknown',provider_receipt='' WHERE owner=%s AND id=ANY(%s)",
+                (root.owner_ref,[outcome['id'],outcome['id']+'_part_3']))
+        seen=[]
+        def observe(child):
+            seen.append(child['id'])
+            return ReconciliationObservation(child['attempt_ref'],child['destination_ref'],child['digest'],last_outcome,'synthetic_exact_receipt',
+                'synthetic_final_part' if last_outcome=='delivered' else '')
+        restarted=DeliveryExecutor(pai.pg.app,registry=root.registry,sender=sender)
+        assert restarted.deliver_result(owner=root.owner_ref,job_id=job,destination_ref='destination_private',upper_bound=0)['status']=='unknown'
+>       reconciled=restarted.reconcile(owner=root.owner_ref,delivery_id=outcome['id'],adapter=observe,upper_bound=0)
+
+tests/test_pai_control_polish.py:177:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <prm.runtime.delivery.DeliveryExecutor object at 0x7fa26ee48460>
+
+    def reconcile(self, *, owner, delivery_id, adapter, upper_bound):
+        pending = self.attempt(owner=owner, delivery_id=delivery_id)
+        if pending is None:
+            raise StorageError('attempt unavailable')
+        if pending['status'] != 'unknown' or adapter is None:
+            return pending
+        if pending['digest']!=_canonical(pending['payload'])[1]:raise StateConflict('reconciliation payload integrity differs')
+        if pending['kind']=='answer' and len(pending['payload'].get('text',''))>3800:
+            payload=pending['payload'];text=payload['text']
+            parts=[text[index:index+3600] for index in range(0,len(text),3600)];receipts=[]
+            for index,part in enumerate(parts):
+                child_id=delivery_id+'_part_'+str(index+1)
+                child=self.attempt(owner=owner,delivery_id=child_id)
+                if child is None:return pending  # No evidence for an unattempted part.
+                expected={**payload,'text':'['+str(index+1)+'/'+str(len(parts))+']\n'+part,'part':index+1,'parts':len(parts)}
+                if (child['digest']!=_canonical(expected)[1] or child['destination_ref']!=pending['destination_ref']
+>                   or child['source_ref']!=pending['source_ref']):raise StateConflict('aggregate part binding differs')
+E                   prm.storage.postgres.StateConflict: aggregate part binding differs
+
+src/prm/runtime/delivery.py:344: StateConflict
+---------------------------- Captured stderr setup -----------------------------
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+----------------------------- Captured stderr call -----------------------------
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+_ test_multipart_reconciliation_preserves_html_boundaries_and_last_controls[not_delivered-True-True] _
+
+pai = namespace(root=<prm.runtime.composition.AssistantRuntime object at 0x7fa2731ded70>, pg=<prm.storage.testing.PostgresSa...pytest-3536/test_multipart_reconciliation_3'), ops=<prm.runtime.operations.OperationsRuntime object at 0x7fa27323e8f0>)
+html = True, navigation = True, last_outcome = 'not_delivered'
+
+    @pytest.mark.parametrize('html,navigation', [(True, True), (False, True), (True, False)])
+    @pytest.mark.parametrize('last_outcome', ['delivered', 'not_delivered'])
+    def test_multipart_reconciliation_preserves_html_boundaries_and_last_controls(pai,html,navigation,last_outcome):
+        from prm.runtime.delivery import ReconciliationObservation
+        root=pai.root;sent=[]
+        sender=lambda destination,text,attempt:(sent.append(text) or TransportReceipt('synthetic_part_'+str(len(sent))))
+        executor=DeliveryExecutor(pai.pg.app,registry=root.registry,sender=sender)
+        for capability,data_class,purpose,operation in [
+            ('assistant.result_delivery','user_provided','answer.delivery','deliver'),
+            ('assistant.delivery_reconciliation','private_connector_metadata','delivery.reconcile','read')]:
+            allow(pai,capability,'destination_private',data_class,purpose,provider='provider_telegram',connection=None,operation=operation)
+        item=root.queue.store.put(root.owner_ref,'conversation','input_reconcile_html',{'query':'synthetic long answer'},expected_version=0)
+        job=root.queue.enqueue(owner=root.owner_ref,idempotency_key='reconcile_html',kind='compute.assistant',deadline=pai.now+timedelta(minutes=3),
+            payload={'schema_version':1,'input_namespace':'conversation','input_ref':item.object_id,'input_version':1,'input_digest':item.digest,'connection_ref':None,'resource_ref':'resource_local_request','purpose':'local.assistant','consent_revision':1})
+        options={}
+        if html:options['telegram_parse_mode']='HTML'
+        if navigation:options['telegram_navigation']=keyboard('Проверить результат действия')
+        text='<b>'+'a'*7000+'</b>' if html else 'a'*7800
+        root.queue.complete(root.queue.claim(owner=root.owner_ref,kinds=('compute.assistant',)),
+            {'text':text,'data_class':'user_provided','data_classes':['user_provided'],'payload':options})
+        outcome=executor.deliver_result(owner=root.owner_ref,job_id=job,destination_ref='destination_private',upper_bound=0)
+        assert outcome['status']=='sent' and len(sent)==3
+        # A crash can leave the precommitted aggregate/last receipt unknown after
+        # provider acceptance. The exact child payloads survive the restart.
+        with root.queue.store.transaction() as tx:
+            tx.conn.execute("UPDATE pa_delivery.attempts SET status='unknown',provider_receipt='' WHERE owner=%s AND id=ANY(%s)",
+                (root.owner_ref,[outcome['id'],outcome['id']+'_part_3']))
+        seen=[]
+        def observe(child):
+            seen.append(child['id'])
+            return ReconciliationObservation(child['attempt_ref'],child['destination_ref'],child['digest'],last_outcome,'synthetic_exact_receipt',
+                'synthetic_final_part' if last_outcome=='delivered' else '')
+        restarted=DeliveryExecutor(pai.pg.app,registry=root.registry,sender=sender)
+        assert restarted.deliver_result(owner=root.owner_ref,job_id=job,destination_ref='destination_private',upper_bound=0)['status']=='unknown'
+>       reconciled=restarted.reconcile(owner=root.owner_ref,delivery_id=outcome['id'],adapter=observe,upper_bound=0)
+
+tests/test_pai_control_polish.py:177:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <prm.runtime.delivery.DeliveryExecutor object at 0x7fa273074700>
+
+    def reconcile(self, *, owner, delivery_id, adapter, upper_bound):
+        pending = self.attempt(owner=owner, delivery_id=delivery_id)
+        if pending is None:
+            raise StorageError('attempt unavailable')
+        if pending['status'] != 'unknown' or adapter is None:
+            return pending
+        if pending['digest']!=_canonical(pending['payload'])[1]:raise StateConflict('reconciliation payload integrity differs')
+        if pending['kind']=='answer' and len(pending['payload'].get('text',''))>3800:
+            payload=pending['payload'];text=payload['text']
+            parts=[text[index:index+3600] for index in range(0,len(text),3600)];receipts=[]
+            for index,part in enumerate(parts):
+                child_id=delivery_id+'_part_'+str(index+1)
+                child=self.attempt(owner=owner,delivery_id=child_id)
+                if child is None:return pending  # No evidence for an unattempted part.
+                expected={**payload,'text':'['+str(index+1)+'/'+str(len(parts))+']\n'+part,'part':index+1,'parts':len(parts)}
+                if (child['digest']!=_canonical(expected)[1] or child['destination_ref']!=pending['destination_ref']
+>                   or child['source_ref']!=pending['source_ref']):raise StateConflict('aggregate part binding differs')
+E                   prm.storage.postgres.StateConflict: aggregate part binding differs
+
+src/prm/runtime/delivery.py:344: StateConflict
+---------------------------- Captured stderr setup -----------------------------
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+----------------------------- Captured stderr call -----------------------------
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+_ test_multipart_reconciliation_preserves_html_boundaries_and_last_controls[not_delivered-False-True] _
+
+pai = namespace(root=<prm.runtime.composition.AssistantRuntime object at 0x7fa26f9fdfc0>, pg=<prm.storage.testing.PostgresSa...pytest-3536/test_multipart_reconciliation_4'), ops=<prm.runtime.operations.OperationsRuntime object at 0x7fa273059e40>)
+html = False, navigation = True, last_outcome = 'not_delivered'
+
+    @pytest.mark.parametrize('html,navigation', [(True, True), (False, True), (True, False)])
+    @pytest.mark.parametrize('last_outcome', ['delivered', 'not_delivered'])
+    def test_multipart_reconciliation_preserves_html_boundaries_and_last_controls(pai,html,navigation,last_outcome):
+        from prm.runtime.delivery import ReconciliationObservation
+        root=pai.root;sent=[]
+        sender=lambda destination,text,attempt:(sent.append(text) or TransportReceipt('synthetic_part_'+str(len(sent))))
+        executor=DeliveryExecutor(pai.pg.app,registry=root.registry,sender=sender)
+        for capability,data_class,purpose,operation in [
+            ('assistant.result_delivery','user_provided','answer.delivery','deliver'),
+            ('assistant.delivery_reconciliation','private_connector_metadata','delivery.reconcile','read')]:
+            allow(pai,capability,'destination_private',data_class,purpose,provider='provider_telegram',connection=None,operation=operation)
+        item=root.queue.store.put(root.owner_ref,'conversation','input_reconcile_html',{'query':'synthetic long answer'},expected_version=0)
+        job=root.queue.enqueue(owner=root.owner_ref,idempotency_key='reconcile_html',kind='compute.assistant',deadline=pai.now+timedelta(minutes=3),
+            payload={'schema_version':1,'input_namespace':'conversation','input_ref':item.object_id,'input_version':1,'input_digest':item.digest,'connection_ref':None,'resource_ref':'resource_local_request','purpose':'local.assistant','consent_revision':1})
+        options={}
+        if html:options['telegram_parse_mode']='HTML'
+        if navigation:options['telegram_navigation']=keyboard('Проверить результат действия')
+        text='<b>'+'a'*7000+'</b>' if html else 'a'*7800
+        root.queue.complete(root.queue.claim(owner=root.owner_ref,kinds=('compute.assistant',)),
+            {'text':text,'data_class':'user_provided','data_classes':['user_provided'],'payload':options})
+        outcome=executor.deliver_result(owner=root.owner_ref,job_id=job,destination_ref='destination_private',upper_bound=0)
+        assert outcome['status']=='sent' and len(sent)==3
+        # A crash can leave the precommitted aggregate/last receipt unknown after
+        # provider acceptance. The exact child payloads survive the restart.
+        with root.queue.store.transaction() as tx:
+            tx.conn.execute("UPDATE pa_delivery.attempts SET status='unknown',provider_receipt='' WHERE owner=%s AND id=ANY(%s)",
+                (root.owner_ref,[outcome['id'],outcome['id']+'_part_3']))
+        seen=[]
+        def observe(child):
+            seen.append(child['id'])
+            return ReconciliationObservation(child['attempt_ref'],child['destination_ref'],child['digest'],last_outcome,'synthetic_exact_receipt',
+                'synthetic_final_part' if last_outcome=='delivered' else '')
+        restarted=DeliveryExecutor(pai.pg.app,registry=root.registry,sender=sender)
+        assert restarted.deliver_result(owner=root.owner_ref,job_id=job,destination_ref='destination_private',upper_bound=0)['status']=='unknown'
+>       reconciled=restarted.reconcile(owner=root.owner_ref,delivery_id=outcome['id'],adapter=observe,upper_bound=0)
+
+tests/test_pai_control_polish.py:177:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <prm.runtime.delivery.DeliveryExecutor object at 0x7fa26efc1780>
+
+    def reconcile(self, *, owner, delivery_id, adapter, upper_bound):
+        pending = self.attempt(owner=owner, delivery_id=delivery_id)
+        if pending is None:
+            raise StorageError('attempt unavailable')
+        if pending['status'] != 'unknown' or adapter is None:
+            return pending
+        if pending['digest']!=_canonical(pending['payload'])[1]:raise StateConflict('reconciliation payload integrity differs')
+        if pending['kind']=='answer' and len(pending['payload'].get('text',''))>3800:
+            payload=pending['payload'];text=payload['text']
+            parts=[text[index:index+3600] for index in range(0,len(text),3600)];receipts=[]
+            for index,part in enumerate(parts):
+                child_id=delivery_id+'_part_'+str(index+1)
+                child=self.attempt(owner=owner,delivery_id=child_id)
+                if child is None:return pending  # No evidence for an unattempted part.
+                expected={**payload,'text':'['+str(index+1)+'/'+str(len(parts))+']\n'+part,'part':index+1,'parts':len(parts)}
+                if (child['digest']!=_canonical(expected)[1] or child['destination_ref']!=pending['destination_ref']
+>                   or child['source_ref']!=pending['source_ref']):raise StateConflict('aggregate part binding differs')
+E                   prm.storage.postgres.StateConflict: aggregate part binding differs
+
+src/prm/runtime/delivery.py:344: StateConflict
+---------------------------- Captured stderr setup -----------------------------
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+----------------------------- Captured stderr call -----------------------------
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+_ test_multipart_reconciliation_preserves_html_boundaries_and_last_controls[not_delivered-True-False] _
+
+pai = namespace(root=<prm.runtime.composition.AssistantRuntime object at 0x7fa26efc3550>, pg=<prm.storage.testing.PostgresSa...pytest-3536/test_multipart_reconciliation_5'), ops=<prm.runtime.operations.OperationsRuntime object at 0x7fa26f017220>)
+html = True, navigation = False, last_outcome = 'not_delivered'
+
+    @pytest.mark.parametrize('html,navigation', [(True, True), (False, True), (True, False)])
+    @pytest.mark.parametrize('last_outcome', ['delivered', 'not_delivered'])
+    def test_multipart_reconciliation_preserves_html_boundaries_and_last_controls(pai,html,navigation,last_outcome):
+        from prm.runtime.delivery import ReconciliationObservation
+        root=pai.root;sent=[]
+        sender=lambda destination,text,attempt:(sent.append(text) or TransportReceipt('synthetic_part_'+str(len(sent))))
+        executor=DeliveryExecutor(pai.pg.app,registry=root.registry,sender=sender)
+        for capability,data_class,purpose,operation in [
+            ('assistant.result_delivery','user_provided','answer.delivery','deliver'),
+            ('assistant.delivery_reconciliation','private_connector_metadata','delivery.reconcile','read')]:
+            allow(pai,capability,'destination_private',data_class,purpose,provider='provider_telegram',connection=None,operation=operation)
+        item=root.queue.store.put(root.owner_ref,'conversation','input_reconcile_html',{'query':'synthetic long answer'},expected_version=0)
+        job=root.queue.enqueue(owner=root.owner_ref,idempotency_key='reconcile_html',kind='compute.assistant',deadline=pai.now+timedelta(minutes=3),
+            payload={'schema_version':1,'input_namespace':'conversation','input_ref':item.object_id,'input_version':1,'input_digest':item.digest,'connection_ref':None,'resource_ref':'resource_local_request','purpose':'local.assistant','consent_revision':1})
+        options={}
+        if html:options['telegram_parse_mode']='HTML'
+        if navigation:options['telegram_navigation']=keyboard('Проверить результат действия')
+        text='<b>'+'a'*7000+'</b>' if html else 'a'*7800
+        root.queue.complete(root.queue.claim(owner=root.owner_ref,kinds=('compute.assistant',)),
+            {'text':text,'data_class':'user_provided','data_classes':['user_provided'],'payload':options})
+        outcome=executor.deliver_result(owner=root.owner_ref,job_id=job,destination_ref='destination_private',upper_bound=0)
+        assert outcome['status']=='sent' and len(sent)==3
+        # A crash can leave the precommitted aggregate/last receipt unknown after
+        # provider acceptance. The exact child payloads survive the restart.
+        with root.queue.store.transaction() as tx:
+            tx.conn.execute("UPDATE pa_delivery.attempts SET status='unknown',provider_receipt='' WHERE owner=%s AND id=ANY(%s)",
+                (root.owner_ref,[outcome['id'],outcome['id']+'_part_3']))
+        seen=[]
+        def observe(child):
+            seen.append(child['id'])
+            return ReconciliationObservation(child['attempt_ref'],child['destination_ref'],child['digest'],last_outcome,'synthetic_exact_receipt',
+                'synthetic_final_part' if last_outcome=='delivered' else '')
+        restarted=DeliveryExecutor(pai.pg.app,registry=root.registry,sender=sender)
+        assert restarted.deliver_result(owner=root.owner_ref,job_id=job,destination_ref='destination_private',upper_bound=0)['status']=='unknown'
+>       reconciled=restarted.reconcile(owner=root.owner_ref,delivery_id=outcome['id'],adapter=observe,upper_bound=0)
+
+tests/test_pai_control_polish.py:177:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <prm.runtime.delivery.DeliveryExecutor object at 0x7fa26f017c70>
+
+    def reconcile(self, *, owner, delivery_id, adapter, upper_bound):
+        pending = self.attempt(owner=owner, delivery_id=delivery_id)
+        if pending is None:
+            raise StorageError('attempt unavailable')
+        if pending['status'] != 'unknown' or adapter is None:
+            return pending
+        if pending['digest']!=_canonical(pending['payload'])[1]:raise StateConflict('reconciliation payload integrity differs')
+        if pending['kind']=='answer' and len(pending['payload'].get('text',''))>3800:
+            payload=pending['payload'];text=payload['text']
+            parts=[text[index:index+3600] for index in range(0,len(text),3600)];receipts=[]
+            for index,part in enumerate(parts):
+                child_id=delivery_id+'_part_'+str(index+1)
+                child=self.attempt(owner=owner,delivery_id=child_id)
+                if child is None:return pending  # No evidence for an unattempted part.
+                expected={**payload,'text':'['+str(index+1)+'/'+str(len(parts))+']\n'+part,'part':index+1,'parts':len(parts)}
+                if (child['digest']!=_canonical(expected)[1] or child['destination_ref']!=pending['destination_ref']
+>                   or child['source_ref']!=pending['source_ref']):raise StateConflict('aggregate part binding differs')
+E                   prm.storage.postgres.StateConflict: aggregate part binding differs
+
+src/prm/runtime/delivery.py:344: StateConflict
+---------------------------- Captured stderr setup -----------------------------
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+----------------------------- Captured stderr call -----------------------------
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+WARNING: password file "/dev/null" is not a plain file
+--------- generated xml file: /tmp/pai-acceptance-c69mvosj/pytest.xml ----------
+=========================== short test summary info ============================
+FAILED tests/test_pai_control_polish.py::test_multipart_reconciliation_preserves_html_boundaries_and_last_controls[delivered-True-True]
+FAILED tests/test_pai_control_polish.py::test_multipart_reconciliation_preserves_html_boundaries_and_last_controls[delivered-False-True]
+FAILED tests/test_pai_control_polish.py::test_multipart_reconciliation_preserves_html_boundaries_and_last_controls[delivered-True-False]
+FAILED tests/test_pai_control_polish.py::test_multipart_reconciliation_preserves_html_boundaries_and_last_controls[not_delivered-True-True]
+FAILED tests/test_pai_control_polish.py::test_multipart_reconciliation_preserves_html_boundaries_and_last_controls[not_delivered-False-True]
+FAILED tests/test_pai_control_polish.py::test_multipart_reconciliation_preserves_html_boundaries_and_last_controls[not_delivered-True-False]
+6 failed in 44.95s

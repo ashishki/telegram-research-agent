@@ -1,5 +1,9 @@
 # RAG Data Readiness
 
+## Current evidence boundary — 10 October2026
+
+The counts/readiness below are the dated2026-08-11 private corpus audit, not a current refresh. Current PA work used a canonical synthetic SQLite corpus, real Go inference and selected public HTTP; it did not read/update the actual private archive. Latest Search became synthesized_verified with2 query matches/2 cited sources. That proof and private/live gaps are in [PRODUCT_STATUS](PRODUCT_STATUS.md). Do not infer current corpus size/freshness or global completeness from the old table.
+
 Status: PRM-1 empirical evidence recorded; PRM-2 document contract recorded; PRM-5 reaction fast-lane evidence recorded; PRM-24 product RAG eval set recorded
 Last updated: 2026-08-11
 

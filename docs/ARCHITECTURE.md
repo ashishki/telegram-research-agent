@@ -1,166 +1,107 @@
 # Architecture
 
-Status: observed source architecture plus explicitly proposed target
-Version: 2.2
-Last updated: 2026-10-06
-Source baseline: 8faee4232cb30e6b6f39cfbd974c151846f79da6
+Version:3.0. Observed implementation snapshot:10 October2026, runtime/test/engineering SHA `0fbcfd1dde780724ad934aa66825afe17a6efc98`. Current stage and non-evidence are in [PRODUCT_STATUS](PRODUCT_STATUS.md). ADR-013 remains proposed as a human design decision; its durable local implementation now exists and must not be described as merely a plan.
 
-## Product boundary
+## Product and entrypoints
 
-`telegram-research-agent` is a private Personal Telegram Research Memory and Grounded Assistant for one operator. The complete PA target is Chat/Search/Brief/Watch/Act. Weekly Briefs are a primary user outcome; the older archive-centered foundation remains reusable.
+One private owner, one assistant, five primary outcomes: Chat/Search/Brief/Watch/confirmed Act. Domain memory/media/academic sources share the same ownership/permission/result boundaries. PostgreSQL state does not replace the canonical SQLite Telegram archive. No second bot or unrestricted autonomous runtime is introduced.
 
-## Proposed durable target
+`AssistantRuntime` in `src/prm/runtime/composition.py` composes the application, durable repositories, ingress, worker handlers and selected adapters. Telegram/CLI use explicit configuration; the durable path is opt-in and the current target is synthetic. Old application/callback surfaces remain compatibility callers, not proof that the deployed bot already uses the new composition.
 
-[PAI design](design/PAI.md) and proposed [ADR-013](adr/ADR-013-pa-durable-runtime.md)
-describe PostgreSQL authority/jobs with the canonical SQLite archive retained.
-This is a draft requiring independent review and human approval. PostgreSQL,
-scheduler, multiprocess authority and new live integrations are not implemented
-by this documentation. [PAI progress](verification/PAI-progress.md) distinguishes
-contracts from application wiring and current evidence.
-
-## Observed source flow
-
-```text
-Telegram / CLI / Eval
-        |
-        v
-PRM application service
-        |
-        +-- request routing and OperatorContext
-        +-- archive and saved-memory retrieval
-        +-- project context
-        +-- evidence quality and approved claim ledger
-        +-- bounded synthesis or deterministic fallback
-        +-- final-answer verification
-        +-- feedback and confirmation-gated actions
-        |
-        v
-SQLite archive + optional local sidecars + approved provider calls
+```mermaid
+flowchart TD
+    A[Telegram / CLI / native eval] --> B[Owner-bound durable ingress]
+    B --> C[Inbox dedup + conversation CAS]
+    C --> D[Durable queue / leases / deadlines]
+    D --> E[Shared application and workers]
+    E --> F[Current policy / source / budget checks]
+    F --> G[Canonical SQLite FTS]
+    F --> H[Selected public / Graph / Canvas / media adapters]
+    F --> I[Scoped model generation]
+    G --> J[Bounded evidence / strict verification]
+    H --> J
+    I --> J
+    J --> K[Immutable result / Brief / proposal]
+    K --> L[Private renderer / HTML PDF Markdown]
+    K --> M[Effect preparation + final scope locks]
+    M --> N[Selected transport]
+    N --> O[Receipt / unknown / explicit reconciliation]
+    O --> C
 ```
 
-## Layers
+The diagram describes code paths. Actual provider observations are Go model inference/public fetch; other transports are fixture-tested. No source/account/service becomes authorized by appearing in this graph.
 
-### Interfaces
+## Data authorities
 
-- Telegram polling and callback adapter;
-- compact PRM CLI;
-- private Eval V2 harness.
+| Authority | Owner /purpose | What it stores | Limit |
+| --- | --- | --- | --- |
+| SQLite archive | Canonical private Telegram source | raw_posts/posts/FTS and source IDs | No blanket LLM egress/backfill or new canonical duplicate. |
+| PostgreSQL versioned objects | Owner-bound runtime state | conversation/result/memory versions and heads | CAS, schema/digest checks, immutable result refs. |
+| Policy/budget | Explicit current capability/provider/purpose | grants/revisions/revoke, reservations/windows/settlements | Source read, model egress, write, background separate; unknown spend conservative. |
+| Queue/schedules | Durable operational intent | inbox/job/checkpoint/lease, occurrences/next_due | Fencing, bounded retries, cancel/quiet/caps, no catch-up burst. |
+| Action/delivery ledgers | Exact effect identity | preview/confirmation/attempt/receipt/unknown | Expiry/one-use/no-replay; recipient delivery not inferred. |
+| Source connections | Selected connection/resource | OAuth/vault refs, sync cursors/tombstones | Tokens outside result/job/logs; resource scope checked at use. |
+| Private artifact storage | Exact report/object/version/owner | HTML/PDF/MD and metadata | Session/expiry/owner checks, no arbitrary renderer network/credentials. |
 
-Interfaces must call the same PRM application boundary. They must not rebuild routing, retrieval or synthesis independently.
+Implementation namespaces/repositories are in `src/prm/storage/` and installed runtime schemas. Job payloads refer to objects/versions/digests/consent/deadline; they are not arbitrary callables, secret containers or approval objects.
 
-### Application
+## Storage target boundary
 
-The application service owns one request lifecycle:
+`SyntheticTarget` accepts identified disposable PostgreSQL on127.0.0.1, non5432 port, pa_test database/role names and pa-synthetic marker. It rejects ambient PG configuration, unrecognized schema/target or privileged role. `PostgresSandbox` is a test process, not a service mutation.
 
-1. normalize input;
-2. select one workflow;
-3. require project clarification when needed;
-4. call the research/chat path;
-5. render one answer contract;
-6. verify the final answer;
-7. return a side-effect-free response object.
+Private/production target selection/authentication/migration are not implemented by removing this guard. PAI-27/28 must choose/review the real target and host before private data or cutover. Local persistence/restart tests do not imply installed production durability or backup SLO.
 
-### Domain contracts
+## Message lifecycle
 
-- `OperatorContext` — ephemeral request identity and workflow;
-- evidence item — relevance and evidence quality kept separate;
-- approved claim ledger — claims allowed into synthesis;
-- project decision — one bounded recommendation or explicit no-action;
-- interaction receipt — private metadata, not automatic proof of usefulness.
+1. Authenticate the owner tuple and preserve canonical update identity.
+2. Store/deduplicate inbox and enqueue atomically before acknowledgement.
+3. Claim bounded job/lease, use CAS state/version and actual source pointers.
+4. Authorize current resource/provider/purpose/data class and reserve budget.
+5. Execute a selected read/model operation under guards; classify unavailable/partial/unknown without inventing progress.
+6. Verify claims against evidence, commit immutable result and source lineage.
+7. Prepare delivery/effect separately; recheck owner/source/version/revoke immediately before transport.
+8. Persist actual provider receipt or unknown. Reconciliation reads exact scoped evidence; it never blindly sends again.
 
-### Retrieval
+Private connector content is not ordinary generated chat history. Original-user, generated-history and connector/archive egress have distinct gates. Topic reset/expiry affects context; it does not grant access or silently change durable preferences.
 
-Canonical data remains SQLite `raw_posts`, `posts` and `posts_fts`.
+## Search and Brief
 
-Default policy:
+`runtime/archive.py` and `runtime/research.py` use the canonical FTS baseline. Deep research has bounded plan/steps/deadline/checkpoints, selected sources, verified synthesis and explicit fallback. `research_answer.py` accepts structured findings only when exact quote/URL and existing claim-ledger checks pass; there is no weakened global verifier.
 
-- exact and most archive queries: SQLite FTS with deterministic fallback;
-- local hash-vector sidecar: fallback only on FTS miss;
-- query rewriting: bounded and job-specific;
-- API dense sidecar: evaluation adapter only until a meaningful holdout gain exists;
-- source links and duplicate/repost identity are preserved.
+Brief source collection/selection/editorial yields one versioned `BriefDocument`. Refresh/comparison/followups keep exact refs and identity. HTML/PDF/MD are projections of that saved document. Cover metrics now share one factual definition; full source headings survive PDF. Fixed pagination has actual layout validation and flow fallback when content cannot fit. Mobile chart values use readable textual alternatives; renderers do not load arbitrary external content.
 
-### Evidence and generation
+## Effects, delivery and recovery
 
-```text
-retrieved evidence
-  -> evidence quality
-  -> candidate claims
-  -> approved claim ledger
-  -> synthesis
-  -> final rendered-answer verification
+```mermaid
+stateDiagram-v2
+    [*] --> Prepared: exact preview + current one-use confirmation
+    Prepared --> Sent: matching provider receipt
+    Prepared --> Unknown: loss/crash/accepted202 without object evidence
+    Prepared --> NotSent: trustworthy not-started/rejection evidence
+    Unknown --> Sent: scoped exact reconciliation
+    Unknown --> NotSent: scoped exact absence evidence
+    Sent --> Sent: duplicate request returns prior receipt
+    Unknown --> Unknown: no evidence / no retry
 ```
 
-Current-fact requests fail closed until an approved external verification path runs. Repeated Telegram commentary is not automatically independent evidence.
+The diagram is a simplified effect state, not a claim of provider exactly-once. Job state and effect state differ; crash after prepared can mean external acceptance. Revocation/cancel stops unstarted work and does not erase unknown effects.
 
-Source-bounded external watch is implemented in `src/external_watch/`, with a
-collector, confirmed-profile loader, change store, selection and delivery.
-The 2026-09-03 receipt records bounded UTD timer enablement; current runtime and
-profile confirmation were not observed by the 2026-09-17 audit. A general saved
-`watch_topic` remains durable intent only; the specific UTD capability and
-separate runtime permissions govern polling and notifications. Existing
-delivery is best-effort receipt deduplication, not proven exactly-once.
+Current multipart delivery uses `_multipart_payloads` for both dispatch/reconcile: same HTML split, prefix, part count, last-part-only controls and digest. Earlier parts retain their actual receipts. Missing/not-sent later parts preserve partial aggregate unknown. The repaired P1 is independently closed by117; extreme tag-depth P2 remains documented.
 
-`docs/UTD_ACADEMIC_INBOX_RESEARCH_HANDOFF.md` records an optional future
-read-only Academic Inbox research direction (mail, Canvas and selected public
-UTD context). It is deliberately outside the active watch: that document grants no runtime authority. PA-10..12 now supply local
-mail/calendar/academic contracts; OAuth and integrated account use remain
-PAI-16..19 work.
+Deletion inherits source/input/response/main-result lineage for diagnostic chunks and synthesis snapshots. Shared lineage locks plus parent/tombstone checks avoid inserting derived objects after deletion. Actual116 explicitly closed the original orphan-chunk P1; provider-side/backup private deletion exceptions are not live-proven.
 
-The general search/news evolution in ADR-009 and
-`docs/PRM_SEARCH_NEWS_PLAN.md` is implemented locally: archive-grounded answers,
-controlled verification, request editions and confirmation-gated subscriptions.
-It remains default-off for live external work and requires a separate human
-pilot decision; it is not a general web-search or news-subscription runtime.
-The final local evidence is in
-`docs/audit/PRM_SN_INTEGRATED_REPLAY_2026-09-17.md`.
+## Adapters and model transport
 
-### Local deep research contract
+- Graph: connection lifecycle/OAuth/PKCE/vault, mail/calendar read and exact action/reconcile; tested via controlled HTTP, no current real account.
+- Public web/GitHub: Brave discovery requires selected key; safe primary fetch and exact repository reads have real observations.
+- Canvas/academic: separately scoped minimal records, conflict/lifecycle semantics; UTD/API deferred.
+- Media: bounded download/inspect/text extraction, optional speech/OCR/vision; real user provider canary missing.
+- Go: actual development capture uses an explicit controlled adapter translating token parameters/declaring thinking mode; it is not a deployed production profile. Current generator V4.1 Flash, advisory reviewer/judge Pro, image judge Kimi.
 
-`archive_to_action` uses a bounded five-phase contract:
+Governed GLM Role Runner/phase receipts remain a distinct protocol and stale/human-gated where applicable. `opencode_pool_review.py` is advisory only. No model process writes code/grants/human approval.
 
-```text
-plan -> gather -> gap-check -> synthesise -> verify
-```
+## Operations and merge boundary
 
-`plan` creates phrase-preserving local queries. `gather` pools up to 32 local
-archive candidates. `gap-check` identifies missing direct or replayable-practice
-evidence and may spend one additional bounded archive search on targeted local
-queries. `synthesise` sees at most 12 cited excerpts and selects at most eight
-sources. `verify` retains the existing answer and claim gates. No phase sends
-the raw corpus, starts a container, runs live web search, or mutates canonical
-archive data.
+CLI/runtime supports local status/drain/kill, selected-domain export/import, backup/restore/rehearsal with exact manifests and monotone consumed/unknown fences. Service templates are inactive examples; installed host/process/timer state is not observed by these source tests.
 
-### Durable actions
-
-Conversation is ephemeral by default. Notes, watches, project links, actions and experiments are written only through explicit confirmation. Profile, project configuration, code and external systems are never mutated automatically.
-
-## Runtime boundary
-
-Runtime templates present in source (no current service observation):
-
-- `systemd/telegram-prm-assistant.service`;
-- `systemd/telegram-prm-archive-refresh.service`;
-- `systemd/telegram-prm-archive-refresh.timer`.
-
-Report-era timers and services are compatibility history.
-
-## Compatibility boundary
-
-The repository retrofit uses a strangler approach:
-
-- new PRM interfaces call the application boundary;
-- the old handler and CLI implementations remain behind compatibility modules;
-- old report modules are not imported by the active PRM interface;
-- a compatibility module is removed only after callers and focused tests are migrated;
-- Git branches/tags preserve executable history; dead Python is not stored under `src/archive`.
-
-## Non-goals
-
-- public SaaS or multi-user permissions;
-- a new vector database service;
-- a graph database;
-- a second bot;
-- unrestricted autonomous web research;
-- automatic long-term preference learning;
-- restarting the legacy report pipeline; PA Brief remains a primary target.
+This publication merges code/docs into master and may trigger CI. It does not perform production migration/deploy or enable accounts. Historical report/UTD runtime receipts retain dates and cannot serve as evidence of current deployment. Full current layer/requirement maps and next gates are in [PRODUCT_STATUS](PRODUCT_STATUS.md), [69/10 matrix](verification/PAI-requirement-evidence-20261010.md) and [pilot packet](verification/PAI-pilot-access-20261010.md).

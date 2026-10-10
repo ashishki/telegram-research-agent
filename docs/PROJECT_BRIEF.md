@@ -1,5 +1,9 @@
 # Project Brief — Personal AI Assistant
 
+## Current implementation/evidence overlay — 10 October2026
+
+This brief is the programme target/authority reference. Local durable runtime, actual model/public-source observations and outstanding source/production/human gates are described in [PRODUCT_STATUS](PRODUCT_STATUS.md). Verified runtime0fbcfd1 passed398 active PAI cases/all69 IDs/10 scenarios; review117 is scoped ADVISORY. The original planning/approval text below is not rewritten as a new acceptance. Current assignment: document and merge to master under ADR-019; no private account or production rollout inferred.
+
 Project: telegram-research-agent
 Mode: Standard
 Status: approved by owner in the active session on 2026-10-06; exact feature-design approval pending.

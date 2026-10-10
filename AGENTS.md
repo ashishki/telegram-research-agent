@@ -26,7 +26,14 @@ live accounts, paid egress, production migrations, services, timers or release.
 Prepare a concrete design before requesting a missing human decision; continue
 independent authorized work. Never forge approval or mark missing slices done.
 
-Implement directly in the assigned branch. Do not edit master directly, reset
+The 2026-10-10 owner assignments additionally authorize the recorded public/
+synthetic Go pool/model evaluation and extra usage, comprehensive current-doc
+reconciliation, and normal history-preserving master integration (ADR-018/019).
+This does not approve private sources, production services/cutover or formal
+feature/human acceptance. Read PRODUCT_STATUS and current merge/evidence receipt
+for engineering progress; dated failures and formal draft/planned states remain.
+
+Implement directly in the assigned branch. Do not edit source on master directly; the explicitly assigned integration uses a normal merge. Do not reset
 another user's work, force-push, or rerun completed historical tasks. The old
 instructions and task states are preserved in `*.before-pa-20260918.md` files;
 read them only when resolving a specific historical boundary.

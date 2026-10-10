@@ -1,136 +1,35 @@
-# Operator Quickstart
+# Operator quickstart — текущая PA версия
 
-Status: draft for PRM-UX planning
-Date: 2026-08-12
+Обновлено10 октября2026. Рабочая локальная версия проверена, реальные test bot/mail/calendar ещё не выбраны. Этот документ не утверждает, что доступный владельцу Telegram bot уже переключён на новый runtime. Полное состояние — [PRODUCT_STATUS](PRODUCT_STATUS.md).
 
-## 1. What do I send to the bot?
+## Сначала посмотреть результат
 
-Send a normal text or voice message. Use Russian when you want the answer in
-Russian.
+Открыть [portable AI Brief](artifacts/pa-20261010/README.md): HTML, PDF, Markdown, mobile light/dark. Все источники/пользовательские сведения там синтетические; реальные личные материалы не опубликованы.
 
-Examples:
+## Вопросы и продолжения
 
-```text
-Какие практики agent evals обсуждались за последние 90 дней?
-Что из этого применимо к telegram-research-agent?
-Собери бриф для поста про AI adoption и workflow.
-Что важно по моделям за последние две недели?
-```
+Целевая повседневная поверхность — одна беседа. Проверены native сценарии: вопрос о первых тестах в проекте, «сделай короче», новая тема, исправление адресата и сохранение «завтра утром». В controls/eval использовались также явные operator commands;6 curated sessions не доказывают все natural-language intentions.
 
-Manual commands such as `/research`, `/brief`, and `/chat` are fallback
-controls, not the normal workflow.
+Поиск должен дать ответ с поддерживающими источниками и ограничением покрытия. Если генерация не проходит verifier, ожидается честный evidence-only fallback. Два найденных по запросу материала не означают весь архив. Новый поиск/сравнение и пояснение старого результата должны различать исходную версию и новые факты.
 
-For a non-obvious request, the assistant may first say in one line how it will
-handle it. If the goal is unclear, it asks one short choice: archive research
-or an editor brief.
+## Brief
 
-The current conversation context is temporary: a follow-up can use the recent
-topic for up to 30 minutes. A new topic, an explicit command, or a restart
-starts a new conversation rather than creating permanent memory.
+Ожидаемая последовательность: выбранный период/source scope→редакционный overview→полный immutable Brief→HTML/PDF/MD. По запросу можно читать подробности/источники, обновлять/сопоставлять версии. Новая версия явно отличается, export не придумывает факты заново. Непроверенная польза/результат остаётся неизвестной.
 
-## 2. What kind of answer should I receive?
+## Наблюдение
 
-The normal answer is:
+До включения проверить тему/source/cadence/quiet/cap/timezone/expiry. «Подтвердить наблюдение» сохраняет выбранный scope. «Проверить наблюдение» показывает фактический последний сбор; подтверждённое намерение не означает запущенный сервис. «Приостановить» прекращает новую работу/отправки; уже начатое могло продолжиться. «Возобновить» не заменяет последующего фактического tick.
 
-- `Короткий вывод`;
-- `Что найдено`;
-- `Почему это важно тебе`;
-- `Что сделать`;
-- `Чего пока не делать`;
-- `Где доказательства слабые`;
-- `Источники`.
+## Действие
 
-Ordinary Telegram answers should not show debug metrics, token counts, model
-call counts, local paths, raw DB IDs, or unexplained internal labels.
+Перед письмом/event проверить полные параметры/адресата/текст/timezone. «Отправить письмо» или разрешённое «да» действует только для единственного current fully delivered owner preview. Unknown/202 не означает готовое письмо. «Проверить результат действия» сверяет объект; наличие в SentItems не доказывает получение. Повтор confirmation не должен отправлять заново.
 
-## 3. How do I save something?
+## Что выбрать для настоящего пилота
 
-Use the post-answer save action when it exists, or ask:
+[Пакет20 задач](verification/PAI-pilot-access-20261010.md) уже подготовлен. Нужны безопасные ссылки на выбранные test bot/chat/owner/destination, account/folder/calendar, scopes/retention/budgets. Не отправлять ключи в чат/Git. Read/model-egress/write/background отдельно; private-data storage/production target тоже отдельно. UTD/API отложен, Brave key отсутствует.
 
-```text
-Сохрани это как заметку
-Следи за этой темой
-Привяжи к проекту telegram-research-agent
-```
+Текущий локальный CLI — `PYTHONPATH=src python -m prm.cli --help`. Он требует явный SyntheticTarget/config для durable operations; не подставлять production database и не включать исторические archive/report timers по старому quickstart.
 
-The assistant should show a compact proposal first. Nothing durable should be
-written until you explicitly confirm.
+## Как оценивать полезность
 
-## 4. How do I refresh the archive?
-
-Current approved routine: weekly bounded archive refresh timer.
-
-Manual refresh requires explicit approval because it writes the canonical local
-archive:
-
-```bash
-PYTHONPATH=src python3 src/main.py memory refresh-archive \
-  --days 21 \
-  --confirm-canonical-write \
-  --json
-```
-
-Target Telegram action `/refresh` remains planned; PRM-MAT-8 defines the
-owner-only, independently reported refresh lifecycle. It is not implemented by this
-document.
-
-## 5. How do I leave feedback?
-
-Use short feedback after an answer:
-
-```text
-полезно
-мимо
-слишком shallow
-не тот приоритет
-применил
-```
-
-Voice feedback should enter the same proposal/confirmation path as text.
-
-## 6. What does the system not do?
-
-It does not:
-
-- start autonomous production testing without explicit approval;
-- prove product value before real labels;
-- run unrestricted web research;
-- use external embeddings or hosted vector services;
-- save memory without confirmation;
-- mutate code/config/projects automatically;
-- generate weekly reports as the product center;
-- treat legacy bot/report timers as the PRM product.
-
-## 7. Where do I see current health?
-
-Local status:
-
-```bash
-PYTHONPATH=src python3 src/main.py memory status --json
-```
-
-Gate status:
-
-- `evals/prm18_release_gate_receipt_2026-08-11_post_prm28.json`
-- `docs/audit/PRM_MANUAL_TELEGRAM_ASSISTANT_ACTIVATION_2026-08-11.md`
-- `docs/audit/PRM_MANUAL_ARCHIVE_REFRESH_2026-08-12.md`
-- `docs/audit/PRM_WEEKLY_ARCHIVE_REFRESH_TIMER_2026-08-12.md`
-# PRM-QA Operator Quickstart Update - 2026-08-15
-
-Normal Telegram use remains one conversational entrypoint: send ordinary text or
-voice to the `prm-assistant` runtime. The runtime is still manual testing only,
-not PRM-19 dogfood evidence.
-
-Project-decision questions must name a project. If the message says “мой
-проект” without an explicit configured project, the assistant asks which project
-to use before making a recommendation.
-
-After answers, use:
-
-- `Полезно` for useful answers;
-- `Частично` for partial answers, then choose a reason when offered;
-- `Мимо` for misses, then choose a reason when offered.
-
-Save/watch/project/action/experiment buttons are confirmation-gated. Feedback
-and private interaction receipts are local owner artifacts and are not public
-product-value claims.
+Операторские20 задач/дальнейший согласованный pilot должны измерять весь результат, пропущенные обязанности, ложные отказы/утверждения, noise, задержку и стоимость. Модельная оценка6/6 — диагностический benchmark с synthetic data, не ваше конечное принятие продукта.

@@ -1,9 +1,28 @@
 # Implementation Journal
 
 Status: active
-Last updated: 2026-08-16
+Last updated: 2026-10-10
 
 Historical entries are preserved in `docs/archive/pre_retrofit_2026-08-16/IMPLEMENTATION_JOURNAL.pre-retrofit.md`.
+
+## 2026-10-10 — durable PA verification and documentation integration
+
+Implemented local durable Chat/Search/Brief/Watch/Act/state/source/operations
+paths under owner scope; canonical SQLite remains. Current code0fbcfd1 has398
+active PAI cases/all69 IDs/10 scenarios; independent116 closed original deletion
+but found multipart P1,6 regressions reproduced it,117 closes corrected code with
+ADVISORY/P2. Real Go V4.1 generation11 calls/6 sessions25 turns qualified6/6 through
+Pro; Kimi fixed-content corrected renderer pass. Actual GitHub/Python public
+reads; Graph/Telegram effects are synthetic. Source/private/production/operator
+acceptance remains open, UTD/API deferred. Original429/403/STOP/fixture errors are
+preserved, model scores not a causal matched comparison.
+
+The owner requested maximum-detail README/current docs and merging all working
+branch history into master. ADR-019 authorizes normal integration/publication,
+with no source edits on master/force/reset or production deploy. Current documents,
+69/10 evidence projection and audited portable synthetic artifacts are published;
+historical snapshots and formal statuses stay unchanged. Actual refs/checks/CI:
+verification/PAI-master-integration-20261010.md/.json. No private source/token data.
 
 ## 2026-08-16 — RFX repository retrofit started
 

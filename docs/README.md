@@ -1,51 +1,30 @@
-# Documentation
+# Документация репозитория
 
-## Current product
+Актуальное состояние10 октября2026: [README продукта](../README.md), [PRODUCT_STATUS](PRODUCT_STATUS.md), [PA_DOCUMENT_INDEX](PA_DOCUMENT_INDEX.md). Основной workstream — полный Personal AI Assistant, Chat/Search/Brief/Watch/confirmed Act.
 
-1. `PROJECT_BRIEF.md`
-2. `ARCHITECTURE.md`
-3. `IMPLEMENTATION_CONTRACT.md`
-4. `PRODUCT_OPERATING_MODEL.md`
-5. `operator_quickstart.md`
-6. `operator_workflow.md`
+## Текущая реализация и доказательство
 
-## Active delivery
+- [Архитектура](ARCHITECTURE.md): durable local composition/storage/effects и private/live границы.
+- [Статус](PRODUCT_STATUS.md): весь PAI-00…31, результаты, недоказанное и причины.
+- [69/10 evidence matrix](verification/PAI-requirement-evidence-20261010.md).
+- [Go assessment/P1 fixes](verification/PAI-go-pilot-20261010.md).
+- [Portable Brief/receipts](artifacts/pa-20261010/README.md).
+- [Master integration](verification/PAI-master-integration-20261010.md).
 
-- `tasks.md` — PRM-SN queue, with existing RFX/UTD records preserved;
-- `CODEX_PROMPT.md` — concise implementation handoff;
-- `PRM_SEARCH_NEWS_PLAN.md` — twelve bounded tasks and five phases;
-- `PRM_SEARCH_NEWS_DEEP_REVIEW.md` — phase gates and Terra/high review protocol;
-- `prompts/prm_search_news_implementer.md` — end-to-end goal over all twelve PRM-SN tasks and five engineering reviews;
-- `audit/PRM_SN_INTEGRATED_REPLAY_2026-09-17.md` — final fixture-only replay and residual gates;
-- `PRM_SEARCH_NEWS_PILOT_PACKET.md` — reviewable, non-authorizing pilot/rollback packet;
-- `PRM_VISUAL_EVAL.md` — synthetic visual screens and redacted model-judge packet;
-- `audit/PRM_COMBAT_EVAL_2026-09-18.md` — final local product-claim evaluation evidence;
-- `UTD_ACADEMIC_INBOX_RESEARCH_HANDOFF.md` — research-only design and guardrails
-  for a possible read-only UTD email/Canvas/public-source Academic Inbox; it
-  is not an implementation or runtime approval;
-- `EVIDENCE_INDEX.md` — current evidence only;
-- `IMPLEMENTATION_JOURNAL.md` — current phase journal;
-- `REVIEW_POLICY.md` — review and approval boundaries.
+## План и продолжение
 
-## Retrofit
+- [Handoff](CODEX_PROMPT.md), [full spec](PERSONAL_ASSISTANT_SPEC.md).
+- [Task graph](tasks.md), [PAI cards](PA_IMPLEMENTATION_TASKS.md), [PAI registry](design/PAI.design.json).
+- [Pilot access20 tasks](verification/PAI-pilot-access-20261010.md), [cutover preparation](verification/PAI-28-cutover-packet.md).
+- [Operating model](PRODUCT_OPERATING_MODEL.md), [runtime runbook](runbooks/assistant_runtime.md).
 
-- `retrofit/RFX_REPOSITORY_RETROFIT.md`
-- `retrofit/RFX_DEEP_REVIEW.md`
-- `repo_hygiene_and_archive_plan.md`
-- `legacy_runtime_inventory.md`
-- `legacy_surfaces.md`
+## Контракты и verification
 
-## RAG, privacy and operations
+- [Implementation contract](IMPLEMENTATION_CONTRACT.md), [boundaries](ASSISTANT_BOUNDARIES.md).
+- [Test strategy](TEST_STRATEGY.md), [review policy](REVIEW_POLICY.md), [Playbook pin/setup](PLAYBOOK_ADOPTION.md).
+- [Evidence index](EVIDENCE_INDEX.md), [journal](IMPLEMENTATION_JOURNAL.md), [chronological PAI progress](verification/PAI-progress.md).
+- [Owner access request](security/OWNER-ACCESS-REQUEST.md), [academic original handoff](UTD_ACADEMIC_INBOX_RESEARCH_HANDOFF.md).
 
-- `retrieval_eval.md`
-- `generation_eval.md`
-- `tool_eval.md`
-- `agent_eval.md`
-- `PRIVACY_THREAT_MODEL.md`
-- `COST_BUDGET.md`
-- `ROLLBACK_AND_REINDEX_PLAN.md`
-- `runbooks/`
+## Исторические и предметные материалы
 
-## History
-
-Historical report-era, roadmap, task, evidence and handoff documents are under `docs/archive/`. They are reference material, not active product authority.
+PRM-SN/RFX/UTD/report-era contracts, audits, roadmap и `docs/archive/**` сохраняются как references. Это не действующая команда запускать старый runtime/таймер/paid review. Последние local/provider proofs имеют конкретные SHA; model score не human acceptance. Private source/account data и tokens в документацию Git не публикуются.

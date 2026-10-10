@@ -1,0 +1,5 @@
+$ PYTHONPATH=src /srv/openclaw-you/workspace/telegram-research-agent/.venv-pai/bin/python -m pytest tests/test_prm_application.py tests/test_prm_bot_dispatch.py tests/test_prm_cli.py tests/test_retrofit_boundaries.py tests/test_prm_intent_archive_contract.py tests/test_prm_utd_dispatch.py tests/test_prm_utd_callbacks.py tests/test_external_watch_shadow.py tests/test_external_watch_fetch_safety.py tests/test_external_watch_profile.py tests/test_external_watch_relevance.py tests/test_external_watch_delivery.py tests/test_external_watch_calibration.py tests/test_external_watch_selection.py -q
+........................................................................ [ 48%]
+........................................................................ [ 96%]
+......                                                                   [100%]
+150 passed in 14.28s

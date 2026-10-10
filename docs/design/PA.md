@@ -1,5 +1,7 @@
 # PA — Personal Assistant Programme Design
 
+[Current status](../PRODUCT_STATUS.md).
+
 Status: review_required. Planning depth: designed_slices. Risk: high.
 The owner requested this design and its publication; exact hash-bound human
 approval has not been recorded. Never manufacture that approval.

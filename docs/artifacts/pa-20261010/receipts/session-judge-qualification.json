@@ -1,0 +1,72 @@
+{
+  "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+  "public_synthetic_only": true,
+  "sessions": 6,
+  "turns": 25,
+  "qualified": 6,
+  "cases": [
+    {
+      "case_id": "context_and_topic",
+      "raw_verdict": "pass",
+      "minimum_axis_score": 4,
+      "mean_axis_score": 4.875,
+      "meets_all_axis_floor4": true
+    },
+    {
+      "case_id": "editing_and_context_repair",
+      "raw_verdict": "pass",
+      "minimum_axis_score": 5,
+      "mean_axis_score": 5.0,
+      "meets_all_axis_floor4": true
+    },
+    {
+      "case_id": "archive_research",
+      "raw_verdict": "pass",
+      "minimum_axis_score": 5,
+      "mean_axis_score": 5.0,
+      "meets_all_axis_floor4": true
+    },
+    {
+      "case_id": "weekly_brief",
+      "raw_verdict": "pass",
+      "minimum_axis_score": 5,
+      "mean_axis_score": 5.0,
+      "meets_all_axis_floor4": true
+    },
+    {
+      "case_id": "confirmed_action",
+      "raw_verdict": "pass",
+      "minimum_axis_score": 5,
+      "mean_axis_score": 5.0,
+      "meets_all_axis_floor4": true
+    },
+    {
+      "case_id": "watch",
+      "raw_verdict": "pass",
+      "minimum_axis_score": 5,
+      "mean_axis_score": 5.0,
+      "meets_all_axis_floor4": true
+    }
+  ],
+  "generator_model": "deepseek-v4.1-flash",
+  "actual_generator_calls": 11,
+  "latency_seconds": {
+    "minimum": 1.21,
+    "median": 1.753,
+    "maximum": 5.237,
+    "sample_size": 11,
+    "production_SLO_proof": false
+  },
+  "judge_model": "deepseek-v4-pro",
+  "requested_effort": "max",
+  "observed_effort": "unknown",
+  "comparison_to_old_GLM_MiMo": "different generator/judge models and changed controls; not a matched causal or longitudinal calibration",
+  "human_acceptance": false,
+  "raw_judgment_sha256": "0a27a251c295929349ae71c384f7a402dea27cdde5ae3bffdc986a24f7d67e49",
+  "interpretation_notes": [
+    "Search query returned2 matching sources; the third corpus fact does not match the query. The source count is query-bounded, not the entire archive count. Raw judge comments retained, no factual counter changed.",
+    "Watch/Act states were computed by native code/real isolated PostgreSQL; provider/Telegram effects and source contents were synthetic, not live accounts.",
+    "Resume stored state observed; a post-resume live scheduler/service run was not performed.",
+    "Coverage language and aggressive shortening suggestions are retained as advisories; no automatic preference or source-scope expansion performed."
+  ]
+}

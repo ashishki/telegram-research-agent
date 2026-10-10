@@ -1,0 +1,476 @@
+{
+  "date": "2026-10-10",
+  "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+  "private_content": false,
+  "actual_accounts_or_messages": false,
+  "known_provider_key_absence_checked": true,
+  "files": [
+    {
+      "path": "docs/artifacts/pa-20261010/fresh-ai/product-brief.html",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/capabilities-v41-current/product-brief.html",
+      "bytes": 19333,
+      "sha256": "68866535845706f1789cfae520529830711ede0c35439fa179b44eff83071714",
+      "privacy": "public_synthetic_only",
+      "dataset": "fresh-ai"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/fresh-ai/product-brief.pdf",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/capabilities-v41-current/product-brief.pdf",
+      "bytes": 23647,
+      "sha256": "a8478a77765fc5a68c460969b3465797486b5d38019a1dd2306e411560846d1e",
+      "privacy": "public_synthetic_only",
+      "dataset": "fresh-ai"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/fresh-ai/product-brief.md",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/capabilities-v41-current/product-brief.md",
+      "bytes": 8629,
+      "sha256": "c1124a290c0cfd44cdccd928f2a80e1bd93a09f83d35c8dca65aa3599af29872",
+      "privacy": "public_synthetic_only",
+      "dataset": "fresh-ai"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/fresh-ai/mobile-light.png",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/capabilities-v41-current/mobile-light.png",
+      "bytes": 449158,
+      "sha256": "4eeb8b06982e159b8a1409f06d204976a3de14ad47e6606a3e75fda10c28a913",
+      "privacy": "public_synthetic_only",
+      "dataset": "fresh-ai"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/fresh-ai/mobile-dark.png",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/capabilities-v41-current/mobile-dark.png",
+      "bytes": 483041,
+      "sha256": "a5a20427d559269e6d10722c3d6101bebfe42408007c4c34cdf235b705ca30d7",
+      "privacy": "public_synthetic_only",
+      "dataset": "fresh-ai"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/fresh-ai/desktop-light.png",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/capabilities-v41-current/desktop-light.png",
+      "bytes": 465362,
+      "sha256": "8a487a892139652af06e5d39e9a4f817033cea7e2c13ae908618582cfe73a72d",
+      "privacy": "public_synthetic_only",
+      "dataset": "fresh-ai"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/fresh-ai/visual-check.json",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/capabilities-v41-current/visual-check.json",
+      "bytes": 2955,
+      "sha256": "56408b49fb9efc5bf82fad054f2c63cb875981b96d8578713ea3c7953774c76d",
+      "privacy": "public_synthetic_only",
+      "dataset": "fresh-ai"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/fresh-ai/brief-pdf-page-1.png",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/capabilities-v41-current/brief-pdf-page-1.png",
+      "bytes": 89666,
+      "sha256": "3d6d0919d7a60bf5053db7acccf15ec85510a65c3c042393815f33ffd69733fe",
+      "privacy": "public_synthetic_only",
+      "dataset": "fresh-ai"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/fresh-ai/brief-pdf-page-2.png",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/capabilities-v41-current/brief-pdf-page-2.png",
+      "bytes": 103015,
+      "sha256": "f4fdb0f1e655ee9780cd96c50cad7c3ec7a0c4aaf8be6dad93c4dc72e4858736",
+      "privacy": "public_synthetic_only",
+      "dataset": "fresh-ai"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/fresh-ai/brief-pdf-page-3.png",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/capabilities-v41-current/brief-pdf-page-3.png",
+      "bytes": 98246,
+      "sha256": "b07b344cd75be030ace9a2b22e403365ff5031ccc51ff9477fa725d29f63aed7",
+      "privacy": "public_synthetic_only",
+      "dataset": "fresh-ai"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/fresh-ai/brief-pdf-page-4.png",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/capabilities-v41-current/brief-pdf-page-4.png",
+      "bytes": 103293,
+      "sha256": "305e1eb6e871d18f6f20210a9e03aef9e803624f961031cf69a747de4ce0b6bc",
+      "privacy": "public_synthetic_only",
+      "dataset": "fresh-ai"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/fresh-ai/brief-pdf-page-5.png",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/capabilities-v41-current/brief-pdf-page-5.png",
+      "bytes": 52253,
+      "sha256": "7b7d63d2d4e593e39760f18848d965b0f1eceb6c604cebfe1a405e801fe6f605",
+      "privacy": "public_synthetic_only",
+      "dataset": "fresh-ai"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/renderer-benchmark/product-brief.html",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/brief-repaired-render/product-brief.html",
+      "bytes": 16602,
+      "sha256": "9db90b7180f28fa32c02a5dc1343ed91a13ef1cfc8f9b287ee7b326f0b307182",
+      "privacy": "public_synthetic_only",
+      "dataset": "renderer-benchmark"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/renderer-benchmark/product-brief.pdf",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/brief-repaired-render/product-brief.pdf",
+      "bytes": 20019,
+      "sha256": "e91e166d521f0653a42ac710751a0d0dd0f55ded047afb010981b40c88cf82f1",
+      "privacy": "public_synthetic_only",
+      "dataset": "renderer-benchmark"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/renderer-benchmark/product-brief.md",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/brief-repaired-render/product-brief.md",
+      "bytes": 6078,
+      "sha256": "d80e7e5a806bac1afd2c743f7cd354118c39ab7461ec710a2640377bc2d2df93",
+      "privacy": "public_synthetic_only",
+      "dataset": "renderer-benchmark"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/renderer-benchmark/mobile-light.png",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/brief-repaired-render/mobile-light.png",
+      "bytes": 314607,
+      "sha256": "21a7e86b591071d0c9b6e8d1a12f9391f868ab8e9d808270823f04b1ae7f98da",
+      "privacy": "public_synthetic_only",
+      "dataset": "renderer-benchmark"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/renderer-benchmark/mobile-dark.png",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/brief-repaired-render/mobile-dark.png",
+      "bytes": 337618,
+      "sha256": "b583346f2ec0bcf5eae964b02f3eee61c50ad8e0daad8d594079ecc0c0ffa3f3",
+      "privacy": "public_synthetic_only",
+      "dataset": "renderer-benchmark"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/renderer-benchmark/desktop-light.png",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/brief-repaired-render/desktop-light.png",
+      "bytes": 329108,
+      "sha256": "e37ede239044b9b0d052b73fc2099bca8fa4fe63abb286cd8fb2209484c11f86",
+      "privacy": "public_synthetic_only",
+      "dataset": "renderer-benchmark"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/renderer-benchmark/visual-check.json",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/brief-repaired-render/visual-check.json",
+      "bytes": 2955,
+      "sha256": "16d8c70897655172f57a54326a26202ecc9fda0f2e055e2716654fffe721c843",
+      "privacy": "public_synthetic_only",
+      "dataset": "renderer-benchmark"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/renderer-benchmark/render-receipt.json",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/brief-repaired-render/render-receipt.json",
+      "bytes": 1548,
+      "sha256": "1de4e5f867441fe65056941aace2fe3b0d90d95e6b0f417490ec0489f0beb28e",
+      "privacy": "public_synthetic_only",
+      "dataset": "renderer-benchmark"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/renderer-benchmark/brief-pdf-page-1.png",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/brief-repaired-render/brief-pdf-page-1.png",
+      "bytes": 91491,
+      "sha256": "75d6a89a9ddccb3c884bc51373811f65b6552f8741d72d22ad32b98485de4fd4",
+      "privacy": "public_synthetic_only",
+      "dataset": "renderer-benchmark"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/renderer-benchmark/brief-pdf-page-2.png",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/brief-repaired-render/brief-pdf-page-2.png",
+      "bytes": 150060,
+      "sha256": "142daeb279d812472f4efb6fe72ade3d0085b15d76ae7b924caea95170075069",
+      "privacy": "public_synthetic_only",
+      "dataset": "renderer-benchmark"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/renderer-benchmark/brief-pdf-page-3.png",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/brief-repaired-render/brief-pdf-page-3.png",
+      "bytes": 52288,
+      "sha256": "58239813ea655ceed56d3d980231fcc56ce7109dfeef8ec7679952aca5e40749",
+      "privacy": "public_synthetic_only",
+      "dataset": "renderer-benchmark"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/receipts/engineering115-result.json",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/engineering115-result.json",
+      "bytes": 5527,
+      "sha256": "a503b63881b6ff559832e6eefc6394dc1880086befbd50f9a62920601bdea50f",
+      "privacy": "public_synthetic_only",
+      "dataset": "verification_receipt"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/receipts/engineering116-result.json",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/engineering116-result.json",
+      "bytes": 7994,
+      "sha256": "2a3870fd12fe8155137008581ac144462788b883a1d80c189ab5b733fea7ecb9",
+      "privacy": "public_synthetic_only",
+      "dataset": "verification_receipt"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/receipts/engineering117-result.json",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/engineering117-result.json",
+      "bytes": 4829,
+      "sha256": "9e7003d71bed6ce305d82d66a33ad43b98d6c992546ce21fde8d70b9aa7fa4d8",
+      "privacy": "public_synthetic_only",
+      "dataset": "verification_receipt"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/receipts/engineering116-scope.json",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/engineering116-scope.json",
+      "bytes": 5122,
+      "sha256": "97b4a42ec628a34b8766d609eca87d0c3ffdfe14d70d96f30bca6872ba106f0e",
+      "privacy": "public_synthetic_only",
+      "dataset": "verification_receipt"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/receipts/engineering117-scope.json",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/engineering117-scope.json",
+      "bytes": 2206,
+      "sha256": "375b96adda047d9f87f2fbb55af4f57c49ec4288e7699b05cceb6ae8cb8500f7",
+      "privacy": "public_synthetic_only",
+      "dataset": "verification_receipt"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/receipts/engineering116-input.txt",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/engineering116-input.txt",
+      "bytes": 894053,
+      "sha256": "22769dcfb9f6061d0d5e150332c56cf263f2892d5f32db73d60c558ffb4cd456",
+      "privacy": "public_synthetic_only",
+      "dataset": "verification_receipt"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/receipts/engineering117-input.txt",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/engineering117-input.txt",
+      "bytes": 176840,
+      "sha256": "cad9ffc6a2b0d7b1129f60ccf40bbae35fc3f4f057c9bc235da07b1c7f69efac",
+      "privacy": "public_synthetic_only",
+      "dataset": "verification_receipt"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/receipts/repair-tests.json",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/repair-tests.json",
+      "bytes": 2613,
+      "sha256": "39098c023f78f3f5972477799f0c224f8f8cd17b7c932d6a5283f32252220abe",
+      "privacy": "public_synthetic_only",
+      "dataset": "verification_receipt"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/receipts/pai-complete-final.json",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/pai-complete-final.json",
+      "bytes": 791,
+      "sha256": "c01afcb57ef8f1aeb783d8c2eeb56fe26c2c1c7acda5508eb84d87599748d1db",
+      "privacy": "public_synthetic_only",
+      "dataset": "verification_receipt"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/receipts/pai-complete-final.log",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/pai-complete-final.log",
+      "bytes": 1906,
+      "sha256": "a7262a71187d0c87f5c98e7dc9e1c0ae55032ba36873d015bdcb35b4f343ed2f",
+      "privacy": "public_synthetic_only",
+      "dataset": "verification_receipt"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/receipts/multipart-p1-before.log.gz",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/multipart-p1-before.log",
+      "bytes": 2858,
+      "sha256": "3fdde99bfec90517dc84660fcbf92e7fbd7b9ec7184205ec989cd24730dc4456",
+      "privacy": "public_synthetic_only",
+      "dataset": "verification_receipt",
+      "encoding": "gzip_lossless_raw",
+      "raw_sha256": "95160658ed8d8a90d51782aa9aa4b99602be26f8e7dc1bcf819a69bfc6d681b6"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/receipts/multipart-p1-after.log",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/multipart-p1-after.log",
+      "bytes": 296,
+      "sha256": "5b8f42094c708c5bdefa13c34ef21ff0d12151bb9ca0da681021c73f6131133f",
+      "privacy": "public_synthetic_only",
+      "dataset": "verification_receipt"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/receipts/brief-source-fixes.log",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/brief-source-fixes.log",
+      "bytes": 376,
+      "sha256": "789e3b9e9658dfd7ea689d5b2b67c9efd70e8610d6751af6b5926041ecd6a499",
+      "privacy": "public_synthetic_only",
+      "dataset": "verification_receipt"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/receipts/recovery-after-repair.log",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/recovery-after-repair.log",
+      "bytes": 296,
+      "sha256": "45067b5510de82a497c3e9f4f2713abe05d013b738315ee0caf12d22bd41abad",
+      "privacy": "public_synthetic_only",
+      "dataset": "verification_receipt"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/receipts/transport-tests.log",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/transport-tests.log",
+      "bytes": 260,
+      "sha256": "b95be967be1c3e35a4e09db3fae510518f9ee8a521ba991a07d09de66cdf41ed",
+      "privacy": "public_synthetic_only",
+      "dataset": "verification_receipt"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/receipts/session-judge-result.json",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/session-judge-result.json",
+      "bytes": 10772,
+      "sha256": "0a27a251c295929349ae71c384f7a402dea27cdde5ae3bffdc986a24f7d67e49",
+      "privacy": "public_synthetic_only",
+      "dataset": "verification_receipt"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/receipts/session-judge-qualification.json",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/session-judge-qualification.json",
+      "bytes": 2460,
+      "sha256": "09e66d6e0dcd43303bac51187d05b9c2038761c4861039d461a47fbbf935d3e7",
+      "privacy": "public_synthetic_only",
+      "dataset": "verification_receipt"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/receipts/session-judge-scope.json",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/session-judge-scope.json",
+      "bytes": 1790,
+      "sha256": "b5b59009aad5046dfc4d842a3297021da394da8f0a68433b1bc6da28476ccb24",
+      "privacy": "public_synthetic_only",
+      "dataset": "verification_receipt"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/receipts/judge-dataset.json",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/judge-dataset.json",
+      "bytes": 70358,
+      "sha256": "9e361e4ebbfdbb7df1c5203f7212086a030fd6033c2f380968e2b740ba6d0b77",
+      "privacy": "public_synthetic_only",
+      "dataset": "verification_receipt"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/receipts/control-sessions.json",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/control-sessions.json",
+      "bytes": 9138,
+      "sha256": "4ede76b929a3d92e43a2b538bcbf9b0bdba05541c666f33f506b029ebd3f5748",
+      "privacy": "public_synthetic_only",
+      "dataset": "verification_receipt"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/receipts/visual-judge-result.json",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/visual-judge-result.json",
+      "bytes": 2190,
+      "sha256": "a47756a3957d2b7053a17c315de30487886ec96b75d060c24371521b647873a6",
+      "privacy": "public_synthetic_only",
+      "dataset": "verification_receipt"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/receipts/visual-kimi-result.json",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/visual-kimi-result.json",
+      "bytes": 5037,
+      "sha256": "e3c6c4f79cb52725517e7ef25b826be34701f44db0a949c195eb4ce3940d3c73",
+      "privacy": "public_synthetic_only",
+      "dataset": "verification_receipt"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/receipts/visual-kimi-repaired-result.json",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/visual-kimi-repaired-result.json",
+      "bytes": 4395,
+      "sha256": "39768aa4a32e42984f45ca3e4fd09164a0b1974382b3cf81139830d090f06701",
+      "privacy": "public_synthetic_only",
+      "dataset": "verification_receipt"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/receipts/public-source-canary-result.json",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/public-source-canary-result.json",
+      "bytes": 1493,
+      "sha256": "e6d4e3559b954b778f974b8a9be9d2d7a94feef97b5a147d2a1b220790e41a98",
+      "privacy": "public_synthetic_only",
+      "dataset": "verification_receipt"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/receipts/public-source-canary-corrected-result.json",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/public-source-canary-corrected-result.json",
+      "bytes": 1029,
+      "sha256": "4a7c6c5d853d143b8ddbde90833fbffa9f86a3b0d2569eb7458bd2fe2adac1fe",
+      "privacy": "public_synthetic_only",
+      "dataset": "verification_receipt"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/receipts/engineering118-result.json",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/engineering118-result.json",
+      "bytes": 2887,
+      "sha256": "598426534f52432bd369e921bc12eebf8f1b06a951c06bc553836f1d9d7e1d17",
+      "privacy": "public_synthetic_only",
+      "dataset": "master_integration_receipt"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/receipts/engineering118-scope.json",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/engineering118-scope.json",
+      "bytes": 1029,
+      "sha256": "654f83bb28647ec5102214060a709d1534ab7aa374be56fd8eea2826ce5ab355",
+      "privacy": "public_synthetic_only",
+      "dataset": "master_integration_receipt"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/receipts/engineering118-input.txt",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/engineering118-input.txt",
+      "bytes": 27580,
+      "sha256": "0e6ad00b5832a1a55765825542e50e20fa17164137135a4f1c1c07a479b81e81",
+      "privacy": "public_synthetic_only",
+      "dataset": "master_integration_receipt"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/receipts/master-guard-tests.log",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/master-guard-tests.log",
+      "bytes": 99,
+      "sha256": "cbc646a4395e71a8e00bd1b7e6748ff889d50b7e21a9d25b2c11adfc5678b7de",
+      "privacy": "public_synthetic_only",
+      "dataset": "master_integration_receipt"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/receipts/master-raw-contract.log",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/master-raw-contract.log",
+      "bytes": 6105,
+      "sha256": "99928be488d88648046b9a5b395e19a131876635df6c288c68ca87115299a0bc",
+      "privacy": "public_synthetic_only",
+      "dataset": "master_integration_receipt"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/receipts/premerge-focused-prm.log",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/premerge-focused-prm.log",
+      "bytes": 3183,
+      "sha256": "2d978cb6427f842440a108e3ea68ebac43ee5e7014ff9407a0bfbf74d6c8f820",
+      "privacy": "public_synthetic_only",
+      "dataset": "master_integration_receipt"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/receipts/premerge-retrofit.log",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/premerge-retrofit.log",
+      "bytes": 858,
+      "sha256": "606ac2d6a6d610960d541724cca032d4508869438eae72bf2e763aba140b1116",
+      "privacy": "public_synthetic_only",
+      "dataset": "master_integration_receipt"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/receipts/master-metadata-checks.json",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/master-metadata-checks.json",
+      "bytes": 3077,
+      "sha256": "dfe80af5514abbc1fdb75277397f987974462c02305464c4a1956235f7e81102",
+      "privacy": "public_synthetic_only",
+      "dataset": "master_integration_receipt"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/receipts/master-document-audit.json",
+      "source": ".playbook-artifacts/pai-go-pilot-20261010/master-document-audit.json",
+      "bytes": 128,
+      "sha256": "5bc3123c5218103abcedee3d5d4267ff0a3b3c3b36e2cfd00abafda182e48c8a",
+      "privacy": "public_synthetic_only",
+      "dataset": "master_integration_receipt"
+    },
+    {
+      "path": "docs/artifacts/pa-20261010/receipts/multipart-p1-before.log.txt",
+      "source": "docs/artifacts/pa-20261010/receipts/multipart-p1-before.log.gz",
+      "bytes": 55920,
+      "sha256": "f92fc5a23cf851176eafc58d15cee811afcd82743808fc0060bd6f87f1568bc2",
+      "privacy": "public_synthetic_only",
+      "dataset": "readable_log_view",
+      "normalization": "trailing whitespace only; original bytes preserved in gzip"
+    }
+  ]
+}

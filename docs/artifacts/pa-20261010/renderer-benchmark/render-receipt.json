@@ -1,0 +1,34 @@
+{
+  "status": "rendered",
+  "runtime": "native scoped BriefRuntime and PrivateReportRuntime isolated renderer",
+  "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+  "captured_session_sha256": "436edfce4d85f5be74469c1708b01d2d8635d13f888da4fe216811c4807b4e29",
+  "editorial_content": "exact observed MiMo Flash story JSON reused; not a new paid inference",
+  "synthetic_source_reconstruction": "exact captured source texts/IDs/URLs/publication times; fresh synthetic runtime, same requested window",
+  "new_model_calls": 0,
+  "real_account_or_messages": false,
+  "assets": [
+    {
+      "format": "html",
+      "path": ".playbook-artifacts/pai-go-pilot-20261010/brief-repaired-render/product-brief.html",
+      "sha256": "9db90b7180f28fa32c02a5dc1343ed91a13ef1cfc8f9b287ee7b326f0b307182",
+      "media_type": "text/html; charset=utf-8",
+      "synthetic": true
+    },
+    {
+      "format": "pdf",
+      "path": ".playbook-artifacts/pai-go-pilot-20261010/brief-repaired-render/product-brief.pdf",
+      "sha256": "e91e166d521f0653a42ac710751a0d0dd0f55ded047afb010981b40c88cf82f1",
+      "media_type": "application/pdf",
+      "synthetic": true
+    },
+    {
+      "format": "markdown",
+      "path": ".playbook-artifacts/pai-go-pilot-20261010/brief-repaired-render/product-brief.md",
+      "sha256": "d80e7e5a806bac1afd2c743f7cd354118c39ab7461ec710a2640377bc2d2df93",
+      "media_type": "text/markdown; charset=utf-8",
+      "synthetic": true
+    }
+  ],
+  "code_sha256": "97228181a7ee5e0691fecdd1db70535e53f2c17a6b63849f6def0885cee0faaa"
+}

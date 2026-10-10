@@ -1,0 +1,217 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-10",
+  "status": "prepared_not_yet_merged",
+  "authority": "owner explicit comprehensive docs and master merge; ADR-019",
+  "before": {
+    "local_master": "cee8baae3b8a41f571bd689f2dadf7e6e981863f",
+    "origin_master": "cc105b0024b3e7aa6768ee29acc105b4c682376c",
+    "source_branch": "docs/personal-assistant-blueprint-playbook-20260918",
+    "source_anchor": "4c2656c554496d4802951c323c12a4d64e720531"
+  },
+  "runtime_verified_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+  "runtime_source_changes_after_verified_head": false,
+  "additional_source_change": "CI expected-rejection guard known PA/PAI registry union, separate63-test/independent118 proof",
+  "premerge_tests": {
+    "focused_prm": {
+      "cases": 751,
+      "seconds": 88.06,
+      "log_sha256": "2d978cb6427f842440a108e3ea68ebac43ee5e7014ff9407a0bfbf74d6c8f820"
+    },
+    "retrofit": {
+      "cases": 150,
+      "seconds": 14.28,
+      "log_sha256": "606ac2d6a6d610960d541724cca032d4508869438eae72bf2e763aba140b1116"
+    },
+    "CI_guard_bridge_plan": {
+      "cases": 63,
+      "seconds": 3.21,
+      "log_sha256": "cbc646a4395e71a8e00bd1b7e6748ff889d50b7e21a9d25b2c11adfc5678b7de"
+    }
+  },
+  "metadata_checks": [
+    {
+      "name": "pin",
+      "argv": [
+        ".venv-pai/bin/python",
+        "tools/playbook.py",
+        "--check-pin"
+      ],
+      "exit_code": 0,
+      "log_sha256": "a0bbdfed39cb015f3a6cad3c4c848a2ca577566ca3bc06104a9d61639e50d0c0",
+      "log": ".playbook-artifacts/pai-go-pilot-20261010/master-check-pin.log"
+    },
+    {
+      "name": "pa_plan",
+      "argv": [
+        ".venv-pai/bin/python",
+        "tools/check_personal_assistant_plan.py"
+      ],
+      "exit_code": 0,
+      "log_sha256": "0c24cfa4ff23fc2417805ef5127f64dadf4b07f75fc94501afbd69f66e739964",
+      "log": ".playbook-artifacts/pai-go-pilot-20261010/master-check-pa_plan.log"
+    },
+    {
+      "name": "pai_plan",
+      "argv": [
+        ".venv-pai/bin/python",
+        "tools/check_pai_plan.py"
+      ],
+      "exit_code": 0,
+      "log_sha256": "3ac8f22e48d470d88352af228e77b3edaba0f68bb886426d78cfa2f534c79c0a",
+      "log": ".playbook-artifacts/pai-go-pilot-20261010/master-check-pai_plan.log"
+    },
+    {
+      "name": "references",
+      "argv": [
+        ".venv-pai/bin/python",
+        "tools/playbook.py",
+        "playbook_validate",
+        "--root",
+        ".",
+        "--check",
+        "references"
+      ],
+      "exit_code": 0,
+      "log_sha256": "be704b4420bcd2142c123f46eb22c4df5fc0fd99941bbd01ffd824862cac3e95",
+      "log": ".playbook-artifacts/pai-go-pilot-20261010/master-check-references.log"
+    },
+    {
+      "name": "readiness_delivery",
+      "argv": [
+        ".venv-pai/bin/python",
+        "tools/playbook.py",
+        "playbook_validate",
+        "--root",
+        ".",
+        "--check",
+        "delivery",
+        "--check",
+        "readiness"
+      ],
+      "exit_code": 0,
+      "log_sha256": "be704b4420bcd2142c123f46eb22c4df5fc0fd99941bbd01ffd824862cac3e95",
+      "log": ".playbook-artifacts/pai-go-pilot-20261010/master-check-readiness_delivery.log"
+    },
+    {
+      "name": "expected_approval_guard",
+      "argv": [
+        ".venv-pai/bin/python",
+        "tools/check_pa_approval_guard.py"
+      ],
+      "exit_code": 0,
+      "log_sha256": "008fbde53ad3b2309a0714485ac79f5ff4c235b3dc7599d2f78b29f9e0fe5299",
+      "log": ".playbook-artifacts/pai-go-pilot-20261010/master-check-expected_approval_guard.log"
+    },
+    {
+      "name": "mat_safety",
+      "argv": [
+        ".venv-pai/bin/python",
+        "tools/prm_mat_eval.py",
+        "--check",
+        "safety"
+      ],
+      "exit_code": 0,
+      "log_sha256": "a815c0c066a4352e24ef358ee3cef396650353dd8dbff94335af1b8c70defacf",
+      "log": ".playbook-artifacts/pai-go-pilot-20261010/master-check-mat_safety.log"
+    },
+    {
+      "name": "public_scorecard",
+      "argv": [
+        ".venv-pai/bin/python",
+        "scripts/public_scorecard_demo.py",
+        "--check"
+      ],
+      "exit_code": 0,
+      "log_sha256": "6d6ec25babaee66be6e61c98ca623c0f6431b9284ed86e546b08c388e9615c44",
+      "log": ".playbook-artifacts/pai-go-pilot-20261010/master-check-public_scorecard.log"
+    },
+    {
+      "name": "whitespace",
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "log": ".playbook-artifacts/pai-go-pilot-20261010/master-check-whitespace.log"
+    }
+  ],
+  "raw_contract": "exact51 missing approvals remains, zero warnings; expected rejection only, not full project pass",
+  "historical_remote_master_CI": "cc105b run35328205490 failure observed; not relabeled as current",
+  "current_remote_CI": "not yet run on new publication",
+  "merge_strategy": "normal fast-forward if current origin/master is ancestor; preserve all history/worktrees; no force/reset",
+  "source_branch_history_commits_since_local_master_before": 307,
+  "deployment_performed": false,
+  "human_acceptance": false,
+  "remaining_gates": [
+    "test bot/chat/mail/calendar/source scopes unselected",
+    "UTD/API deferred;Brave key absent",
+    "private/production target/cutover/operator pilot/formal gates open",
+    "HTML nesting P2",
+    "CI guard empty-draft fail-closed robustness P2; current51 nonempty programme unaffected"
+  ],
+  "next_safe_command": "PYTHONPATH=src .venv-pai/bin/python -m prm.cli --help",
+  "independent_CI_guard_review": {
+    "call_number": 118,
+    "kind": "single_independent_CI_guard_review_for_owner_master_integration",
+    "source_head": "4c2656c554496d4802951c323c12a4d64e720531",
+    "base_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+    "requested_model": "deepseek-v4-pro",
+    "requested_effort": "max",
+    "observed_effort": "unknown",
+    "output_maximum": 393216,
+    "maximum_calls": 1,
+    "automatic_retry": false,
+    "timeout_seconds": 7200,
+    "private_content": false,
+    "formal_acceptance": false,
+    "input_bytes": 27580,
+    "input_sha256": "0e6ad00b5832a1a55765825542e50e20fa17164137135a4f1c1c07a479b81e81",
+    "diff_sha256": "f9cd1c1c90cf789248de74cb32a8a81d6c0ac297f55f53e8dfa4e0a1a559dc73",
+    "source_sha256": {
+      "tools/check_pa_approval_guard.py": "348c0c07e86b4cf2cae32ecc015af611155b3294876774ed3f68750c2e996b08",
+      "tests/test_pa_approval_guard.py": "72f9f70e1b9a715c015db5ea23f786fc0a427a1748c2832e9b5c00bc243a69db"
+    },
+    "authority": "owner detailed docs/master integration; necessary scoped review budget and Go extra usage",
+    "status": "reviewed",
+    "started_at": "2026-10-10T08:44:59.875655+00:00",
+    "cost": "unknown",
+    "review": {
+      "verdict": "ADVISORY",
+      "summary": "Review of the planning-guard compatibility correction found no P0/P1 defects. The guard accepts only the exact 51-task PA/PAI missing-approval negative set, delegates approved/implemented states to raw upstream, and rejects unexpected errors/warnings. One P2 robustness gap: an empty draft programme would be falsely rejected because expected_rejection demands returncode 1 even when no tasks exist. Current scoped tests pass and raw validator behavior is preserved.",
+      "findings": [
+        {
+          "severity": "P2",
+          "file": "tools/check_pa_approval_guard.py",
+          "line": 77,
+          "description": "A wholly draft/review_required programme with zero registered slices yields an empty task_ids set. expected_rejection then requires returncode == 1, which the raw validator will not produce for a pass with no missing-approval errors; the guard will therefore fail CI for a valid empty draft programme instead of accepting the raw successful result.",
+          "recommendation": "Consider handling empty task_ids by delegating to the raw upstream result (print output and return result.returncode) or explicitly requiring at least one slice in draft_task_ids, so an empty draft programme is not misclassified as an invalid rejection."
+        }
+      ]
+    },
+    "observed_model": "deepseek-v4-pro",
+    "usage": {
+      "prompt_tokens": 7993,
+      "completion_tokens": 13229,
+      "total_tokens": 21222,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 7993,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 12943
+      }
+    },
+    "duration_seconds": 222.626,
+    "finished_at": "2026-10-10T08:48:42.502292+00:00"
+  },
+  "document_audit": {
+    "current_markdown_count": 39,
+    "broken_links": [],
+    "portable_artifact_hashes_checked": 48,
+    "runtime_unchanged": true
+  }
+}

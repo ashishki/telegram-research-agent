@@ -1,0 +1,80 @@
+{
+  "authority": "owner2026-10-10 Go-pool/extra-usage current public-synthetic model evaluation; render-only work independent of deletion closure",
+  "provider": "opencode_go",
+  "model": "kimi-k2.7-code",
+  "privacy": "public_synthetic_only",
+  "maximum_calls": 1,
+  "automatic_retry": false,
+  "timeout_seconds": 600,
+  "input_bytes": 1264288,
+  "input_sha256": "a9c8ae30038a3578d443408d92c16389b5f4ae00294ee77cf605da43655dac6a",
+  "images": [
+    {
+      "path": ".playbook-artifacts/pai-go-pilot-20261010/brief-repaired-render/brief-pdf-page-1.png",
+      "sha256": "75d6a89a9ddccb3c884bc51373811f65b6552f8741d72d22ad32b98485de4fd4",
+      "bytes": 91491
+    },
+    {
+      "path": ".playbook-artifacts/pai-go-pilot-20261010/brief-repaired-render/brief-pdf-page-2.png",
+      "sha256": "142daeb279d812472f4efb6fe72ade3d0085b15d76ae7b924caea95170075069",
+      "bytes": 150060
+    },
+    {
+      "path": ".playbook-artifacts/pai-go-pilot-20261010/brief-repaired-render/brief-pdf-page-3.png",
+      "sha256": "58239813ea655ceed56d3d980231fcc56ce7109dfeef8ec7679952aca5e40749",
+      "bytes": 52288
+    },
+    {
+      "path": ".playbook-artifacts/pai-go-pilot-20261010/brief-repaired-render/mobile-light.png",
+      "sha256": "21a7e86b591071d0c9b6e8d1a12f9391f868ab8e9d808270823f04b1ae7f98da",
+      "bytes": 314607
+    },
+    {
+      "path": ".playbook-artifacts/pai-go-pilot-20261010/brief-repaired-render/mobile-dark.png",
+      "sha256": "b583346f2ec0bcf5eae964b02f3eee61c50ad8e0daad8d594079ecc0c0ffa3f3",
+      "bytes": 337618
+    }
+  ],
+  "advisory_only": true,
+  "vision_availability": "Go public model list and provider catalog image input; actual account behavior not presumed",
+  "requested_effort": "provider_default_unknown",
+  "reason": "new source-title and shared cover-metric code repaired after actual prior Kimi observations; one assessment of current native renderer",
+  "source_receipt": ".playbook-artifacts/pai-go-pilot-20261010/brief-repaired-render/render-receipt.json",
+  "runtime_code_sha256": "97228181a7ee5e0691fecdd1db70535e53f2c17a6b63849f6def0885cee0faaa",
+  "status": "judged",
+  "cost": "unknown",
+  "observed_model": "kimi-k2.7-code",
+  "observed_effort": "unknown",
+  "usage": {
+    "prompt_tokens": 8927,
+    "completion_tokens": 2172,
+    "total_tokens": 11099,
+    "completion_tokens_details": {
+      "reasoning_tokens": 1751
+    }
+  },
+  "judgment": {
+    "scores": {
+      "pdf_legibility": 5,
+      "pdf_pagination": 5,
+      "source_visibility": 5,
+      "mobile_layout": 4,
+      "dark_theme": 5,
+      "visual_hierarchy": 4
+    },
+    "verdict": "pass",
+    "findings": [
+      "PDF page 1: headline, date range, and green-bordered summary block are fully legible with no clipping or undesirable hyphenation.",
+      "PDF page 1: the metrics row shows four cards; the first three have clear numeric values, but the fourth card ('в выборке' / 'ПОКРЫТИЕ') lacks a numeric value, which weakens visual hierarchy and scannability.",
+      "PDF page 2: event card text, bold lead-ins, amber-bordered disclaimer, and supporting source handles (@source/1001–1003) are readable and not truncated.",
+      "PDF page 3: numbered source entries display handles and full descriptions cleanly; footer page count is correct and unobstructed.",
+      "PDF pagination: the story continues intentionally from the overview on page 1 to the full event card on page 2 and source details on page 3 with no lost context.",
+      "Mobile light/dark: content reflows within the narrow viewport without horizontal overflow; metric cards stack in a 2x2 grid.",
+      "Mobile light/dark: full source URLs are visible as underlined teal links in both themes, and small meta text (date, status) remains readable.",
+      "Mobile light/dark: the coverage metric card still shows no numeric value, leaving a visual imbalance in the 2x2 metrics grid.",
+      "Dark theme: background, body text, links, and card borders maintain sufficient contrast and distinct hierarchy."
+    ],
+    "summary": "The PDF and mobile renderings are generally clean and readable. Pagination handles the intentionally split story well, sources are visible, and both light and dark mobile themes reflow correctly. The main advisory issue is the coverage metric card lacking a numeric value, which slightly weakens visual hierarchy and grid balance."
+  },
+  "duration_seconds": 84.257
+}

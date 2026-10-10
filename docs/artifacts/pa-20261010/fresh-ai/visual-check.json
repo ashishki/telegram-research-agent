@@ -1,0 +1,121 @@
+{
+  "synthetic_only": true,
+  "html_sha256": "68866535845706f1789cfae520529830711ede0c35439fa179b44eff83071714",
+  "pdf_sha256": "a8478a77765fc5a68c460969b3465797486b5d38019a1dd2306e411560846d1e",
+  "browser": "Chromium1243 via Playwright1.63.0",
+  "actual_external_browser_requests": false,
+  "screens": [
+    {
+      "case": "desktop-light",
+      "errors": [],
+      "dimensions": {
+        "viewport": 1280,
+        "document": 1280,
+        "body": 1280,
+        "background": "rgb(245, 245, 240)",
+        "overflows": [],
+        "chart_value_font_sizes": [
+          "16px",
+          "16px"
+        ],
+        "chart_values_visible": [
+          "none",
+          "none"
+        ],
+        "coverage_cell_labels": [
+          "Источник",
+          "Состояние",
+          "Ограничение"
+        ]
+      },
+      "screenshot": "desktop-light.png"
+    },
+    {
+      "case": "mobile-light",
+      "errors": [],
+      "dimensions": {
+        "viewport": 390,
+        "document": 390,
+        "body": 390,
+        "background": "rgb(245, 245, 240)",
+        "overflows": [],
+        "chart_value_font_sizes": [
+          "16px",
+          "16px"
+        ],
+        "chart_values_visible": [
+          "block",
+          "block"
+        ],
+        "coverage_cell_labels": [
+          "Источник",
+          "Состояние",
+          "Ограничение"
+        ],
+        "coverage_label_widths": [
+          {
+            "label": "Источник",
+            "column": 128,
+            "text": 87.25
+          },
+          {
+            "label": "Состояние",
+            "column": 128,
+            "text": 95.875
+          },
+          {
+            "label": "Ограничение",
+            "column": 128,
+            "text": 121.4296875
+          }
+        ]
+      },
+      "screenshot": "mobile-light.png"
+    },
+    {
+      "case": "mobile-dark",
+      "errors": [],
+      "dimensions": {
+        "viewport": 390,
+        "document": 390,
+        "body": 390,
+        "background": "rgb(18, 23, 22)",
+        "overflows": [],
+        "chart_value_font_sizes": [
+          "16px",
+          "16px"
+        ],
+        "chart_values_visible": [
+          "block",
+          "block"
+        ],
+        "coverage_cell_labels": [
+          "Источник",
+          "Состояние",
+          "Ограничение"
+        ],
+        "coverage_label_widths": [
+          {
+            "label": "Источник",
+            "column": 128,
+            "text": 87.25
+          },
+          {
+            "label": "Состояние",
+            "column": 128,
+            "text": 95.875
+          },
+          {
+            "label": "Ограничение",
+            "column": 128,
+            "text": 121.4296875
+          }
+        ]
+      },
+      "screenshot": "mobile-dark.png"
+    }
+  ],
+  "pdf_pages": 5,
+  "pdf_out_of_page_text": [],
+  "human_acceptance": false
+}

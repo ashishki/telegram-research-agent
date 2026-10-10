@@ -1,50 +1,35 @@
 # Evidence Index
 
-Status: active
-Last updated: 2026-09-17
+Updated10 October2026. Current runtime/test/independent source proof0fbcfd1. Current document/Git refs and CI observations are separate metadata in the integration receipt. Historical dates are preserved.
 
-Historical evidence is preserved in `docs/archive/pre_retrofit_2026-08-16/EVIDENCE_INDEX.pre-retrofit.md` and Git history.
+## Current source evidence
 
-## Current baseline
-
-- latest audited code: `cee8baae3b8a41f571bd689f2dadf7e6e981863f`;
-- search/news audit: `docs/audit/PRM_SEARCH_NEWS_BASELINE_2026-09-17.md`;
-- task registration (not implementation/review): `docs/audit/PRM_SEARCH_NEWS_TASK_REGISTRATION_2026-09-17.md`;
-- retrofit baseline: `5dfd38660b7d8d24998b4dcdf801c419c1dc8f7c`;
-- archive: preserved as the remote pre-retrofit archive branch (discover with
-  `git branch -r`); it is intentionally not a workspace path;
-- active integration ref: `master`;
-- Eval V2 audit: `docs/audit/PRM_EVAL_V2_QUALITY_PASS_2026-08-15.md`;
-- retrieval ADR: `docs/adr/ADR-005-prm-qa-selected-retrieval-policy.md`;
-- ADR numbering remediation: `ADR-005` is retrieval policy, `ADR-006` is the
-  intent-first contract, and `ADR-007` is local deep research; historical
-  duplicate filenames were renamed without changing their decisions.
-- public regression reports: `evals/prm_qa/`;
-- operator usefulness: not yet proven; controlled smoke review remains required.
-- historical delivery receipt: UTD timer enabled on 2026-09-03 pending profile
-  confirmation; current service/profile state was not observed by this audit.
-- PRM-SN task/review registration is documentation, not implementation,
-  a completed Terra review, or permission to start dogfood.
-
-## Retrofit evidence
-
-| Item | Location | State |
+| Evidence | Entry | What it supports |
 | --- | --- | --- |
-| Strategy and deletion rules | `docs/retrofit/RFX_REPOSITORY_RETROFIT.md` | current |
-| Active architecture | `docs/ARCHITECTURE.md` | current |
-| Active task queue | `docs/tasks.md` | current |
-| Pre-retrofit docs | `docs/archive/pre_retrofit_2026-08-16/` | preserved |
-| Deep review | `docs/retrofit/RFX_DEEP_REVIEW.md` | complete with human-only residual gates |
-| Focused PRM tests | local 2026-08-28 verification | see RFX deep review |
-| Retrofit boundary tests | local 2026-08-28 verification | see RFX deep review |
-| MAT safety | local 2026-08-28 verification | see RFX deep review |
-| Playbook validation | local 2026-08-28 verification | see RFX deep review |
-| UTD controlled live-watch enablement | `docs/audit/UTD_LIVE_DOGFOOD_START_2026-09-03.md` | enabled; no source polling or delivery before profile confirmation |
-| PRM product UX advisory judge | `docs/audit/PRM_PRODUCT_UX_JUDGE_2026-09-03.md` | 50 cases / 200 turns; human review remains for style and cognitive load |
+| Product/code/layers/gaps | [PRODUCT_STATUS](PRODUCT_STATUS.md) | Honest current stage and every PAI packet. |
+| All69/10 binding cases | [Requirement evidence](verification/PAI-requirement-evidence-20261010.md) | Actual synthetic full-spec run; no formal approval. |
+| Full398/test/Go/P1/quality receipts | [Go report](verification/PAI-go-pilot-20261010.md), [JSON](verification/PAI-go-pilot-20261010.json) | Current candidate proof and limitations. |
+| Exact independent code inputs/verdicts | [Portable receipts](artifacts/pa-20261010/README.md) | Original116 STOP,117 ADVISORY, input/diff/source hashes. |
+| Full current dialogue input | [Judge input](verification/PAI-go-pilot-session-judge-20261010.input.txt), [manifest](verification/PAI-go-pilot-session-judge-20261010.input.json) | Public synthetic6 sessions25 turns, real V4.1 inference. |
+| Brief/pixels/PDF | [Portable artifacts](artifacts/pa-20261010/README.md) | Current renderer benchmark and separately generated new AI content. |
+| Current CI-focused/source merge | [Integration receipt](verification/PAI-master-integration-20261010.md) | PRM751/retrofit150, metadata checks, actual refs/CI when observed. |
+| Actual connected pilot | [Prepared20-task access](verification/PAI-pilot-access-20261010.md) | Missing selections; no live accounts/human acceptance claimed. |
+| Prior full390/cosmetic block | [Four-point report](verification/PAI-four-point-20261010.md) | Earlier dated code/guard/captures; not relabeled as current398. |
+| Prior359 and first judges | [Product verification9Oct](verification/PAI-product-verification-20261009.md) | Original GLM/MiMo/vision/raw outcomes and source version. |
+| GCN reuse provenance | [Reuse JSON](verification/PAI-GCN-reuse-20261009.json) | Read-only neighboring SHA/dirty hashes and concept limits. |
 
-## Evidence rules
+## Current distinctions
 
-- focused tests are not a full-suite claim;
-- automated silver evals are regression evidence, not proof of usefulness;
-- private questions, post bodies, provider payloads and local paths are not public evidence;
-- deleted code remains recoverable from the archive branch and Git history.
+- Source/runtime proof remains0fbcfd1 across docs-only commits/merge if source bytes match.
+- Raw STOP/429/403, fixture clock denial, bad measured field, interrupted sessions and preflight mistakes are not removed.
+- Synthetic PG/Graph/Telegram states were computed by code; fake external effects are not real account writes.
+- Go/public HTTP observations are genuine; available model ID did not guarantee legacy model access.
+- Kimi vision pass on fixed old editorial content is not the new V4.1 Brief's independent vision result.
+- No current full historical suite or operator/private-source acceptance; remote CI requires its own actual run.
+- Raw51 missing formal approvals and expected-rejection guard remain distinct.
+
+## Historical evidence
+
+`docs/archive/`, `*.before-*`, dated PA/PRM/RFX/UTD/audit/review records remain references on their original SHAs. The August runtime receipts and September UTD timer/profile state are not re-observed current deployment. Original full task/model call history lives in [PAI progress](verification/PAI-progress.md); do not restart its old NEXT-TASK batches.
+
+Public examples/receipts are a curated synthetic subset with byte hashes. Personal questions/archive/account IDs/provider keys/private artifacts are excluded. Earlier report-era public demos and `evals/prm_qa` are separately labeled data, not current PA live usefulness.

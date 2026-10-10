@@ -1,69 +1,46 @@
-# Current assignment — selected Go alternative and pilot verification
+# Current assignment — detailed docs and master integration
 
-2026-10-10 owner latest instruction: «делай, выбери другую моедл ищ пула го,
-там у нас есть еще лимиты точно». ADR-018 authorizes a fresh advisory DeepSeek
-V4 Pro engineering/content check on the SAME Go endpoint/public synthetic scope.
-Pending Codex choice is superseded. DeepSeek V4 Flash captures current synthetic
-conversations; existing DeepSeek Flash Vision judges actual current renders.
-The original GLM STOP/429/history and governed role-consumer guards stay intact.
-New pool transport holdouts:195 passed6.50s; plan/pin pass. Commit all scoped
-source first; one engineering P1/changed-range check, then native captures and
-one content/visual assessment after usable safety closure. No unchanged full
-product tier repeats, blind provider retry or old programme/design batch.
-Live pilot source/destination/account selection is requested while independent
-work continues. Specific external effects still require their exact preview.
-UTD/API remains deferred; no private egress, production service/timer or release.
+2026-10-10 owner explicitly requested detailed documentation/README: stage,
+outcomes, unfinished/unproven work and reasons; merge all session work into
+master. ADR-019 records this Git authority. Edit on the assigned working branch,
+validate, merge preserving history; no direct source edits on master, reset,
+force push, production deploy or invented acceptance.
 
-Previous verified implementation and remaining evidence boundaries follow.
+Read README -> PRODUCT_STATUS -> the dated evidence needed for the current slice.
+The full spec remains PERSONAL_ASSISTANT_SPEC. PAI design/requirements statuses
+remain draft/planned until genuine formal acceptance; no MVP reduction or restart
+of completed historical tasks/programme review batches.
 
-# Current assignment — four-point local implementation and verification
+Verified runtime/test code:0fbcfd1dde780724ad934aa66825afe17a6efc98.
+Actual full active PAI398/1164.34s,zero skips/failures,all69 IDs/10 scenarios;
+delivery43/127.72s,Brief77/100.04s,recovery33/260.43s. Premerge PRM/retrofit and
+final refs: PAI-master-integration-20261010.md/.json. Subsequent runtime unchanged;CI guard union correction4c2656c is separately63-test/118 ADVISORY verified.
 
-Owner assignment 2026-10-10: all four proposed points, then one accumulated
-verification block by topic. Local design/authority: ADR-017. Assigned branch
-docs/personal-assistant-blueprint-playbook-20260918; verified code candidate
-2e541af8e9928e1b1002110e055bd615aa8b5434. Subsequent handoff edits are metadata only.
+DeepSeek116 closed deletion P1 but found multipart recovery P1 (STOP). Six cases
+reproduced; shared dispatch/reconcile builder repaired it. Actual117 on0fbcfd1:
+ADVISORY/no P0/P1,470.397s,usage49125/19472/68597; extreme HTML nesting P2 remains.
+This is scoped engineering closure, not governed role/design/human acceptance.
 
-Search, Watch/Act and mobile/print Brief changes are implemented and locally
-tested. Evidence: docs/verification/PAI-four-point-20261010.md and .json.
-Search uses strict anchored structured findings and honest bounded coverage;
-Watch/Act use exact readable previews, bounded text controls and honest
-unknown/reconciled/duplicate states; Brief preserves citations/identity and
-makes mobile values/coverage and print layout readable. Existing safety rules
-and global claim verifier remain. GCN concept provenance stays in the dated
-PAI-GCN-reuse-20261009.json; no neighbor configuration/private content copied.
+Owner selected another Go model, then enabled extra usage. Working capture:
+DeepSeek V4.1 Flash11 calls /6 sessions25 turns; text judge DeepSeek Pro/max
+requested,observed unknown,6/6 floor4 on every8 axes. Kimi fixed-content repaired
+renderer: pass,PDF/sources/dark5,mobile/hierarchy4. New V4.1 Brief5-page PDF has0
+clipping/browser errors. Do not conflate datasets or claim measured matched-model
+improvement. Original GLM/MiMo grades,115 quota429, legacy Flash/vision403, invalid
+fixture clocks and failures stay dated evidence. Production model/cost unknown.
 
-Actual checks: PAI complete 390 passed / 871.25s, zero skips/failures and
-all 69 exact IDs / 10 scenarios; PRM 736 passed / 105.21s; retrofit
-150 passed / 10.12s. Topic layers overlap: deletion 2 passed / 16.29s;
-Search 58 passed / 83.59s; Watch/Act 61 passed / 131.67s; Brief 55 passed / 38.82s.
-Per-layer source SHA, exact argv/environment and log hashes are in the report.
-Preserve original failures and the interrupted exec-session run (143/SIGTERM,
-304 progress dots; cause unknown); detached repeat is a one-shot local test,
-not a service/timer. Offline desktop/mobile light/dark and native PDF are
-observed: no horizontal overflow/JS errors, 3 PDF pages, no out-of-page text.
+Live pilot needs selected Telegram/mail/calendar/resource/destination/scopes;
+missing-info question sent, private configurations not received. Concrete20-task
+packet: PAI-pilot-access-20261010.md. Brave discovery key not selected; actual
+GitHub exact-ref/public Python fetch observed. UTD/API owner-deferred. Current
+SyntheticTarget is not private/production storage. No actual mail/calendar writes,
+private corpus egress, service/timer startup or cutover in this work.
 
-Stop point: independent P1 closure remains OPEN. The fixed deletion/chunk core
-matches 6467c50; actual112 independently reviewed cbab0fb and found STOP/P1.
-Actual113 failed with unknown HTTP status. Actual114 requested glm-5.3/max on
-6467c50 and returned HTTP429 / Retry-After156472s / 0.536s, no report/usage.
-Provider hint: 12 October 00:00 UTC / 02:00 Berlin; likely weekly quota, not
-confirmed account billing. No further provider requests or automatic fallback.
-One read-only Codex substitution decision remains pending; no approval inferred.
-Current changes are not independently closed or newly model-graded. Previous
-real session/vision results remain historical, never relabeled as current.
+Raw formal contract has51 missing approvals; expected-rejection CI guard is not
+human acceptance. Preserve historical records and statuses. CI guard118:ADVISORY/no P0/P1,empty-draft robustness P2 retained. No further model calls or
+full PAI rerun for doc cosmetics; pin/reference/plan/appropriate CI checks suffice
+unless merge changes runtime bytes. No tokens/private account data in Git.
 
-Formal playbook contract still reports 51 missing task/design approvals.
-Pin, PA/PAI plan, references, bridge and MAT safety checks pass; the complete
-project verifier is not claimed green. Full historical pytest was not run.
-UTD/API stays owner-deferred. Real accounts/Brave credentials are not selected.
-No private egress, production DB/config/services/timers, release, master edits
-or push authority is inferred; no slice/programme/human acceptance marked done.
-
-Next safe command (read-only entrypoint inspection, no key or model request):
-`.venv-pai/bin/python tools/mimo_code_review.py --help`.
-After selected-provider recovery or explicit alternate reviewer choice, prepare
-one fresh immutable P1/changed-range packet of the verified candidate and record
-actual identity/effort/verdict/usage. Do not rerun/overwrite113/114 scripts or
-resume old full-design batches. No additional full tests without a new change,
-failure or unresolved concern. Follow boundaries, implementation contract and
-pinned tools/playbook.py; do not forge missing review or human acceptance.
+After integration stop at source/pilot gates. Next safe command:
+`PYTHONPATH=src .venv-pai/bin/python -m prm.cli --help`.
+Use current merge receipt for branch/ref. Do not rerun immutable115/116/117 scripts.

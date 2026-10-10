@@ -1,5 +1,15 @@
 # Release Notes
 
+## 2026-10-10 — PA local verification and repository integration
+
+This is a source/document publication, not production rollout or full human acceptance. Durable Chat/Search/Brief/Watch/Act and shared permission/state/recovery paths are locally implemented; current source0fbcfd1 passes398 active PAI cases/all69 IDs/10 scenarios. Two reproduced P1s are independently closed by116/117; extreme HTML nesting P2 retained.
+
+Actual V4.1 generation11 calls/6 sessions25 turns meets all-axis floor4 through Pro judge. Brief source titles/KPI/identity/mobile/PDF corrected; Kimi fixed-content renderer pass. Actual public GitHub/Python reads; test Graph/Telegram effects remain synthetic. Current README/status/architecture/operator/runbook/evidence maps and portable synthetic examples are updated and merged under explicit owner ADR-019.
+
+Real connections/Brave/private target/cutover/long owner pilot/formal approval remain open; UTD/API deferred. Raw429/403/STOP/measurement failures and older baseline dates are preserved. Details: [PRODUCT_STATUS](PRODUCT_STATUS.md), [integration](verification/PAI-master-integration-20261010.md).
+
+Historical dated entries below describe their then-current runtime; they do not assert current services/timers are enabled.
+
 ## 2026-07-15
 
 ### Report V2 Implementation Queue Closed

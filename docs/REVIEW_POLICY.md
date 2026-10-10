@@ -99,6 +99,20 @@ input1MB/watchdog7200s/SSE64MiB/final text1MiB remain. Go effort forwarding and
 actual billing remain unknown unless telemetry reports them. No extra numerical
 permission loop is required by the owner's existing maximum-resource direction.
 
+## Observed Go-pool outcomes — 2026-10-10
+
+Actual115 Pro request returned429 GoUsageLimitError. Owner enabled extra usage;
+116 completed and closed deletion P1 but STOPped on newly exposed multipart
+recovery. Six cases reproduced; shared builder repair is independently closed by
+117 on0fbcfd1:ADVISORY/no P0/P1, one extreme-HTML-depth P2 retained. Model effort
+requested max, observed unknown. Legacy V4 Flash/experimental Vision returned403
+access disabled, so actual current generator is V4.1 Flash and image judge Kimi
+K2.7 Code. Public/synthetic6-session content and fixed-content visual inputs,
+usage/identity/SHAs/raw failures are preserved in PAI-go-pilot-20261010 evidence.
+This is separate engineering/advisory evidence; no governed GLM role set, current
+tooling audit, exact design or human approval is synthesized. Current master
+integration is explicitly authorized by owner/ADR-019, not granted by a reviewer.
+
 ## Roles, runners and receipt compatibility
 
 | Role | Required route/evidence | Current integration |

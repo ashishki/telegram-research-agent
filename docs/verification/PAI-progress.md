@@ -765,3 +765,49 @@ not green. UTD/API owner-deferred; real accounts/Brave/production gates unchange
 Next safe command: `.venv-pai/bin/python tools/mimo_code_review.py --help`; prepare
 one fresh exact-candidate review after provider recovery or explicit model choice,
 never overwrite113/114 or restart superseded design batches. No push or master edit.
+
+Actual engineering115 allocated on fa7857b5772c2f745f28cd893bda9efbab98b776: one DeepSeek V4 Pro/max independent P1/accumulated-change advisory request under ADR-018; no retry, public code/synthetic only, not old programme/design batch.
+
+Actual engineering116 allocated on fa7857b5772c2f745f28cd893bda9efbab98b776: one DeepSeek V4 Pro/max independent P1/accumulated-change advisory request under ADR-018 after owner enabled extra usage; no retry, public code/synthetic only, not old programme/design batch.
+
+Actual engineering117 allocated on 0fbcfd1dde780724ad934aa66825afe17a6efc98: one DeepSeek V4 Pro/max independent P1/accumulated-change advisory request under ADR-018 after owner enabled extra usage; exact6-failure reproduction and43/77-pass repairs; no retry, public code/synthetic only, not old programme/design batch.
+
+
+2026-10-10 completed current Go/pilot verification on0fbcfd1dde780724ad934aa66825afe17a6efc98:
+Actual115 consumed:Pro429 GoUsageLimitError. Owner then enabled extra usage;
+116 completed890.457s/232712+40027=272739 tokens,closed deletion P1 but STOP on
+multipart digest reconstruction. Six reproductions failed44.95s; shared exact
+builder repair43/127.72s,Brief77/100.04s,recovery33/260.43s. Actual117 completed
+470.397s/49125+19472=68597,ADVISORY/no P0/P1 in scope;HTML nesting P2 retained.
+Current full active PAI398 passed1164.34s,zero skips/failures,all69 IDs/10 scenarios.
+No unchanged historical full suite or programme/design batches restarted.
+
+Legacy generator/vision403 attempts retained. Actual working generation:V4.1
+Flash11 calls,min1.21/median1.753/max5.237s. Native6 sessions25 turns; Pro text judge
+201.587s/8592+10683=19275,all6 meet every8-axis floor4. Old/new models differ;
+not a matched causal improvement. Kimi repaired fixed-content renderer84.257s,
+8927+2172=11099,pass:PDF/sources/dark5,mobile/hierarchy4. Fresh actual V4.1 Brief
+5-page PDF has0 clipping/browser errors; its exact new content is not separately
+vision-graded. Model billing/production profile/human usefulness remain unknown.
+
+Native controls corrected only for future-clock fixture measurement:wall/DB
+Watch tick collected1 change/synthetic sent1,no job after pause;fake Graph1 write,
+202 unknown→exact scoped reconcile→no duplicate. Actual public GitHub exactSHA
+read0.752s andPython HTTP200/336954bytes0.378s. No live private/account writes.
+All attempts/inputs/hashes/raw judgments and sample renders now have audited
+portable public-synthetic copies in docs/artifacts/pa-20261010. Go evaluation
+reports and69/10 matrix do not change draft/planned formal acceptance states.
+
+Latest owner explicitly requested detailed README/all current documentation and
+merge of working history into master (ADR-019). Current premerge focused-prm751
+passed88.06s andretrofit150 passed14.28s;additional pin/plan/reference/guard/CI and
+actual local/remote refs recorded separately in PAI-master-integration-20261010.
+This is source/Git integration,not private-source permission or production rollout.
+Live test bot/chat/mail/calendar resources remain unselected;access20-task packet
+is concrete,missing-info question remains pending. UTD/API owner-deferred;Brave
+key/private production target/cutover/operator acceptance remain open. No master
+source edits/reset/force-push and no old immutable review script reruns.
+
+Actual118 allocated: one Pro/max independent review of2-file CI expected-rejection PA/PAI compatibility correction on4c2656c554496d4802951c323c12a4d64e720531 under owner master assignment; no role/human acceptance or automatic retry.
+
+Actual118 completed on4c2656c:ADVISORY/no P0/P1,222.626s,usage7993/13229/21222;known PA/PAI exact51 CI negative guard corrected,63 tests3.21s. Future empty-draft fail-closed P2 retained. Runtime remains0fbcfd1;docs/master merge under ADR-019,formal approvals unchanged.

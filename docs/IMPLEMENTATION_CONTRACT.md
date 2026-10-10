@@ -3,9 +3,20 @@
 Status: current operating contract. Changes to an accepted decision require a
 new ADR under `docs/adr/`.
 
-Version: 4.4
+Version: 4.5
 
-Effective date: 2026-10-07
+Effective date: 2026-10-10
+
+## Current owner assignment and evidence
+
+ADR-018 records owner-selected Go alternatives/extra usage for public code and
+synthetic evaluation. ADR-019 explicitly authorizes detailed status documentation
+and normal working-branch integration into master. Earlier no-master/push stop
+points do not block this requested Git integration; editing stays on the working
+branch, history is preserved, no force/reset. Master CI does not deploy runtime.
+Runtime0fbcfd1 has actual398 full active PAI checks and scoped117 P1 closure.
+These permissions/results are not live-account/private-egress, production or
+formal role/design/human acceptance. See PRODUCT_STATUS and merge receipt.
 
 ## Product Authority
 

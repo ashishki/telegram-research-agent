@@ -1,0 +1,223 @@
+{
+  "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+  "privacy": "public_synthetic_only",
+  "real_provider_calls": 0,
+  "key_read": false,
+  "actual_accounts_or_messages": false,
+  "runtime": "native ingress/worker/current-visible confirmation/real PG; fake HTTP Graph and synthetic delivery",
+  "cases": [
+    {
+      "topic": "act",
+      "turns": [
+        {
+          "user": "/actpreview {\"action_code\": \"mail.send\", \"resource_ref\": \"resource_selected_mail\", \"content\": {\"to\": [\"recipient@example.test\"], \"subject\": \"Учебная Аврора\", \"body\": \"Работа будет готова завтра утром.\"}}",
+          "assistant": "Предпросмотр письма\nИз выбранного подключённого аккаунта Microsoft.\nКому: recipient@example.test\nТема: Учебная Аврора\n\nТекст письма:\nРабота будет готова завтра утром.\n\nПодтверждение действует до 10.10 09:54 (Europe/Berlin).\nПроверь полный текст и параметры. Нажми «Отправить письмо» или ответь «да».",
+          "status": "preview",
+          "text_keyboard": {
+            "kind": "reply_keyboard",
+            "keyboard": [
+              [
+                {
+                  "text": "Отправить письмо"
+                }
+              ]
+            ],
+            "resize_keyboard": true,
+            "one_time_keyboard": true
+          }
+        },
+        {
+          "user": "Отправить письмо",
+          "assistant": "Провайдер принял запрос, но выполнение ещё не подтверждено. Автоматически повторять его не буду. Нажми «Проверить результат действия» для отдельной сверки.",
+          "status": "unknown",
+          "text_keyboard": {
+            "kind": "reply_keyboard",
+            "keyboard": [
+              [
+                {
+                  "text": "Проверить результат действия"
+                }
+              ]
+            ],
+            "resize_keyboard": true,
+            "one_time_keyboard": true
+          }
+        },
+        {
+          "user": "Проверить результат действия",
+          "assistant": "Письмо найдено в «Отправленных». Получение письма адресатом этим не подтверждается.\nИдентификатор объекта у провайдера: synthetic_sent_2",
+          "status": "succeeded",
+          "text_keyboard": {
+            "kind": "reply_keyboard",
+            "keyboard": [
+              [
+                {
+                  "text": "Проверить результат действия"
+                }
+              ]
+            ],
+            "resize_keyboard": true,
+            "one_time_keyboard": true
+          }
+        },
+        {
+          "user": "Отправить письмо",
+          "assistant": "Повторное подтверждение уже использовано; нового действия не было.\nПровайдер подтвердил операцию с письмом. Получение письма адресатом этим не подтверждается.\nИдентификатор объекта у провайдера: synthetic_sent_2",
+          "status": "succeeded",
+          "text_keyboard": {
+            "kind": "reply_keyboard",
+            "keyboard": [
+              [
+                {
+                  "text": "Проверить результат действия"
+                }
+              ]
+            ],
+            "resize_keyboard": true,
+            "one_time_keyboard": true
+          }
+        }
+      ],
+      "synthetic_graph_write_count": 1
+    },
+    {
+      "topic": "watch",
+      "turns": [
+        {
+          "user": "/watch resource_archive",
+          "assistant": "Предпросмотр наблюдения\nИсточник: архив Telegram\nПроверка: каждые 5 мин.\nСообщать: содержательные изменения\nЧасовой пояс: Europe/Berlin\nНе больше 3 сообщений в день. Тихие часы: 22:00–08:00.\nДо: 2026-11-09T07:44:37.646424+00:00\nНаблюдение ещё не включено. Нажми «Подтвердить наблюдение».",
+          "text_keyboard": {
+            "kind": "reply_keyboard",
+            "keyboard": [
+              [
+                {
+                  "text": "Подтвердить наблюдение"
+                }
+              ]
+            ],
+            "resize_keyboard": true,
+            "one_time_keyboard": true
+          }
+        },
+        {
+          "user": "Подтвердить наблюдение",
+          "assistant": "Подписка сохранена. Работа планировщика пока не подтверждена; её состояние можно проверить кнопкой.",
+          "text_keyboard": {
+            "kind": "reply_keyboard",
+            "keyboard": [
+              [
+                {
+                  "text": "Проверить наблюдение"
+                }
+              ],
+              [
+                {
+                  "text": "Приостановить наблюдение"
+                }
+              ]
+            ],
+            "resize_keyboard": true,
+            "one_time_keyboard": true
+          }
+        },
+        {
+          "user": "Проверить наблюдение",
+          "assistant": "Подписка сохранена: активна. Работа планировщика наблюдалась недавно. Последняя проверка: собрано изменений: 1.",
+          "text_keyboard": {
+            "kind": "reply_keyboard",
+            "keyboard": [
+              [
+                {
+                  "text": "Проверить наблюдение"
+                }
+              ],
+              [
+                {
+                  "text": "Приостановить наблюдение"
+                }
+              ]
+            ],
+            "resize_keyboard": true,
+            "one_time_keyboard": true
+          }
+        },
+        {
+          "user": "Приостановить наблюдение",
+          "assistant": "Подписка приостановлена: новые сборы и отправки остановлены. Уже начатый запрос мог продолжиться.",
+          "text_keyboard": {
+            "kind": "reply_keyboard",
+            "keyboard": [
+              [
+                {
+                  "text": "Проверить наблюдение"
+                }
+              ],
+              [
+                {
+                  "text": "Возобновить наблюдение"
+                }
+              ]
+            ],
+            "resize_keyboard": true,
+            "one_time_keyboard": true
+          }
+        },
+        {
+          "user": "Проверить наблюдение",
+          "assistant": "Подписка сохранена: приостановлена. Работа планировщика наблюдалась недавно. Последняя проверка: собрано изменений: 1.",
+          "text_keyboard": {
+            "kind": "reply_keyboard",
+            "keyboard": [
+              [
+                {
+                  "text": "Проверить наблюдение"
+                }
+              ],
+              [
+                {
+                  "text": "Возобновить наблюдение"
+                }
+              ]
+            ],
+            "resize_keyboard": true,
+            "one_time_keyboard": true
+          }
+        },
+        {
+          "user": "Возобновить наблюдение",
+          "assistant": "Подписка возобновлена. Фактическую работу планировщика можно проверить кнопкой.",
+          "text_keyboard": {
+            "kind": "reply_keyboard",
+            "keyboard": [
+              [
+                {
+                  "text": "Проверить наблюдение"
+                }
+              ]
+            ],
+            "resize_keyboard": true,
+            "one_time_keyboard": true
+          }
+        }
+      ],
+      "evidence": [
+        {
+          "scheduler_job_enqueued": true,
+          "collection": {
+            "status": "collected",
+            "notifications": 1
+          },
+          "eligible_count": 1,
+          "synthetic_delivery_statuses": [
+            "sent"
+          ],
+          "clock": "wall clock/DB; no future fixture due date",
+          "real_service_started": false
+        },
+        {
+          "new_job_after_pause": false
+        }
+      ]
+    }
+  ]
+}

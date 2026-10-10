@@ -1,5 +1,9 @@
 # Owner access request — what to get and what to hand over
 
+## Актуальное подключение — 10 октября2026
+
+OAuth/PKCE/vault/Graph/calendar/Canvas local code и synthetic checks уже существуют. Дальше требуется реальная выбранная конфигурация, а не повторная реализация этих контрактов с нуля. Необходимые account/resource/destination/scopes/retention/budgets и20-task pilot — [current packet](../verification/PAI-pilot-access-20261010.md). UTD/Canvas/API по указанию владельца отложен; не считать его обязательным запросом сейчас. Go/extra usage разрешены только для записанных public/synthetic workloads; это не consent личного архива/почты. Test bot/chat и mail/calendar настройки пока не получены. Ключи хранить приватно и сообщать путь; не публиковать account IDs/receipts в Git.
+
 Status: preparation checklist. Nothing here is granted yet. **Do not paste any
 secret into chat.** Secrets go into files under
 `/srv/openclaw-you/workspace/telegram-research-agent/secrets/` (git-ignored) or

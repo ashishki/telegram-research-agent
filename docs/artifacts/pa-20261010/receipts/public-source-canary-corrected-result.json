@@ -1,0 +1,29 @@
+{
+  "scope": {
+    "authority": "owner2026-10-10 current public canary preparation; no private accounts or model calls",
+    "privacy": "public_only",
+    "repository": "pytest-dev/pytest",
+    "requested_ref": "e4f7f174bc4a1686b31639d29a3e211941390979",
+    "paths": [
+      "README.rst"
+    ],
+    "public_document": "https://docs.python.org/3/library/unittest.html",
+    "maximum_http_calls": 2,
+    "automatic_retry": false,
+    "private_content_or_credentials": false,
+    "source_head": "fa7857b5772c2f745f28cd893bda9efbab98b776"
+  },
+  "results": [
+    {
+      "capability": "github_exact_ref_read",
+      "status": "read",
+      "duration_seconds": 0.752,
+      "observed_ref": "e4f7f174bc4a1686b31639d29a3e211941390979",
+      "payload_sha256": "4a7ab8e4a89247f5d48243c57698157f9c8c6c235c6fd1728a90c8107b8192e9",
+      "item_count": 1,
+      "actual_public_http": true
+    }
+  ],
+  "search_discovery": "not_probed_missing_explicit_Brave_credential",
+  "private_account_integrations": "unavailable_no_selected_account"
+}

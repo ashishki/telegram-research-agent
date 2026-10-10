@@ -1,0 +1,49 @@
+{
+  "authority": "owner2026-10-10 Go-pool/extra-usage current public-synthetic model evaluation; render-only work independent of deletion closure",
+  "provider": "opencode_go",
+  "model": "deepseek-v4-flash-vision-exp",
+  "privacy": "public_synthetic_only",
+  "maximum_calls": 1,
+  "automatic_retry": false,
+  "timeout_seconds": 90,
+  "input_bytes": 1254806,
+  "input_sha256": "ddb59e245835e944a9465cb60de05c70059d6e7f3469d7dafaae32d509a5fb80",
+  "images": [
+    {
+      "path": ".playbook-artifacts/pai-four-point-20261010/brief-render-current/brief-pdf-page-1.png",
+      "sha256": "add98d701b5e9454d5c0363b15f47d0ad0d46d9bc98e4dba2738788e96ac8719",
+      "bytes": 86225
+    },
+    {
+      "path": ".playbook-artifacts/pai-four-point-20261010/brief-render-current/brief-pdf-page-2.png",
+      "sha256": "142daeb279d812472f4efb6fe72ade3d0085b15d76ae7b924caea95170075069",
+      "bytes": 150060
+    },
+    {
+      "path": ".playbook-artifacts/pai-four-point-20261010/brief-render-current/brief-pdf-page-3.png",
+      "sha256": "1f519ed02585acccd261d4e9f479e81876e3620934918dbbc214173a953a79d7",
+      "bytes": 50433
+    },
+    {
+      "path": ".playbook-artifacts/pai-four-point-20261010/brief-render-current/mobile-light.png",
+      "sha256": "21a7e86b591071d0c9b6e8d1a12f9391f868ab8e9d808270823f04b1ae7f98da",
+      "bytes": 314607
+    },
+    {
+      "path": ".playbook-artifacts/pai-four-point-20261010/brief-render-current/mobile-dark.png",
+      "sha256": "b583346f2ec0bcf5eae964b02f3eee61c50ad8e0daad8d594079ecc0c0ffa3f3",
+      "bytes": 337618
+    }
+  ],
+  "advisory_only": true,
+  "experimental_vision_availability": "public Go model list; account capability not presumed",
+  "source_receipt": ".playbook-artifacts/pai-four-point-20261010/brief-render-current/render-receipt.json",
+  "runtime_code_sha256": "959228f20f377f362654844d6ee6fc6a1357d1bb6874f08897eaf63318f498d2",
+  "status": "provider_rejected",
+  "cost": "unknown",
+  "provider_error_body": "{\"error\":{\"type\":\"server_error\",\"message\":\"Upstream request failed: Model access is disabled\"}}",
+  "http_status": 403,
+  "error_type": "HTTPError",
+  "provider_outcome": "not_accepted",
+  "duration_seconds": 0.972
+}

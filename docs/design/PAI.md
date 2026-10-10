@@ -1,5 +1,7 @@
 # Feature Design — PAI durable Personal Assistant
 
+[Current status](../PRODUCT_STATUS.md).
+
 ## Metadata
 
 Feature-ID: PAI
@@ -49,7 +51,7 @@ code/tests/REVIEW_POLICY. Any such change invalidates that gate; re-audit before
 consuming design receipts. Bootstrap diagnostics/historical provisional reports
 remain evidence only. No tooling reviewer grants human feature completion.
 
-Current native93: ADVISORY at9098d0c, observed glm-5.3, no P0/P1.
+Dated audit93: ADVISORY at9098d0c, observed glm-5.3, no P0/P1.
 Actual require_tooling_audit checks current critical hashes; exact evidence:
 PAI-review-continuation-93.json. Native79 retains historical sources. Requested
 max/unknown observed effort and fixtures do not grant human design approval.
@@ -308,7 +310,6 @@ IMPLEMENTATION_CONTRACT separately authorize local PAI-02..26 implementation
 with synthetic sources while design reviews/human acceptance remain open;
 ADR-015 sequences the completed local pass before tests/reviews. This is explicit
 owner sequencing, not invented design acceptance. No live/release authority.
-
 
 ## 10. Concrete evidence bindings
 

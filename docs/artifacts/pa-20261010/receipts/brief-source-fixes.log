@@ -1,0 +1,5 @@
+........................................................................ [ 93%]
+.....                                                                    [100%]
+--------- generated xml file: /tmp/pai-acceptance-s26sf35t/pytest.xml ----------
+77 passed in 100.04s (0:01:40)
+PAI scoped test verification (full-spec coverage not checked): 77 acceptance cases, zero skips/failures

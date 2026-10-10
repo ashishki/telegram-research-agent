@@ -1,5 +1,9 @@
 # Sol — последовательная реализация Personal Assistant
 
+## Current stop point — 10 October2026
+
+This is the original owner-selected Sol launch template, not an instruction to rerun PAI-00…26 or override the active implementer. Local runtime0fbcfd1 passed398/69/10 with independent117 P1 closure. Start from [current handoff](../CODEX_PROMPT.md) and [PRODUCT_STATUS](../PRODUCT_STATUS.md); use the active session default model/mode unless explicitly instructed. Test files are now present except the two conditional30/31 suites. Latest owner requested comprehensive docs/master integration; live/production/operator decisions remain separate.
+
 Готовый стартовый промпт. Используется после выбора Sol владельцем в рабочей
 сессии. Не задаёт API model ID/reasoning и не выдаёт live или release approval.
 

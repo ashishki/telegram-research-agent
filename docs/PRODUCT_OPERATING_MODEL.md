@@ -1,407 +1,45 @@
 # Product Operating Model
 
-> 2026-08-13 planning note: current runtime statements below are historical/local runtime receipts, not PRM-MAT operator-validation evidence. The proposed mature request, durability, freshness and approval boundaries are in `docs/prm_mature_product_contract.md`.
+Updated:10 October2026. Source proof:0fbcfd1. Complete current map: [PRODUCT_STATUS](PRODUCT_STATUS.md). Earlier claims about an enabled service/timer belonged to their dated runtime receipts; current host/service state was not inspected in this work.
 
-Status: active handoff
-Last updated: 2026-09-18
+## Product and actual operating state
 
-## Current Truth
+Personal AI Assistant has five primary outcomes: Chat/Search/Brief/Watch/confirmed Act, with shared connections/memory/media/academic rules. Weekly Brief is a primary outcome. The durable local composition is implemented and fixture/provider benchmark verified. Production profile, private-data target, actual connected Telegram/mail/calendar and long owner pilot remain open.
 
-### Superseding Operator Test Policy
-
-The operator chose direct human production tests instead of a formal PRM-19
-dogfood phase on 2026-08-12. Historical dogfood-named receipts remain factual
-history, but they do not block active PRM-UX implementation. Any live action
-still requires its specific approval boundary for privacy, provider egress,
-canonical writes, runtime/service state, and compatibility cleanup.
-
-Historical PRM-18 release-gate receipts retain their original dogfood wording,
-but are not active UX gates. Release readiness is not claimed. Legacy
-weekly-report automation remains frozen, and the safe PRM assistant runtime is
-active only for operator-controlled testing.
-
-The next active queue is PRM-UX: Operator Experience And Professional
-Personalization. It is a minimum-sufficient product UX phase over the existing
-local PRM/RAG substrate. It must not be treated as approval for new vector
-backends, external embeddings, unrestricted web research, legacy report
-automation, or release claims.
-
-The current delivery workstream is UTD, a confirmation-gated external-watch
-surface inside the existing assistant. Since 2026-09-03 its dedicated live
-timer has been enabled, while delivery remains fail-closed because no confirmed
-UTD profile is present. Until the operator explicitly confirms the onboarding
-draft, the runtime does not poll the allowlisted official sources and cannot
-send Telegram alerts. Confirmation does not start PRM-19 dogfood or authorize
-automatic profile changes, university-system actions, unrestricted research, or
-a release claim. The receipt is
-`docs/audit/UTD_LIVE_DOGFOOD_START_2026-09-03.md`.
-
-`docs/UTD_ACADEMIC_INBOX_RESEARCH_HANDOFF.md` is a research-only proposal for
-an optional read-only inbox over university email, Canvas and selected public
-UTD sources. It has no confirmed profile, OAuth connection, collection,
-delivery, timer or authority in the present operating model. It must not be
-treated as an extension of the current UTD public-watch permission.
-
-Runtime freeze recorded on 2026-07-29:
-
-- `telegram-ai-split-report.timer` stopped and disabled;
-- `telegram-bot.service` stopped and disabled;
-- `telegram-ai-split-report.service` reset from failed to inactive;
-- no legacy Telegram Research Agent systemd service or timer is active;
-- no `oc_you` crontab exists;
-- no project cron job was found in system cron.
-
-Existing generated artifacts under `data/output/` remain private historical
-outputs. They were not deleted, moved, archived, or promoted to operator-test
-evidence.
-
-A dedicated safe runtime now exists in code as `src/main.py prm-assistant` and
-as a repo unit template at `systemd/telegram-prm-assistant.service`. It is
-installed, enabled, and running for manual operator testing as of 2026-08-11
-18:27 CEST.
-
-## Single Product Shape
-
-The unified product is:
-
-> Personal Telegram Research Memory + Grounded Assistant.
-
-There should be one operator-facing entrypoint. The operator asks questions,
-gets grounded answers with Telegram/archive citations and evidence-class
-boundaries, and saves useful memory only through explicit confirmation.
-
-Weekly briefs, Knowledge Library pages, project context views, and MVP Radar
-cards are secondary projections over the same memory and evidence graph. They
-are not separate products and must not compete for the primary workflow.
-
-## Layers
-
-| Layer | Role | Current state |
+| Layer | Actual observation | Meaning |
 | --- | --- | --- |
-| Canonical Telegram archive | Private retained source material in SQLite tables such as `raw_posts`, `posts`, and FTS indexes. | Existing. Live ingestion is frozen. |
-| Archive search | Bounded SQLite FTS retrieval with metadata and citation identity. | Implemented as local baseline plus PRM-27 local vector sidecar for hybrid fallback; external embeddings/hosted vector services remain blocked. |
-| Curated knowledge | Knowledge Atoms, idea threads, saved notes, watch topics, project links, decisions, experiments. | Partial and fixture-backed; operator validation remains separate. |
-| Assistant tools | Read-only PRM tools plus confirmation-gated proposal/write tools. | Safe `prm-assistant` runtime active for operator-controlled testing. |
-| Knowledge Library | Topic-page projection over bounded supplied topic evidence. | Deterministic renderer implemented. |
-| Weekly Brief V3 | Secondary weekly projection over usage, reactions, notes, projects, questions, and failures. | Deterministic fixture projection implemented; no scheduled runtime. |
-| MVP Radar | Evidence lens for market/build decisions. | Must be secondary, bounded, and blocked from auto-build/release claims. |
-| Legacy reports | V1/V2 Brief, Atlas, Report V2 rollout, old digest/study/MVP commands. | Compatibility-only. Frozen from automatic runtime. |
+| Code/local state | SyntheticTarget +native ingress/worker/state/effects | Persisted local fixtures and restart behavior, not installed production. |
+| Model | Go Pro/V4.1/Kimi requests on public synthetic data | Current selected API integration; no private-source model grant or deployed profile. |
+| Public sources | GitHub exact SHA /Python HTTP200 | Real public fetch; not Brave search discovery. |
+| Watch/Act | Real local scheduler/PG with fake provider effects | Correct current state/one write/no replay; no real message/event. |
+| Exports | Native HTML/PDF/MD +offline browser/image judge | Content/identity/legibility proof on named datasets; private hosted reader untested. |
+| CI | Observed separately per integration SHA | Local tests cannot assert remote workflow completion. |
+| Operator/production | No current selected live resources/cutover | Explicit next-gate scope, not a silent startup. |
 
-## MVP Radar Boundary
+## One owner and source boundaries
 
-MVP Radar should not be the product center. It should become one assistant and
-brief surface:
+Authenticate actual private owner/actor/chat tuple. No actor guessed from stored row or destination. Canonical archive/source IDs are retained. Separate sources remain separately scoped; duplicate title or account-looking metadata does not turn a source into authority.
 
-- it answers "is there enough evidence to investigate/build?";
-- it must separate Telegram evidence from external validation evidence;
-- it must not approve a build from Telegram-only demand;
-- it must degrade locally when Radar data is missing or failed;
-- it must record missing evidence and next validation questions;
-- it must not start Frontier, Radar, external research, or report generation
-  without an explicit task approval.
+Read permission is distinct from model-egress permission, write permission and background consent. Private connector/archive context is not generic chat history. The model does not issue grants. A source URL alone does not verify a claim, and an indexed/read/learned state is not inferred from retrieval.
 
-In the unified product, MVP Radar is a `decision_evidence_card`, not a weekly
-pipeline driver.
+## Foreground work
 
-## Safe Use Right Now
+Ordinary chat has bounded original/recent context and topic reset. Slow reads/research/rendering run through durable jobs, with owner-visible state. A result can be stored yet not delivered; a request can be queued yet not executed. Current quality benchmark observes6 sessions/25 turns, not months of everyday usefulness.
 
-Use the repository in inspection and deterministic-verification mode only:
+Source-bound Search can reject unsupported generation and display explicit evidence-only fallback. Coverage says which query/selection was checked, found vs cited records, unavailable/unknown results. Brief/followups preserve immutable object/version/evidence; export does not regenerate facts.
 
-```bash
-PYTHONPATH=src python3 - <<'PY'
-import json
-from pathlib import Path
-from evals.prm_release_gate import summarize_prm_release_gate, validate_prm_release_gate_receipt
+## Background and external effects
 
-receipt = json.loads(Path("evals/prm18_release_gate_receipt_2026-07-29.json").read_text(encoding="utf-8"))
-print(summarize_prm_release_gate(validate_prm_release_gate_receipt(receipt)))
-PY
-```
+Watch first shows source/cadence/cap/quiet/timezone/expiry. Saved intent is distinct from observed tick/collection/delivery. Pause/revoke/cancel are checked again at final dispatch; already-started work may have continued. A stored resume does not prove a new running service.
 
-For the current post-PRM28 gate, inspect:
+Act requires exact current fully delivered owner-visible preview plus fresh scope/one-use expiring confirmation. `202` remains unknown until exact object evidence; SentItems proof is not recipient receipt. Unknown effects do not retry. Multipart delivery shares one exact payload builder with reconciliation; individual receipts and aggregate state are distinct.
 
-```bash
-PYTHONPATH=src python3 - <<'PY'
-import json
-from pathlib import Path
-from evals.prm_release_gate import summarize_prm_release_gate, validate_prm_release_gate_receipt
+## What may run now
 
-receipt = json.loads(Path("evals/prm18_release_gate_receipt_2026-08-11_post_prm28.json").read_text(encoding="utf-8"))
-print(summarize_prm_release_gate(validate_prm_release_gate_receipt(receipt)))
-PY
-```
+Allowed existing development scope: synthetic fixtures, isolated test PG, scoped tests, explicit public/synthetic Go review/capture/judges, public exact-ref/fetch, document integration into master. No keys/private corpora/account IDs in Git. API call count/failures/tokens/unknown billing are retained.
 
-Allowed without a separate runtime approval:
+Live pilot needs owner-selected bot/destination/test mailbox/calendar and operation/data/model/budget/retention scopes. Use the already prepared [20-task access packet](verification/PAI-pilot-access-20261010.md). Default is no external account effect, no recurring daemon/timer, no private corpus egress. SyntheticTarget is not repurposed as production/private storage.
 
-- read docs and receipts;
-- run deterministic tests and validators;
-- ask local PRM memory with `PYTHONPATH=src python3 src/main.py memory ask
-  "<question>"`; this is local-only and does not call LLMs, external search,
-  Telegram services, startup migrations, generation jobs, or write tools;
-- inspect process/systemd state;
-- inspect artifact names, mtimes, sizes, and manifests when needed without
-  committing private generated content;
-- use the running safe PRM runtime for manual operator tests without recording
-  PRM-19 dogfood evidence.
+## History and authority
 
-Not allowed as dogfood yet:
-
-- live Telegram ingestion;
-- reaction sync;
-- LLM extraction or LLM judge fan-out;
-- Frontier or Radar generation;
-- weekly report generation or delivery;
-- full archive indexing changes beyond the gitignored PRM-27 sidecar;
-- external embeddings, hosted vector services, or vector work beyond ADR-004;
-- external web research;
-- dogfood/release claims.
-
-## Safe Operator Entry Point
-
-The explicit safe entrypoint is:
-
-```bash
-PYTHONPATH=src python3 src/main.py prm-assistant
-```
-
-This may run for manual operator testing. Do not run or describe it as dogfood
-until the human operator explicitly approves dogfood start.
-
-For immediate local use, prefer:
-
-```bash
-PYTHONPATH=src python3 src/main.py memory ask "какие есть подтверждения по моей идее?"
-```
-
-This returns a local evidence brief. It does not perform Telegram RAG LLM
-synthesis over archive snippets; that synthesis exists only inside the
-separately approved manual Telegram runtime.
-
-Completed pre-PRM-19 UX block:
-
-- PRM-18A implemented the operator-facing LLM chat contract and explicit
-  provider-egress switch as a docs-only contract; it does not approve provider
-  calls, service starts, dogfood, or production DB writes.
-- PRM-18B implemented a CLI chat harness over the existing PI chat/RAG path
-  with fake-provider tests by default.
-- PRM-18C aligned Telegram `prm-assistant` UX and the start/stop runbook; the
-  service was later installed, enabled, and started for manual testing only.
-- The deep review boundary for this block is recorded at
-  `docs/audit/PRM_DEEP_REVIEW_PRM18A_18C_2026-08-03.md`.
-
-PRM-18A contracted command surfaces:
-
-- current local-only evidence: `PYTHONPATH=src python3 src/main.py memory ask "<question>"`;
-- current local-only receipt: `PYTHONPATH=src python3 src/main.py memory ask --json "<question>"`;
-- PRM-18B one-shot command:
-  `PYTHONPATH=src python3 src/main.py memory ask --llm-approved --allow-provider-egress "<question>"`;
-- PRM-18B interactive command:
-  `PYTHONPATH=src python3 src/main.py memory chat --allow-provider-egress`;
-- Telegram auto route in the current manual runtime: ordinary text or voice
-  transcript chooses local research or local editor brief by default, then can
-  add bounded LLM synthesis after local RAG when explicitly enabled;
-- Telegram manual local research fallback in the current manual runtime:
-  `/research <question>`;
-- Telegram manual editor brief fallback in the current manual runtime:
-  `/brief <question>` for source-backed theses;
-- PRM-18C Telegram LLM parity command after separate provider-egress approval:
-  `/chat <question>` with `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1`.
-
-CLI/`/chat` LLM-backed surfaces must print sources, archive-support status,
-unknowns or external-verification needs, write status, and an explicit
-privacy/cost line. Telegram `/research`, `/brief`, and auto-routed
-research/brief are report views: they should show a packaged topical report,
-sources, and plain-language boundaries, but hide technical metrics such as
-model calls, cost, tool counts, budgets, retrieval modes, and debug hints.
-Without the explicit provider-egress switch, the product must stay local-only or
-refuse before sending bounded Telegram snippets to a provider.
-
-Future polished assistant target:
-
-- specified in `docs/personal_research_memory_product_contract.md` and
-  scheduled in `docs/tasks.md`;
-- PRM-21 records the contract; PRM-22 implements a fixture-first linked-source
-  resolver/cache layer, and PRM-23 implements a bounded fixture-first
-  `memory research` planner/CLI;
-- expected to add archive search plus approved linked-source research,
-  project-context routing, approach comparison, LLM synthesis, and
-  deeper-reading paths;
-- not PRM-19 evidence until implemented and explicitly dogfooded;
-- not an approval to start live web research, provider egress, services,
-  dogfood, production DB writes, durable production cache writes, or
-  vector/backend adoption.
-
-Implemented `prm-assistant` runtime mode:
-
-- one service, currently enabled for manual operator testing only;
-- no automatic timers;
-- ordinary text and voice transcripts enter `/auto`, which chooses local
-  research or local source-backed editor/social-post brief by default;
-- `/research` and `/brief` remain manual fallback commands;
-- short follow-ups can use the last in-process research question for that
-  chat and previous mode; this dialog context is volatile and is not written to
-  the database;
-- LLM auto-routing and auto chat require both
-  `PRM_TELEGRAM_AUTO_LLM_ROUTER=1` and
-  `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1`; `/chat` remains the separate
-  LLM-backed fallback command and requires provider-egress approval before use
-  with private snippets;
-- Telegram research/brief can add bounded LLM synthesis after local hybrid RAG
-  when `PRM_TELEGRAM_RAG_LLM_SYNTHESIS=1` is also enabled; the provider receives
-  only selected bounded snippets/context, not the raw corpus, and usage
-  recording is suppressed to avoid production DB writes;
-- Telegram research/brief responses are packaged topic reports and do not show
-  technical metrics in the user-visible message;
-- freshness-scoped research questions such as "last two weeks" are strict
-  dated-archive queries: `date_from`/`date_to` are applied to SQLite FTS and the
-  local vector sidecar, stale candidates are rejected after retrieval, and the
-  user-facing answer must say when no local posts exist in that window instead
-  of using older related posts as evidence;
-- manual archive freshness for PRM testing uses `memory refresh-archive
-  --days N --confirm-canonical-write`; this bounded command writes the
-  canonical local archive and rebuilds the approved local vector sidecar, but
-  deliberately avoids legacy services/timers, migrations, reaction sync, media
-  download, vision LLM, provider egress, source-event writes, report
-  generation, dogfood evidence, and release claims;
-- after explicit operator approval on 2026-08-12, weekly archive freshness uses
-  the dedicated `telegram-prm-archive-refresh.timer`, which runs only the same
-  bounded `memory refresh-archive --days 21 --confirm-canonical-write --json`
-  path and does not start legacy ingest/report automation;
-- auto-routing guards archive/source questions from generic chat fallback, so
-  questions about posts, archive evidence, AI transformation, companies,
-  Telegram, RAG, or vectors stay on the RAG path;
-- read-only tools enabled by default;
-- proposal tools return drafts only;
-- `confirm_save_proposal` is the only durable memory write;
-- ordinary text and voice transcript dispatch to `/auto`, not the legacy
-  `/message` or `/voice` feedback/reminder router;
-- legacy callbacks are disabled, so inline buttons cannot write old decision,
-  reminder, or artifact-feedback rows;
-- old generation/write commands are blocked:
-  `/run_digest`, `/run_mvp_weekly`, old report delivery, ingest, sync, Radar,
-  `/feedback_confirm`, direct tags, marks, and reminders.
-- startup does not run automatic DB migrations; any production schema migration
-  remains a separate approved maintenance action with backup.
-
-## Consolidation Plan
-
-1. Keep legacy runtime frozen.
-2. Keep the dedicated PRM assistant runtime separated from dogfood evidence
-   until approved dogfood start.
-3. Complete the minimum PRM-UX dogfood-start slice: single ordinary-message
-   entrypoint, answer-first Telegram contract, professional lens selection,
-   active-project context, approved freshness threshold, reaction searchability
-   path, confirmation-gated post-answer actions, real-question smoke eval, and
-   consistent operator docs.
-4. Replace old weekly-report timers with no report timers by default. The
-   explicitly approved `telegram-prm-archive-refresh.timer` may refresh the
-   local archive weekly for manual PRM testing, but it is not dogfood evidence
-   and must not generate reports.
-5. Convert Weekly Brief V3 into a secondary projection generated from real
-   PRM usage receipts, not from the old Report V2 rollout gate.
-6. Convert MVP Radar into a bounded decision evidence card inside the assistant
-   and Weekly Brief V3, with external-evidence separation and no auto-build
-   approval.
-7. Keep PRM-18A through PRM-18C as the pre-dogfood chat workflow and privacy
-   contract baseline.
-8. Define PRM-19 dogfood metadata before collecting any dogfood evidence:
-   at least 30 real questions, usefulness labels, corrections, saved notes,
-   watch topics, decisions, time to useful answer, cost, value, and friction.
-9. Run PRM-19 only after human dogfood-start approval. The current post-PRM28
-   PRM-18 receipt has deterministic local stop-ship blockers cleared, but the
-   explicit dogfood-start approval blocker remains.
-10. Run PRM-20 cleanup only after real dogfood evidence justifies what to keep,
-   demote, archive, or remove.
-
-## Human Approval Checklist For PRM-UX
-
-Explicit approval is required before:
-
-- accepting the professional lens schema;
-- changing `profile.yaml`;
-- changing project active/priority status or the default active project set;
-- changing archive-refresh schedule or systemd timezone;
-- adding reaction sync to a routine service;
-- starting live external verification or approving external skills;
-- changing provider-egress boundaries;
-- starting PRM-19 dogfood;
-- claiming PRM-19 success;
-- deleting, moving, or archiving legacy code/docs.
-
-Before reaction sync can be added to any routine service, the operator must
-record the credential scope, Telethon personal-reaction visibility result,
-channel/source volume, rate-limit policy, failure alerting/rollback behavior,
-and confirmation that reaction failure remains isolated from archive freshness.
-Until then, the PRM-UX-6 receipts are fixture/read-only models only and do not
-authorize a sync run, timer change, or durable preference learning.
-
-## Runtime Commands
-
-Do not restart the legacy bot or report timer as a PRM workflow.
-
-The repo templates for the legacy report timer are archived at
-`systemd/archive/legacy_report_era/`. If historical compatibility runtime is
-intentionally needed, record that as a separate approval and use explicit
-commands against an already-installed host unit:
-
-```bash
-systemctl start telegram-bot.service
-systemctl start telegram-ai-split-report.timer
-```
-
-Starting either of those reintroduces legacy behavior. The bot includes commands
-that can generate artifacts or write local feedback/tag/reminder rows, and the
-report timer includes live ingestion and weekly report generation.
-
-The safe assistant unit template is `systemd/telegram-prm-assistant.service`.
-It is currently installed, enabled, and running for manual operator testing
-only. Starting or observing this service is not PRM-19 dogfood evidence.
-
-Current activation/status runbook:
-
-```bash
-systemd-analyze verify systemd/telegram-prm-assistant.service
-sudo install -m 0644 systemd/telegram-prm-assistant.service /etc/systemd/system/telegram-prm-assistant.service
-sudo systemctl daemon-reload
-sudo systemctl enable --now telegram-prm-assistant.service
-systemctl status telegram-prm-assistant.service --no-pager
-journalctl -u telegram-prm-assistant.service -n 100 --no-pager
-```
-
-Rollback to disabled:
-
-```bash
-sudo systemctl stop telegram-prm-assistant.service
-sudo systemctl disable telegram-prm-assistant.service
-sudo rm -f /etc/systemd/system/telegram-prm-assistant.service
-sudo systemctl daemon-reload
-```
-
-Do not convert this manual runtime into PRM-19 dogfood until dogfood-start
-approval is explicitly recorded.
-
-The safe archive-refresh timer templates are
-`systemd/telegram-prm-archive-refresh.service` and
-`systemd/telegram-prm-archive-refresh.timer`. They are separate from legacy
-`telegram-ingest.*` and `telegram-ai-split-report.*`.
-
-Current archive-refresh timer runbook:
-
-```bash
-systemd-analyze verify systemd/telegram-prm-archive-refresh.service systemd/telegram-prm-archive-refresh.timer
-sudo install -m 0644 systemd/telegram-prm-archive-refresh.service /etc/systemd/system/telegram-prm-archive-refresh.service
-sudo install -m 0644 systemd/telegram-prm-archive-refresh.timer /etc/systemd/system/telegram-prm-archive-refresh.timer
-sudo systemctl daemon-reload
-sudo systemctl enable --now telegram-prm-archive-refresh.timer
-systemctl list-timers --all telegram-prm-archive-refresh.timer --no-pager
-journalctl -u telegram-prm-archive-refresh.service -n 100 --no-pager
-```
-
-Rollback to disabled:
-
-```bash
-sudo systemctl disable --now telegram-prm-archive-refresh.timer
-sudo rm -f /etc/systemd/system/telegram-prm-archive-refresh.service
-sudo rm -f /etc/systemd/system/telegram-prm-archive-refresh.timer
-sudo systemctl daemon-reload
-```
+The August/September runtime/report freeze and bounded UTD enablement receipts remain historical. They neither assert current service state nor extend consent to mail/Canvas. UTD/API is currently owner-deferred. Current execution authority is the owner's assignment plus [CODEX_PROMPT](CODEX_PROMPT.md), [boundaries](ASSISTANT_BOUNDARIES.md) and contract/ADRs. Exact design/role/human acceptance remains separate from merge.

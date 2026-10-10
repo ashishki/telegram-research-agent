@@ -1,0 +1,1088 @@
+{
+  "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+  "privacy": "public_synthetic_only",
+  "real_external_effects": false,
+  "generator_model": "deepseek-v4.1-flash",
+  "actual_generator_calls": 11,
+  "cases": [
+    {
+      "case_id": "context_and_topic",
+      "capability": "chat",
+      "privacy": "public_synthetic",
+      "turns": [
+        {
+          "turn": 1,
+          "user": "/chat Меня зовут Ирина. В учебном проекте Аврора на Python я впервые пишу тесты. Объясни, с чего начать, в трёх пунктах.",
+          "assistant": "# С чего начать писать тесты в проекте «Аврора» на Python\n\nПривет, Ирина! Вот три первых шага:\n\n1. **Определись с инструментом.** Для Python почти стандарт — `pytest`: его проще освоить, чем встроенный `unittest`, и он меньше требует шаблонного кода. Установи его (`pip install pytest`) и создай в корне проекта папку `tests/` с первым файлом вида `test_*.py`.\n\n2. **Начни с одной маленькой функции.** Выбери самый простой, «чистый» участок кода (например, функцию, которая что-то считает или преобразует данные и не зависит от сети/файлов) и напиши для неё тест(ы). Схема теста простая: подготовить вход → вызвать функцию → сравнить результат с ожидаемым через `assert`.\n\n3. **Запусти и убедись, что тест работает.** Выполни `pytest` в корне проекта. Сначала полезно убедиться, что тест проходит на верных данных, а потом специально сломать ожидаемый результат — если тест упал, значит он действительно что-то проверяет. С этого момента просто добавляй по тесту на каждую новую функцию или найденный баг.\n\nЕсли хочешь, могу подробнее разобрать любой из пунктов — например, как структурировать папку `tests/` под конкретную структуру «Авроры» или что такое фикстуры в pytest.",
+          "status": "ok",
+          "expected_goal": "Explain three practical steps for a beginner, using only synthetic personal facts.",
+          "elapsed_seconds": 4.729,
+          "delivery": {
+            "status": "sent",
+            "receipt_ref": "synthetic_telegram_1",
+            "adapter": "synthetic Telegram only"
+          },
+          "result_payload": {
+            "request_id": "request_666777d7f8434d2fb46ae90b6782d7e1",
+            "conversation": {
+              "retention": "durable_expiring",
+              "response_refs": [
+                "response_0b83e46c61dc9e04e9a0ebd5",
+                "response_e3a55ff47d5072f6e93d1d61"
+              ],
+              "conversation_id": "conversation_e15fac365faea36a230d81ad",
+              "summary_version": 3
+            },
+            "safe_context": {
+              "omitted_state": [
+                "prior_messages",
+                "response_objects",
+                "topic_summary",
+                "confirmations"
+              ]
+            },
+            "write_performed": false,
+            "source_data_class": "model_generated",
+            "source_data_classes": [
+              "model_generated"
+            ],
+            "model_call_attempted": true
+          }
+        },
+        {
+          "turn": 2,
+          "user": "Что сделать первым именно в моём проекте?",
+          "assistant": "Первым делом в проекте «Аврора» — **создать каркас для тестов и проверить, что `pytest` вообще находит и запускает тесты**.\n\nКонкретно:\n\n1. **Установи pytest** в то же окружение, где запускается «Аврора» (`pip install pytest` или через `requirements-dev.txt` / `pyproject.toml`, если они уже есть у тебя).\n2. **Создай папку `tests/` в корне проекта** и один файл `tests/test_smoke.py` с элементарной проверкой, например:\n   ```python\n   def test_pytest_works():\n       assert 1 + 1 == 2\n   ```\n3. **Запусти `pytest` из корня проекта** и убедись, что тест виден и проходит.\n\nПочему именно это первым: пока нет рабочего «пустого» прогона, любой следующий тест непонятно, падает из-за кода или из-за неверной настройки. А ещё это заставит сразу решить два базовых вопроса твоего проекта — **какое окружение считается тестовым и откуда `pytest` импортирует модули «Авроры»** (корень в `sys.path`, установка пакета или настройка в `pyproject.toml`).\n\nЕсли скажешь, как устроена «Аврора» — где лежит код, есть ли уже `pyproject.toml` / `requirements.txt`, как запускается сама программа, — подскажу точнее, куда положить `tests/` и как настроить импорт.",
+          "status": "ok",
+          "expected_goal": "Continue Aurora testing topic and give one practical step.",
+          "elapsed_seconds": 5.956,
+          "delivery": {
+            "status": "sent",
+            "receipt_ref": "synthetic_telegram_2",
+            "adapter": "synthetic Telegram only"
+          },
+          "result_payload": {
+            "request_id": "request_ecdcfa7480ba4e9c899bcdf42cf5419c",
+            "conversation": {
+              "retention": "durable_expiring",
+              "response_refs": [
+                "response_cfb3425eea552e95ca3014b2",
+                "response_3cbd93c179847b320abeed1e"
+              ],
+              "conversation_id": "conversation_e15fac365faea36a230d81ad",
+              "summary_version": 6
+            },
+            "safe_context": {
+              "omitted_state": [
+                "prior_messages",
+                "response_objects",
+                "topic_summary",
+                "confirmations"
+              ]
+            },
+            "write_performed": false,
+            "source_data_class": "model_generated",
+            "source_data_classes": [
+              "model_generated"
+            ],
+            "model_call_attempted": true
+          }
+        },
+        {
+          "turn": 3,
+          "user": "Сделай короче",
+          "assistant": "**Установи pytest** в то же окружение, где запускается «Аврора» (`pip install pytest` или через `requirements-dev.txt` / `pyproject.toml`, если они уже есть у тебя).",
+          "status": "ok",
+          "expected_goal": "Shorten the previous object; do not change topic.",
+          "elapsed_seconds": 2.487,
+          "delivery": {
+            "status": "sent",
+            "receipt_ref": "synthetic_telegram_3",
+            "adapter": "synthetic Telegram only"
+          },
+          "result_payload": {
+            "conversation": {
+              "retention": "ephemeral_clear_on_restart",
+              "response_refs": [
+                "response_caafb4b2f1fc316e7e4b568b",
+                "response_cfb3425eea552e95ca3014b2",
+                "response_3cbd93c179847b320abeed1e"
+              ],
+              "conversation_id": "conversation_e15fac365faea36a230d81ad",
+              "summary_version": 7,
+              "has_current_confirmation": false
+            },
+            "response_ref": "response_cfb3425eea552e95ca3014b2",
+            "source_scopes": [],
+            "write_performed": false,
+            "source_data_class": "model_generated",
+            "source_data_classes": [
+              "model_generated"
+            ],
+            "model_call_attempted": false
+          }
+        },
+        {
+          "turn": 4,
+          "user": "/chat А как называется мой проект и что я сейчас изучаю?",
+          "assistant": "Твой проект называется **«Аврора»**, и ты изучаешь **написание тестов на Python** — это твой первый опыт с тестами в этом учебном проекте.",
+          "status": "ok",
+          "expected_goal": "Recover the explicitly supplied Aurora/Python testing context; no fabricated user facts.",
+          "elapsed_seconds": 5.02,
+          "delivery": {
+            "status": "sent",
+            "receipt_ref": "synthetic_telegram_4",
+            "adapter": "synthetic Telegram only"
+          },
+          "result_payload": {
+            "request_id": "request_efad5e71fbcf4bb399d5373b5ea92ffe",
+            "conversation": {
+              "retention": "durable_expiring",
+              "response_refs": [
+                "response_864ac877f42be432c88a9f80",
+                "response_39bfd44d2b2e571105d29505"
+              ],
+              "conversation_id": "conversation_e15fac365faea36a230d81ad",
+              "summary_version": 10
+            },
+            "safe_context": {
+              "omitted_state": [
+                "prior_messages",
+                "response_objects",
+                "topic_summary",
+                "confirmations"
+              ]
+            },
+            "write_performed": false,
+            "source_data_class": "model_generated",
+            "source_data_classes": [
+              "model_generated"
+            ],
+            "model_call_attempted": true
+          }
+        },
+        {
+          "turn": 5,
+          "user": "/new",
+          "assistant": "Начинаем новую тему. Предыдущий ответ и подтверждения не будут использованы.",
+          "status": "topic_reset",
+          "expected_goal": "Clear conversation context without changing saved preferences.",
+          "elapsed_seconds": 1.664,
+          "delivery": {
+            "status": "sent",
+            "receipt_ref": "synthetic_telegram_5",
+            "adapter": "synthetic Telegram only"
+          },
+          "result_payload": {
+            "conversation": {
+              "retention": "ephemeral_clear_on_restart",
+              "response_refs": [
+                "response_864ac877f42be432c88a9f80",
+                "response_39bfd44d2b2e571105d29505"
+              ],
+              "conversation_id": "conversation_e15fac365faea36a230d81ad",
+              "summary_version": 10,
+              "has_current_confirmation": false
+            },
+            "write_performed": false,
+            "source_data_class": "user_provided",
+            "source_data_classes": [
+              "user_provided"
+            ],
+            "model_call_attempted": false
+          }
+        },
+        {
+          "turn": 6,
+          "user": "/chat Другая тема: чем fixture отличается от mock? Объясни новичку в двух предложениях.",
+          "assistant": "Fixture — это заранее подготовленное окружение или данные для теста (например, тестовая база, объект или набор значений), которое используется, чтобы тест запускался в известном состоянии. Mock — это подставной объект, который имитирует поведение реальной зависимости и позволяет проверить, что нужные вызовы были сделаны, не используя настоящую систему.",
+          "status": "ok",
+          "expected_goal": "Follow explicit new topic; no stale Aurora-specific recommendation.",
+          "elapsed_seconds": 4.815,
+          "delivery": {
+            "status": "sent",
+            "receipt_ref": "synthetic_telegram_6",
+            "adapter": "synthetic Telegram only"
+          },
+          "result_payload": {
+            "request_id": "request_e42a9864aef542e9b7ccad90b4b39b17",
+            "conversation": {
+              "retention": "durable_expiring",
+              "response_refs": [
+                "response_ef7c6ea302b2140f14417e47",
+                "response_c81ba84ed817bdfe47a0d360"
+              ],
+              "conversation_id": "conversation_e15fac365faea36a230d81ad",
+              "summary_version": 14
+            },
+            "safe_context": {
+              "omitted_state": [
+                "prior_messages",
+                "response_objects",
+                "topic_summary",
+                "confirmations"
+              ]
+            },
+            "write_performed": false,
+            "source_data_class": "model_generated",
+            "source_data_classes": [
+              "model_generated"
+            ],
+            "model_call_attempted": true
+          }
+        },
+        {
+          "turn": 7,
+          "user": "/chat Что из прошлого вопроса мы сравнивали?",
+          "assistant": "Мы сравнивали **fixture** и **mock** — чем они отличаются, в объяснении для новичка.",
+          "status": "ok",
+          "expected_goal": "Continue fixture versus mock topic.",
+          "elapsed_seconds": 4.98,
+          "delivery": {
+            "status": "sent",
+            "receipt_ref": "synthetic_telegram_7",
+            "adapter": "synthetic Telegram only"
+          },
+          "result_payload": {
+            "request_id": "request_7f7b2c708a68483e83edd94bc5fda4a1",
+            "conversation": {
+              "retention": "durable_expiring",
+              "response_refs": [
+                "response_9db376fb7d91d9bd61ac11c4",
+                "response_026a2f6fb23098b23e259a0e"
+              ],
+              "conversation_id": "conversation_e15fac365faea36a230d81ad",
+              "summary_version": 17
+            },
+            "safe_context": {
+              "omitted_state": [
+                "prior_messages",
+                "response_objects",
+                "topic_summary",
+                "confirmations"
+              ]
+            },
+            "write_performed": false,
+            "source_data_class": "model_generated",
+            "source_data_classes": [
+              "model_generated"
+            ],
+            "model_call_attempted": true
+          }
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "case_id": "editing_and_context_repair",
+      "capability": "chat",
+      "privacy": "public_synthetic",
+      "turns": [
+        {
+          "turn": 1,
+          "user": "/new",
+          "assistant": "Начинаем новую тему. Предыдущий ответ и подтверждения не будут использованы.",
+          "status": "topic_reset",
+          "expected_goal": "Fresh dialogue.",
+          "elapsed_seconds": 1.069,
+          "delivery": {
+            "status": "sent",
+            "receipt_ref": "synthetic_telegram_8",
+            "adapter": "synthetic Telegram only"
+          },
+          "result_payload": {
+            "conversation": {
+              "retention": "ephemeral_clear_on_restart",
+              "response_refs": [
+                "response_9db376fb7d91d9bd61ac11c4",
+                "response_026a2f6fb23098b23e259a0e"
+              ],
+              "conversation_id": "conversation_e15fac365faea36a230d81ad",
+              "summary_version": 17,
+              "has_current_confirmation": false
+            },
+            "write_performed": false,
+            "source_data_class": "user_provided",
+            "source_data_classes": [
+              "user_provided"
+            ],
+            "model_call_attempted": false
+          }
+        },
+        {
+          "turn": 2,
+          "user": "/chat В синтетическом примере я пишу коллеге: «Не смогу закончить сегодня, пришлю завтра утром». Перепиши вежливо, не меняя срок.",
+          "assistant": "Вот вежливый вариант, срок сохранён — завтра утром:\n\n«К сожалению, сегодня я не успею закончить. Пришлю результат завтра утром».\n\nБолее формальный вариант:\n\n«К сожалению, сегодня завершить не получится. Отправлю готовый вариант завтра утром».",
+          "status": "ok",
+          "expected_goal": "Rewrite supplied wording and preserve tomorrow morning; no made-up date.",
+          "elapsed_seconds": 4.893,
+          "delivery": {
+            "status": "sent",
+            "receipt_ref": "synthetic_telegram_9",
+            "adapter": "synthetic Telegram only"
+          },
+          "result_payload": {
+            "request_id": "request_d6f15e48de8e4ff28ffe33cda09e4543",
+            "conversation": {
+              "retention": "durable_expiring",
+              "response_refs": [
+                "response_1e856d0ccb9dba3191066cde",
+                "response_698b023c7d72cb7c3cd0249e"
+              ],
+              "conversation_id": "conversation_e15fac365faea36a230d81ad",
+              "summary_version": 21
+            },
+            "safe_context": {
+              "omitted_state": [
+                "prior_messages",
+                "response_objects",
+                "topic_summary",
+                "confirmations"
+              ]
+            },
+            "write_performed": false,
+            "source_data_class": "model_generated",
+            "source_data_classes": [
+              "model_generated"
+            ],
+            "model_call_attempted": true
+          }
+        },
+        {
+          "turn": 3,
+          "user": "/chat Сделай менее официально",
+          "assistant": "Вот менее официальные варианты, срок тот же — завтра утром:\n\n«Извини, сегодня не успею доделать. Скину завтра утром».\n\n«Прости, сегодня никак не закончу. Пришлю завтра утром».",
+          "status": "ok",
+          "expected_goal": "Edit the current draft without losing deadline or audience.",
+          "elapsed_seconds": 4.457,
+          "delivery": {
+            "status": "sent",
+            "receipt_ref": "synthetic_telegram_10",
+            "adapter": "synthetic Telegram only"
+          },
+          "result_payload": {
+            "request_id": "request_1c387c1a489a48f28ab01c933789d8ad",
+            "conversation": {
+              "retention": "durable_expiring",
+              "response_refs": [
+                "response_249a099c7b6fd82b13ff8d2a",
+                "response_25ec018d8b8010e199d3f2eb"
+              ],
+              "conversation_id": "conversation_e15fac365faea36a230d81ad",
+              "summary_version": 24
+            },
+            "safe_context": {
+              "omitted_state": [
+                "prior_messages",
+                "response_objects",
+                "topic_summary",
+                "confirmations"
+              ]
+            },
+            "write_performed": false,
+            "source_data_class": "model_generated",
+            "source_data_classes": [
+              "model_generated"
+            ],
+            "model_call_attempted": true
+          }
+        },
+        {
+          "turn": 4,
+          "user": "/chat Нет, адресат — преподаватель. Дедлайн остаётся тем же. Исправь обращение.",
+          "assistant": "Понял, адресат — преподаватель, срок тот же. Вот менее официальный, но уважительный вариант:\n\n«Здравствуйте! Извините, сегодня, к сожалению, не успею закончить. Пришлю завтра утром».\n\nЧуть короче:\n\n«Здравствуйте! Прошу прощения, сегодня не успею доделать. Отправлю завтра утром».\n\nЕсли у вас уже был контакт и вы знаете, как принято обращаться (по имени-отчеству или нейтрально «Здравствуйте»), скажите — подгоню формулировку.",
+          "status": "ok",
+          "expected_goal": "Repair recipient context; preserve the original deadline.",
+          "elapsed_seconds": 4.353,
+          "delivery": {
+            "status": "sent",
+            "receipt_ref": "synthetic_telegram_11",
+            "adapter": "synthetic Telegram only"
+          },
+          "result_payload": {
+            "request_id": "request_078df3fc317342c8bf6cd1501aaf5cf4",
+            "conversation": {
+              "retention": "durable_expiring",
+              "response_refs": [
+                "response_ee3382aa2c3f6b614be6178e",
+                "response_dcb218a7b5ce503d12f1fe54"
+              ],
+              "conversation_id": "conversation_e15fac365faea36a230d81ad",
+              "summary_version": 27
+            },
+            "safe_context": {
+              "omitted_state": [
+                "prior_messages",
+                "response_objects",
+                "topic_summary",
+                "confirmations"
+              ]
+            },
+            "write_performed": false,
+            "source_data_class": "model_generated",
+            "source_data_classes": [
+              "model_generated"
+            ],
+            "model_call_attempted": true
+          }
+        },
+        {
+          "turn": 5,
+          "user": "/chat Напомни, когда я обещала прислать работу?",
+          "assistant": "Вы обещали прислать работу **завтра утром**.",
+          "status": "ok",
+          "expected_goal": "Recall tomorrow morning without inventing an exact date or confirmed external reminder.",
+          "elapsed_seconds": 3.434,
+          "delivery": {
+            "status": "sent",
+            "receipt_ref": "synthetic_telegram_12",
+            "adapter": "synthetic Telegram only"
+          },
+          "result_payload": {
+            "request_id": "request_98b177185184499280003a2f99797455",
+            "conversation": {
+              "retention": "durable_expiring",
+              "response_refs": [
+                "response_0227b11e91f8ba8314825793",
+                "response_1ea1095f5ac74ce2b3196370"
+              ],
+              "conversation_id": "conversation_e15fac365faea36a230d81ad",
+              "summary_version": 30
+            },
+            "safe_context": {
+              "omitted_state": [
+                "prior_messages",
+                "response_objects",
+                "topic_summary",
+                "confirmations"
+              ]
+            },
+            "write_performed": false,
+            "source_data_class": "model_generated",
+            "source_data_classes": [
+              "model_generated"
+            ],
+            "model_call_attempted": true
+          }
+        }
+      ],
+      "evidence": []
+    },
+    {
+      "case_id": "archive_research",
+      "capability": "search",
+      "turns": [
+        {
+          "turn": 1,
+          "user": "/deep {\"schema_version\": 1, \"question\": \"Какие тесты добавлены в учебном проекте Аврора и где пока нет измерений?\", \"steps\": [{\"source\": \"archive\", \"query\": \"Аврора тест\"}], \"max_tool_calls\": 1, \"deadline_seconds\": 120}",
+          "assistant": "Исследование сохранено. Проверю выбранные источники и подготовлю ответ с цитатами и границами покрытия.\nСтатус: /status job_20f373b5551d4366999445ef6c90105e\nОтмена: /cancel job_20f373b5551d4366999445ef6c90105e",
+          "status": "queued",
+          "expected_goal": "Collect only synthetic archive, explain exact supported changes and missing measurements.",
+          "elapsed_seconds": 0.895,
+          "delivery": {
+            "status": "sent",
+            "receipt_ref": "synthetic_telegram_1",
+            "adapter": "synthetic Telegram only"
+          },
+          "result_payload": {
+            "job_ref": "job_20f373b5551d4366999445ef6c90105e",
+            "source_data_class": "user_provided",
+            "source_data_classes": [
+              "user_provided"
+            ]
+          }
+        },
+        {
+          "turn": 2,
+          "user": "Завершение зарегистрированного исследования",
+          "assistant": "Аврора: добавлены unit tests для функции normalize_email (https://t.me/source/1001).\n\nТест проверяет удаление пробелов и нижний регистр (https://t.me/source/1001).\n\nАврора: добавлен тест slugify для русских названий (https://t.me/source/1002).\n\nИзменение внедрено в учебном проекте, результат пока не измерен (https://t.me/source/1002).\n\nПокрытие: проверено 1 из 1 запланированных поисковых шагов; найдено материалов: 2; процитировано: 2. Это ограниченная выборка по запросу, а не проверка всего архива или интернета.\nЕсли источник не сообщает о результате измерения, результат остаётся неизвестным.",
+          "status": "synthesized_verified",
+          "expected_goal": "Source-bound research result, exact citations and honest coverage.",
+          "delivery": {
+            "status": "sent",
+            "adapter": "native scoped delivery; synthetic Telegram only"
+          }
+        }
+      ],
+      "evidence": [
+        {
+          "source_id": "tg:1",
+          "text": "Аврора: добавлены unit tests для функции normalize_email. Тест проверяет удаление пробелов и нижний регистр.",
+          "privacy": "synthetic"
+        },
+        {
+          "source_id": "tg:2",
+          "text": "Аврора: добавлен тест slugify для русских названий. Изменение внедрено в учебном проекте, результат пока не измерен.",
+          "privacy": "synthetic"
+        },
+        {
+          "source_id": "tg:3",
+          "text": "Аврора: unittest входит в стандартную библиотеку Python. pytest устанавливается отдельно. Здесь нет данных о преимуществе по качеству.",
+          "privacy": "synthetic"
+        }
+      ]
+    },
+    {
+      "case_id": "weekly_brief",
+      "capability": "brief",
+      "turns": [
+        {
+          "turn": 1,
+          "user": "/weekly Важное по учебному проекту Аврора",
+          "assistant": "🗞 <b>Важное по учебному проекту Аврора</b>\n<i>03.10 09:40 — 10.10 09:40 · Europe/Berlin</i>\n\n<b>1. Аврора: добавлены unit tests для функции normalize_email</b>\nВ учебный проект добавлены unit tests для функции normalize_email. Тест проверяет удаление пробелов и приведение к нижнему регистру.\nИсточник: <a href=\"https://t.me/source/1001\">@source</a>\n\n<b>2. Аврора: добавлен тест slugify для русских названий</b>\nВ учебном проекте появился тест slugify для русских названий. По источнику, изменение уже внедрено, но результат пока не измерен.\nИсточник: <a href=\"https://t.me/source/1002\">@source</a>\n\n<b>3. Аврора: unittest в стандартной библиотеке Python, pytest устанавливается отдельно</b>\nВ источнике отмечено, что unittest входит в стандартную библиотеку Python, а pytest устанавливается отдельно. Данных о преимуществе по качеству здесь нет.\nИсточник: <a href=\"https://t.me/source/1003\">@source</a>\n\n✓ Проверено подключений: 1 из 1; использовано материалов: 3. Покрытие — в пределах выбранных источников.\nПодробнее — «Показать полный бриф». Можно попросить объяснить любой пункт.",
+          "status": "ok",
+          "expected_goal": "Editorial weekly summary with evidence and no invented impact or deadlines.",
+          "elapsed_seconds": 7.275,
+          "delivery": {
+            "status": "sent",
+            "receipt_ref": "synthetic_telegram_3",
+            "adapter": "synthetic Telegram only"
+          },
+          "result_payload": {
+            "brief_view": "telegram",
+            "conversation": {
+              "retention": "ephemeral_clear_on_restart",
+              "response_refs": [
+                "response_81c7aadc74e36032dd7437ff"
+              ],
+              "conversation_id": "conversation_e15fac365faea36a230d81ad",
+              "summary_version": 1,
+              "has_current_confirmation": false
+            },
+            "brief_refresh": {
+              "performed": false,
+              "material_changes": [],
+              "new_source_search": false
+            },
+            "source_scopes": [
+              {
+                "purpose": "brief.archive",
+                "grant_ref": null,
+                "operation": "read",
+                "owner_ref": "owner_brief_5da7607122134604bd5ca97b",
+                "capability": "archive.read",
+                "data_class": "private_archive",
+                "is_fallback": false,
+                "provider_ref": "provider_local",
+                "resource_ref": "resource_archive",
+                "operation_ref": null,
+                "connection_ref": null,
+                "expected_grant_revision": null
+              }
+            ],
+            "brief_document": {
+              "status": "complete",
+              "window": {
+                "end_at": "2026-10-10T07:40:34.336540Z",
+                "start_at": "2026-10-03T07:40:34.336540Z",
+                "timezone": "Europe/Berlin",
+                "generated_at": "2026-10-10T07:40:34.650889Z"
+              },
+              "version": 1,
+              "brief_id": "brief_7c7e8293be656e8b79ade550",
+              "sections": [
+                {
+                  "items": [
+                    {
+                      "title": "Аврора: добавлены unit tests для функции normalize_email. Тест проверяет удаление пробелов и нижний регистр.",
+                      "item_id": "brief_item_evidence_tg_1",
+                      "summary": "Аврора: добавлены unit tests для функции normalize_email. Тест проверяет удаление пробелов и нижний регистр.",
+                      "evidence_refs": [
+                        "evidence_tg_1"
+                      ],
+                      "selection_reasons": [
+                        "local_archive_source",
+                        "importance_medium",
+                        "urgency_unknown",
+                        "published_in_window",
+                        "source_active"
+                      ]
+                    },
+                    {
+                      "title": "Аврора: добавлен тест slugify для русских названий. Изменение внедрено в учебном проекте, результат пока не измерен.",
+                      "item_id": "brief_item_evidence_tg_2",
+                      "summary": "Аврора: добавлен тест slugify для русских названий. Изменение внедрено в учебном проекте, результат пока не измерен.",
+                      "evidence_refs": [
+                        "evidence_tg_2"
+                      ],
+                      "selection_reasons": [
+                        "local_archive_source",
+                        "importance_medium",
+                        "urgency_unknown",
+                        "published_in_window",
+                        "source_active"
+                      ]
+                    },
+                    {
+                      "title": "Аврора: unittest входит в стандартную библиотеку Python. pytest устанавливается отдельно. Здесь нет данных о преимуществе по качеству.",
+                      "item_id": "brief_item_evidence_tg_3",
+                      "summary": "Аврора: unittest входит в стандартную библиотеку Python. pytest устанавливается отдельно. Здесь нет данных о преимуществе по качеству.",
+                      "evidence_refs": [
+                        "evidence_tg_3"
+                      ],
+                      "selection_reasons": [
+                        "local_archive_source",
+                        "importance_medium",
+                        "urgency_unknown",
+                        "published_in_window",
+                        "source_active"
+                      ]
+                    }
+                  ],
+                  "title": "По темам",
+                  "section_id": "other_signals"
+                }
+              ],
+              "editorial": {
+                "stories": [
+                  {
+                    "title": "Аврора: добавлены unit tests для функции normalize_email",
+                    "caveat": "В источнике нет данных о том, как тесты выполняются в процессе разработки или как измерялся их эффект.",
+                    "anchors": [
+                      {
+                        "quote": "Аврора: добавлены unit tests для функции normalize_email. Тест проверяет удаление пробелов и нижний регистр.",
+                        "evidence_ref": "evidence_tg_1"
+                      }
+                    ],
+                    "summary": "В учебный проект добавлены unit tests для функции normalize_email. Тест проверяет удаление пробелов и приведение к нижнему регистру.",
+                    "next_step": "Следить, запускаются ли эти тесты в обычном рабочем процессе и покрывают ли они другие случаи normalize_email, кроме пробелов и нижнего регистра.",
+                    "explanation": "Это событие показывает, что в проекте появилось автоматическое тестирование конкретного преобразования адресов. Значимость отдельно от фактов в том, что unit tests снижают риск незаметно сломать normalize_email при будущих изменениях и делают поведение функции явно зафиксированным в проверках.",
+                    "why_selected": "Самое конкретное изменение в подборке: назван объект тестирования и указано, какие проверки в него входят.",
+                    "plain_explanation": "Для функции normalize_email написали автоматические тесты. Они проверяют, что лишние пробелы убираются, а буквы становятся строчными."
+                  },
+                  {
+                    "title": "Аврора: добавлен тест slugify для русских названий",
+                    "caveat": "Источник прямо говорит, что результат пока не измерен.",
+                    "anchors": [
+                      {
+                        "quote": "Аврора: добавлен тест slugify для русских названий. Изменение внедрено в учебном проекте, результат пока не измерен.",
+                        "evidence_ref": "evidence_tg_2"
+                      }
+                    ],
+                    "summary": "В учебном проекте появился тест slugify для русских названий. По источнику, изменение уже внедрено, но результат пока не измерен.",
+                    "next_step": "Уточнить, какие именно русские названия используются в тесте и как будет измеряться результат внедрения.",
+                    "explanation": "Событие фиксирует расширение тестового покрытия на преобразование русскоязычных названий. Его значимость отдельно от фактов в том, что такие тесты помогают удерживать корректное поведение slugify для неалфавитных символов и кириллицы; однако без измерения результата пока нельзя судить о фактическом эффекте.",
+                    "why_selected": "Указывает на отдельное добавление теста и содержит явную оговорку о том, что результат не измерен.",
+                    "plain_explanation": "Добавили тест для функции, которая делает короткий идентификатор из русских названий. Изменение уже в проекте, но пока неизвестно, насколько оно помогло."
+                  },
+                  {
+                    "title": "Аврора: unittest в стандартной библиотеке Python, pytest устанавливается отдельно",
+                    "caveat": "В источнике нет данных о преимуществе по качеству между unittest и pytest.",
+                    "anchors": [
+                      {
+                        "quote": "Аврора: unittest входит в стандартную библиотеку Python. pytest устанавливается отдельно. Здесь нет данных о преимуществе по качеству.",
+                        "evidence_ref": "evidence_tg_3"
+                      }
+                    ],
+                    "summary": "В источнике отмечено, что unittest входит в стандартную библиотеку Python, а pytest устанавливается отдельно. Данных о преимуществе по качеству здесь нет.",
+                    "next_step": "Если в проекте выбирают между unittest и pytest, зафиксировать критерии выбора отдельно от доступности инструмента.",
+                    "explanation": "Это не изменение проекта, а пояснение о доступности инструментов тестирования. Значимость отдельно от фактов в том, что выбор между unittest и pytest может влиять на зависимости и настройку окружения, но сам по себе этот факт не доказывает лучшего качества тестов.",
+                    "why_selected": "Сообщение содержит проверяемое утверждение о наличии инструментов и прямо ограничивает выводы отсутствием данных о качестве.",
+                    "plain_explanation": "unittest уже есть в Python, а pytest нужно ставить отдельно. В этом сообщении не утверждается, что один инструмент даёт лучшее качество."
+                  }
+                ],
+                "omitted_refs": []
+              },
+              "owner_ref": "owner_brief_5da7607122134604bd5ca97b",
+              "evidence_refs": [
+                "evidence_tg_1",
+                "evidence_tg_2",
+                "evidence_tg_3"
+              ],
+              "schema_version": "assistant.brief_document.v1",
+              "previous_version": null,
+              "coverage_manifest": {
+                "sources": [
+                  {
+                    "state": "checked",
+                    "reason": null,
+                    "source_ref": "resource_archive"
+                  }
+                ],
+                "limitations": [
+                  "bounded_local_archive_selection"
+                ]
+              },
+              "selection_reasons": [
+                "local_archive_selected",
+                "source_bound_items",
+                "importance_urgency_separate"
+              ]
+            },
+            "brief_editorial": {
+              "status": "saved_editorial"
+            },
+            "write_performed": false,
+            "brief_inspection": {
+              "topic": "Важное по учебному проекту Аврора",
+              "period": {
+                "basis": "explicit_requested_range",
+                "end_at": "2026-10-10T07:40:34.336540Z",
+                "interval": "[start_at,end_at)",
+                "start_at": "2026-10-03T07:40:34.336540Z",
+                "timezone": "Europe/Berlin",
+                "generated_at": "2026-10-10T07:40:34.650889Z"
+              },
+              "history": {
+                "comparison_ref": null,
+                "previous_version": null
+              },
+              "coverage": {
+                "sources": [
+                  {
+                    "state": "checked",
+                    "reason": null,
+                    "source_ref": "resource_archive"
+                  }
+                ],
+                "complete": true,
+                "limitations": [
+                  "bounded_local_archive_selection"
+                ]
+              },
+              "evidence": [
+                {
+                  "topics": [
+                    "unclassified"
+                  ],
+                  "event_at": null,
+                  "time_kind": "published",
+                  "deleted_at": null,
+                  "source_ref": "https://t.me/source/1001",
+                  "updated_at": null,
+                  "observed_at": "2026-10-08T07:40:22.878241Z",
+                  "reissued_at": null,
+                  "evidence_ref": "evidence_tg_1",
+                  "published_at": "2026-10-08T07:40:22.878241Z",
+                  "source_state": "active",
+                  "source_version": "fe361f583ab7e707f20a30d624ec3e95e4dbad3484a13003cea2ee2386b5054e",
+                  "period_relation": "published_in_window",
+                  "first_discovered_at": "2026-07-20T10:00:00Z",
+                  "factual_snapshot_digest": "sha256:a1595a1a26489b8f421aa4ba8cc2abeda37bc789cf58d402a732411e57e22c49"
+                },
+                {
+                  "topics": [
+                    "unclassified"
+                  ],
+                  "event_at": null,
+                  "time_kind": "published",
+                  "deleted_at": null,
+                  "source_ref": "https://t.me/source/1002",
+                  "updated_at": null,
+                  "observed_at": "2026-10-08T07:40:22.878241Z",
+                  "reissued_at": null,
+                  "evidence_ref": "evidence_tg_2",
+                  "published_at": "2026-10-08T07:40:22.878241Z",
+                  "source_state": "active",
+                  "source_version": "271a8c9457085f1b7a6338c3f1e8a4dbd177efc6b254f68e4db4e7f6bd386e1a",
+                  "period_relation": "published_in_window",
+                  "first_discovered_at": "2026-07-20T10:00:00Z",
+                  "factual_snapshot_digest": "sha256:ff3d5ab332db60b94c68d42c1ba7e45280dbbe8ce96879728555c93b6786e5ac"
+                },
+                {
+                  "topics": [
+                    "unclassified"
+                  ],
+                  "event_at": null,
+                  "time_kind": "published",
+                  "deleted_at": null,
+                  "source_ref": "https://t.me/source/1003",
+                  "updated_at": null,
+                  "observed_at": "2026-10-08T07:40:22.878241Z",
+                  "reissued_at": null,
+                  "evidence_ref": "evidence_tg_3",
+                  "published_at": "2026-10-08T07:40:22.878241Z",
+                  "source_state": "active",
+                  "source_version": "62b6a3803147d71955d3792cf1477997e464685d76b8f958eb44dc28ca3047d4",
+                  "period_relation": "published_in_window",
+                  "first_discovered_at": "2026-07-20T10:00:00Z",
+                  "factual_snapshot_digest": "sha256:6f5fea81d2ffad41a14fd7875f33c75f8523b6279f6d79f35a1bac96118ca1fc"
+                }
+              ],
+              "brief_ref": {
+                "version": 1,
+                "brief_id": "brief_7c7e8293be656e8b79ade550",
+                "retention": "owner_scoped_durable_version_history_with_ephemeral_visible_binding",
+                "content_digest": "sha256:36dfa91315ef14d52b412fbe25a0d5a822758f68e8407de2e6c320ed0edfaf10"
+              },
+              "conflicts": [],
+              "deduplication": [],
+              "schema_version": "prm_brief_inspection.v1",
+              "importance_vs_urgency": [
+                {
+                  "item_id": "brief_item_evidence_tg_1",
+                  "urgency": "unknown",
+                  "importance": "medium",
+                  "project_refs": [],
+                  "selection_reasons": [
+                    "local_archive_source",
+                    "importance_medium",
+                    "urgency_unknown",
+                    "published_in_window",
+                    "source_active"
+                  ]
+                },
+                {
+                  "item_id": "brief_item_evidence_tg_2",
+                  "urgency": "unknown",
+                  "importance": "medium",
+                  "project_refs": [],
+                  "selection_reasons": [
+                    "local_archive_source",
+                    "importance_medium",
+                    "urgency_unknown",
+                    "published_in_window",
+                    "source_active"
+                  ]
+                },
+                {
+                  "item_id": "brief_item_evidence_tg_3",
+                  "urgency": "unknown",
+                  "importance": "medium",
+                  "project_refs": [],
+                  "selection_reasons": [
+                    "local_archive_source",
+                    "importance_medium",
+                    "urgency_unknown",
+                    "published_in_window",
+                    "source_active"
+                  ]
+                }
+              ]
+            },
+            "notification_sent": false,
+            "source_data_class": "private_archive",
+            "retrieval_performed": false,
+            "source_data_classes": [
+              "private_archive"
+            ],
+            "telegram_navigation": {
+              "kind": "reply_keyboard",
+              "button_text": "Показать полный бриф",
+              "brief_version": {
+                "version": 1,
+                "brief_id": "brief_7c7e8293be656e8b79ade550"
+              },
+              "current_visible_brief_only": true
+            },
+            "telegram_parse_mode": "HTML",
+            "automatic_job_created": false,
+            "brief_document_created": true
+          }
+        }
+      ],
+      "evidence": [
+        {
+          "source_id": "tg:1",
+          "text": "Аврора: добавлены unit tests для функции normalize_email. Тест проверяет удаление пробелов и нижний регистр.",
+          "privacy": "synthetic"
+        },
+        {
+          "source_id": "tg:2",
+          "text": "Аврора: добавлен тест slugify для русских названий. Изменение внедрено в учебном проекте, результат пока не измерен.",
+          "privacy": "synthetic"
+        },
+        {
+          "source_id": "tg:3",
+          "text": "Аврора: unittest входит в стандартную библиотеку Python. pytest устанавливается отдельно. Здесь нет данных о преимуществе по качеству.",
+          "privacy": "synthetic"
+        }
+      ],
+      "artifacts": [
+        {
+          "format": "html",
+          "path": ".playbook-artifacts/pai-go-pilot-20261010/capabilities-v41-current/product-brief.html",
+          "sha256": "68866535845706f1789cfae520529830711ede0c35439fa179b44eff83071714",
+          "media_type": "text/html; charset=utf-8",
+          "synthetic": true
+        },
+        {
+          "format": "pdf",
+          "path": ".playbook-artifacts/pai-go-pilot-20261010/capabilities-v41-current/product-brief.pdf",
+          "sha256": "a8478a77765fc5a68c460969b3465797486b5d38019a1dd2306e411560846d1e",
+          "media_type": "application/pdf",
+          "synthetic": true
+        },
+        {
+          "format": "markdown",
+          "path": ".playbook-artifacts/pai-go-pilot-20261010/capabilities-v41-current/product-brief.md",
+          "sha256": "c1124a290c0cfd44cdccd928f2a80e1bd93a09f83d35c8dca65aa3599af29872",
+          "media_type": "text/markdown; charset=utf-8",
+          "synthetic": true
+        }
+      ],
+      "artifact_content": "# Важное по учебному проекту Аврора\n\n- Версия: 1\n- Период: 2026-10-03 09:40 — 2026-10-10 09:40 Europe/Berlin\n- Покрытие: полное в выбранной области\n\n## Главное\n\n### 1. Аврора: добавлены unit tests для функции normalize\\_email\n\nВ учебный проект добавлены unit tests для функции normalize\\_email. Тест проверяет удаление пробелов и приведение к нижнему регистру.\n\n**Объяснение.** Это событие показывает, что в проекте появилось автоматическое тестирование конкретного преобразования адресов. Значимость отдельно от фактов в том, что unit tests снижают риск незаметно сломать normalize\\_email при будущих изменениях и делают поведение функции явно зафиксированным в проверках.\n\n**Почему выделено.** Самое конкретное изменение в подборке: назван объект тестирования и указано, какие проверки в него входят.\n\n**Условный следующий шаг.** Следить, запускаются ли эти тесты в обычном рабочем процессе и покрывают ли они другие случаи normalize\\_email, кроме пробелов и нижнего регистра.\n\n**Оговорка.** В источнике нет данных о том, как тесты выполняются в процессе разработки или как измерялся их эффект.\n\n**Поддерживающие источники.**\n- [https://t.me/source/1001](<https://t.me/source/1001>) — Аврора: добавлены unit tests для функции normalize\\_email. Тест проверяет удаление пробелов и нижний регистр.\n\n### 2. Аврора: добавлен тест slugify для русских названий\n\nВ учебном проекте появился тест slugify для русских названий. По источнику, изменение уже внедрено, но результат пока не измерен.\n\n**Объяснение.** Событие фиксирует расширение тестового покрытия на преобразование русскоязычных названий. Его значимость отдельно от фактов в том, что такие тесты помогают удерживать корректное поведение slugify для неалфавитных символов и кириллицы; однако без измерения результата пока нельзя судить о фактическом эффекте.\n\n**Почему выделено.** Указывает на отдельное добавление теста и содержит явную оговорку о том, что результат не измерен.\n\n**Условный следующий шаг.** Уточнить, какие именно русские названия используются в тесте и как будет измеряться результат внедрения.\n\n**Оговорка.** Источник прямо говорит, что результат пока не измерен.\n\n**Поддерживающие источники.**\n- [https://t.me/source/1002](<https://t.me/source/1002>) — Аврора: добавлен тест slugify для русских названий. Изменение внедрено в учебном проекте, результат пока не измерен.\n\n### 3. Аврора: unittest в стандартной библиотеке Python, pytest устанавливается отдельно\n\nВ источнике отмечено, что unittest входит в стандартную библиотеку Python, а pytest устанавливается отдельно. Данных о преимуществе по качеству здесь нет.\n\n**Объяснение.** Это не изменение проекта, а пояснение о доступности инструментов тестирования. Значимость отдельно от фактов в том, что выбор между unittest и pytest может влиять на зависимости и настройку окружения, но сам по себе этот факт не доказывает лучшего качества тестов.\n\n**Почему выделено.** Сообщение содержит проверяемое утверждение о наличии инструментов и прямо ограничивает выводы отсутствием данных о качестве.\n\n**Условный следующий шаг.** Если в проекте выбирают между unittest и pytest, зафиксировать критерии выбора отдельно от доступности инструмента.\n\n**Оговорка.** В источнике нет данных о преимуществе по качеству между unittest и pytest.\n\n**Поддерживающие источники.**\n- [https://t.me/source/1003](<https://t.me/source/1003>) — Аврора: unittest входит в стандартную библиотеку Python. pytest устанавливается отдельно. Здесь нет данных о преимуществе по качеству.\n\n\n## Временная линия источников\n\n- **2026-10-08T07:40:22.878241Z \\(published\\)** — Аврора: добавлены unit tests для функции normalize\\_email. Тест проверяет удаление пробелов и нижний регистр.\n  - Источник: [https://t.me/source/1001](<https://t.me/source/1001>)\n- **2026-10-08T07:40:22.878241Z \\(published\\)** — Аврора: добавлен тест slugify для русских названий. Изменение внедрено в учебном проекте, результат пока не измерен.\n  - Источник: [https://t.me/source/1002](<https://t.me/source/1002>)\n- **2026-10-08T07:40:22.878241Z \\(published\\)** — Аврора: unittest входит в стандартную библиотеку Python. pytest устанавливается отдельно. Здесь нет данных о преимуществе по качеству.\n  - Источник: [https://t.me/source/1003](<https://t.me/source/1003>)\n\n## Покрытие\n\n| Источник | Состояние | Ограничение |\n| --- | --- | --- |\n| Архив Telegram | проверен | — |\n\nОграничения: Выборка ограничена выбранным архивом и периодом.\n\n## Источники\n\n### Аврора: добавлены unit tests для функции normalize\\_email. Тест проверяет удаление пробелов и нижний регистр.\n\n- URL: [https://t.me/source/1001](<https://t.me/source/1001>)\n- Время: 2026-10-08T07:40:22.878241Z \\(published\\)\n- Состояние: active; отношение к периоду: published\\_in\\_window\n\n### Аврора: добавлен тест slugify для русских названий. Изменение внедрено в учебном проекте, результат пока не измерен.\n\n- URL: [https://t.me/source/1002](<https://t.me/source/1002>)\n- Время: 2026-10-08T07:40:22.878241Z \\(published\\)\n- Состояние: active; отношение к периоду: published\\_in\\_window\n\n### Аврора: unittest входит в стандартную библиотеку Python. pytest устанавливается отдельно. Здесь нет данных о преимуществе по качеству.\n\n- URL: [https://t.me/source/1003](<https://t.me/source/1003>)\n- Время: 2026-10-08T07:40:22.878241Z \\(published\\)\n- Состояние: active; отношение к периоду: published\\_in\\_window\n\n<!-- brief brief_7c7e8293be656e8b79ade550 v1; sha256 sha256:36dfa91315ef14d52b412fbe25a0d5a822758f68e8407de2e6c320ed0edfaf10 -->\n"
+    },
+    {
+      "case_id": "confirmed_action",
+      "capability": "act",
+      "turns": [
+        {
+          "turn": 1,
+          "user": "/actpreview {\"action_code\": \"mail.send\", \"resource_ref\": \"resource_selected_mail\", \"content\": {\"to\": [\"recipient@example.test\"], \"subject\": \"Учебная Аврора\", \"body\": \"Работа будет готова завтра утром.\"}}",
+          "assistant": "Предпросмотр письма\nИз выбранного подключённого аккаунта Microsoft.\nКому: recipient@example.test\nТема: Учебная Аврора\n\nТекст письма:\nРабота будет готова завтра утром.\n\nПодтверждение действует до 10.10 09:54 (Europe/Berlin).\nПроверь полный текст и параметры. Нажми «Отправить письмо» или ответь «да».",
+          "status": "preview",
+          "expected_goal": "Exact current preview/confirmation, honest state/receipt, actual local scheduler evidence and no repeated effects.",
+          "delivery": {
+            "status": "native synthetic control/result delivery",
+            "real_provider_account": false
+          }
+        },
+        {
+          "turn": 2,
+          "user": "Отправить письмо",
+          "assistant": "Провайдер принял запрос, но выполнение ещё не подтверждено. Автоматически повторять его не буду. Нажми «Проверить результат действия» для отдельной сверки.",
+          "status": "unknown",
+          "expected_goal": "Exact current preview/confirmation, honest state/receipt, actual local scheduler evidence and no repeated effects.",
+          "delivery": {
+            "status": "native synthetic control/result delivery",
+            "real_provider_account": false
+          }
+        },
+        {
+          "turn": 3,
+          "user": "Проверить результат действия",
+          "assistant": "Письмо найдено в «Отправленных». Получение письма адресатом этим не подтверждается.\nИдентификатор объекта у провайдера: synthetic_sent_2",
+          "status": "succeeded",
+          "expected_goal": "Exact current preview/confirmation, honest state/receipt, actual local scheduler evidence and no repeated effects.",
+          "delivery": {
+            "status": "native synthetic control/result delivery",
+            "real_provider_account": false
+          }
+        },
+        {
+          "turn": 4,
+          "user": "Отправить письмо",
+          "assistant": "Повторное подтверждение уже использовано; нового действия не было.\nПровайдер подтвердил операцию с письмом. Получение письма адресатом этим не подтверждается.\nИдентификатор объекта у провайдера: synthetic_sent_2",
+          "status": "succeeded",
+          "expected_goal": "Exact current preview/confirmation, honest state/receipt, actual local scheduler evidence and no repeated effects.",
+          "delivery": {
+            "status": "native synthetic control/result delivery",
+            "real_provider_account": false
+          }
+        }
+      ],
+      "evidence": [],
+      "synthetic_graph_write_count": 1,
+      "provider": "synthetic Graph/Telegram; no live accounts"
+    },
+    {
+      "case_id": "watch",
+      "capability": "watch",
+      "turns": [
+        {
+          "turn": 1,
+          "user": "/watch resource_archive",
+          "assistant": "Предпросмотр наблюдения\nИсточник: архив Telegram\nПроверка: каждые 5 мин.\nСообщать: содержательные изменения\nЧасовой пояс: Europe/Berlin\nНе больше 3 сообщений в день. Тихие часы: 22:00–08:00.\nДо: 2026-11-09T07:44:37.646424+00:00\nНаблюдение ещё не включено. Нажми «Подтвердить наблюдение».",
+          "status": "control",
+          "expected_goal": "Exact current preview/confirmation, honest state/receipt, actual local scheduler evidence and no repeated effects.",
+          "delivery": {
+            "status": "native synthetic control/result delivery",
+            "real_provider_account": false
+          }
+        },
+        {
+          "turn": 2,
+          "user": "Подтвердить наблюдение",
+          "assistant": "Подписка сохранена. Работа планировщика пока не подтверждена; её состояние можно проверить кнопкой.",
+          "status": "control",
+          "expected_goal": "Exact current preview/confirmation, honest state/receipt, actual local scheduler evidence and no repeated effects.",
+          "delivery": {
+            "status": "native synthetic control/result delivery",
+            "real_provider_account": false
+          }
+        },
+        {
+          "turn": 3,
+          "user": "Проверить наблюдение",
+          "assistant": "Подписка сохранена: активна. Работа планировщика наблюдалась недавно. Последняя проверка: собрано изменений: 1.",
+          "status": "control",
+          "expected_goal": "Exact current preview/confirmation, honest state/receipt, actual local scheduler evidence and no repeated effects.",
+          "delivery": {
+            "status": "native synthetic control/result delivery",
+            "real_provider_account": false
+          }
+        },
+        {
+          "turn": 4,
+          "user": "Приостановить наблюдение",
+          "assistant": "Подписка приостановлена: новые сборы и отправки остановлены. Уже начатый запрос мог продолжиться.",
+          "status": "control",
+          "expected_goal": "Exact current preview/confirmation, honest state/receipt, actual local scheduler evidence and no repeated effects.",
+          "delivery": {
+            "status": "native synthetic control/result delivery",
+            "real_provider_account": false
+          }
+        },
+        {
+          "turn": 5,
+          "user": "Проверить наблюдение",
+          "assistant": "Подписка сохранена: приостановлена. Работа планировщика наблюдалась недавно. Последняя проверка: собрано изменений: 1.",
+          "status": "control",
+          "expected_goal": "Exact current preview/confirmation, honest state/receipt, actual local scheduler evidence and no repeated effects.",
+          "delivery": {
+            "status": "native synthetic control/result delivery",
+            "real_provider_account": false
+          }
+        },
+        {
+          "turn": 6,
+          "user": "Возобновить наблюдение",
+          "assistant": "Подписка возобновлена. Фактическую работу планировщика можно проверить кнопкой.",
+          "status": "control",
+          "expected_goal": "Exact current preview/confirmation, honest state/receipt, actual local scheduler evidence and no repeated effects.",
+          "delivery": {
+            "status": "native synthetic control/result delivery",
+            "real_provider_account": false
+          }
+        }
+      ],
+      "evidence": [
+        {
+          "scheduler_job_enqueued": true,
+          "collection": {
+            "status": "collected",
+            "notifications": 1
+          },
+          "eligible_count": 1,
+          "synthetic_delivery_statuses": [
+            "sent"
+          ],
+          "clock": "wall clock/DB; no future fixture due date",
+          "real_service_started": false
+        },
+        {
+          "new_job_after_pause": false
+        }
+      ],
+      "synthetic_graph_write_count": null,
+      "provider": "synthetic Graph/Telegram; no live accounts"
+    }
+  ],
+  "capture_provenance": [
+    {
+      "path": ".playbook-artifacts/pai-go-pilot-20261010/chat-v41-current/sessions.json",
+      "sha256": "5f490715c3435f6a8e43404531e69276b27b6a85230e94846e86863f2eb094e5",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "script_launch": ".playbook-artifacts/pai-go-pilot-20261010/capture_chat_v41.py.launch.json"
+    },
+    {
+      "path": ".playbook-artifacts/pai-go-pilot-20261010/capabilities-v41-current/sessions.json",
+      "sha256": "d455612c31aef903623d6aaf48741bba7bdab53445bd1c203807362720e5cbc7",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "script_launch": ".playbook-artifacts/pai-go-pilot-20261010/capture_capabilities_v41.py.launch.json"
+    },
+    {
+      "path": ".playbook-artifacts/pai-go-pilot-20261010/control-sessions.json",
+      "sha256": "4ede76b929a3d92e43a2b538bcbf9b0bdba05541c666f33f506b029ebd3f5748",
+      "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+      "script": ".playbook-artifacts/pai-go-pilot-20261010/capture_controls_clock_corrected.py"
+    }
+  ],
+  "original_failed_attempts_retained": [
+    "chat-current Flash403",
+    "capabilities-current Flash403",
+    "capabilities-v41-current future-clock Watch delivery denial; corrected control-only capture used"
+  ],
+  "model_selection_is_production_default": false
+}

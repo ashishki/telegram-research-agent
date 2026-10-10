@@ -1,0 +1,10 @@
+$ PYTHONPATH=src /srv/openclaw-you/workspace/telegram-research-agent/.venv-pai/bin/python tools/run_pai_acceptance.py --require-spec-matrix -q tests/test_pai_academic_runtime.py tests/test_pai_acceptance_guard.py tests/test_pai_action_runtime.py tests/test_pai_archive_search.py tests/test_pai_brief_runtime.py tests/test_pai_chat_runtime.py tests/test_pai_connections.py tests/test_pai_cost_cache.py tests/test_pai_deep_research.py tests/test_pai_delivery.py tests/test_pai_durable_actions.py tests/test_pai_durable_conversation.py tests/test_pai_durable_policy.py tests/test_pai_end_to_end.py tests/test_pai_graph_mail.py tests/test_pai_ingress_jobs.py tests/test_pai_load_recovery.py tests/test_pai_media_runtime.py tests/test_pai_memory_runtime.py tests/test_pai_migration.py tests/test_pai_operations_runtime.py tests/test_pai_plan.py tests/test_pai_product_sessions.py tests/test_pai_search_polish.py tests/test_pai_control_polish.py tests/test_pai_brief_polish.py tests/test_pai_report_runtime.py tests/test_pai_requirements.py tests/test_pai_review_recovery.py tests/test_pai_schedule_runtime.py tests/test_pai_scheduler.py tests/test_pai_storage.py tests/test_pai_web_github.py tests/test_pai_watch_wiring.py tests/test_pai_workers.py
+........................................................................ [ 18%]
+........................................................................ [ 36%]
+........................................................................ [ 54%]
+........................................................................ [ 72%]
+........................................................................ [ 90%]
+......................................                                   [100%]
+--------- generated xml file: /tmp/pai-acceptance-ojbuenh5/pytest.xml ----------
+398 passed in 1164.34s (0:19:24)
+PAI full-spec acceptance: 398 acceptance cases, zero skips/failures

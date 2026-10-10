@@ -1,0 +1,76 @@
+{
+  "call_number": 117,
+  "kind": "independent_engineering_P1_closure_and_accumulated_changes; not old design batch",
+  "provider": "opencode_go",
+  "requested_model": "deepseek-v4-pro",
+  "requested_effort": "max",
+  "output_maximum": 393216,
+  "input_bound": 1000000,
+  "timeout_seconds": 7200,
+  "maximum_calls": 1,
+  "automatic_retry": false,
+  "owner_authority": "latest2026-10-10 choose another Go pool model; ADR-018; ongoing necessary reviews; maximum-resource preference",
+  "private_content": false,
+  "source_head": "0fbcfd1dde780724ad934aa66825afe17a6efc98",
+  "base_head": "fa7857b5772c2f745f28cd893bda9efbab98b776",
+  "source_paths": [
+    "src/prm/report_exports.py",
+    "src/prm/runtime/deletion.py",
+    "src/prm/runtime/delivery.py",
+    "src/prm/runtime/presentation.py",
+    "src/prm/runtime/result_payloads.py",
+    "src/prm/runtime/transports.py",
+    "tests/test_pai_brief_polish.py",
+    "tests/test_pai_control_polish.py",
+    "tools/opencode_pool_review.py"
+  ],
+  "source_sha256": {
+    "src/prm/report_exports.py": "97228181a7ee5e0691fecdd1db70535e53f2c17a6b63849f6def0885cee0faaa",
+    "src/prm/runtime/deletion.py": "12ce6cf1397e7b67bc4f5b1f515bab9d870c3a4f26bf4e2a3709f94782315c04",
+    "src/prm/runtime/delivery.py": "2a67c6e5b0adc9933b7e5b51df73e300d92c40df0b45cb79f0b0acc995a45df4",
+    "src/prm/runtime/presentation.py": "e54c81c041e0168223f8b864c55c794971ac85063a993bd2c9e796f91e19198b",
+    "src/prm/runtime/result_payloads.py": "e57f05f2f72dd0e7bc42db7cd082edace4023287b59da19a216a368e25f56c84",
+    "src/prm/runtime/transports.py": "bdc08d8cc1f76909fe8ad12c7a82f886c1da50163c414a1cd3efa25ce064e215",
+    "tests/test_pai_brief_polish.py": "2d32c098f1b4d68060b6956edce45c5c60c28b2ef81048ecb5f5cbb32cf1d993",
+    "tests/test_pai_control_polish.py": "0c598d1103a6f230f54d3caac52ec30820f5c438363c828935351446d206ddd5",
+    "tools/opencode_pool_review.py": "a6d9d643968ef983385d8e36b3be2731e896301628f6ecc98378d9a0809f2458"
+  },
+  "diff_sha256": "effa3b60d65e5fdf3c8d90ad185ee3599f96d3bdd3e7263664f2b3078f7759a1",
+  "input_sha256": "cad9ffc6a2b0d7b1129f60ccf40bbae35fc3f4f057c9bc235da07b1c7f69efac",
+  "input_bytes": 176840,
+  "formal_design_or_human_acceptance": false,
+  "status": "reviewed",
+  "started_at": "2026-10-10T07:26:47.014820+00:00",
+  "cost": "unknown",
+  "observed_model": "deepseek-v4-pro",
+  "observed_effort": "unknown",
+  "usage": {
+    "prompt_tokens": 49125,
+    "completion_tokens": 19472,
+    "total_tokens": 68597,
+    "prompt_cache_hit_tokens": 0,
+    "prompt_cache_miss_tokens": 49125,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 19049
+    }
+  },
+  "finish_reason": "stop",
+  "review": {
+    "verdict": "ADVISORY",
+    "findings": [
+      {
+        "severity": "P2",
+        "file": "src/prm/runtime/presentation.py",
+        "line": 72,
+        "description": "split_html_messages can emit a part longer than the Telegram 3800-character transport limit when many open tags cross a split boundary: it appends current+closing without checking that length. A valid deeply nested HTML reply can then cause BoundedTelegramSender to reject the child, leaving the multipart attempt permanently unknown even though the payload was otherwise deliverable.",
+        "recommendation": "Enforce an explicit output bound in split_html_messages (or immediately after prefixing in _multipart_payloads) such that every piece plus the [i/n] prefix is <=3800, and/or cap total tag depth/raw markup before splitting. Add a regression test with deep nesting."
+      }
+    ],
+    "summary": "The original multipart HTML/last-keyboard digest reconstruction P1 is resolved by actual code: delivery.py now has one shared _multipart_payloads builder used by both dispatch and reconcile. It reproduces Telegram HTML splitting, prefixing, and last-part-only navigation exactly; reconcile checks owner/destination/source/digest per part. Completed parts are returned from existing attempts and not resent; missing/not-sent later parts keep the aggregate unknown; matching provider evidence can settle all accepted parts. The added tests cover HTML/plain, navigation/no-navigation, and delivered/not_delivered final-part outcomes and pass. Deletion core is unchanged in this diff and retains lineage_lock plus dependency traversal for split-result chunks; result_payloads records all source/input/main-result dependency edges under that lock. Brief presentation changes preserve report identity and the paginated-PDF overflow fallback; cover metrics are now the same factual set. Search/Watch/Act suites passed in the supplied runs. Evidence is limited to local synthetic tests and no live provider or production integration."
+  },
+  "duration_seconds": 470.397,
+  "finished_at": "2026-10-10T07:34:37.412378+00:00"
+}

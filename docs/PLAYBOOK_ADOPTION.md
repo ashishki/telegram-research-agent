@@ -1,5 +1,9 @@
 # Playbook Adoption — 2026-09-18
 
+## Current evidence overlay — 10 October2026
+
+Pin remains d570163ab17ec3b4245187c778f1e8d89af9690f. The adoption-time statements below (Python3.13/6 bridge checks/network absence) are dated2026-09-18 observations, not the current result. Current source0fbcfd1 has398 active PAI cases, current premerge PRM751/88.06s and retrofit150/14.28s; actual Go engineering/content/image assessments and public-source reads are in [Go evidence](verification/PAI-go-pilot-20261010.md). Raw51 missing formal approvals remain; expected-rejection guard is not human acceptance. Governance source hashes/roles remain separate from new advisory pool engineering.
+
 ## What changed
 
 The owner requested upgrading the repository's development methodology. Old
