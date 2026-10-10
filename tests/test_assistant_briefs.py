@@ -185,7 +185,8 @@ def test_telegram_card_is_compact_html_and_escapes_archive_derived_content() -> 
     assert "&lt;b&gt;Not markup&lt;/b&gt;" in rendered
     assert "&lt;tag&gt; &amp; keeps the characters visible." in rendered
     assert 'href="https://t.me/example/html?one=1&amp;two=2">@example</a>' in rendered
-    assert "Проверено 1 из 1 источников." in rendered
+    assert "Проверено подключений: 1 из 1" in rendered
+    assert f"использовано материалов: {len(document.evidence)}" in rendered
     assert "Версия:" not in rendered
     assert len(rendered) <= 2400
 
