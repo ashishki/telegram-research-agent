@@ -590,7 +590,7 @@ Acceptance-Criteria:
   - Structural preparation is not independent design review or human approval.
 Verification:
   - python3 tools/check_pai_plan.py
-  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_playbook_bridge.py tests/test_assistant_conversation.py tests/test_prm_product_ux_eval.py tests/test_pai_plan.py tests/test_opencode_role_review.py tests/test_memory_research.py
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_playbook_bridge.py tests/test_assistant_conversation.py tests/test_prm_product_ux_eval.py tests/test_pai_plan.py tests/test_opencode_role_review.py tests/test_opencode_pool_review.py tests/test_memory_research.py
 Context-Refs:
   - docs/PA_IMPLEMENTATION_TASKS.md#pai-00
   - docs/design/PAI.md

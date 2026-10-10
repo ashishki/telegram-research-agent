@@ -75,6 +75,30 @@ fresh reviews request max and complete JSON. Nonempty summary/finding fields are
 now declared in the provider schema as already required by the consumer. This
 tooling change requires a fresh actual independent audit before design use.
 
+## Owner Go-pool amendment — 2026-10-10
+
+The owner instructed: «делай, выбери другую моедл ищ пула го, там у нас есть
+еще лимиты точно». ADR-018 records the selected alternative DeepSeek V4 Pro for
+fresh advisory engineering/content checks on the SAME Go endpoint, max effort,
+public source/synthetic input only. The pending Codex selection is superseded.
+DeepSeek V4 Flash is selected for current synthetic conversation capture; the
+existing DeepSeek V4 Flash Vision judge assesses actual public synthetic renders.
+The known key path is reused without scans or disclosure. Account quotas are
+not inferred from the public model list. Allocate and count each request/failure;
+no identical automatic retry or inference after a model-specific rejection.
+
+`tools/opencode_pool_review.py` is a separate bounded advisory entrypoint using
+the existing no-redirect/SSE guards; it cannot publish governed role/design
+receipts. Current governed GLM runner/selection/history/phase aggregation remain
+unchanged, with their existing stale-tooling gate. An actual complete fresh
+DeepSeek engineering verdict may close its exact scoped P1, but cannot accept
+feature design, live resources, human usefulness, deployment or release. Do not
+mix role-model sets or relabel GLM STOP/429 receipts. Official selected-model
+maximum393216 output tokens and requested max are recorded before key access;
+input1MB/watchdog7200s/SSE64MiB/final text1MiB remain. Go effort forwarding and
+actual billing remain unknown unless telemetry reports them. No extra numerical
+permission loop is required by the owner's existing maximum-resource direction.
+
 ## Roles, runners and receipt compatibility
 
 | Role | Required route/evidence | Current integration |

@@ -51,7 +51,9 @@
         "tools/finalize_opencode_design_reviews.py",
         "docs/PA_SCALING_STRATEGY_2026-10-06.md",
         "tools/run_pai_acceptance.py",
-        "tests/test_pai_acceptance_guard.py"
+        "tests/test_pai_acceptance_guard.py",
+        "tools/opencode_pool_review.py",
+        "tests/test_opencode_pool_review.py"
       ],
       "change_budget": "files<=72",
       "dependencies": [],
@@ -95,7 +97,8 @@
             "tests/test_pai_plan.py",
             "tests/test_opencode_role_review.py",
             "tests/test_memory_research.py",
-            "tests/test_pai_acceptance_guard.py"
+            "tests/test_pai_acceptance_guard.py",
+            "tests/test_opencode_pool_review.py"
           ],
           "expected_exit_code": 0,
           "id": "reconciliation_regression",

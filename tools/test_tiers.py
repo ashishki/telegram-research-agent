@@ -65,6 +65,7 @@ PRM_ACTIVE_TESTS = (
     # PAI task/design coverage is structural evidence, separate from product.
     "tests/test_pai_plan.py",
     "tests/test_opencode_role_review.py",
+    "tests/test_opencode_pool_review.py",
     # PA-06 is a high-risk worker/checkpoint boundary. Keep its dedicated
     # adversarial suite in the required active tier rather than relying on a
     # separate optional command.

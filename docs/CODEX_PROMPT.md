@@ -1,3 +1,21 @@
+# Current assignment — selected Go alternative and pilot verification
+
+2026-10-10 owner latest instruction: «делай, выбери другую моедл ищ пула го,
+там у нас есть еще лимиты точно». ADR-018 authorizes a fresh advisory DeepSeek
+V4 Pro engineering/content check on the SAME Go endpoint/public synthetic scope.
+Pending Codex choice is superseded. DeepSeek V4 Flash captures current synthetic
+conversations; existing DeepSeek Flash Vision judges actual current renders.
+The original GLM STOP/429/history and governed role-consumer guards stay intact.
+New pool transport holdouts:195 passed6.50s; plan/pin pass. Commit all scoped
+source first; one engineering P1/changed-range check, then native captures and
+one content/visual assessment after usable safety closure. No unchanged full
+product tier repeats, blind provider retry or old programme/design batch.
+Live pilot source/destination/account selection is requested while independent
+work continues. Specific external effects still require their exact preview.
+UTD/API remains deferred; no private egress, production service/timer or release.
+
+Previous verified implementation and remaining evidence boundaries follow.
+
 # Current assignment — four-point local implementation and verification
 
 Owner assignment 2026-10-10: all four proposed points, then one accumulated
