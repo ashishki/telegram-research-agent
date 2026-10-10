@@ -30,6 +30,41 @@ from prm.briefs import (
 
 REPORT_RENDERER_VERSION = "prm_brief_report.v1"
 REPORT_ACCESS_TTL = timedelta(minutes=20)
+
+
+def _same_text(first,second):
+    return ' '.join(str(first).split())==' '.join(str(second).split())
+
+
+def _summary_html(evidence):
+    return '' if _same_text(evidence.title,evidence.summary) else '<p>'+_html_text(evidence.summary)+'</p>'
+
+
+def _coverage_source_name(value):
+    return {'resource_archive':'Архив Telegram','resource_personal_brief':'Личные источники','resource_selected_mail':'Выбранная почта'}.get(value,value)
+
+
+def _coverage_state_name(value):
+    return {'checked':'проверен','unavailable':'недоступен','partial':'частично проверен','skipped':'пропущен'}.get(value,value)
+
+
+def _limitation_name(value):
+    return {'bounded_local_archive_selection':'Выборка ограничена выбранным архивом и периодом.',
+            'selected_sources_unavailable':'Выбранные источники сейчас недоступны.'}.get(value,value)
+
+
+def _coverage_label(document):
+    return 'полное в выбранной области' if document.coverage_manifest.complete else 'частичное: не все выбранные источники проверены'
+
+
+def _short_period_text(document):
+    from zoneinfo import ZoneInfo
+    zone=ZoneInfo(document.window.timezone)
+    return document.window.start_at.astimezone(zone).strftime('%d.%m')+' – '+document.window.end_at.astimezone(zone).strftime('%d.%m')+' · '+document.window.timezone
+
+
+def _chart_values_html(values):
+    return '<dl class="chart-values">'+''.join('<div><dt>'+_html_text(key)+'</dt><dd>'+_html_text(count)+' материалов</dd></div>' for key,count in values.items())+'</dl>'
 _CSP = (
     "default-src 'none'; style-src 'unsafe-inline'; img-src 'none'; font-src 'none'; "
     "script-src 'none'; connect-src 'none'; media-src 'none'; object-src 'none'; "
@@ -111,10 +146,9 @@ def render_markdown(document: BriefDocument) -> BriefReportArtifact:
     lines = [
         f"# {_markdown_text(document.topic)}",
         "",
-        f"- Версия: `{document.brief_id}` v{document.version}",
-        f"- Идентичность содержимого: `{document.content_digest}`",
+        f"- Версия: {document.version}",
         f"- Период: {_markdown_text(_period_text(document))}",
-        f"- Статус покрытия: {_markdown_text(document.status)}",
+        f"- Покрытие: {_markdown_text(_coverage_label(document))}",
         "",
         "## Главное",
         "",
@@ -124,31 +158,30 @@ def render_markdown(document: BriefDocument) -> BriefReportArtifact:
     for evidence in _timeline(document):
         lines.extend((
             f"- **{_markdown_text(_display_time(evidence))}** — {_markdown_text(evidence.title)}",
-            f"  - {_markdown_text(evidence.summary)}",
+            *(() if _same_text(evidence.title,evidence.summary) else (f"  - {_markdown_text(evidence.summary)}",)),
             f"  - Источник: {_markdown_source(evidence.source_ref)}",
         ))
     lines.extend(("", "## Покрытие", "", "| Источник | Состояние | Ограничение |", "| --- | --- | --- |"))
     for item in document.coverage_manifest.sources:
         lines.append(
             "| " + " | ".join(
-                _markdown_table(value) for value in (item.source_ref, item.state, item.reason or "—")
+                _markdown_table(value) for value in (_coverage_source_name(item.source_ref), _coverage_state_name(item.state), item.reason or "—")
             ) + " |"
         )
     if document.coverage_manifest.limitations:
-        lines.extend(("", "Ограничения: " + ", ".join(_markdown_text(item) for item in document.coverage_manifest.limitations)))
+        lines.extend(("", "Ограничения: " + ", ".join(_markdown_text(_limitation_name(item)) for item in document.coverage_manifest.limitations)))
     lines.extend(("", "## Источники", ""))
     for evidence in document.evidence:
         lines.extend((
             f"### {_markdown_text(evidence.title)}",
             "",
-            _markdown_text(evidence.summary),
-            "",
+            *(() if _same_text(evidence.title,evidence.summary) else (_markdown_text(evidence.summary),"")),
             f"- URL: {_markdown_source(evidence.source_ref)}",
             f"- Время: {_markdown_text(_display_time(evidence))}",
             f"- Состояние: {_markdown_text(evidence.source_state)}; отношение к периоду: {_markdown_text(evidence.period_relation)}",
             "",
         ))
-    return BriefReportArtifact("markdown", "text/markdown; charset=utf-8", "\n".join(lines).rstrip() + "\n", identity)
+    return BriefReportArtifact("markdown", "text/markdown; charset=utf-8", "\n".join(lines).rstrip() + f"\n\n<!-- brief {document.brief_id} v{document.version}; sha256 {document.content_digest} -->\n", identity)
 
 
 def render_html(document: BriefDocument) -> BriefReportArtifact:
@@ -159,29 +192,29 @@ def render_html(document: BriefDocument) -> BriefReportArtifact:
     topic = _html_text(document.topic)
     story_or_items = _html_story_or_item_sections(document)
     timeline_rows = "".join(
-        "<li><time datetime=\"{time}\">{time}</time><div><strong>{title}</strong><p>{summary}</p>{source}</div></li>".format(
+        "<li><time datetime=\"{time}\">{time}</time><div><strong>{title}</strong>{summary}{source}</div></li>".format(
             time=_html_attr(_iso(evidence.observed_at)),
             title=_html_text(evidence.title),
-            summary=_html_text(evidence.summary),
+            summary=_summary_html(evidence),
             source=_html_source(evidence.source_ref),
         )
         for evidence in _timeline(document)
     )
     coverage_rows = "".join(
-        "<tr><td>{source}</td><td>{state}</td><td>{reason}</td></tr>".format(
-            source=_html_source_label(item.source_ref),
-            state=_html_text(item.state),
+        '<tr><td data-label="Источник">{source}</td><td data-label="Состояние">{state}</td><td data-label="Ограничение">{reason}</td></tr>'.format(
+            source=_html_source_label(_coverage_source_name(item.source_ref)),
+            state=_html_text(_coverage_state_name(item.state)),
             reason=_html_text(item.reason or "—"),
         )
         for item in document.coverage_manifest.sources
     )
     limitation = "".join(f"<li>{_html_text(item)}</li>" for item in document.coverage_manifest.limitations)
     source_rows = "".join(
-        "<article class=\"source-card\"><h3>{title}</h3><p>{summary}</p><p>{source}</p>"
+        "<article class=\"source-card\"><h3>{title}</h3>{summary}<p>{source}</p>"
         "<dl><dt>Время</dt><dd>{time}</dd><dt>Состояние</dt><dd>{state}</dd>"
         "<dt>Отношение к периоду</dt><dd>{relation}</dd></dl></article>".format(
             title=_html_text(evidence.title),
-            summary=_html_text(evidence.summary),
+            summary=_summary_html(evidence),
             source=_html_source(evidence.source_ref),
             time=_html_text(_display_time(evidence)),
             state=_html_text(evidence.source_state),
@@ -212,7 +245,7 @@ def render_html(document: BriefDocument) -> BriefReportArtifact:
   <header class="hero">
     <p class="eyebrow">Private BriefDocument</p>
     <h1>{topic}</h1>
-    <p class="period">{_html_text(_period_text(document))}</p>
+    <p class="period" data-print-period="{_html_attr(_short_period_text(document))}">{_html_text(_period_text(document))}</p>
     <dl class="identity"><dt>Версия</dt><dd>{_html_text(document.brief_id)} v{document.version}</dd><dt>Идентичность содержимого</dt><dd><code>{_html_text(document.content_digest)}</code></dd><dt>Покрытие</dt><dd>{_html_text(document.status)}</dd></dl>
   </header>
   <section aria-labelledby="main-heading"><p class="eyebrow">Главное</p><h2 id="main-heading">События и объяснения</h2>{story_or_items}</section>
@@ -256,10 +289,10 @@ def render_designed_html(document: BriefDocument) -> BriefReportArtifact:
     chart = _designed_chart_svg(document)
     sources = document.evidence_by_ref()
     source_cards = "".join(
-        "<article class=\"source-card\"><h3>{title}</h3><p>{summary}</p><p>{source}</p>"
+        "<article class=\"source-card\"><h3>{title}</h3>{summary}<p>{source}</p>"
         "<p class=\"source-meta\">{time} · {state}</p></article>".format(
             title=_html_text(evidence.title),
-            summary=_html_text(evidence.summary),
+            summary=_summary_html(evidence),
             source=_html_source(evidence.source_ref),
             time=_html_text(_display_time(evidence)),
             state=_html_text(evidence.source_state),
@@ -268,9 +301,9 @@ def render_designed_html(document: BriefDocument) -> BriefReportArtifact:
     )
     limitation = "".join(f"<li>{_html_text(item)}</li>" for item in document.coverage_manifest.limitations)
     coverage_rows = "".join(
-        "<tr><td>{source}</td><td>{state}</td><td>{reason}</td></tr>".format(
-            source=_html_source_label(item.source_ref),
-            state=_html_text(item.state),
+        '<tr><td data-label="Источник">{source}</td><td data-label="Состояние">{state}</td><td data-label="Ограничение">{reason}</td></tr>'.format(
+            source=_html_source_label(_coverage_source_name(item.source_ref)),
+            state=_html_text(_coverage_state_name(item.state)),
             reason=_html_text(item.reason or "—"),
         )
         for item in document.coverage_manifest.sources
@@ -279,7 +312,7 @@ def render_designed_html(document: BriefDocument) -> BriefReportArtifact:
         ("items", len(document.items), "пунктов"),
         ("sources", len(document.evidence), "источников"),
         ("conflicts", len(document.conflicts), "конфликтов дат"),
-        ("coverage", "полное" if document.coverage_manifest.complete else "частичное", "покрытие"),
+        ("coverage", "в выборке" if document.coverage_manifest.complete else "частичное", "покрытие"),
     )
     kpi_html = "".join(
         f'<div class="kpi"><span class="kpi-value">{_html_text(value)}</span>'
@@ -333,7 +366,7 @@ def render_designed_html(document: BriefDocument) -> BriefReportArtifact:
   <header class="cover">
     <p class="eyebrow">{cover_eyebrow}</p>
     <h1>{topic}</h1>
-    <p class="period">{_html_text(_period_text(document))}</p>
+    <p class="period" data-print-period="{_html_attr(_short_period_text(document))}">{_html_text(_period_text(document))}</p>
 {cover_lead}
     <div class="kpis">{kpi_html}</div>
   </header>
@@ -471,7 +504,7 @@ def render_paginated_html(
     add_page(
         "Обзор",
         f'<div class="cover"><p class="eyebrow">{cover_eyebrow}</p><h1>{topic}</h1>'
-        f'<p class="period">{period}</p>{lead}<div class="kpis">{kpi_html}</div>'
+        f'<p class="period" data-print-period="{_html_attr(_short_period_text(document))}">{period}</p>{lead}<div class="kpis">{kpi_html}</div>'
         f"{select_note}{toc}</div>",
     )
     story_cards = _story_card_blocks(document)
@@ -568,13 +601,13 @@ def _designed_chart_svg(document: BriefDocument) -> str:
     bar_width = slot * 0.68
     parts: list[str] = []
     # Light y-axis with gridlines and value labels so the chart is readable.
-    parts.append(f'<line class="chart-axis" x1="{left - 6}" y1="{baseline}" x2="{width - pad}" y2="{baseline}"/>')
-    parts.append(f'<line class="chart-axis" x1="{left - 6}" y1="{pad}" x2="{left - 6}" y2="{baseline}"/>')
+    parts.append(f'<line stroke="#9aa4a0" stroke-width="1" class="chart-axis" x1="{left - 6}" y1="{baseline}" x2="{width - pad}" y2="{baseline}"/>')
+    parts.append(f'<line stroke="#9aa4a0" stroke-width="1" class="chart-axis" x1="{left - 6}" y1="{pad}" x2="{left - 6}" y2="{baseline}"/>')
     for step in (0, maximum / 2, maximum):
         y = baseline - usable * (step / maximum) if maximum else baseline
-        parts.append(f'<line class="chart-grid" x1="{left - 6}" y1="{y:.1f}" x2="{width - pad}" y2="{y:.1f}"/>')
+        parts.append(f'<line stroke="#cbd2cc" stroke-width="1" class="chart-grid" x1="{left - 6}" y1="{y:.1f}" x2="{width - pad}" y2="{y:.1f}"/>')
         parts.append(
-            f'<text class="chart-ylabel" x="{left - 10}" y="{y + 3:.1f}" text-anchor="end">'
+            f'<text fill="#4f5858" font-size="10" class="chart-ylabel" x="{left - 10}" y="{y + 3:.1f}" text-anchor="end">'
             f'{int(step) if float(step).is_integer() else round(step, 1)}</text>'
         )
     for index, day in enumerate(days):
@@ -584,20 +617,21 @@ def _designed_chart_svg(document: BriefDocument) -> str:
         y = baseline - bar_height
         centre = x + bar_width / 2
         parts.append(
-            f'<rect class="chart-bar" x="{x:.1f}" y="{y:.1f}" width="{bar_width:.1f}" '
+            f'<rect fill="#146b5c" class="chart-bar" x="{x:.1f}" y="{y:.1f}" width="{bar_width:.1f}" '
             f'height="{bar_height:.1f}" rx="4"/>'
         )
         parts.append(
-            f'<text class="chart-label" x="{centre:.1f}" y="{height - pad + 2:.1f}" '
+            f'<text fill="#4f5858" font-size="12" class="chart-label" x="{centre:.1f}" y="{height - pad + 2:.1f}" '
             f'text-anchor="middle">{_html_text(day[5:])}</text>'
         )
         parts.append(
-            f'<text class="chart-value" x="{centre:.1f}" y="{y - 5:.1f}" '
+            f'<text fill="#1e2525" font-size="12" class="chart-value" x="{centre:.1f}" y="{y - 5:.1f}" '
             f'text-anchor="middle">{value}</text>'
         )
+    values=_chart_values_html(counts)
     return (
         f'<svg class="chart" width="{width}" height="{height}" viewBox="0 0 {width} {height}" '
-        f'role="img" aria-label="Наблюдения по дням">{"".join(parts)}</svg>'
+        f'role="img" aria-label="Наблюдения по дням">{"".join(parts)}</svg>{values}'
     )
 
 
@@ -624,17 +658,18 @@ def _designed_top_sources_svg(document: BriefDocument) -> str:
         y = pad + index * row_height
         bar_width = (width - label_width - 70) * (value / maximum)
         parts.append(
-            f'<text class="hbar-label" x="{label_width - 12}" y="{y + 15}" text-anchor="end">{_html_text(host)}</text>'
+            f'<text fill="#4f5858" font-size="12" class="hbar-label" x="{label_width - 12}" y="{y + 15}" text-anchor="end">{_html_text(host)}</text>'
         )
         parts.append(
-            f'<rect class="hbar-bar" x="{label_width}" y="{y + 3}" width="{bar_width:.1f}" height="16" rx="4"/>'
+            f'<rect fill="#146b5c" class="hbar-bar" x="{label_width}" y="{y + 3}" width="{bar_width:.1f}" height="16" rx="4"/>'
         )
         parts.append(
-            f'<text class="hbar-value" x="{label_width + bar_width + 8:.1f}" y="{y + 16}">{value}</text>'
+            f'<text fill="#1e2525" font-size="12" class="hbar-value" x="{label_width + bar_width + 8:.1f}" y="{y + 16}">{value}</text>'
         )
+    values=_chart_values_html(dict(items))
     return (
         f'<svg class="hbar" width="{width}" height="{height}" viewBox="0 0 {width} {height}" '
-        f'role="img" aria-label="Пункты по источникам">{"".join(parts)}</svg>'
+        f'role="img" aria-label="Пункты по источникам">{"".join(parts)}</svg>{values}'
     )
 
 
@@ -659,6 +694,11 @@ def _designed_stylesheet() -> str:
 .hbar-label { fill: #4f5858; font-size: 12px; }
 .hbar-value { fill: #1e2525; font-size: 12px; font-weight: 700; }
 .cover-lead { margin: 18px 0 0; padding: 14px 16px; border-left: 4px solid var(--accent); background: var(--panel); font-size: 1.05rem; line-height: 1.45; }
+.chart-values { display: none; }
+.chart-values div { display: flex; justify-content: space-between; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.chart-values dt { overflow-wrap: anywhere; }
+.chart-values dd { margin: 0; font-weight: 750; }
+@media (max-width: 760px) { .chart, .hbar { display: none; } .chart-values { display: block; margin: 0; font-size: 1rem; } }
 .source-meta { margin: 4px 0 0; font-size: .85rem; color: var(--muted); }
 @media (prefers-color-scheme: dark) { .chart-label { fill: #b7c2bd; } .chart-value { fill: #edf3f0; } }
 @media print { .brief-report--designed .cover { padding-top: 8px; } .kpi { background: #fff; } .chart-bar { fill: #146b5c; } }
@@ -1045,10 +1085,10 @@ def _story_card_blocks(document: BriefDocument) -> list[str]:
 
 def _source_card_blocks(document: BriefDocument) -> list[str]:
     return [
-        "<article class=\"source-card\"><h3>{title}</h3><p>{summary}</p><p>{source}</p>"
+        "<article class=\"source-card\"><h3>{title}</h3>{summary}<p>{source}</p>"
         "<p class=\"source-meta\">{time} · {state}</p></article>".format(
             title=_html_text(evidence.title),
-            summary=_html_text(evidence.summary),
+            summary=_summary_html(evidence),
             source=_html_source(evidence.source_ref),
             time=_html_text(_display_time(evidence)),
             state=_html_text(evidence.source_state),
@@ -1509,7 +1549,7 @@ def _to_unicode_cmap(glyph_unicode: dict[int, str]) -> bytes:
 
 def _stylesheet() -> str:
     return """
-@page { size: A4; margin: 22mm 13mm 20mm; @top-left { content: string(brieftitle); font-size: 9pt; color: #4f5858; } @top-center { content: string(briefsection); font-size: 8.5pt; color: #4f5858; } @top-right { content: string(briefperiod); font-size: 8.5pt; color: #4f5858; } @bottom-center { content: "Страница " counter(page) " / " counter(pages); font-size: 8.5pt; color: #4f5858; } }
+@page { size: A4; margin: 22mm 13mm 20mm; @top-left { content: string(brieftitle); font-size: 9pt; color: #4f5858; } @top-center { content: string(briefsection); font-size: 8.5pt; color: #4f5858; } @top-right { content: string(briefperiod); content: string(briefperiodshort); font-size: 7.5pt; white-space: nowrap; color: #4f5858; } @bottom-center { content: "Страница " counter(page) " / " counter(pages); font-size: 8.5pt; color: #4f5858; } }
 @page :first { @top-left { content: none; } @top-center { content: none; } @top-right { content: none; } }
 :root { color-scheme: light dark; --bg: #f5f5f0; --panel: #ffffff; --ink: #1e2525; --muted: #4f5858; --line: #cbd2cc; --accent: #146b5c; --caveat: #7b4a13; }
 * { box-sizing: border-box; }
@@ -1528,7 +1568,7 @@ p, li { orphans: 2; widows: 2; }
 p, li, td, th, dd, code, a, blockquote { overflow-wrap: anywhere; }
 h2 + div, h2 + ol, h2 + p, h2 + svg, h2 + .table-wrap, h2 + .source-grid { break-before: avoid; }
 .brief-report > section:last-of-type { border-bottom: 0; padding-bottom: 0; }
-.period { color: var(--muted); string-set: briefperiod content(text); }
+.period { color: var(--muted); string-set: briefperiod content(text) briefperiodshort attr(data-print-period); }
 .identity, .source-card dl { color: var(--muted); }
 .identity { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 18px 0 0; }
 .identity dt, .source-card dt { font-weight: 700; }
@@ -1548,6 +1588,6 @@ th { background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
 .source-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
 a { color: var(--accent); }
 @media (prefers-color-scheme: dark) { :root { --bg: #121716; --panel: #1c2422; --ink: #edf3f0; --muted: #b7c2bd; --line: #43514c; --accent: #7dd7c1; --caveat: #ffc47b; } }
-@media (max-width: 760px) { .brief-report { width: min(100% - 20px, 680px); padding: 18px 0 32px; } .hero, .brief-report > section { padding: 18px 0; } .story, .source-card { padding: 14px; } .timeline li { grid-template-columns: 1fr; gap: 4px; } .identity { grid-template-columns: 1fr; gap: 1px; } }
-@media print { body { background: #fff; color: #111; } .brief-report { width: auto; padding: 0; } .story, .source-card { background: #fff; } a { color: #111; text-decoration: underline; } }
+@media (max-width: 760px) { .brief-report { width: min(100% - 20px, 680px); padding: 18px 0 32px; } .hero, .brief-report > section { padding: 18px 0; } .story, .source-card { padding: 14px; } .timeline li { grid-template-columns: 1fr; gap: 4px; } .identity { grid-template-columns: 1fr; gap: 1px; } .table-wrap { overflow: visible; } .table-wrap thead { display: none; } .table-wrap tr { display: block; padding: 8px 12px; border-bottom: 1px solid var(--line); } .table-wrap td { display: grid; grid-template-columns: 105px minmax(0,1fr); gap: 10px; padding: 5px 0; border: 0; } .table-wrap td::before { content: attr(data-label); font-weight: 700; color: var(--muted); } }
+@media print { body { background: #fff; color: #111; } .source-grid { display: block; } .story, .source-card { font-size: 10.5pt; } .story .takeaway { font-size: 11pt; } .table-wrap + h3 { margin-top: 18px; } .brief-report { width: auto; padding: 0; } .story, .source-card { background: #fff; } a { color: #111; text-decoration: underline; } }
 """

@@ -95,8 +95,20 @@ class AssistantRuntime:
             if lease is not None:
                 with self.queue.store.transaction() as tx:self.queue._fenced(tx,lease)
         guard()
-        if hasattr(self,'actions') and request.input_kind=='text' and request.query.strip().casefold() in {'да','yes','подтверждаю'}:
+        from .presentation import CONFIRM_LABELS,ACTION_CHECK
+        confirm_text=request.query.strip().casefold()
+        action_label={label.casefold():code for code,label in CONFIRM_LABELS.items()}
+        if hasattr(self,'actions') and request.input_kind=='text' and confirm_text==ACTION_CHECK.casefold():
             from prm.contracts import AssistantResult
+            current=self.visible_action_receipt(request.chat_id)
+            if current is None:return AssistantResult(request_ref,'confirmation_unavailable','chat','Для сверки нужен текущий показанный результат действия.')
+            receipt=self.actions.reconcile(current.idempotency_key)
+            return self.remember_action_outcome(request,request_ref,receipt,self.action_code(receipt),reconciled=True)
+        if hasattr(self,'actions') and request.input_kind=='text' and (confirm_text in {'да','yes','подтверждаю'} or confirm_text in action_label):
+            from prm.contracts import AssistantResult
+            current=self.visible_action_receipt(request.chat_id)
+            if current is not None and (confirm_text not in action_label or action_label[confirm_text]==self.action_code(current)):
+                return self.remember_action_outcome(request,request_ref,current,self.action_code(current),repeated=True)
             with self.queue.store.transaction() as tx:
                 rows=tx.conn.execute("SELECT ref,version FROM pa_actions.proposals WHERE owner=%s AND status='prepared'",(self.owner_ref,)).fetchall()
             versions={row['ref']:str(row['version']) for row in rows}
@@ -105,9 +117,14 @@ class AssistantRuntime:
                 with self.queue.store.transaction() as tx:
                     visible=tx.conn.execute("SELECT 1 FROM pa_jobs.jobs j JOIN pa_delivery.attempts a ON a.owner=j.owner AND a.id='answer_'||j.id WHERE j.owner=%s AND a.status='sent' AND j.result_ref IS NOT NULL AND EXISTS(SELECT 1 FROM pa_runtime.object_versions v WHERE v.owner=j.owner AND v.namespace='result' AND v.object_id=j.result_ref AND v.payload->'payload'->>'proposal_ref'=%s AND v.payload->'payload'->>'version'=%s) LIMIT 1",(self.owner_ref,resolution.confirmation_ref.proposal_ref,resolution.confirmation_ref.proposal_version)).fetchone()
                 if visible is None:return AssistantResult(request_ref,'confirmation_unavailable','chat','Подтверждение будет доступно после доставки полного текущего предпросмотра.')
+                if confirm_text in action_label:
+                    with self.queue.store.transaction() as tx:
+                        proposal=tx.conn.execute('SELECT payload FROM pa_actions.proposals WHERE owner=%s AND ref=%s',
+                            (self.owner_ref,resolution.confirmation_ref.proposal_ref)).fetchone()
+                    if proposal is None or proposal['payload']['action_code']!=action_label[confirm_text]:
+                        return AssistantResult(request_ref,'confirmation_unavailable','chat','Кнопка не относится к текущему предпросмотру. Проверь его заново.')
                 receipt=self.actions.confirm_and_execute(resolution.confirmation_ref.proposal_ref,actor_ref=self.owner_ref)
-                return AssistantResult(request_ref,receipt.status,'chat','Исход подтверждённого действия: '+receipt.status,
-                    payload={'receipt_ref':receipt.idempotency_key,'source_data_class':'private_connector_content'})
+                return self.remember_action_outcome(request,request_ref,receipt,self.action_code(receipt))
             return AssistantResult(request_ref,'confirmation_unavailable','chat','Для подтверждения нужен один текущий видимый предпросмотр с точной версией.')
         if request.query.startswith('/deep '):
             import json
@@ -117,7 +134,7 @@ class AssistantRuntime:
             plan=json.loads(argument) if argument.startswith('{') else {'schema_version':1,'question':argument,
                 'steps':[{'source':'archive','query':argument}],'max_tool_calls':3,'deadline_seconds':180}
             job=DurableResearchWorker(self).enqueue(plan,idempotency_key='deep_'+request_ref)
-            return AssistantResult(request_ref,'queued','research','Исследование сохранено. /status '+job+'; отмена: /cancel '+job,
+            return AssistantResult(request_ref,'queued','research','Исследование сохранено. Проверю выбранные источники и подготовлю ответ с цитатами и границами покрытия.\nСтатус: /status '+job+'\nОтмена: /cancel '+job,
                 payload={'job_ref':job,'source_data_class':'user_provided','source_data_classes':['user_provided']})
         lowered=request.query.casefold()
         service=None
@@ -229,6 +246,43 @@ class AssistantRuntime:
             for group in groups:
                 for decision in group:decision.reservation.abandon_before_transport()
 
+    def action_code(self,receipt):
+        with self.queue.store.transaction() as tx:
+            row=tx.conn.execute('SELECT payload FROM pa_actions.proposals WHERE owner=%s AND ref=%s',
+                (self.owner_ref,receipt.proposal_ref)).fetchone()
+        if row is None:raise StorageError('action proposal unavailable')
+        return row['payload']['action_code']
+
+    def visible_action_receipt(self,chat_id):
+        state=self.conversations.load(chat_id)
+        if state is None or not state.object_refs:return None
+        from prm.conversation import CONVERSATION_TTL
+        with self.queue.store.transaction() as tx:
+            row=tx.conn.execute("""SELECT v.payload->'payload'->>'receipt_ref' AS receipt FROM pa_runtime.object_versions v
+                JOIN pa_jobs.jobs j ON j.owner=v.owner AND j.result_ref=v.object_id
+                JOIN pa_delivery.attempts a ON a.owner=j.owner AND a.id='answer_'||j.id AND a.status='sent'
+                WHERE v.owner=%s AND v.namespace='result' AND v.version=1 AND v.payload->'payload' ? 'receipt_ref'
+                AND (v.payload->'payload'->'conversation'->'response_refs') ? %s
+                AND v.created_at>=%s ORDER BY v.created_at DESC LIMIT 1""",(self.owner_ref,state.object_refs[0].response_ref,state.expires_at-CONVERSATION_TTL)).fetchone()
+        receipt=self.actions.store.get(row['receipt']) if row else None
+        if receipt and state.current_confirmation_ref and receipt.proposal_ref!=state.current_confirmation_ref.proposal_ref:return None
+        return receipt
+
+    def action_outcome_payload(self,receipt,code,*,repeated=False,reconciled=False):
+        from .presentation import action_outcome,keyboard,ACTION_CHECK
+        return {'status':receipt.status,'text':action_outcome(receipt,code,repeated=repeated,reconciled=reconciled),
+                'receipt_ref':receipt.idempotency_key,'provider_operation_ref':receipt.provider_operation_ref,
+                'delivery_completion':'provider acceptance is distinct from recipient delivery',
+                'telegram_navigation':keyboard(ACTION_CHECK),'source_data_class':'private_connector_content'}
+
+    def remember_action_outcome(self,request,request_ref,receipt,code,*,repeated=False,reconciled=False):
+        from prm.contracts import AssistantResult
+        value=self.action_outcome_payload(receipt,code,repeated=repeated,reconciled=reconciled)
+        state=self.conversations.record_response(request.chat_id,text=value['text'],topic='')
+        self.conversations.record_origin(state.object_refs[0].response_ref,('private_connector_content',))
+        value['conversation']={'response_refs':[state.object_refs[0].response_ref]}
+        return AssistantResult(request_ref,receipt.status,'chat',value['text'],payload=value)
+
     def attach_graph(self,transport,*,mail_selection=None,calendar_selection=None):
         if (transport.owner_ref,transport.registry)!=(self.owner_ref,self.registry):raise StorageError('selected Graph runtime owner differs')
         from .graph import GraphMailAdapter
@@ -325,14 +379,14 @@ class AssistantRuntime:
                 command,_,argument=request.query.partition(' ');guard()
                 if command=='/actreconcile':
                     receipt=action_runtime.reconcile(argument)
-                    return {'status':receipt.status,'text':'Результат сверки с провайдером: '+receipt.status,'receipt_ref':receipt.idempotency_key}
+                    return self.action_outcome_payload(receipt,self.action_code(receipt),reconciled=True)
                 if command=='/actconfirm':
                     if request.input_kind!='text':raise StorageError('editable voice transcription is not write confirmation; use the exact text/button preview')
                     parts=argument.split()
                     if len(parts)!=3:raise StorageError('exact preview reference, version and digest required')
+                    prior=any(r.proposal_ref==parts[0] and r.proposal_version==int(parts[1]) for r in action_runtime.store.all())
                     receipt=action_runtime.confirm_and_execute(parts[0],actor_ref=self.owner_ref,expected_version=int(parts[1]),expected_digest=parts[2])
-                    return {'status':receipt.status,'text':'Исход действия: '+receipt.status+'. Provider ref: '+receipt.provider_operation_ref,
-                            'receipt_ref':receipt.idempotency_key,'delivery_completion':'provider acceptance is distinct from recipient delivery'}
+                    return self.action_outcome_payload(receipt,self.action_code(receipt),repeated=prior)
                 if command=='/actpreview':
                     value=json.loads(argument)
                     proposal=action_runtime.preview(action_code=value['action_code'],resource_ref=value['resource_ref'],content=value['content'],rationale_refs=('user_request:'+request_ref,))
@@ -344,8 +398,10 @@ class AssistantRuntime:
                     if row is None:raise StorageError('proposal unavailable')
                     proposal=action_runtime.edit(_proposal(row['payload']),content=json.loads(body))
                 else:raise StorageError('exact action command required')
-                return {'status':'preview','text':'Предпросмотр '+proposal.action_code+': '+json.dumps(proposal.content,ensure_ascii=False)+'\n/actconfirm '+proposal.proposal_ref+' '+str(proposal.version)+' '+proposal.digest,
-                        'proposal_ref':proposal.proposal_ref,'version':proposal.version,'content_digest':proposal.digest}
+                from .presentation import action_preview,keyboard,CONFIRM_LABELS
+                return {'status':'preview','text':action_preview(proposal),
+                        'proposal_ref':proposal.proposal_ref,'version':proposal.version,'content_digest':proposal.digest,
+                        'telegram_navigation':keyboard(CONFIRM_LABELS[proposal.action_code])}
             self.services['actions']=actions
         if brief_runtime is not None:
             self.brief_runtime=brief_runtime

@@ -121,7 +121,8 @@ class ActionRuntime:
 
     def _show(self,proposal):
         from prm.conversation import ConfirmationRef,identity_hash
-        text='Предпросмотр '+proposal.action_code+': '+__import__('json').dumps(proposal.content,ensure_ascii=False)
+        from .presentation import action_preview
+        text=action_preview(proposal)
         state=self.root.conversations.record_response(self.root.owner_chat_id,text=text[:2400],topic='')
         identity=identity_hash(self.root.owner_chat_id)
         self.root.conversations.offer_confirmation(self.root.owner_chat_id,ConfirmationRef(proposal.proposal_ref,str(proposal.version),

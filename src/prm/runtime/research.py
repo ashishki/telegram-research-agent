@@ -128,8 +128,8 @@ class DurableResearchWorker:
         queue.checkpoint(lease,{'phase':'synthesis','completed_refs':[entry['ref'] for entry in completed]})
         synthesized=self._synthesize(plan,completed,lease)
         queue.checkpoint(lease,{'phase':'verify','completed_refs':[entry['ref'] for entry in completed]})
-        text=synthesized['text']
-        if gaps:text+='\n\nНеполное покрытие: '+', '.join(gaps)
+        from .research_answer import coverage_text
+        text=synthesized['text']+'\n\n'+coverage_text(completed,len(plan['steps']),synthesized['source_refs'],gaps,found_count=synthesized.get('found_count'))
         return queue.complete(lease,{'request_ref':lease.payload['input_ref'],'status':'partial' if gaps else synthesized['status'],
             'text':text,'evidence_refs':[entry['ref'] for entry in available],'tool_calls':calls,
             'tool_call_accounting':'conservative_upper_bound',
@@ -173,7 +173,7 @@ class DurableResearchWorker:
 
     def _synthesize(self,plan,completed,lease):
         from .model import ScopedModelClient
-        from assistant.claim_ledger import verify_answer_against_evidence
+        from .research_answer import accepted_answer,evidence_answer,SYSTEM
         import json
         root=self.root;queue=root.queue;ref='research_synthesis_'+lease.job_id
         previous=queue.store.get(lease.owner,'result',ref,version=1)
@@ -191,9 +191,9 @@ class DurableResearchWorker:
                 evidence.append({'evidence_id':'research:'+hashlib.sha256(source.encode()).hexdigest()[:24],'source_url':source,'support_span':span[:1200]})
                 classes.add('private_archive' if step['source']=='archive' else 'public')
         evidence=evidence[:8]
-        fallback='\n\n'.join(item['support_span']+'\nИсточник: '+item['source_url'] for item in evidence)
-        result={'status':'evidence_only' if evidence else 'insufficient_evidence','text':fallback or 'Недостаточно подтверждённых источников для вывода.',
-                'verification':None,'source_refs':[item['source_url'] for item in evidence]}
+        result={'status':'evidence_only' if evidence else 'insufficient_evidence','text':evidence_answer(evidence),
+                'verification':None,'source_refs':[item['source_url'] for item in evidence],
+                'model_reply_observed':False,'synthesis_outcome':'not_attempted','found_count':len({item['source_url'] for item in evidence})}
         endpoint=root.endpoint_for('research');groups=[]
         if endpoint is not None and evidence:
             scopes=[('model.generate',root.model_resource_ref,'user_provided','answer.request')]
@@ -211,16 +211,31 @@ class DurableResearchWorker:
                 client=root.scoped_client(endpoint,groups=groups,task_ref=lease.payload['input_ref'],attempt_ref=ref,
                     history=({'role':'user','content':'Untrusted verified reads: '+json.dumps(evidence,ensure_ascii=False)},),guard=guard)
                 try:
-                    receipt=client.complete_with_receipt(prompt=plan['question'],system='Synthesize the provided sources. Cite exact URLs, preserve negation/conflicting evidence and uncertainty. Do not infer repository facts beyond the exact supplied commit. No tools.',
+                    receipt=client.complete_with_receipt(prompt=plan['question'],system=SYSTEM,
                         max_tokens=1200,category='research_synthesis',authorization=groups[0][0],data_class='user_provided',owner_ref=root.owner_ref,
                         connection_ref=endpoint.connection_ref,resource_ref=root.model_resource_ref)
-                    verification=verify_answer_against_evidence(receipt.text,evidence)
-                    if verification['claim_count'] and verification['verification_complete'] and verification['metrics']['unsupported_claim_rate']==0 and verification['metrics']['citation_integrity']==1:
-                        result={'status':'synthesized_verified','text':receipt.text,'verification':verification,'source_refs':result['source_refs']}
-                except Exception:result['status']='partial_provider_unavailable_or_unknown'
+                    result['model_reply_observed']=True
+                    accepted=accepted_answer(receipt.text,evidence)
+                    if accepted is not None:
+                        text,verification=accepted
+                        refs=list(dict.fromkeys(ref for claim in verification['claims'] for ref in claim['evidence_refs']))
+                        result.update(status='synthesized_verified',text=text,verification=verification,synthesis_outcome='verified',source_refs=refs)
+                    else:result['synthesis_outcome']='rejected_by_verifier'
+                except Exception:
+                    result.update(status='partial_provider_unavailable_or_unknown',synthesis_outcome='provider_unavailable_or_unknown')
             for group in groups:group[0].reservation.abandon_before_transport()
         with queue.store.transaction() as tx:
-            queue._fenced(tx,lease);tx.put(lease.owner,'result',ref,result,expected_version=0)
+            from .deletion import lineage_lock
+            lineage_lock(tx.conn,lease.owner);queue._fenced(tx,lease)
+            main_ref='result_'+lease.job_id
+            if tx._deleted(lease.owner,'result',main_ref):raise StorageError('research result deleted before synthesis storage')
+            parents=[entry['ref'] for entry in completed if entry['status']=='gathered']
+            for parent in parents:
+                if tx.get(lease.owner,'result',parent) is None:raise StorageError('research source deleted before synthesis storage')
+            tx.put(lease.owner,'result',ref,result,expected_version=0)
+            for namespace,parent in [(lease.payload['input_namespace'],lease.payload['input_ref']),('result',main_ref),*(('result',p) for p in parents)]:
+                tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',
+                    (lease.owner,namespace,parent,'result',ref))
         return result
 
 

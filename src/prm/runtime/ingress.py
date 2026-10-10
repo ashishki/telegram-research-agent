@@ -15,6 +15,7 @@ class IntakeReply:
     text: str
     request_ref: str | None = None
     job_id: str | None = None
+    navigation: dict | None = None
 
 
 class TelegramJobIngress:
@@ -48,6 +49,13 @@ class TelegramJobIngress:
                 return IntakeReply('Это действие недоступно; подтверждение не использовано.')
             return self.control(parts[1], parts[2])
         parts = text.split(maxsplit=1)
+        watch_words={'подтвердить наблюдение':'/watchconfirm','проверить наблюдение':'/watchstatus',
+                     'приостановить наблюдение':'/watchpause','возобновить наблюдение':'/watchresume',
+                     'отключить наблюдение':'/watchunsubscribe'}
+        if text.casefold() in watch_words and self.watch_scheduler is not None:
+            if message.get('voice') or message.get('voice_transcript'):
+                return IntakeReply('Управление наблюдением требует текста или нажатия показанной кнопки.')
+            return self.watch_control(watch_words[text.casefold()],'')
         if parts and parts[0] == '/deliverystatus' and self.delivery_executor is not None:
             return IntakeReply(self.delivery_executor.describe(owner=self.owner_ref, delivery_id=parts[1] if len(parts) == 2 else ''))
         if parts and parts[0].startswith('/watch') and self.watch_scheduler is not None:
@@ -118,6 +126,7 @@ class TelegramJobIngress:
 
     def watch_control(self, command, argument):
         scheduler = self.watch_scheduler
+        from .presentation import keyboard
         actor = dict(chat_id=self.owner_chat_id, actor_id=self.owner_chat_id, owner_chat_id=self.owner_chat_id)
         if command in {'/watch','/watchpreview'}:
             import json,uuid
@@ -134,23 +143,54 @@ class TelegramJobIngress:
                 'source_refs':tuple(value['source_refs']),'expires_at':datetime.fromisoformat(value['expires_at'])}
             subscription=WatchSubscription(**value)
             ref=scheduler.preview(subscription,interval_seconds=interval,**actor)
-            return IntakeReply('Предпросмотр подписки: '+', '.join(subscription.source_refs)+'; '+subscription.trigger+'; '+subscription.timezone_name+
-                '; до '+subscription.expires_at.isoformat()+'; не больше '+str(subscription.daily_cap)+' сообщений в день; тихие часы '+
-                str(subscription.quiet_start)+'–'+str(subscription.quiet_end)+'. Подтверди: /watchconfirm '+ref)
+            labels={'provider_local':'архив Telegram','provider_microsoft_graph':'выбранная папка почты Microsoft'}
+            sources=', '.join(labels.get(scheduler.source_bindings[source]['provider_ref'],'выбранный источник') for source in subscription.source_refs)
+            cadence=('каждые '+str(interval//60)+' мин.' if subscription.frequency=='immediate' else
+                     'ежедневно в '+str(subscription.delivery_time))
+            trigger={'meaningful_change':'содержательные изменения','digest':'сводку изменений'}.get(subscription.trigger,'выбранные изменения')
+            text='Предпросмотр наблюдения\nИсточник: '+sources+'\nПроверка: '+cadence+'\nСообщать: '+trigger+'\nЧасовой пояс: '+subscription.timezone_name
+            text+='\nНе больше '+str(subscription.daily_cap)+' сообщений в день. Тихие часы: '+str(subscription.quiet_start)+'–'+str(subscription.quiet_end)+'.'
+            if subscription.allow_urgent_during_quiet_hours:text+=' Срочные уведомления разрешены и в тихие часы.'
+            text+='\nДо: '+subscription.expires_at.isoformat()+'\nНаблюдение ещё не включено. Нажми «Подтвердить наблюдение».'
+            # Explicit references remain an operator fallback if several previews coexist.
+            with self.queue.store.transaction() as tx:
+                pending=tx.conn.execute('SELECT count(*) AS n FROM pa_schedule.previews WHERE owner=%s AND NOT consumed AND expires>clock_timestamp()',(self.owner_ref,)).fetchone()['n']
+            if pending>1:text+='\nВыбери этот предпросмотр: /watchconfirm '+ref
+            return IntakeReply(text,navigation=keyboard('Подтвердить наблюдение'))
+        if not argument:
+            with self.queue.store.transaction() as tx:
+                if command=='/watchconfirm':
+                    rows=tx.conn.execute('SELECT id FROM pa_schedule.previews WHERE owner=%s AND NOT consumed AND expires>clock_timestamp() ORDER BY expires DESC LIMIT 2',(self.owner_ref,)).fetchall()
+                else:
+                    rows=tx.conn.execute("SELECT id FROM pa_schedule.schedules WHERE owner=%s AND payload->>'lifecycle' NOT IN ('cancelled','completed') ORDER BY id LIMIT 2",(self.owner_ref,)).fetchall()
+            if len(rows)!=1:
+                return IntakeReply('Для этой кнопки нужен один действующий предпросмотр или одна подписка. Выбери конкретную подписку командой, если их несколько.')
+            argument=rows[0]['id']
         if command == '/watchconfirm':
-            scheduler.confirm(argument, **actor)
-            return IntakeReply('Подписка сохранена. Работа планировщика проверяется через /watchstatus.')
+            try:scheduler.confirm(argument, **actor)
+            except StateConflict:return IntakeReply('Этот предпросмотр уже использован, изменён или истёк. Новый сбор не запущен этим подтверждением.')
+            return IntakeReply('Подписка сохранена. Работа планировщика пока не подтверждена; её состояние можно проверить кнопкой.',
+                navigation=keyboard('Проверить наблюдение','Приостановить наблюдение'))
         if command == '/watchstatus':
             state = scheduler.status(owner=self.owner_ref, subscription_id=argument)
             if state is None:
                 return IntakeReply('Подписка не найдена.')
             observed = 'наблюдалась недавно' if state['scheduler_observed_recently'] else 'пока не подтверждена'
-            return IntakeReply(f"Подписка сохранена: {state['lifecycle']}. Работа планировщика {observed}. Последний результат: {state['last_reason']}.")
+            status={'active':'активна','paused':'приостановлена','cancelled':'отключена','completed':'завершена'}.get(state['lifecycle'],'ожидает проверки')
+            reason={'active':'задача проверки создана','collection_grant_denied':'нет разрешения на сбор','pause':'наблюдение приостановлено','resume':'наблюдение возобновлено','unsubscribe':'наблюдение отключено'}.get(state['last_reason'],'проверки ещё не было')
+            last=state.get('last_collection')
+            if last and last.get('status')=='collected':reason='собрано изменений: '+str(last['notifications'])
+            return IntakeReply(f"Подписка сохранена: {status}. Работа планировщика {observed}. Последняя проверка: {reason}.",
+                navigation=keyboard('Проверить наблюдение','Возобновить наблюдение' if state['lifecycle']=='paused' else 'Приостановить наблюдение'))
         actions = {'/watchpause': 'pause', '/watchunsubscribe': 'unsubscribe', '/watchdone': 'done', '/watchresume': 'resume'}
         if command not in actions:
             return IntakeReply('Используй /watchstatus, /watchpause, /watchunsubscribe, /watchdone с ID подписки.')
         scheduler.feedback(argument, actions[command], **actor)
-        return IntakeReply('Состояние подписки сохранено.')
+        text={'pause':'Подписка приостановлена: новые сборы и отправки остановлены. Уже начатый запрос мог продолжиться.',
+              'resume':'Подписка возобновлена. Фактическую работу планировщика можно проверить кнопкой.',
+              'unsubscribe':'Наблюдение отключено. Новые сборы и отправки по этой подписке остановлены.',
+              'done':'Наблюдение завершено.'}[actions[command]]
+        return IntakeReply(text,navigation=keyboard('Проверить наблюдение','Возобновить наблюдение') if actions[command]=='pause' else keyboard('Проверить наблюдение'))
 
     def control(self, command: str, job_id: str) -> IntakeReply:
         if not re.fullmatch(r'job_[a-f0-9]{32}', job_id):

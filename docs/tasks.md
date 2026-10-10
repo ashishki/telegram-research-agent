@@ -706,7 +706,7 @@ Status: planned
 Depends-On: PAI-03 PAI-04
 Risk-Level: high
 Critic-Required: required
-Runtime-Verification:; `.venv-pai/bin/python tools/run_pai_acceptance.py -q tests/test_pai_product_sessions.py` required
+Runtime-Verification: required
 Correction-Budget: 2
 Planning-Depth: designed_slices
 Slice-ID: PAI-05
@@ -714,7 +714,8 @@ Objective: после перезапуска «объясни второй пу�
 Acceptance-Criteria:
   - restart, новая тема, отмена, старый callback, две pending proposals и expiry дают правильный результат; retained history удаляется по выбранной политике; беседа другого owner недоступна.
   - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
-Verification:; `.venv-pai/bin/python tools/run_pai_acceptance.py -q tests/test_pai_product_sessions.py`
+Verification:
+  - .venv-pai/bin/python tools/run_pai_acceptance.py -q tests/test_pai_product_sessions.py
   - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_durable_conversation.py tests/test_assistant_conversation.py tests/test_assistant_report_dialogue.py
 Context-Refs:
   - docs/PA_IMPLEMENTATION_TASKS.md#pai-05
@@ -765,6 +766,7 @@ Acceptance-Criteria:
   - через настоящий ingress fake long job не блокирует другой запрос; duplicate update не создаёт вторую job; restart сохраняет status; cancel прекращает будущие steps. Не писать «в фоне», если enqueue не состоялся.
   - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
 Verification:
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/run_pai_acceptance.py -q tests/test_pai_control_polish.py
   - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_ingress_jobs.py tests/test_prm_bot_dispatch.py tests/test_callbacks.py tests/test_prm_cli.py
   - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_product_sessions.py
 Context-Refs:
@@ -791,6 +793,7 @@ Acceptance-Criteria:
   - два scheduler, повтор tick, downtime, DST, изменение срока, revoke и paused scope проходят; UI различает сохранённое намерение и реально работающий scheduler. Никакой systemd timer не включён этим тестом.
   - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
 Verification:
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/run_pai_acceptance.py -q tests/test_pai_control_polish.py
   - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_scheduler.py tests/test_assistant_jobs.py tests/test_assistant_subscriptions.py
 Context-Refs:
   - docs/PA_IMPLEMENTATION_TASKS.md#pai-08
@@ -816,6 +819,7 @@ Acceptance-Criteria:
   - fake server принял effect, но ACK потерян — повтор не происходит; pause/revoke race и старый lease не обходят guard; unknown без возможности проверки остаётся unknown. Реальных отправок ещё нет.
   - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
 Verification:
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/run_pai_acceptance.py -q tests/test_pai_control_polish.py
   - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_delivery.py tests/test_assistant_jobs.py tests/test_assistant_actions.py tests/test_assistant_egress.py
   - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_delivery.py::test_postgres_authority_spans_legacy_sqlite_send tests/test_pai_delivery.py::test_sqlite_busy_boundary_distinguishes_no_send tests/test_pai_delivery.py::test_multipart_not_started_does_not_claim_absence_after_prior_send
 Context-Refs:
@@ -920,6 +924,7 @@ Acceptance-Criteria:
   - kill/resume в каждом phase, отмена, потеря провайдера, исчерпание steps/time/cost и новый вопрос в той же беседе корректны; выводы о проекте опираются на актуальный ref, а не общий фон модели.
   - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
 Verification:
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/run_pai_acceptance.py -q tests/test_pai_search_polish.py
   - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_deep_research.py tests/test_assistant_research.py tests/test_prm_research_planner.py
   - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_deep_research.py::test_research_tool_result_injection_cannot_create_authority_or_effects
 Context-Refs:
@@ -937,7 +942,7 @@ Status: planned
 Depends-On: PAI-05 PAI-08 PAI-09 PAI-11 PAI-13
 Risk-Level: high
 Critic-Required: required
-Runtime-Verification:; `.venv-pai/bin/python tools/run_pai_acceptance.py -q tests/test_pai_product_sessions.py` required
+Runtime-Verification: required
 Correction-Budget: 2
 Planning-Depth: designed_slices
 Slice-ID: PAI-14
@@ -945,7 +950,9 @@ Objective: «что важного за неделю» даёт редакцио
 Acceptance-Criteria:
   - quiet/partial week, дубли, противоречия, delayed source, DST и followups проходят; смена представления не перегенерирует факты. Fixture quality не выдаётся за human/live quality.
   - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
-Verification:; `.venv-pai/bin/python tools/run_pai_acceptance.py -q tests/test_pai_product_sessions.py`
+Verification:
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/run_pai_acceptance.py -q tests/test_pai_brief_polish.py
+  - .venv-pai/bin/python tools/run_pai_acceptance.py -q tests/test_pai_product_sessions.py
   - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_brief_runtime.py tests/test_assistant_briefs.py tests/test_assistant_brief_editorial.py tests/test_assistant_report_dialogue.py
 Context-Refs:
   - docs/PA_IMPLEMENTATION_TASKS.md#pai-14
@@ -962,7 +969,7 @@ Status: planned
 Depends-On: PAI-07 PAI-14
 Risk-Level: high
 Critic-Required: required
-Runtime-Verification:; `.venv-pai/bin/python tools/run_pai_acceptance.py -q tests/test_pai_product_sessions.py` required
+Runtime-Verification: required
 Correction-Budget: 2
 Planning-Depth: designed_slices
 Slice-ID: PAI-15
@@ -970,7 +977,9 @@ Objective: один отчёт читается с телефона в Telegram 
 Acceptance-Criteria:
   - чужой/отозванный/истёкший доступ не читает artifact; Telegram/HTML/PDF показывают те же story/source IDs, ничего не обрезано. Человеческая визуальная приёмка остаётся в PAI-27/29.
   - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
-Verification:; `.venv-pai/bin/python tools/run_pai_acceptance.py -q tests/test_pai_product_sessions.py`
+Verification:
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/run_pai_acceptance.py -q tests/test_pai_brief_polish.py
+  - .venv-pai/bin/python tools/run_pai_acceptance.py -q tests/test_pai_product_sessions.py
   - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_report_runtime.py tests/test_assistant_report_exports.py tests/test_assistant_report_access.py tests/test_pdf_inspection.py
 Context-Refs:
   - docs/PA_IMPLEMENTATION_TASKS.md#pai-15
@@ -1098,6 +1107,7 @@ Acceptance-Criteria:
   - настоящий путь preview→edit→confirm→fake provider→receipt проходит; content/recipient/time change, two clicks, kill/ACK loss, version conflict и revoke не дают неожиданную запись. Payments/submission/registration остаются вне tools.
   - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
 Verification:
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/run_pai_acceptance.py -q tests/test_pai_control_polish.py
   - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_action_runtime.py tests/test_assistant_actions.py tests/test_pai_delivery.py tests/test_prm_post_answer_actions.py
   - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/run_pai_acceptance.py -q tests/test_pai_action_runtime.py::test_mail_202_and_ack_loss_need_separate_exact_reconciliation_read tests/test_pai_action_runtime.py::test_mail_reconciliation_denies_missing_oauth_scope_before_http tests/test_pai_action_runtime.py::test_mail_reconciliation_mismatched_digest_keeps_unknown
 Context-Refs:
@@ -1250,6 +1260,7 @@ Acceptance-Criteria:
   - каждая обязательная PA-возможность имеет wired positive и failure evidence, нет открытых P0/P1; отсутствие provider/human proof указано отдельно. Generic tier и judge не заменяют эту матрицу.
   - The exact card scenarios in the Context-Ref must pass; missing tests, skipped PostgreSQL, fixtures or absent live authority never count as full acceptance.
 Verification:
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python tools/run_pai_acceptance.py -q tests/test_pai_search_polish.py tests/test_pai_control_polish.py tests/test_pai_brief_polish.py
   - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_pai_end_to_end.py tests/test_pai_load_recovery.py
   - python3 tools/test_tiers.py focused-prm
   - python3 tools/test_tiers.py retrofit-boundaries

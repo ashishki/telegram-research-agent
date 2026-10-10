@@ -98,6 +98,12 @@ class DeliveryExecutor:
                        'data_class':result.payload.get('data_class','private_archive'),
                        'data_classes':result.payload.get('data_classes',[result.payload.get('data_class','private_archive')]),
                        'request_ref': result.payload.get('request_ref'),'source_scopes':result.payload.get('payload',{}).get('source_scopes',[])}
+            options=result.payload.get('payload',{})
+            if options.get('telegram_navigation') is not None:
+                from .transports import navigation_markup
+                navigation_markup(options['telegram_navigation'])
+                payload['telegram_navigation']=options['telegram_navigation']
+            if options.get('telegram_parse_mode')=='HTML':payload['telegram_parse_mode']='HTML'
             if effect_lease is None and tx.conn.execute("SELECT 1 FROM pa_jobs.jobs WHERE owner=%s AND mode='effect' AND payload->>'effect_key'=%s LIMIT 1",
                 (owner,'answer_'+job_id)).fetchone():
                 prior=tx.conn.execute('SELECT 1 FROM pa_delivery.attempts WHERE owner=%s AND id=%s',(owner,'answer_'+job_id)).fetchone()
@@ -125,10 +131,14 @@ class DeliveryExecutor:
             tx.conn.execute('''INSERT INTO pa_delivery.attempts(owner,id,attempt_ref,kind,source_ref,destination_ref,digest,payload,status)
                 VALUES(%s,%s,%s,'answer',%s,%s,%s,%s,'unknown')''',
                 (owner,delivery_id,'attempt_'+uuid.uuid4().hex,job_id,destination_ref,digest,Jsonb(payload)))
-        parts=[payload['text'][index:index+3600] for index in range(0,len(payload['text']),3600)]
+        if payload.get('telegram_parse_mode')=='HTML':
+            from .presentation import split_html_messages
+            parts=split_html_messages(payload['text'])
+        else:parts=[payload['text'][index:index+3600] for index in range(0,len(payload['text']),3600)]
         receipts=[]
         for index,text in enumerate(parts):
             part={**payload,'text':'['+str(index+1)+'/'+str(len(parts))+']\n'+text,'part':index+1,'parts':len(parts)}
+            if index!=len(parts)-1:part.pop('telegram_navigation',None)
             attempt=self._deliver(owner=owner,delivery_id=delivery_id+'_part_'+str(index+1),kind='answer',source_ref=job_id,
                 destination_ref=destination_ref,payload=part,upper_bound=upper_bound,effect_lease=effect_lease)
             if attempt['status']!='sent':
@@ -277,7 +287,11 @@ class DeliveryExecutor:
                 if row['status'] != 'unknown' or row['digest'] != digest:
                     raise CapabilityDenied('attempt already settled or changed')
                 try:
-                    result = self.sender(destination_ref, payload['text'], row['attempt_ref'])
+                    from .transports import BoundedTelegramSender
+                    if type(self.sender) is BoundedTelegramSender:
+                        result=self.sender.send_with_options(destination_ref,payload['text'],row['attempt_ref'],
+                            navigation=payload.get('telegram_navigation'),parse_mode=payload.get('telegram_parse_mode'))
+                    else:result = self.sender(destination_ref, payload['text'], row['attempt_ref'])
                 except KnownDeliveryNotStarted:
                     known_adapter_outcome = 'transport_not_started'
                     raise

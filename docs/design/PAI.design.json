@@ -478,7 +478,9 @@
         "tests/fixtures/assistant/**",
         "tools/test_tiers.py",
         "tests/test_pai_product_sessions.py",
-        "src/prm/runtime/result_payloads.py"
+        "src/prm/runtime/result_payloads.py",
+        "src/prm/runtime/presentation.py",
+        "tests/test_pai_control_polish.py"
       ],
       "change_budget": "files<=24",
       "dependencies": [
@@ -531,6 +533,18 @@
           "expected_exit_code": 0,
           "required": true,
           "timeout_seconds": 600
+        },
+        {
+          "id": "four_point_product_polish",
+          "argv": [
+            "{python}",
+            "tools/run_pai_acceptance.py",
+            "-q",
+            "tests/test_pai_control_polish.py"
+          ],
+          "expected_exit_code": 0,
+          "required": true,
+          "timeout_seconds": 900
         }
       ]
     },
@@ -550,7 +564,10 @@
         "tests/test_assistant_jobs.py",
         "tests/test_assistant_subscriptions.py",
         "tests/fixtures/assistant/**",
-        "tools/test_tiers.py"
+        "tools/test_tiers.py",
+        "src/prm/runtime/ingress.py",
+        "src/prm/runtime/presentation.py",
+        "tests/test_pai_control_polish.py"
       ],
       "change_budget": "files<=24",
       "dependencies": [
@@ -589,6 +606,18 @@
           "id": "acceptance",
           "required": true,
           "timeout_seconds": 600
+        },
+        {
+          "id": "four_point_product_polish",
+          "argv": [
+            "{python}",
+            "tools/run_pai_acceptance.py",
+            "-q",
+            "tests/test_pai_control_polish.py"
+          ],
+          "expected_exit_code": 0,
+          "required": true,
+          "timeout_seconds": 900
         }
       ]
     },
@@ -613,7 +642,10 @@
         "tests/fixtures/assistant/**",
         "tools/test_tiers.py",
         "src/prm/runtime/composition.py",
-        "src/prm/runtime/delivery.py"
+        "src/prm/runtime/delivery.py",
+        "src/prm/runtime/transports.py",
+        "src/prm/runtime/presentation.py",
+        "tests/test_pai_control_polish.py"
       ],
       "change_budget": "files<=24",
       "dependencies": [
@@ -671,6 +703,18 @@
           "expected_exit_code": 0,
           "required": true,
           "timeout_seconds": 180
+        },
+        {
+          "id": "four_point_product_polish",
+          "argv": [
+            "{python}",
+            "tools/run_pai_acceptance.py",
+            "-q",
+            "tests/test_pai_control_polish.py"
+          ],
+          "expected_exit_code": 0,
+          "required": true,
+          "timeout_seconds": 900
         }
       ]
     },
@@ -927,7 +971,10 @@
         "tests/test_prm_research_planner.py",
         "tests/fixtures/assistant/**",
         "tools/test_tiers.py",
-        "src/prm/research_worker.py"
+        "src/prm/research_worker.py",
+        "src/prm/runtime/research.py",
+        "src/prm/runtime/research_answer.py",
+        "tests/test_pai_search_polish.py"
       ],
       "change_budget": "files<=24",
       "dependencies": [
@@ -980,6 +1027,18 @@
           "expected_exit_code": 0,
           "required": true,
           "timeout_seconds": 180
+        },
+        {
+          "id": "four_point_product_polish",
+          "argv": [
+            "{python}",
+            "tools/run_pai_acceptance.py",
+            "-q",
+            "tests/test_pai_search_polish.py"
+          ],
+          "expected_exit_code": 0,
+          "required": true,
+          "timeout_seconds": 900
         }
       ]
     },
@@ -1005,7 +1064,8 @@
         "tools/test_tiers.py",
         "src/prm/editorial_transport.py",
         "src/prm/runtime/brief.py",
-        "tests/test_pai_product_sessions.py"
+        "tests/test_pai_product_sessions.py",
+        "tests/test_pai_brief_polish.py"
       ],
       "change_budget": "files<=24",
       "dependencies": [
@@ -1060,6 +1120,18 @@
           "required": true,
           "expected_exit_code": 0,
           "timeout_seconds": 600
+        },
+        {
+          "id": "four_point_product_polish",
+          "argv": [
+            "{python}",
+            "tools/run_pai_acceptance.py",
+            "-q",
+            "tests/test_pai_brief_polish.py"
+          ],
+          "expected_exit_code": 0,
+          "required": true,
+          "timeout_seconds": 900
         }
       ]
     },
@@ -1085,7 +1157,8 @@
         "tools/test_tiers.py",
         "src/prm/pdf_inspection.py",
         "src/prm/runtime/composition.py",
-        "tests/test_pai_product_sessions.py"
+        "tests/test_pai_product_sessions.py",
+        "tests/test_pai_brief_polish.py"
       ],
       "change_budget": "files<=24",
       "dependencies": [
@@ -1137,6 +1210,18 @@
           "required": true,
           "expected_exit_code": 0,
           "timeout_seconds": 600
+        },
+        {
+          "id": "four_point_product_polish",
+          "argv": [
+            "{python}",
+            "tools/run_pai_acceptance.py",
+            "-q",
+            "tests/test_pai_brief_polish.py"
+          ],
+          "expected_exit_code": 0,
+          "required": true,
+          "timeout_seconds": 900
         }
       ]
     },
@@ -1446,7 +1531,9 @@
         "tools/test_tiers.py",
         "src/prm/runtime/actions.py",
         "src/prm/runtime/graph.py",
-        "tests/pai_runtime_fixtures.py"
+        "tests/pai_runtime_fixtures.py",
+        "src/prm/runtime/presentation.py",
+        "tests/test_pai_control_polish.py"
       ],
       "change_budget": "files<=24",
       "dependencies": [
@@ -1505,6 +1592,18 @@
           "id": "security_path_acceptance",
           "required": true,
           "timeout_seconds": 600
+        },
+        {
+          "id": "four_point_product_polish",
+          "argv": [
+            "{python}",
+            "tools/run_pai_acceptance.py",
+            "-q",
+            "tests/test_pai_control_polish.py"
+          ],
+          "expected_exit_code": 0,
+          "required": true,
+          "timeout_seconds": 900
         }
       ]
     },
@@ -1841,7 +1940,10 @@
         "tests/test_pai_load_recovery.py",
         "tests/fixtures/assistant/**",
         "tests/test_pai_requirements.py",
-        "tests/test_pai_product_sessions.py"
+        "tests/test_pai_product_sessions.py",
+        "tests/test_pai_search_polish.py",
+        "tests/test_pai_control_polish.py",
+        "tests/test_pai_brief_polish.py"
       ],
       "change_budget": "files<=24",
       "dependencies": [
@@ -1983,6 +2085,20 @@
           "expected_exit_code": 0,
           "required": true,
           "timeout_seconds": 600
+        },
+        {
+          "id": "four_point_product_polish",
+          "argv": [
+            "{python}",
+            "tools/run_pai_acceptance.py",
+            "-q",
+            "tests/test_pai_search_polish.py",
+            "tests/test_pai_control_polish.py",
+            "tests/test_pai_brief_polish.py"
+          ],
+          "expected_exit_code": 0,
+          "required": true,
+          "timeout_seconds": 900
         }
       ]
     },

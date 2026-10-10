@@ -245,8 +245,12 @@ class WatchScheduler:
             if row is None:
                 return None
             now = self._now(tx.conn)
+            occurrence=tx.conn.execute('SELECT j.status,j.result_ref FROM pa_schedule.occurrences o JOIN pa_jobs.jobs j ON j.owner=o.owner AND j.id=o.job_id WHERE o.owner=%s AND o.schedule_id=%s ORDER BY o.due_at DESC LIMIT 1',
+                (owner,subscription_id)).fetchone()
+            last=tx.get(owner,'result',occurrence['result_ref']) if occurrence and occurrence['result_ref'] else None
             return {'intent_saved': True, 'scheduler_observed_recently': row['last_tick'] is not None and now - row['last_tick'] < timedelta(minutes=10),
-                    'lifecycle': _subscription_from_payload(row['payload']).lifecycle, 'last_reason': row['last_reason'], 'next_due_at': row['next_due']}
+                    'lifecycle': _subscription_from_payload(row['payload']).lifecycle, 'last_reason': row['last_reason'], 'next_due_at': row['next_due'],
+                    'last_collection':last.payload if last else None}
 
     def complete_subject(self, subscription_id, subject_ref, *, chat_id, actor_id, owner_chat_id):
         owner = self._owner(chat_id, actor_id, owner_chat_id)

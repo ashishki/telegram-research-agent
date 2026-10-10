@@ -2407,7 +2407,7 @@ def _render_editorial(
         if story.caveat and not compact:
             block.append(f"<b>Ограничение:</b> {_telegram_html(story.caveat, 300)}")
         refs = tuple(dict.fromkeys(anchor.evidence_ref for anchor in story.anchors))
-        for ref in refs[:1] if compact else refs:
+        for ref in refs:
             source = sources[ref]
             block.append(_telegram_card_source_link(source.source_ref, compact=compact))
             if not compact:
@@ -2546,7 +2546,7 @@ def _telegram_card_coverage_line(document: BriefDocument) -> str:
     checked = sum(source.state == "checked" for source in document.coverage_manifest.sources)
     total = len(document.coverage_manifest.sources)
     if document.coverage_manifest.complete:
-        return f"✓ Проверено {checked} из {total} источников."
+        return f"✓ Проверено подключений: {checked} из {total}; использовано материалов: {len(document.evidence)}. Покрытие — в пределах выбранных источников."
     return "◌ Это не полный обзор недели: показаны только найденные материалы."
 
 
