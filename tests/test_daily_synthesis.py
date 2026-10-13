@@ -76,7 +76,7 @@ def test_numeric_role_signed_number_and_attribution_cannot_change_in_json_or_pla
     assert assessed_answer(claim.rstrip('. ')+' ('+URL+').',evidence,question='latency') is None
 
 @pytest.mark.parametrize('source_value,claim_value',[('20','−20'),('−20','20'),('20','－20'),('20','- 20'),
-    ('20','‐20'),('20','‑20'),('20','‒20'),('20','–20'),('20','—20'),('±20','20')])
+    ('20','‐20'),('20','‑20'),('20','‒20'),('20','–20'),('20','—20'),('±20','20'),('+/-20','-20'),('-/+20','20')])
 def test_unicode_or_split_numeric_sign_cannot_be_lost(source_value,claim_value):
     source=f'Service Alpha reduced latency to {source_value} milliseconds.'
     claim=f'Service Alpha reduced latency to {claim_value} milliseconds.'
@@ -139,6 +139,7 @@ def test_actual_loopback_block_response_preserves_supported_subset_in_durable_wo
     pytest.param('Service Alpha reduced latency to 20 milliseconds.','Service Alpha reduced latency to −20 milliseconds.',id='unicode_claim'),
     pytest.param('Service Alpha reduced latency to −20 milliseconds.','Service Alpha reduced latency to 20 milliseconds.',id='unicode_source'),
     pytest.param('Service Alpha reduced latency to 20 milliseconds.','Service Alpha reduced latency to ‑20 milliseconds.',id='typographic_claim'),
+    pytest.param('Service Alpha reduced latency to +/-20 milliseconds.','Service Alpha reduced latency to -20 milliseconds.',id='ascii_uncertain_source'),
 ])
 @pytest.mark.parametrize('structured',[True,False])
 def test_actual_scoped_json_and_plaintext_transports_reject_slot_mutations(pai,span,claim,structured):
@@ -183,7 +184,7 @@ def test_actual_scoped_json_and_plaintext_transports_reject_slot_mutations(pai,s
         assert outcome.text is None and outcome.status=='generated_answer_rejected' and len(calls)==2 and not pai.requests
     finally:server.shutdown();thread.join(timeout=5);server.server_close()
 
-@pytest.mark.parametrize('old_version',['fact-projection-v1','fact-projection-v2','fact-projection-v3'])
+@pytest.mark.parametrize('old_version',['fact-projection-v1','fact-projection-v2','fact-projection-v3','fact-projection-v4'])
 def test_restart_cannot_trust_old_block_verifier_or_repeat_model_call(pai,old_version):
     import sqlite3
     from tests.test_archive_search import _make_connection,_insert_post

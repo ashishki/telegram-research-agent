@@ -5,7 +5,7 @@ import hashlib,json,re
 from assistant.claim_ledger import verify_answer_against_evidence
 from prm.storage.postgres import StorageError
 
-VOCABULARY_VERSION='fact-projection-v4'
+VOCABULARY_VERSION='fact-projection-v5'
 WORDS={
     'service':'service','сервис':'service','reduced':'reduce','reduce':'reduce','сократил':'reduce','сократила':'reduce',
     'latency':'latency','задержку':'latency','задержка':'latency','to':'to','до':'to',
@@ -41,6 +41,7 @@ def tokens(text):
         return c
     text=''.join(glyph(c) for c in text)
     text=''.join(c for c in unicodedata.normalize('NFKC',text) if unicodedata.category(c)!='Cf')
+    text=re.sub(r'(?:\+\s*[/∕⁄]?[\s]*-|-\s*[/∕⁄]?[\s]*\+)(?=\s*\d)',' uncertain_sign ',text)
     text=re.sub(r'(?<!\w)([+-])\s+(?=\d)',r'\1',text)
     text=re.sub(r"\b(can't|cannot)\b",'can not',text.casefold())
     text=re.sub(r"\b(didn't|doesn't|don't|isn't|aren't|wasn't|weren't)\b",'not',text)
