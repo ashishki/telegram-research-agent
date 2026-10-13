@@ -1,0 +1,77 @@
+{
+  "schema_version": "assistant.daily_synthesis_fixture.v1",
+  "authority": "synthetic matched dev cases, labels fixed before implementation; no human/provider judgment",
+  "frozen_base": "d825ce5",
+  "cases": [
+    {
+      "id": "exact",
+      "text": "Service Alpha reduced latency to 20 milliseconds.",
+      "source_url": "https://example.test/alpha",
+      "quote": "Service Alpha reduced latency to 20 milliseconds.",
+      "expected_supported": true
+    },
+    {
+      "id": "extractive",
+      "text": "Service Alpha reduced latency.",
+      "source_url": "https://example.test/alpha",
+      "quote": "Service Alpha reduced latency to 20 milliseconds.",
+      "expected_supported": true
+    },
+    {
+      "id": "translated",
+      "text": "Сервис Alpha сократил задержку до 20 миллисекунд.",
+      "source_url": "https://example.test/alpha",
+      "quote": "Service Alpha reduced latency to 20 milliseconds.",
+      "expected_supported": true
+    },
+    {
+      "id": "swapped_actor",
+      "text": "Service Beta reduced latency to 20 milliseconds.",
+      "source_url": "https://example.test/alpha",
+      "quote": "Service Alpha reduced latency to 20 milliseconds.",
+      "expected_supported": false
+    },
+    {
+      "id": "false_number",
+      "text": "Service Alpha reduced latency to 99 milliseconds.",
+      "source_url": "https://example.test/alpha",
+      "quote": "Service Alpha reduced latency to 20 milliseconds.",
+      "expected_supported": false
+    },
+    {
+      "id": "dropped_negation",
+      "text": "Service Alpha reduced latency below 20 milliseconds.",
+      "source_url": "https://example.test/alpha",
+      "quote": "Service Alpha did not reduce latency below 20 milliseconds.",
+      "expected_supported": false
+    },
+    {
+      "id": "inverted_relation",
+      "text": "Service latency reduced Alpha to 20 milliseconds.",
+      "source_url": "https://example.test/alpha",
+      "quote": "Service Alpha reduced latency to 20 milliseconds.",
+      "expected_supported": false
+    },
+    {
+      "id": "wrong_url",
+      "text": "Service Alpha reduced latency to 20 milliseconds.",
+      "source_url": "https://example.test/other",
+      "quote": "Service Alpha reduced latency to 20 milliseconds.",
+      "expected_supported": false
+    },
+    {
+      "id": "unbounded_translation",
+      "text": "Alpha стал гораздо быстрее благодаря оптимизации.",
+      "source_url": "https://example.test/alpha",
+      "quote": "Service Alpha reduced latency to 20 milliseconds.",
+      "expected_supported": false
+    },
+    {
+      "id": "invented_causal",
+      "text": "Service Alpha reduced latency to 20 milliseconds. This proves permanent savings.",
+      "source_url": "https://example.test/alpha",
+      "quote": "Service Alpha reduced latency to 20 milliseconds.",
+      "expected_supported": false
+    }
+  ]
+}

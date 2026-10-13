@@ -365,6 +365,7 @@ def _normalize_search_hits(value: object, *, bounds: PublicWebBounds) -> list[di
             "title": _bounded(row.get("title"), _MAX_TITLE_CHARS),
             "snippet": _bounded(row.get("snippet") or row.get("summary"), _MAX_SNIPPET_CHARS),
             "coverage": "search_snippet_only",
+            "publication_time": _timestamp(row.get('published_at')),
             # The caller's bounded allowlist is the only discovery-to-fetch
             # bridge. A plausible public host is not a primary source for this
             # question unless the caller explicitly scoped it.
@@ -427,7 +428,8 @@ def _fetch_candidate(provider: PublicWebProvider, candidate: Mapping[str, Any], 
         "content_hash": "sha256:" + hashlib.sha256(body).hexdigest(),
         "content_type": content_type,
         "content_bytes": len(body),
-        "published_at": _timestamp(published_at),
+        "published_at": _timestamp(raw.get('published_at')),
+        "freshness_basis": 'publication' if _timestamp(raw.get('published_at')) else 'modification' if _timestamp(headers.get('last-modified')) else 'unknown',
         "fetched_at": _now(),
         "freshness": freshness,
         "freshness_status": freshness,

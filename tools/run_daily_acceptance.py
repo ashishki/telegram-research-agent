@@ -10,7 +10,8 @@ TESTS = ('tests/test_daily_entrypoint.py', 'tests/test_daily_controls.py', 'test
          'tests/test_daily_telegram_routes.py', 'tests/test_daily_telegram_transport.py',
          'tests/test_daily_model_protocols.py', 'tests/test_daily_eval_manifest.py',
          'tests/test_daily_conversation.py', 'tests/test_daily_coverage.py',
-         'tests/test_daily_profiles.py','tests/test_daily_projects.py','tests/test_daily_source_freshness.py')
+         'tests/test_daily_profiles.py','tests/test_daily_projects.py','tests/test_daily_source_freshness.py',
+         'tests/test_daily_retrieval.py','tests/test_daily_web_route.py','tests/test_daily_synthesis.py','tests/test_daily_brief_selection.py')
 
 
 def main():

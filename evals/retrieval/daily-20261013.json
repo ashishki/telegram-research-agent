@@ -1,0 +1,336 @@
+{
+  "schema_version": "assistant.daily_retrieval_fixture.v1",
+  "authority": "synthetic implementer-labelled; not human gold or independent holdout",
+  "frozen_before_implementation_base": "d825ce5",
+  "corpus": [
+    {
+      "id": 1,
+      "channel_id": 1001,
+      "channel_username": "@alpha",
+      "language": "en",
+      "text": "Agent evaluation measures task success and regression tests."
+    },
+    {
+      "id": 2,
+      "channel_id": 1002,
+      "channel_username": "@beta",
+      "language": "ru",
+      "text": "Оценка агентов использует успешность задач и регрессионные тесты."
+    },
+    {
+      "id": 3,
+      "channel_id": 1001,
+      "channel_username": "@alpha",
+      "language": "en",
+      "text": "Retrieval combines vector search with grounded context."
+    },
+    {
+      "id": 4,
+      "channel_id": 1002,
+      "channel_username": "@beta",
+      "language": "ru",
+      "text": "Поиск использует векторный контекст и проверенные источники."
+    },
+    {
+      "id": 5,
+      "channel_id": 1001,
+      "channel_username": "@alpha",
+      "language": "en",
+      "text": "Service Alpha reduced latency to 20 milliseconds."
+    },
+    {
+      "id": 6,
+      "channel_id": 1002,
+      "channel_username": "@beta",
+      "language": "ru",
+      "text": "Сервис Alpha сократил задержку до 20 миллисекунд."
+    },
+    {
+      "id": 7,
+      "channel_id": 1003,
+      "channel_username": "@small",
+      "language": "en",
+      "text": "Ocean salinity observations use calibrated sensors."
+    },
+    {
+      "id": 8,
+      "channel_id": 1001,
+      "channel_username": "@alpha",
+      "language": "en",
+      "text": "Service Alpha did not reduce latency below 20 milliseconds."
+    },
+    {
+      "id": 9,
+      "channel_id": 1003,
+      "channel_username": "@small",
+      "language": "en",
+      "text": "Agent evaluation measures task success and regression tests."
+    }
+  ],
+  "cases": [
+    {
+      "id": "retrieval_1",
+      "query": "Agent evaluation",
+      "language": "en",
+      "category": "exact",
+      "relevance": {
+        "1": 2,
+        "2": 2,
+        "9": 2
+      },
+      "filters": {},
+      "split": "frozen_synthetic_dev"
+    },
+    {
+      "id": "retrieval_2",
+      "query": "Оценка агентов",
+      "language": "ru",
+      "category": "exact",
+      "relevance": {
+        "1": 2,
+        "2": 2,
+        "9": 2
+      },
+      "filters": {},
+      "split": "frozen_synthetic_dev"
+    },
+    {
+      "id": "retrieval_3",
+      "query": "retrieval vector",
+      "language": "en",
+      "category": "exact",
+      "relevance": {
+        "3": 2,
+        "4": 2
+      },
+      "filters": {},
+      "split": "frozen_synthetic_dev"
+    },
+    {
+      "id": "retrieval_4",
+      "query": "векторный поиск",
+      "language": "ru",
+      "category": "paraphrase",
+      "relevance": {
+        "3": 2,
+        "4": 2
+      },
+      "filters": {},
+      "split": "frozen_synthetic_dev"
+    },
+    {
+      "id": "retrieval_5",
+      "query": "agent eval",
+      "language": "en",
+      "category": "paraphrase",
+      "relevance": {
+        "1": 2,
+        "2": 2,
+        "9": 2
+      },
+      "filters": {},
+      "split": "frozen_synthetic_dev"
+    },
+    {
+      "id": "retrieval_6",
+      "query": "регрессионные проверки агентов",
+      "language": "ru",
+      "category": "paraphrase",
+      "relevance": {
+        "1": 2,
+        "2": 2,
+        "9": 2
+      },
+      "filters": {},
+      "split": "frozen_synthetic_dev"
+    },
+    {
+      "id": "retrieval_7",
+      "query": "task success evaluation",
+      "language": "en",
+      "category": "paraphrase",
+      "relevance": {
+        "1": 2,
+        "2": 2,
+        "9": 2
+      },
+      "filters": {},
+      "split": "frozen_synthetic_dev"
+    },
+    {
+      "id": "retrieval_8",
+      "query": "проверенные источники поиска",
+      "language": "ru",
+      "category": "paraphrase",
+      "relevance": {
+        "3": 2,
+        "4": 2
+      },
+      "filters": {},
+      "split": "frozen_synthetic_dev"
+    },
+    {
+      "id": "retrieval_9",
+      "query": "Service Alpha latency",
+      "language": "en",
+      "category": "exact",
+      "relevance": {
+        "5": 2,
+        "6": 2,
+        "8": 2
+      },
+      "filters": {},
+      "split": "frozen_synthetic_dev"
+    },
+    {
+      "id": "retrieval_10",
+      "query": "задержка сервиса Alpha",
+      "language": "ru",
+      "category": "paraphrase",
+      "relevance": {
+        "5": 2,
+        "6": 2,
+        "8": 2
+      },
+      "filters": {},
+      "split": "frozen_synthetic_dev"
+    },
+    {
+      "id": "retrieval_11",
+      "query": "Ocean salinity",
+      "language": "en",
+      "category": "exact",
+      "relevance": {
+        "7": 2
+      },
+      "filters": {},
+      "split": "frozen_synthetic_dev"
+    },
+    {
+      "id": "retrieval_12",
+      "query": "calibrated sensors",
+      "language": "en",
+      "category": "paraphrase",
+      "relevance": {
+        "7": 2
+      },
+      "filters": {},
+      "split": "frozen_synthetic_dev"
+    },
+    {
+      "id": "retrieval_13",
+      "query": "quasar photometry",
+      "language": "en",
+      "category": "no_answer",
+      "relevance": {},
+      "filters": {},
+      "split": "frozen_synthetic_dev"
+    },
+    {
+      "id": "retrieval_14",
+      "query": "нейтринная обсерватория",
+      "language": "ru",
+      "category": "no_answer",
+      "relevance": {},
+      "filters": {},
+      "split": "frozen_synthetic_dev"
+    },
+    {
+      "id": "retrieval_15",
+      "query": "invoice payroll",
+      "language": "en",
+      "category": "no_answer",
+      "relevance": {},
+      "filters": {},
+      "split": "frozen_synthetic_dev"
+    },
+    {
+      "id": "retrieval_16",
+      "query": "счёт бухгалтерии",
+      "language": "ru",
+      "category": "no_answer",
+      "relevance": {},
+      "filters": {},
+      "split": "frozen_synthetic_dev"
+    },
+    {
+      "id": "retrieval_17",
+      "query": "Agent evaluation",
+      "language": "en",
+      "category": "filter",
+      "relevance": {
+        "1": 2
+      },
+      "filters": {
+        "channel_identities": [
+          [
+            1001,
+            "@alpha"
+          ]
+        ]
+      },
+      "split": "frozen_synthetic_dev"
+    },
+    {
+      "id": "retrieval_18",
+      "query": "Agent evaluation",
+      "language": "en",
+      "category": "filter",
+      "relevance": {
+        "2": 2
+      },
+      "filters": {
+        "languages": [
+          "ru"
+        ]
+      },
+      "split": "frozen_synthetic_dev"
+    },
+    {
+      "id": "retrieval_19",
+      "query": "latency",
+      "language": "en",
+      "category": "filter",
+      "relevance": {
+        "6": 2
+      },
+      "filters": {
+        "channel_identities": [
+          [
+            1002,
+            "@beta"
+          ]
+        ]
+      },
+      "split": "frozen_synthetic_dev"
+    },
+    {
+      "id": "retrieval_20",
+      "query": "retrieval",
+      "language": "en",
+      "category": "filter",
+      "relevance": {},
+      "filters": {
+        "date_from": "2026-10-14T00:00:00Z"
+      },
+      "split": "frozen_synthetic_dev"
+    },
+    {
+      "id": "retrieval_21",
+      "query": "сервис Alpha",
+      "language": "ru",
+      "category": "filter",
+      "relevance": {
+        "5": 2,
+        "8": 2
+      },
+      "filters": {
+        "languages": [
+          "en"
+        ]
+      },
+      "split": "frozen_synthetic_dev"
+    }
+  ],
+  "learned_candidate": "not_run_requires_D46_miss_classes_and_resource_decision"
+}

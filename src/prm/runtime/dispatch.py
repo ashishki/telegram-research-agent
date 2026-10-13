@@ -39,7 +39,7 @@ SERVICE_COMMANDS = {
     'mail': ('/mail', '/mailread'), 'calendar': ('/calendar',), 'contacts': ('/contacts',),
     'academic': ('/academic', '/academicdone', '/academicstage', '/academicwatch'),
     'memory': ('/memory', '/memoryedit', '/memorysearch', '/memoryexport', '/remember', '/memoryconfirm', '/forget'),
-    'media': ('/transcriptedit',), 'brief': ('/weekly',),
+    'media': ('/transcriptedit',), 'brief': ('/weekly','/briefmaterials'),
 }
 SERVICE_PHRASES = {
     'mail': ('что в почте', 'что требует ответа в почте'),

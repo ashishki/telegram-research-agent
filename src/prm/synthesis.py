@@ -59,6 +59,7 @@ class ArchiveSynthesisOutcome:
     text: str | None
     status: str
     measurement: Mapping[str, object]
+    block_assessment: Mapping[str, object] | None = None
 
 
 def synthesis_allowed(authorization: AuthorizationDecision | None = None) -> bool:
@@ -191,6 +192,16 @@ def synthesize_archive_response(
             measurement={**base_measurement, "provider_egress_attempted": False, "context_egress_attempted": False},
         )
 
+    if str(result.text or '').lstrip().startswith('{'):
+        from prm.research_blocks import assess_blocks
+        sent=[{'source_url':item.source_ref,'support_span':item.text} for item in context.items]
+        assessment=assess_blocks(result.text,sent,question=context.question)
+        if assessment is not None:
+            return ArchiveSynthesisOutcome(text=assessment['text'],
+                status='generated_partially_verified' if assessment['status']=='partial_supported' else 'generated_verified',
+                measurement={**base_measurement,**result.receipt.public_measurement(),
+                    'block_verifier':'fact-projection-v1','accepted_block_count':len(assessment['blocks']),
+                    'rejected_block_count':len(assessment['rejected_blocks'])},block_assessment=assessment)
     answer = " ".join(str(result.text or "").split())
     if not _verified_archive_answer(
         answer,

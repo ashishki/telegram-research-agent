@@ -11,6 +11,17 @@ from prm.public_web import HttpPublicWebProvider,PublicWebBounds,PublicWebTransp
 from prm.storage.postgres import StorageError
 
 
+def project_public_query(owner_text,proposed):
+    """A model may project this question, never add remembered/private words."""
+    from prm.public_web import _validate_public_query,_PRIVATE_QUERY_MARKERS
+    if not isinstance(owner_text,str) or not isinstance(proposed,str):return None
+    original=' '.join(owner_text.split());query=' '.join(proposed.split())
+    private=(*_PRIVATE_QUERY_MARKERS,'мой проект','моего проекта','для моего','my project','my mail','моя почта','мои письма','my calendar','мой календарь')
+    if any(marker in original.casefold() for marker in private) or re.search(r'(?i)\b(?:token|password|секрет|пароль)\b|[\w.+-]+@[\w.-]+\.[a-z]{2,}',original):return None
+    if not query or query not in original or _validate_public_query(query,original_query=original)!='accepted':return None
+    return query
+
+
 class BraveSearchProvider(HttpPublicWebProvider):
     def __init__(self,*,token):
         if not isinstance(token,str) or not token or '\r' in token or '\n' in token:

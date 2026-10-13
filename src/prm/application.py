@@ -494,7 +494,7 @@ class PersonalResearchAssistant:
                 else ""
             ),
         )
-        archive_synthesis_verified = synthesis is not None and synthesis.status == "generated_verified" and synthesis.text is not None
+        archive_synthesis_verified = synthesis is not None and synthesis.status in {"generated_verified","generated_partially_verified"} and synthesis.text is not None
         publication_allowed = _final_answer_publication_allowed(
             verification,
             gate,
@@ -540,6 +540,7 @@ class PersonalResearchAssistant:
         payload = {
             **dict(payload),
             "rendered_final_answer": final_text,
+            "research_blocks": synthesis.block_assessment if synthesis is not None and archive_synthesis_verified and publication_allowed else None,
             "rendered_final_answer_verification": verification,
             "final_answer_publication": {
                 "allowed": final_publication_allowed,
@@ -566,6 +567,8 @@ class PersonalResearchAssistant:
                 if bool(payload.get("mixed_current_boundary"))
                 else "needs_external_verification"
                 if _blocking_current_fact_gate(gate)
+                else 'partial_supported'
+                if archive_synthesis_verified and synthesis.status=='generated_partially_verified' and publication_allowed
                 else str(payload.get("status") or "ok")
             ),
             mode=route.mode,  # type: ignore[arg-type]

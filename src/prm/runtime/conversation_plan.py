@@ -55,6 +55,8 @@ def apply_conversation_plan(root,request,intent,*,request_ref,lease,guard):
     if hasattr(root,'actions'):tools.append('actions.preview')
     if hasattr(root,'memory'):tools.append('memory.preview')
     sources=('archive',)
+    if root.public_web_provider is not None and root.public_web_bounds is not None:
+        tools.append('web.search');sources=(*sources,'public')
     plan=None
     if root.intent_planner is not None:
         try:
@@ -76,6 +78,13 @@ def apply_conversation_plan(root,request,intent,*,request_ref,lease,guard):
     if plan.needs_clarification:return clarification(request_ref,plan.reason)
     if plan.intent=='followup':return _read_view(root,request_ref,ticket,plan,guard)
     if plan.intent=='chat':return replace(request,mode='chat'),RequestIntent(IntentKind.CHAT,request.query,'chat')
+    if plan.intent=='web_search':
+        from .web import project_public_query
+        query=project_public_query(request.query,plan.steps[0].argument)
+        if query is None:return clarification(request_ref,'source_unavailable')
+        command='/deep '+json.dumps({'schema_version':1,'question':request.query[:2000],
+            'steps':[{'source':'public','query':query}],'max_tool_calls':plan.max_tool_calls,'deadline_seconds':180},ensure_ascii=False)
+        return replace(request,query=command),parse_request_intent(command)
     if plan.intent=='search':
         queries=[s.argument or request.query for s in plan.steps]
         if plan.source_filters and set(plan.source_filters)!={'archive'}:return clarification(request_ref,'source_unavailable')

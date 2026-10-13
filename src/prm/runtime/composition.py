@@ -40,7 +40,7 @@ class AssistantRuntime:
         self._conversation_context = ContextVar('pa_reply_conversation', default=None)
         self.conversations=DurableConversationStore(target,owner_ref=owner_ref,history_retention_seconds=history_retention_seconds)
         from prm.storage.briefs import DurableBriefStore
-        self.briefs=DurableBriefStore(target,owner_ref=owner_ref)
+        self.briefs=DurableBriefStore(target,owner_ref=owner_ref,registry=registry)
         self.public_web_provider=public_web_provider;self.deep_archive_reader=deep_archive_reader;self.github_context_provider=github_context_provider
         self.ingress=TelegramJobIngress(self.queue,owner_ref=owner_ref,owner_chat_id=owner_chat_id,bot_ref=bot_ref)
         self.ingress.durable_results=True
@@ -235,6 +235,14 @@ class AssistantRuntime:
                 value['conversation']={'response_refs':[state.object_refs[0].response_ref]}
                 for ref in value.get('source_memory_refs',()):
                     self.memory.register_dependency(parent_namespace='memory',parent_ref=ref,child_namespace='result',child_ref=state.object_refs[0].response_ref)
+                if value.get('source_result_refs'):
+                    from .deletion import lineage_lock
+                    with self.queue.store.transaction() as tx:
+                        lineage_lock(tx.conn,self.owner_ref);guard()
+                        for parent in value['source_result_refs']:
+                            if tx.get(self.owner_ref,'result',parent) is None:raise StorageError('source result deleted while viewing')
+                            tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',
+                                (self.owner_ref,'result',parent,'result',state.object_refs[0].response_ref))
             return AssistantResult(request_ref,value.get('status','ok'),'research',value['text'],payload=value)
         if request.query.strip().casefold() in {'/new','новая тема','начни новую тему'}:
             from prm.conversation import conversation_id_for
@@ -386,7 +394,7 @@ class AssistantRuntime:
         from prm.capabilities import AuthorizationRequest
         self.brief_source_hooks.append(BriefSourceHook(self.archive_resource_ref,AuthorizationRequest(owner_ref=self.owner_ref,
             connection_ref=None,capability='archive.read',resource_ref=self.archive_resource_ref,operation='read',data_class='private_archive',
-            provider_ref='provider_local',purpose='brief.archive'),LocalArchiveReader(self.settings.db_path,root=self).window_evidence,0))
+            provider_ref='provider_local',purpose='brief.archive'),LocalArchiveReader(self.settings.db_path,root=self).enumerate_window,0))
         if mail_selection is not None:
             adapter=GraphMailAdapter(transport)
             def mail(request,request_ref,guard):
@@ -513,10 +521,17 @@ class AssistantRuntime:
             self.brief_runtime=brief_runtime
             def weekly(request,request_ref,guard):
                 guard()
+                if request.query.startswith('/briefmaterials '):
+                    fields=request.query.split()
+                    if len(fields)!=4 or not fields[2].isdigit() or not fields[3].isdigit():raise StorageError('exact Brief version and inventory offset required')
+                    return brief_runtime.materials(brief_id=fields[1],version=int(fields[2]),offset=int(fields[3]),guard=guard)
                 with self.queue.store.transaction() as tx:
                     item=tx.conn.execute("SELECT created_at FROM pa_runtime.object_versions WHERE owner=%s AND namespace='conversation' AND object_id=%s AND version=1",(self.owner_ref,request_ref)).fetchone()
-                return brief_runtime.answer(topic=request.query.removeprefix('/weekly').strip() or 'Важное за неделю',timezone_name='Europe/Berlin',
-                    end_at=item['created_at'] if item else None)
+                topic=request.query.removeprefix('/weekly').strip();period='rolling'
+                if topic.startswith('--calendar-week'):period='calendar_week';topic=topic.removeprefix('--calendar-week').strip()
+                elif topic.startswith('--rolling'):topic=topic.removeprefix('--rolling').strip()
+                return brief_runtime.answer(topic=topic or 'Важное за неделю',timezone_name='Europe/Berlin',
+                    end_at=item['created_at'] if item else None,period_mode=period)
             self.services['brief']=weekly
         if academic_runtime is not None:self.academic=academic_runtime
 

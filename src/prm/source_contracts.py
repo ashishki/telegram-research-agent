@@ -180,6 +180,32 @@ class EvidenceBundle:
             index+=1
         return cls(batches,tuple(candidates[:maximum_items]),len(candidates),excluded_refs=excluded)
 
+    @classmethod
+    def select_ranked(cls,batches,*,maximum_items,topic='',eligible_refs=None):
+        if type(maximum_items)is not int or not 0<=maximum_items<=48:raise StorageError('bounded ranked evidence selection required')
+        baseline=cls.select(batches,maximum_items=0,eligible_refs=eligible_refs)
+        groups={}
+        terms=set(__import__('re').findall(r'[a-zа-яё0-9]{3,}',topic.casefold()))
+        def rank(record):
+            value=record.payload;priority={'critical':0,'high':1,'medium':2,'low':3,'unknown':4}.get(value.get('importance'),4)
+            words=set(__import__('re').findall(r'[a-zа-яё0-9]{3,}',str(value.get('title','')).casefold()+' '+str(value.get('support_span','')).casefold()))
+            return priority,-len(terms&words),record.publication_time.isoformat() if record.publication_time else '9999',record.external_ref
+        excluded=set(baseline.excluded_refs);seen=set()
+        for batch in batches:
+            for record in batch.items:
+                if record.evidence_ref in seen or record.evidence_ref in excluded:continue
+                seen.add(record.evidence_ref)
+                group=_json([record.resource.to_dict(),record.payload.get('source_group_id') or record.resource.resource_ref])
+                groups.setdefault(group,[]).append(record)
+        ordered=[sorted(records,key=rank) for records in groups.values()]
+        ordered.sort(key=lambda records:rank(records[0]))
+        selected=[];index=0
+        while len(selected)<maximum_items and any(index<len(records) for records in ordered):
+            for records in ordered:
+                if index<len(records) and len(selected)<maximum_items:selected.append(records[index])
+            index+=1
+        return cls(batches,tuple(selected),baseline.candidate_count,excluded_refs=baseline.excluded_refs)
+
     @property
     def received_count(self):return sum(len(b.items) for b in self.batches)
     @property

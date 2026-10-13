@@ -22,18 +22,24 @@ class LocalArchiveReader:
         from ingestion.selected_archive import SelectedArchive
         registry=SelectedArchive(conn,self.selection);registry.current();return registry.status()
     def search_archive(self,query,*,limit,filters=None):
-        from db.archive_search import search_telegram_archive
+        from db.archive_search import _coerce_filters
+        from db.archive_retrieval import retrieve_archive
+        from dataclasses import asdict
         from pathlib import Path
         path=Path(self.db_path).resolve();uri='file:'+quote(str(path))+'?mode=ro'
         selected=None
         if self.selection is not None:
             with sqlite3.connect(uri,uri=True) as conn:selected=self._selected(conn)
+        bound=dict(filters or {})
+        if self.selection:bound['channel_identities']=self.selection.channels
         cache=None;key=None
         if self.root is not None:
             from .cost_cache import CostCacheRuntime
             cache=CostCacheRuntime(self.root)
             fingerprints={str(item.name):(item.stat().st_mtime_ns,item.stat().st_size) for item in (path,Path(str(path)+'-wal')) if item.exists()}
-            key=cache.key(kind='retrieval',parameters={'query':query,'limit':min(limit,8),'source_fingerprint':fingerprints,'selection':self.selection.digest if self.selection else None},dependencies=[],version='fts-v1')
+            key=cache.key(kind='retrieval',parameters={'query':query,'limit':min(limit,8),'filters':asdict(_coerce_filters(bound)),
+                'source_fingerprint':fingerprints,'selection':self.selection.digest if self.selection else None,
+                'archive_snapshots':selected['archive_snapshots'] if selected else []},dependencies=[],version='canonical-retrieval-v1')
             request=AuthorizationRequest(owner_ref=self.root.owner_ref,connection_ref=None,capability='archive.read',resource_ref=self.root.archive_resource_ref,
                 operation='read',data_class='private_archive',provider_ref='provider_local',purpose='research.archive')
             hit=cache.get(key=key,authorization_request=request)
@@ -42,9 +48,8 @@ class LocalArchiveReader:
             conn.row_factory=sqlite3.Row
             conn.execute('BEGIN')
             selected=self._selected(conn)
-            bound=dict(filters or {})
-            if self.selection:bound['channel_identities']=self.selection.channels
-            result=search_telegram_archive(conn,query,limit=min(limit,8),filters=bound)
+            retrieved=retrieve_archive(conn,query,limit=min(limit,8),filters=bound)
+            result=list(retrieved.items)
             from dataclasses import asdict,is_dataclass
             if isinstance(result,list):
                 rows=[asdict(item) if is_dataclass(item) else dict(item) for item in result]
@@ -53,37 +58,82 @@ class LocalArchiveReader:
                 resource=SourceResource(self.root.owner_ref if self.root else 'owner_local_archive',self.root.archive_resource_ref if self.root else 'resource_archive','archive','private_archive',scope_digest=self.selection.digest if self.selection else None)
                 batch=SourceBatch.from_items(rows,resource,checked_at=datetime.now(timezone.utc),completeness='unknown',reason='query_top_k_not_full_archive',watermark=selected['archive_snapshots'][0] if selected else None)
                 result={'items':rows,'coverage':'bounded_archive_read','source_count':len(rows)}
+                result['retrieval']=retrieved.metadata()
                 if selected:result['source_freshness']=selected
                 if selected:result['archive_snapshots']=selected['archive_snapshots']
                 if self.root is not None:result['source_batch']=batch.metadata()
             else:result=result.to_dict() if hasattr(result,'to_dict') else result
         if cache is not None:cache.put(key=key,kind='retrieval',payload=result,dependencies=[],ttl_seconds=60)
         return result
-    def window_evidence(self,window,*,limit=2048,offset=0):
-        from pathlib import Path
-        from prm.source_contracts import SourceResource,SourceBatch
-        if type(limit)is not int or not 1<=limit<=2048 or type(offset)is not int or not 0<=offset<=1000000:raise StorageError('bounded source enumeration page required')
-        uri='file:'+quote(str(Path(self.db_path).resolve()))+'?mode=ro'
-        where="julianday(p.posted_at)>=julianday(?) AND julianday(p.posted_at)<julianday(?) AND typeof(p.content)='text' AND trim(p.content)<>''"
-        parameters=(window.start_at.isoformat(),window.end_at.isoformat())
-        with sqlite3.connect(uri,uri=True) as conn:
-            conn.row_factory=sqlite3.Row;conn.execute('BEGIN')
-            selected=self._selected(conn)
-            if self.selection:
-                where+=' AND ('+' OR '.join('(r.channel_id=? AND p.channel_username=?)' for _ in self.selection.channels)+')'
-                parameters=(*parameters,*(v for pair in self.selection.channels for v in pair))
-            total=conn.execute('SELECT count(*) FROM posts p JOIN raw_posts r ON r.id=p.raw_post_id WHERE '+where,parameters).fetchone()[0]
-            rows=conn.execute('SELECT p.id,p.content,p.posted_at,p.channel_username,r.message_id,r.message_url,r.ingested_at FROM posts p JOIN raw_posts r ON r.id=p.raw_post_id WHERE '+where+' ORDER BY p.posted_at DESC,p.id LIMIT ? OFFSET ?',(*parameters,limit,offset)).fetchall()
-        items=[{'evidence_id':'tg:'+str(row['id']),'source_url':row['message_url'],
-                'title':row['content'].splitlines()[0][:180],'support_span':row['content'][:1200],
-                'posted_at':row['posted_at'],'first_discovered_at':row['ingested_at'],'local_archive_provenance':True,
-                'source_version':hashlib.sha256(row['content'].encode()).hexdigest(),'importance':'medium'} for row in rows]
+    def _window_selection(self,conn,window):
+        where="typeof(p.content)='text' AND trim(p.content)<>'' AND ((julianday(p.posted_at)>=julianday(?) AND julianday(p.posted_at)<julianday(?)) OR (julianday(r.ingested_at)>=julianday(?) AND julianday(r.ingested_at)<julianday(?) AND (julianday(p.posted_at)<julianday(?) OR julianday(p.posted_at) IS NULL)))"
+        parameters=(window.start_at.isoformat(),window.end_at.isoformat(),window.start_at.isoformat(),window.end_at.isoformat(),window.start_at.isoformat())
+        selected=self._selected(conn)
+        if self.selection:
+            where+=' AND ('+' OR '.join('(r.channel_id=? AND p.channel_username=?)' for _ in self.selection.channels)+')'
+            parameters=(*parameters,*(v for pair in self.selection.channels for v in pair))
+        total=conn.execute('SELECT count(*) FROM posts p JOIN raw_posts r ON r.id=p.raw_post_id WHERE '+where,parameters).fetchone()[0]
+        return where,parameters,selected,total
+
+    def _window_page(self,conn,window,state,limit,offset,*,ascending=False):
+        from prm.source_contracts import SourceResource,SourceBatch,_time
+        where,parameters,selected,total=state
+        order='ASC' if ascending else 'DESC'
+        rows=conn.execute('SELECT p.id,p.content,p.posted_at,p.channel_username,r.channel_id,r.message_id,r.message_url,r.ingested_at FROM posts p JOIN raw_posts r ON r.id=p.raw_post_id WHERE '+where+' ORDER BY p.posted_at '+order+',p.id LIMIT ? OFFSET ?',(*parameters,limit,offset)).fetchall()
+        items=[]
+        for row in rows:
+            publication=_time(row['posted_at'])
+            text=row['content']
+            # Local selection heuristic, not a verified risk or owner priority.
+            high=any(marker in text.casefold() for marker in ('security advisory','breaking change','уязвим','несовместим'))
+            items.append({'evidence_id':'tg:'+str(row['channel_id'])+':'+str(row['message_id']),'source_url':row['message_url'],
+                'title':text.splitlines()[0][:180],'support_span':text[:1200],
+                'posted_at':publication.isoformat() if publication else None,'first_discovered_at':row['ingested_at'],'local_archive_provenance':True,
+                'source_group_id':'tg_channel:'+str(row['channel_id']),'source_version':hashlib.sha256(text.encode()).hexdigest(),
+                'importance':'high' if high else 'medium'})
         omitted=max(0,total-offset-len(rows))
         resource=SourceResource(self.root.owner_ref if self.root else 'owner_local_archive',self.root.archive_resource_ref if self.root else 'resource_archive','archive','private_archive',
             scope_digest=self.selection.digest if self.selection else hashlib.sha256((parameters[0]+'\x1f'+parameters[1]).encode()).hexdigest())
         limited=bool(omitted or offset or selected and not selected['fresh'])
         return SourceBatch.from_items(items,resource,checked_at=datetime.now(timezone.utc),completeness='partial' if limited else 'complete',
-            omitted_count=omitted,reason='enumeration_page' if omitted or offset else 'selected_source_freshness_unverified' if limited else None,continuation='offset:'+str(offset+len(rows)) if omitted else None,watermark=selected['archive_snapshots'][0] if selected else None)
+            omitted_count=omitted,reason='enumeration_page' if omitted or offset else 'selected_source_freshness_unverified' if limited else None,
+            continuation='offset:'+str(offset+len(rows)) if omitted else None,watermark=selected['archive_snapshots'][0] if selected else None)
+
+    def window_evidence(self,window,*,limit=2048,offset=0):
+        from pathlib import Path
+        if type(limit)is not int or not 1<=limit<=2048 or type(offset)is not int or not 0<=offset<=1000000:raise StorageError('bounded source enumeration page required')
+        uri='file:'+quote(str(Path(self.db_path).resolve()))+'?mode=ro'
+        with sqlite3.connect(uri,uri=True) as conn:
+            conn.row_factory=sqlite3.Row;conn.execute('BEGIN')
+            return self._window_page(conn,window,self._window_selection(conn,window),limit,offset)
+
+    def enumerate_window(self,window,*,maximum_items=2048,page_size=256):
+        from pathlib import Path
+        from contextlib import nullcontext
+        from ingestion.selected_archive import source_file_lock
+        from prm.source_contracts import SourceBatch
+        if type(maximum_items)is not int or not 1<=maximum_items<=2048 or type(page_size)is not int or not 1<=page_size<=256:raise StorageError('bounded weekly enumeration required')
+        path=Path(self.db_path).resolve();uri='file:'+quote(str(path))+'?mode=ro'
+        with source_file_lock(path) if self.selection else nullcontext():
+            with sqlite3.connect(uri,uri=True) as conn:
+                conn.row_factory=sqlite3.Row;conn.execute('BEGIN');state=self._window_selection(conn,window)
+                records=[];offset=0;size=0
+                first=self._window_page(conn,window,state,min(page_size,maximum_items),0,ascending=True)
+                batch=first
+                while True:
+                    for record in batch.items:
+                        encoded=len(record.encoded_payload.encode())+2
+                        if len(records)>=maximum_items or size+encoded>1800000:break
+                        records.append(record);size+=encoded
+                    offset+=len(batch.items)
+                    if len(records)<offset or len(records)>=maximum_items or not batch.continuation:break
+                    batch=self._window_page(conn,window,state,min(page_size,maximum_items-len(records)),offset,ascending=True)
+                omitted=max(0,state[3]-len(records))
+                stale=bool(state[2] and not state[2]['fresh'])
+                return SourceBatch(tuple(records),first.selected_resources,first.checked_at,
+                    'partial' if omitted or stale else 'complete',omitted,
+                    'enumeration_cap' if omitted else 'selected_source_freshness_unverified' if stale else None,
+                    'offset:'+str(len(records)) if omitted else None,first.watermark)
 
 
 class DurableResearchWorker:
@@ -184,7 +234,9 @@ class DurableResearchWorker:
                         tx.put(lease.owner,'result',ref,value,expected_version=cached.version)
                 completed.append(value);calls+=value['tool_calls'];continue
             maximum=1
-            if step['source']=='public':maximum=1+root.public_web_bounds.max_fetches if root.public_web_bounds else 1
+            if step['source']=='public':
+                maximum=min(1+root.public_web_bounds.max_fetches if root.public_web_bounds else 1,plan['max_tool_calls']-calls)
+                if maximum<2:break
             elif step['source']=='github':maximum=1+len(root.github_context_provider.paths) if root.github_context_provider else 1
             if calls+maximum>plan['max_tool_calls']:break
             prepared={'ref':ref,'source':step['source'],'tool_calls':maximum,'status':'read_prepared','evidence':{}}
@@ -235,13 +287,15 @@ class DurableResearchWorker:
                 result['source_scopes']=[asdict(__import__('dataclasses').replace(decision.reservation._request,operation_ref=None))]
             elif step['source']=='public':
                 from prm.public_web import execute_public_web_research
+                from dataclasses import replace
                 if root.public_web_provider is None or root.public_web_bounds is None:raise StorageError('public source unavailable')
+                bounds=replace(root.public_web_bounds,max_fetches=min(root.public_web_bounds.max_fetches,prepared['tool_calls']-1))
                 access=reserve_public_access(root,step['query'],request_ref=lease.job_id+'_'+str(index),search_ref=root.public_search_ref,
-                    fetch_ref=root.public_fetch_ref,bounds=root.public_web_bounds,upper_bound=root.public_upper_bound)
+                    fetch_ref=root.public_fetch_ref,bounds=bounds,upper_bound=root.public_upper_bound)
                 if access is None:raise CapabilityDenied('public source scope denied')
                 try:
                     provider=AuthorizedPublicWeb(root.public_web_provider,root.registry,access,guard=guard)
-                    result['evidence']=execute_public_web_research(public_query=step['query'],original_query=plan_question(lease,queue),access=access,provider=provider,bounds=root.public_web_bounds)
+                    result['evidence']=execute_public_web_research(public_query=step['query'],original_query=plan_question(lease,queue),access=access,provider=provider,bounds=bounds)
                     result['source_scopes']=[asdict(__import__('dataclasses').replace(d.reservation._request,operation_ref=None)) for d in (access.search_authorization,*access.fetch_authorizations)]
                 finally:
                     for decision in (access.search_authorization,*access.fetch_authorizations):decision.reservation.abandon_before_transport()
@@ -262,7 +316,7 @@ class DurableResearchWorker:
 
     def _synthesize(self,plan,completed,lease):
         from .model import ScopedModelClient
-        from .research_answer import accepted_answer,evidence_answer,SYSTEM
+        from .research_answer import assessed_answer,evidence_answer,BLOCK_SYSTEM
         import json
         root=self.root;queue=root.queue;ref='research_synthesis_'+lease.job_id
         previous=queue.store.get(lease.owner,'result',ref,version=1)
@@ -283,6 +337,7 @@ class DurableResearchWorker:
             snapshots.update(step['evidence'].get('archive_snapshots',()))
             for record in batch.items:
                 item=record.payload;source=item.get('source_url') or item.get('message_url');span=item.get('support_span') or item.get('snippet') or item.get('text') or item.get('content')
+                if step['source']=='public' and (item.get('freshness')!='fresh' or step['evidence'].get('conflicts')):continue
                 if isinstance(source,str) and source.startswith('https://') and isinstance(span,str) and span.strip():eligible_refs.add(record.evidence_ref)
             batches.append(batch)
         read_scopes=list({json.dumps(s,sort_keys=True):s for s in read_scopes}.values())
@@ -315,15 +370,13 @@ class DurableResearchWorker:
                 client=root.scoped_client(endpoint,groups=groups,task_ref=lease.payload['input_ref'],attempt_ref=ref,
                     history=({'role':'user','content':'Untrusted verified reads: '+json.dumps(evidence,ensure_ascii=False)},),guard=guard,source_scopes=read_scopes,profile_role='research',archive_snapshots=snapshots)
                 try:
-                    receipt=client.complete_with_receipt(prompt=plan['question'],system=SYSTEM,
+                    receipt=client.complete_with_receipt(prompt=plan['question'],system=BLOCK_SYSTEM,
                         max_tokens=1200,category='research_synthesis',authorization=groups[0][0],data_class='user_provided',owner_ref=root.owner_ref,
                         connection_ref=endpoint.connection_ref,resource_ref=root.model_resource_ref)
                     result['model_reply_observed']=True
-                    accepted=accepted_answer(receipt.text,evidence)
+                    accepted=assessed_answer(receipt.text,evidence,question=plan['question'])
                     if accepted is not None:
-                        text,verification=accepted
-                        refs=list(dict.fromkeys(ref for claim in verification['claims'] for ref in claim['evidence_refs']))
-                        result.update(status='synthesized_verified',text=text,verification=verification,synthesis_outcome='verified',source_refs=refs)
+                        result.update(accepted,synthesis_outcome='partial_verified' if accepted['status']=='partial_supported' else 'verified')
                     else:result['synthesis_outcome']='rejected_by_verifier'
                 except Exception:
                     result.update(status='partial_provider_unavailable_or_unknown',synthesis_outcome='provider_unavailable_or_unknown')

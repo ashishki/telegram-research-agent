@@ -7,6 +7,20 @@ from prm.contracts import OperatorRequest
 from prm.storage.postgres import StorageError
 
 
+def brief_window(timezone_name,*,end_at=None,period_mode='rolling',generated_at=None):
+    zone=ZoneInfo(timezone_name);now=generated_at or datetime.now(timezone.utc)
+    end=(end_at or now)
+    if end.tzinfo is None or now.tzinfo is None:raise StorageError('aware Brief reference time required')
+    end=end.astimezone(zone)
+    if period_mode=='calendar_week':
+        from datetime import time
+        monday=end.date()-timedelta(days=end.weekday())
+        end=datetime.combine(monday,time(),zone);start=datetime.combine(monday-timedelta(days=7),time(),zone)
+    elif period_mode=='rolling':start=(end.astimezone(timezone.utc)-timedelta(days=7)).astimezone(zone)
+    else:raise StorageError('explicit rolling or calendar_week period required')
+    return BriefWindow(timezone_name,start,end,now)
+
+
 @dataclass(frozen=True)
 class BriefSourceHook:
     source_ref: str
@@ -21,9 +35,8 @@ class BriefRuntime:
         self.root,self.source_hooks=root,tuple(source_hooks)
         self.editorial=editorial or (RuntimeBriefEditorial(root) if root.model_endpoint is not None else None)
 
-    def build(self,*,topic,timezone_name,end_at=None,previous_document=None,comparison_document=None):
-        zone=ZoneInfo(timezone_name);end=(end_at or datetime.now(timezone.utc)).astimezone(zone)
-        window=BriefWindow(timezone_name,end-timedelta(days=7),end,datetime.now(timezone.utc))
+    def build(self,*,topic,timezone_name,end_at=None,previous_document=None,comparison_document=None,period_mode='rolling'):
+        window=brief_window(timezone_name,end_at=end_at,period_mode=period_mode)
         from prm.source_contracts import SourceResource,SourceBatch,EvidenceBundle,normalize_source_batch
         evidence=[];coverage=[];limits=[];used_scopes=[];batches=[]
         for hook in self.source_hooks:
@@ -45,40 +58,71 @@ class BriefRuntime:
                     raise StorageError('Brief personal source owner differs')
                 batches.append(batch)
                 evidence.extend(batch);coverage.append(CoverageSource(hook.source_ref,'checked' if batch.completeness=='complete' else 'partial',batch.reason))
-                if batch:used_scopes.append(asdict(replace(hook.authorization_request,operation_ref=None)))
+                used_scopes.append(asdict(replace(hook.authorization_request,operation_ref=None)))
             except Exception:
                 # Only a still-unprepared reservation can be abandoned. A
                 # possibly processed collector retains its unknown fence/cost.
                 decision.reservation.abandon_before_transport()
                 coverage.append(CoverageSource(hook.source_ref,'unavailable','collection unavailable'))
-        bundle=EvidenceBundle.select(tuple(batches),maximum_items=20) if batches else None
+        received=sum(len(b) for b in batches)
+        # Retain at most2048 candidate records across all selected sources. Read
+        # observations remain separate, including local cap omissions.
+        if received>2048:
+            groups=[sorted(b.items,key=lambda r:({'critical':0,'high':1,'medium':2,'low':3}.get(r.payload.get('importance'),4),r.external_ref)) for b in batches]
+            kept=[[] for _ in batches];index=0
+            while sum(map(len,kept))<2048 and any(index<len(g) for g in groups):
+                for n,group in enumerate(groups):
+                    if index<len(group) and sum(map(len,kept))<2048:kept[n].append(group[index])
+                index+=1
+            batches=[replace(b,items=tuple(kept[n]),completeness='partial' if len(kept[n])<len(b) else b.completeness,
+                omitted_count=b.omitted_count+len(b)-len(kept[n]) if b.omitted_count is not None else None,
+                reason='candidate_global_cap' if len(kept[n])<len(b) else b.reason,
+                continuation='received_selection_cap' if len(kept[n])<len(b) else b.continuation) for n,b in enumerate(batches)]
+            limits.append('candidate_global_cap')
+        from prm.briefs import _evidence_from_mapping
+        eligible=set()
+        for batch in batches:
+            for record in batch.items:
+                try:_evidence_from_mapping(record.payload,window=window)
+                except ValueError:continue
+                eligible.add(record.evidence_ref)
+        bundle=EvidenceBundle.select_ranked(tuple(batches),maximum_items=20,topic=topic,eligible_refs=frozenset(eligible)) if batches else None
         if bundle:
             evidence=[r.payload for r in bundle.selected]
             if bundle.model_omitted_count:
                 limits.append('model_packet_omitted:'+str(bundle.model_omitted_count))
                 coverage=[replace(c,state='partial',reason='model_packet_bounded') if c.state=='checked' else c for c in coverage]
             if bundle.conflict_count:limits.append('conflicting_source_versions:'+str(bundle.conflict_count))
+            if bundle.excluded_refs:limits.append('invalid_or_outside_window_candidates:'+str(len(bundle.excluded_refs)))
         if not self.source_hooks:limits.append('selected_sources_unavailable')
-        request=BriefBuildRequest(topic,window,tuple(evidence[:48]),self.root.owner_ref,tuple(coverage),tuple(limits),
-            previous_document=previous_document,comparison_document=comparison_document,period_basis='explicit_requested_range')
+        request=BriefBuildRequest(topic,window,tuple(evidence),self.root.owner_ref,tuple(coverage),tuple(limits),
+            previous_document=previous_document,comparison_document=comparison_document,period_basis='previous_calendar_week' if period_mode=='calendar_week' else 'rolling_seven_days')
         document=build_brief_document(request)
-        classes={item.resource.data_class for item in bundle.selected} if bundle else set()
+        classes={resource.data_class for batch in batches for resource in batch.selected_resources}
+        snapshots=tuple({b.watermark for b in batches if b.watermark and any(r.kind=='archive' for r in b.selected_resources)}) if self.root.archive_selection else ()
         if self.editorial is not None:
-            editorial=self.editorial(document,data_classes=classes,source_scopes=used_scopes,archive_snapshots=tuple({b.watermark for b in batches if b.watermark}) if self.root.archive_selection else ()) if type(self.editorial)is RuntimeBriefEditorial else self.editorial(document)
+            editorial=self.editorial(document,data_classes=classes,source_scopes=used_scopes,archive_snapshots=snapshots) if type(self.editorial)is RuntimeBriefEditorial else self.editorial(document)
             if editorial is not None:document=build_brief_document(replace(request,editorial=editorial))
-        dependencies=[item['dependency_ref'] for item in evidence[:48] if item.get('dependency_ref')]
+        dependencies=[r.payload['dependency_ref'] for b in batches for r in b.items if r.payload.get('dependency_ref')]
         if not hasattr(self.root.briefs,'pending_coverage'):self.root.briefs.pending_coverage={}
         self.root.briefs.pending_coverage[document.content_digest]=bundle.metadata() if bundle else {'schema_version':'assistant.evidence_bundle.v1','received_count':0,'candidate_count':0,'selected_count':0,'cited_count':None,'batches':[]}
+        self.root.briefs.pending_coverage[document.content_digest]['enumeration_received_count']=received
+        self.root.briefs.pending_coverage[document.content_digest]['candidate_global_cap']=2048
+        self.root.briefs.pending_coverage[document.content_digest]['document_evidence_count']=len(document.evidence)
+        selected={r.evidence_ref for r in bundle.selected} if bundle else set()
+        if not hasattr(self.root.briefs,'pending_inventory'):self.root.briefs.pending_inventory={}
+        self.root.briefs.pending_inventory[document.content_digest]=[{**r.metadata(),'source_url':r.payload.get('source_url'),
+            'selected':r.evidence_ref in selected,'reason':'selected' if r.evidence_ref in selected else 'ineligible' if r.evidence_ref not in eligible else 'model_packet_limit'} for b in batches for r in b.items]
         self.root.briefs.pending_dependencies[document.content_digest]=dependencies
         self.root.briefs.pending_classes[document.content_digest]=tuple(sorted(classes)) or ('user_provided',)
         self.root.briefs.pending_scopes[document.content_digest]=used_scopes
         if not hasattr(self.root.briefs,'pending_snapshots'):self.root.briefs.pending_snapshots={}
-        self.root.briefs.pending_snapshots[document.content_digest]=list({b.watermark for b in batches if b.watermark}) if self.root.archive_selection else []
+        self.root.briefs.pending_snapshots[document.content_digest]=list(snapshots)
         return document
 
-    def answer(self,*,topic,timezone_name,end_at=None):
+    def answer(self,*,topic,timezone_name,end_at=None,period_mode='rolling'):
         from prm.application import PersonalResearchAssistant
-        document=self.build(topic=topic,timezone_name=timezone_name,end_at=end_at)
+        document=self.build(topic=topic,timezone_name=timezone_name,end_at=end_at,period_mode=period_mode)
         assistant=PersonalResearchAssistant(settings=self.root.settings,conversations=self.root.conversations,briefs=self.root.briefs)
         request=OperatorRequest(query=topic,mode='brief',chat_id=self.root.owner_chat_id,
             actor_id=self.root.owner_chat_id,owner_chat_id=self.root.owner_chat_id)
@@ -88,7 +132,34 @@ class BriefRuntime:
         refs=result.payload.get('conversation',{}).get('response_refs',())
         snapshots=self.root.briefs.pending_snapshots.get(document.content_digest,[])
         if refs:self.root.conversations.record_origin(refs[0],classes,source_scopes=self.root.briefs.pending_scopes.get(document.content_digest,()),archive_snapshots=snapshots)
-        return replace(result,payload={**result.payload,'archive_snapshots':snapshots,'source_data_classes':list(classes),'source_data_class':classes[0],'source_scopes':self.root.briefs.pending_scopes.get(document.content_digest,[]),'source_coverage':self.root.briefs.pending_coverage.get(document.content_digest)})
+        inventory_hint='\nМатериалы выборки: /briefmaterials '+document.brief_id+' '+str(document.version)+' 0'
+        return replace(result,text=result.text+inventory_hint,payload={**result.payload,'archive_snapshots':snapshots,'source_data_classes':list(classes),'source_data_class':classes[0],'source_scopes':self.root.briefs.pending_scopes.get(document.content_digest,[]),'source_coverage':self.root.briefs.pending_coverage.get(document.content_digest)})
+
+    def materials(self,*,brief_id,version,offset=0,limit=20,guard=lambda:None):
+        if type(version)is not int or version<1 or type(offset)is not int or not 0<=offset<=2048 or type(limit)is not int or not 1<=limit<=20:raise StorageError('bounded exact Brief material request required')
+        from .source_access import source_current
+        store=self.root.briefs.store;owner=self.root.owner_ref
+        with store.transaction() as tx:
+            from .deletion import lineage_lock
+            lineage_lock(tx.conn,owner);guard()
+            parent=self.root.briefs._document_ref(brief_id);manifest=tx.get(owner,'result',parent,version=version)
+            if manifest is None or manifest.payload.get('brief_id')!=brief_id:raise StorageError('Brief version unavailable')
+            scopes=manifest.payload.get('source_scopes',[]);snapshots=manifest.payload.get('archive_snapshots',[])
+            source_current(tx,self.root.registry,owner,scopes,archive_snapshots=snapshots,require_snapshot=True)
+            pages=manifest.payload.get('material_pages',[]);rows=[];seen=0;dependencies=[parent]
+            for page in pages:
+                if seen+page['count']<=offset:seen+=page['count'];continue
+                item=tx.get(owner,'result',page['ref'],version=1)
+                if item is None or item.digest!=page['digest'] or item.payload['parent_ref']!=parent or item.payload['brief_version']!=version:raise StorageError('Brief inventory changed or unavailable')
+                start=max(0,offset-seen);rows.extend(item.payload['rows'][start:start+limit-len(rows)]);dependencies.append(page['ref']);seen+=page['count']
+                if len(rows)>=limit:break
+            lines=[('В обзоре' if row['selected'] else 'Вне обзора ('+row['reason']+')')+': '+str(row.get('source_url') or row['external_ref']) for row in rows]
+            total=sum(p['count'] for p in pages)
+            text='Материалы сохранённой выборки: '+str(total)+'. '+('Перечень пуст.' if not lines else '\n'+'\n'.join(lines))
+            if offset+len(rows)<total:text+='\nДальше: /briefmaterials '+brief_id+' '+str(version)+' '+str(offset+len(rows))
+            return {'status':'read','text':text,'materials':rows,'inventory_count':total,
+                'source_data_classes':manifest.payload.get('source_data_classes',['user_provided']),
+                'source_scopes':scopes,'archive_snapshots':snapshots,'source_result_refs':dependencies}
 
 
 class RuntimeBriefEditorial:

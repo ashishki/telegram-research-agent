@@ -27,9 +27,10 @@ def install_briefs(target):
 
 
 class DurableBriefStore(BriefDocumentStore):
-    def __init__(self,target,*,owner_ref):
-        super().__init__();self.store=PostgresStore(target);self.owner_ref=owner_ref
+    def __init__(self,target,*,owner_ref,registry=None):
+        super().__init__();self.store=PostgresStore(target);self.owner_ref=owner_ref;self.registry=registry
         self.pending_dependencies={};self.pending_classes={};self.pending_scopes={}
+        self.pending_inventory={};self.pending_coverage={}
 
     def _document_ref(self,brief_id):return 'brief_'+hashlib.sha256(brief_id.encode()).hexdigest()[:32]
     def _binding_ref(self,conversation_id):return 'brief_binding_'+hashlib.sha256(conversation_id.encode()).hexdigest()[:32]
@@ -50,9 +51,31 @@ class DurableBriefStore(BriefDocumentStore):
                 old=tx.get(owner,'result',ref,version=item.version)
                 if old is not None:
                     if old.payload.get('storage_digest')!=digest:raise StateConflict('immutable Brief version differs')
+                    if self.registry is not None:
+                        from prm.runtime.source_access import source_current
+                        source_current(tx,self.registry,owner,old.payload.get('source_scopes',[]),archive_snapshots=old.payload.get('archive_snapshots',[]),require_snapshot=True)
                 else:
+                    scopes=self.pending_scopes.get(item.content_digest,[]);snapshots=getattr(self,'pending_snapshots',{}).get(item.content_digest,[])
+                    classes=list(self.pending_classes.get(item.content_digest,('private_archive','private_connector_content')))
+                    if self.registry is not None:
+                        from prm.runtime.source_access import source_current
+                        source_current(tx,self.registry,owner,scopes,archive_snapshots=snapshots,require_snapshot=True)
+                    inventory=list({r['evidence_ref']:r for r in self.pending_inventory.get(item.content_digest,[])}.values())
+                    pages=[];chunks=[];chunk=[]
+                    for row in inventory:
+                        if chunk and (len(chunk)>=40 or len(json.dumps(chunk+[row],ensure_ascii=False).encode())>40000):chunks.append(chunk);chunk=[]
+                        chunk.append(row)
+                    if chunk:chunks.append(chunk)
+                    for index,rows in enumerate(chunks):
+                        page_ref='briefmaterials_'+hashlib.sha256((ref+'\x1f'+str(item.version)+'\x1f'+str(index)).encode()).hexdigest()[:32]
+                        stored=tx.put(owner,'result',page_ref,{'kind':'brief_material_inventory','parent_ref':ref,'brief_version':item.version,'rows':rows,
+                            'data_classes':classes,'data_class':classes[0],'source_scopes':scopes,'archive_snapshots':snapshots},expected_version=0)
+                        pages.append({'ref':page_ref,'digest':stored.digest,'count':len(rows)})
+                        tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',
+                            (owner,'result',ref,'result',page_ref))
                     tx.put(owner,'result',ref,{'kind':'brief_manifest','brief_id':item.brief_id,'version':item.version,
-                        'content_digest':item.content_digest,'storage_digest':digest,'source_data_classes':list(self.pending_classes.get(item.content_digest,('private_archive','private_connector_content'))),'source_scopes':self.pending_scopes.get(item.content_digest,[]),'archive_snapshots':getattr(self,'pending_snapshots',{}).get(item.content_digest,[])},expected_version=item.version-1)
+                        'content_digest':item.content_digest,'storage_digest':digest,'source_data_classes':classes,'source_scopes':scopes,
+                        'archive_snapshots':snapshots,'material_pages':pages,'source_coverage':self.pending_coverage.get(item.content_digest)},expected_version=item.version-1)
                     tx.conn.execute('INSERT INTO pa_briefs.documents VALUES(%s,%s,%s,%s,%s)',(owner,item.brief_id,item.version,digest,Jsonb(encoded)))
                 if tx.conn.execute("SELECT to_regclass('pa_memory.dependencies') AS meta").fetchone()['meta'] is not None:
                     for dependency in self.pending_dependencies.get(item.content_digest,()):

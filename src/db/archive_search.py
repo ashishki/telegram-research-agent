@@ -95,7 +95,7 @@ class ArchiveSearchResult:
         return payload
 
 
-def search_telegram_archive(
+def search_telegram_archive_fts(
     connection: sqlite3.Connection,
     query: str,
     *,
@@ -141,6 +141,17 @@ def search_telegram_archive(
         document = _select_document_for_query(documents, query)
         results.append(_result_from_row(row_dict, document=document))
     return results
+
+
+def search_telegram_archive(connection,query,*,filters=None,limit=10,snippet_tokens=32,chunk_max_chars=DEFAULT_CHUNK_MAX_CHARS):
+    """Shared canonical service; the unchanged lexical baseline stays available."""
+    from dataclasses import replace
+    from db.archive_retrieval import retrieve_archive
+    # Preserve the legacy result shape. Native callers consume the service's
+    # explicit version/variant/fusion metadata instead of this compatibility view.
+    return [replace(item,retrieval_mode='canonical_exact_lookup' if item.retrieval_mode=='canonical_exact_lookup' else 'sqlite_fts_archive',fusion_score=None) for item in
+        retrieve_archive(connection,query,filters=filters,limit=limit,
+        snippet_tokens=snippet_tokens,chunk_max_chars=chunk_max_chars).items]
 
 
 def build_fts_query(query: str, *, operator: str = "AND") -> str:
