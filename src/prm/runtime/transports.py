@@ -8,10 +8,63 @@ from .model import NoRedirect
 from .delivery import TransportReceipt,KnownDeliveryRejection
 from prm.storage.postgres import StorageError
 from prm.capabilities import CapabilityDenied
+from prm.telegram_contracts import TelegramDestination, TelegramOutcome
+
+
+class BotAPITransport:
+    """A bounded, no-redirect request layer with explicit unknown outcomes."""
+    METHODS = frozenset({'sendMessage', 'answerCallbackQuery', 'getUpdates'})
+
+    def __init__(self, *, token, origin='https://api.telegram.org', synthetic=False):
+        if not isinstance(token, str) or not token or len(token) > 512 or '\n' in token or '\r' in token:
+            raise StorageError('explicit bounded bot credential required')
+        parsed = urlsplit(origin)
+        if parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.path not in {'', '/'}:
+            raise StorageError('fixed Telegram API origin required')
+        if synthetic:
+            if parsed.scheme != 'http' or parsed.hostname != '127.0.0.1' or not parsed.port:
+                raise StorageError('literal synthetic Telegram origin required')
+        elif origin != 'https://api.telegram.org': raise StorageError('selected Telegram origin required')
+        self._token, self.origin = token, origin.rstrip('/')
+
+    def request(self, method, values, *, timeout_seconds=8):
+        if method not in self.METHODS or not isinstance(values, dict) or type(timeout_seconds) is not int or not 1 <= timeout_seconds <= 35:
+            raise StorageError('bounded supported Telegram request required')
+        data = urlencode(values).encode()
+        if len(data) > 128000: raise StorageError('Telegram request exceeds bound')
+        maximum = 1048576 if method == 'getUpdates' else 64000
+        status = 200
+        try:
+            request = Request(self.origin + '/bot' + self._token + '/' + method, data=data,
+                headers={'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'telegram-research-agent/1.0'}, method='POST')
+            try:
+                with build_opener(ProxyHandler({}), NoRedirect()).open(request, timeout=timeout_seconds) as response:
+                    status = response.status
+                    if response.headers.get_content_type() != 'application/json': return TelegramOutcome('unknown')
+                    raw = response.read(maximum + 1)
+            except HTTPError as error:
+                status = error.code
+                try: raw = error.read(maximum + 1)
+                finally: error.close()
+            if len(raw) > maximum: return TelegramOutcome('unknown')
+            value = json.loads(raw)
+        except Exception:
+            # No exception/provider body or token-bearing URL leaves this layer.
+            return TelegramOutcome('unknown')
+        if not isinstance(value, dict): return TelegramOutcome('unknown')
+        if value.get('ok') is True and 200 <= status < 300 and 'result' in value:
+            return TelegramOutcome('accepted', value['result'])
+        code = value.get('error_code')
+        if value.get('ok') is not False or type(code) is not int or not 400 <= code < 500:
+            return TelegramOutcome('unknown')
+        parameters = value.get('parameters', {})
+        retry = parameters.get('retry_after') if isinstance(parameters, dict) else None
+        if type(retry) is not int or not 1 <= retry <= 86400: retry = None
+        return TelegramOutcome('known_rejected', error_code=code, retry_after=retry)
 
 
 class BoundedTelegramSender:
-    def __init__(self,*,token,owner_chat_id,destination_ref,origin='https://api.telegram.org',synthetic=False):
+    def __init__(self,*,token,owner_chat_id,destination_ref,origin='https://api.telegram.org',synthetic=False,bot_ref='bot_default',message_thread_id=None):
         if not isinstance(token,str) or not token or '\n' in token or '\r' in token:raise StorageError('explicit bounded bot credential required')
         parsed=urlsplit(origin)
         if synthetic:
@@ -19,34 +72,38 @@ class BoundedTelegramSender:
         elif origin!='https://api.telegram.org':raise StorageError('selected Telegram origin required')
         if not owner_chat_id.isdigit() or owner_chat_id.startswith('0'):raise StorageError('positive exact private chat required')
         self._token,self.owner_chat_id,self.destination_ref,self.origin=token,owner_chat_id,destination_ref,origin
+        self.destination = TelegramDestination(chat_id=owner_chat_id, bot_ref=bot_ref, message_thread_id=message_thread_id)
+        self.api = BotAPITransport(token=token, origin=origin, synthetic=synthetic)
     def __call__(self,destination,text,attempt_ref):
         return self.send_with_options(destination,text,attempt_ref)
 
-    def send_with_options(self,destination,text,attempt_ref,*,navigation=None,parse_mode=None):
+    def send_with_options(self,destination,text,attempt_ref,*,navigation=None,parse_mode=None,reply_to_message_id=None):
         if destination!=self.destination_ref:raise CapabilityDenied('Telegram destination substituted')
         if not isinstance(text,str) or len(text)>3800:raise StorageError('one bounded Telegram effect per attempt; long results require reader or explicit chunk jobs')
         if parse_mode not in {None,'HTML'}:raise StorageError('unsupported trusted Telegram parse mode')
         values={'chat_id':self.owner_chat_id,'text':text,'disable_web_page_preview':'true'}
+        if self.destination.message_thread_id is not None: values['message_thread_id'] = self.destination.message_thread_id
+        if reply_to_message_id is not None:
+            if type(reply_to_message_id) is not int or not 0 < reply_to_message_id < 2**63: raise StorageError('exact reply message required')
+            values['reply_parameters'] = json.dumps({'message_id': reply_to_message_id, 'allow_sending_without_reply': False})
         if parse_mode:values['parse_mode']=parse_mode
         if navigation is not None:
             markup=navigation_markup(navigation)
             if markup is not None:values['reply_markup']=json.dumps(markup,ensure_ascii=False)
-        body=urlencode(values).encode()
-        try:
-            with build_opener(ProxyHandler({}),NoRedirect()).open(Request(self.origin+'/bot'+self._token+'/sendMessage',data=body,
-                headers={'Content-Type':'application/x-www-form-urlencoded'}),timeout=8) as response:
-                raw=response.read(64001)
-                if len(raw)>64000:raise StorageError('Telegram response exceeds bound')
-                value=json.loads(raw)
-        except HTTPError as error:
-            if 400<=error.code<500:raise KnownDeliveryRejection('provider rejected exact request') from None
-            raise StorageError('Telegram outcome unknown') from None
-        except Exception:raise StorageError('Telegram outcome unknown') from None
-        if value.get('ok') is not True:raise KnownDeliveryRejection('provider negative response')
-        result=value.get('result',{})
-        if str(result.get('chat',{}).get('id'))!=self.owner_chat_id or type(result.get('message_id'))is not int:
+        outcome = self.api.request('sendMessage', values)
+        if outcome.kind == 'known_rejected':
+            error = KnownDeliveryRejection('provider rejected exact request')
+            error.retry_after = outcome.retry_after; error.error_code = outcome.error_code
+            raise error
+        if outcome.kind != 'accepted': raise StorageError('Telegram outcome unknown')
+        result = outcome.result
+        if (not isinstance(result, dict) or not isinstance(result.get('chat'), dict)
+            or str(result['chat'].get('id'))!=self.owner_chat_id or result['chat'].get('type', 'private') != 'private'
+            or type(result.get('message_id'))is not int or not 0 < result['message_id'] < 2**63
+            or result.get('message_thread_id') != self.destination.message_thread_id):
             raise StorageError('Telegram receipt recipient/identity unavailable')
-        return TransportReceipt('telegram:'+self.owner_chat_id+':'+str(result['message_id']))
+        return TransportReceipt('telegram:'+self.owner_chat_id+':'+str(result['message_id']),
+            destination=self.destination, message_id=result['message_id'], method='sendMessage')
 
 
 def navigation_markup(value):

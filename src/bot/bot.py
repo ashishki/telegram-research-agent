@@ -24,6 +24,8 @@ from prm.capabilities import AuthorizationDecision
 from prm.archive_contract import ARCHIVE_RESPONSE_INTENTS
 from prm.contracts import ArchiveSynthesisAccess, ModelEgressAccess
 from prm.routing import decide_route
+from prm.storage.postgres import StateConflict
+from prm.telegram_contracts import TelegramEnvelopeError
 from .runtime import (
     BOT_RUNTIME_LEGACY,
     BOT_RUNTIME_PRM_ASSISTANT,
@@ -60,39 +62,31 @@ def _install_signal_handlers(state: _BotState) -> None:
     signal.signal(signal.SIGINT, lambda _signum, _frame: stop("SIGINT"))
 
 
-def _telegram_get_updates(token: str, offset: int | None) -> list[dict[str, Any]]:
+def _telegram_get_updates(token: str, offset: int | None, allowed_updates=None) -> list[dict[str, Any]]:
     query: dict[str, Any] = {
         "timeout": 30,
-        "allowed_updates": json.dumps(["message", "edited_message", "callback_query"]),
+        "allowed_updates": json.dumps(allowed_updates or ["message", "edited_message", "callback_query"]),
     }
     if offset is not None:
         query["offset"] = offset
-    url = f"{BOT_API_BASE}/bot{token}/getUpdates?{parse.urlencode(query)}"
-    with request.urlopen(url, timeout=35) as response:
-        decoded = json.loads(response.read().decode("utf-8"))
-    if not decoded.get("ok"):
-        raise RuntimeError(f"Telegram API returned error: {decoded!r}")
-    return list(decoded.get("result") or [])
+    from prm.runtime.transports import BotAPITransport
+    outcome = BotAPITransport(token=token, origin=BOT_API_BASE, synthetic=BOT_API_BASE.startswith('http://127.0.0.1:')).request('getUpdates', query, timeout_seconds=35)
+    if outcome.kind != 'accepted' or not isinstance(outcome.result, list) or len(outcome.result) > 100:
+        raise RuntimeError('Telegram updates unavailable')
+    if any(not isinstance(item, dict) or type(item.get('update_id')) is not int or not 0 <= item['update_id'] < 2**63 for item in outcome.result):
+        raise RuntimeError('Telegram update identity unavailable')
+    return outcome.result
 
 
 def _telegram_answer_callback(token: str, callback_query_id: str, text: str) -> None:
-    payload = parse.urlencode(
-        {
+    payload = {
             "callback_query_id": callback_query_id,
             "text": text[:200],
             "show_alert": "false",
         }
-    ).encode("utf-8")
-    req = request.Request(
-        f"{BOT_API_BASE}/bot{token}/answerCallbackQuery",
-        data=payload,
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
-        method="POST",
-    )
-    with request.urlopen(req, timeout=15) as response:
-        decoded = json.loads(response.read().decode("utf-8"))
-    if not decoded.get("ok"):
-        raise RuntimeError(f"Telegram API returned error: {decoded!r}")
+    from prm.runtime.transports import BotAPITransport
+    outcome = BotAPITransport(token=token, origin=BOT_API_BASE, synthetic=BOT_API_BASE.startswith('http://127.0.0.1:')).request('answerCallbackQuery', payload)
+    if outcome.kind != 'accepted' or outcome.result is not True: raise RuntimeError('Telegram callback acknowledgement unavailable')
 
 
 def _answer_prm_callback(
@@ -252,11 +246,14 @@ def run_bot(
     state = _BotState()
     _install_signal_handlers(state)
     offset: int | None = None
+    if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT and job_ingress is not None:
+        offset = job_ingress.polling_offset()
     LOGGER.info("Telegram polling started runtime_mode=%s", runtime_mode)
 
     while True:
         try:
-            updates = _telegram_get_updates(token=token, offset=offset)
+            options = {'allowed_updates': job_ingress.allowed_updates} if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT and job_ingress is not None else {}
+            updates = _telegram_get_updates(token=token, offset=offset, **options)
         except Exception:
             # Provider exceptions can include a request URL (and therefore a
             # bot credential) or response metadata.  Do not attach them to
@@ -272,20 +269,39 @@ def run_bot(
                     raise ValueError('durable ingress owner differs from Telegram owner')
                 try:
                     reply = job_ingress.receive(update)
+                except (StateConflict, TelegramEnvelopeError):
+                    try: job_ingress.quarantine_update(update)
+                    except Exception:
+                        LOGGER.warning('Durable quarantine unavailable; update not acknowledged')
+                        break
+                    offset = job_ingress.polling_offset()
+                    continue
                 except Exception:
                     LOGGER.warning('Durable intake unavailable; update not acknowledged')
                     break
                 # Advance only after commit (or rejection of a foreign update).
-                offset = int(update.get('update_id', 0)) + 1
+                offset = job_ingress.polling_offset()
                 if reply is not None:
                     decisions = issue_private_reply_authorizations(token=token, chat_id=owner_chat_id,
                         actor_id=owner_chat_id, owner_chat_id=owner_chat_id)
                     from .prm_handlers import send_message as send_private_message
                     from prm.runtime.transports import navigation_markup
-                    send_private_message(token, owner_chat_id, reply.text,
-                        reply_markup=navigation_markup(reply.navigation),
-                        delivery_authorization=decisions[0] if decisions else None,
-                        actor_id=owner_chat_id, owner_chat_id=owner_chat_id)
+                    if reply.callback_query_id:
+                        _answer_prm_callback(token, reply.callback_query_id, 'Проверяю.',
+                            delivery_authorization=decisions[0] if decisions else None,
+                            chat_id=owner_chat_id, actor_id=owner_chat_id, owner_chat_id=owner_chat_id)
+                    attempt_ref, send = job_ingress.inbox.prepare_reply(update, reply)
+                    if send:
+                        try:
+                            receipt = job_ingress.inbox.dispatch_reply(attempt_ref, reply, lambda: send_private_message(token, owner_chat_id, reply.text,
+                                reply_markup=navigation_markup(reply.navigation), telegram_navigation=reply.navigation,
+                                telegram_destination=reply.destination, receipt_required=True,
+                                telegram_origin=BOT_API_BASE, synthetic_telegram=BOT_API_BASE.startswith('http://127.0.0.1:'),
+                                delivery_authorization=decisions[1] if len(decisions)>1 else None,
+                                actor_id=owner_chat_id, owner_chat_id=owner_chat_id))
+                            job_ingress.inbox.settle_reply(attempt_ref, reply, receipt)
+                        except Exception:
+                            LOGGER.warning('Intake reply outcome unknown; replay blocked')
                 continue
             offset = int(update.get("update_id", 0)) + 1
             callback = update.get("callback_query")

@@ -12,6 +12,16 @@ Historical PRM-SN/RFX/UTD task records are preserved byte-for-byte at `docs/task
 
 ## Local daily implementation — 2026-10-13
 
+Package 2: D56, after local independent closure of DAILY01-R01/R02/R04 on
+988da0e. The owner's next-package instruction continues local work; non-Codex
+Go/governed/human evidence remains pending, no paid authorization inferred.
+Acceptance registered before implementation:
+`PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python -m pytest -q tests/test_daily_telegram_routes.py tests/test_daily_telegram_transport.py`.
+Cases: actual polling/ingress/worker/delivery, durable replay/quarantine/cursor,
+reply A after B, UTF-16 quote/hidden forward, source revisions/stale preview,
+owner/route/version callback boundaries and acknowledgement, transport outcome
+classification/markup/receipt identity/unknown no-retry, legacy payload recovery.
+
 The owner's active assignment lifts the research-only stop for local synthetic
 implementation. Working branch: codex/pa-daily-implementation-20261013.
 Package 1 is D01–D03, followed by D56 after the independent package gate.

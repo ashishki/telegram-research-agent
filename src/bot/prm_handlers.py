@@ -108,7 +108,12 @@ def send_message(
     delivery_authorization: AuthorizationDecision | None = None,
     actor_id: str | None = None,
     owner_chat_id: str | None = None,
-) -> None:
+    telegram_destination=None,
+    telegram_navigation=None,
+    receipt_required: bool = False,
+    telegram_origin: str = 'https://api.telegram.org',
+    synthetic_telegram: bool = False,
+):
     """Send PA-originated Telegram content only with a current grant.
 
     Calls from text, voice and UTD/callback paths share this single final-send
@@ -125,6 +130,23 @@ def send_message(
         owner_chat_id=owner_chat_id,
     ):
         return
+    if receipt_required:
+        from prm.telegram_contracts import TelegramDestination, TelegramOutcome
+        from prm.runtime.transports import BoundedTelegramSender
+        from prm.runtime.delivery import KnownDeliveryRejection
+        if type(telegram_destination) is not TelegramDestination or telegram_destination.chat_id != chat_id:
+            return TelegramOutcome('unknown')
+        try:
+            sender = BoundedTelegramSender(token=token, owner_chat_id=chat_id, destination_ref='destination_intake_reply',
+                bot_ref=telegram_destination.bot_ref, message_thread_id=telegram_destination.message_thread_id,
+                origin=telegram_origin, synthetic=synthetic_telegram)
+            return sender.send_with_options('destination_intake_reply', text, 'intake_reply',
+                navigation=telegram_navigation, parse_mode=parse_mode)
+        except KnownDeliveryRejection as error:
+            return TelegramOutcome('known_rejected', error_code=getattr(error, 'error_code', None), retry_after=getattr(error, 'retry_after', None))
+        except Exception:
+            LOGGER.warning('PRM intake reply outcome unknown')
+            return TelegramOutcome('unknown')
     try:
         kwargs: dict[str, object] = {
             "chat_id": chat_id,

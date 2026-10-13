@@ -52,7 +52,7 @@ def test_enqueue_failure_rolls_back_inbox_and_never_acknowledges(sandbox):
         current.receive(update(21))
     with current.queue.store.transaction() as tx:
         assert tx.conn.execute('SELECT count(*) AS n FROM pa_runtime.object_heads WHERE owner=%s',
-                               (current.owner_ref,)).fetchone()['n'] == 2
+                               (current.owner_ref,)).fetchone()['n'] == 4
         assert tx.get(current.owner_ref, 'conversation', current.bindings.update_identity_ref(21)) is None
     current.control('cancel', first.job_id)
     assert current.receive(update(21)).job_id
@@ -105,7 +105,7 @@ def test_cancel_warning_when_claim_occurs_strictly_before_cancel_update(sandbox,
     {'chat': {'id': 43, 'type': 'private'}}, {'chat': {'id': 42, 'type': 'group'}},
 ])
 def test_private_tuple_checked_for_text_voice_callbacks(sandbox, changes):
-    current = ingress(sandbox, 'private')
+    current = ingress(sandbox, 'private_' + str(changes.get('from', {}).get('id', '')) + str(changes.get('chat', {}).get('id', '')) + changes.get('chat', {}).get('type', ''))
     for message in [update(30, **changes), update(31, '', voice={'file_id': 'synthetic'}, **changes)]:
         assert current.receive(message) is None
     callback = {'update_id': 32, 'callback_query': {'from': changes.get('from', {'id': 42}),
@@ -214,6 +214,7 @@ def test_callback_cancel_does_not_authorize_unrelated_actions(sandbox):
         'message': {'chat': {'id': 42, 'type': 'private'}}, 'data': 'pai:cancel:' + first.job_id}}
     assert current.receive(callback).text == 'Задача отменена.'
     callback['callback_query']['data'] = 'confirm:anything'
+    callback['update_id'] = 72
     assert 'недоступно' in current.receive(callback).text
 
 
@@ -235,5 +236,5 @@ def test_polling_replays_failed_commit_without_advancing_offset(sandbox, monkeyp
 
     monkeypatch.setattr(bot, '_telegram_get_updates', poll)
     bot.run_bot(SimpleNamespace(db_path=':memory:'), job_ingress=current)
-    assert offsets == [None, None]
+    assert offsets == [81, 81]
     assert current.receive(update(81)).job_id

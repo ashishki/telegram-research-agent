@@ -6,7 +6,8 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
-TESTS = ('tests/test_daily_entrypoint.py', 'tests/test_daily_controls.py', 'tests/test_daily_dispatch.py')
+TESTS = ('tests/test_daily_entrypoint.py', 'tests/test_daily_controls.py', 'tests/test_daily_dispatch.py',
+         'tests/test_daily_telegram_routes.py', 'tests/test_daily_telegram_transport.py')
 
 
 def main():

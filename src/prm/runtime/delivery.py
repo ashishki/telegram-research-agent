@@ -1,6 +1,6 @@
 """Precommitted effect attempts, final policy locks and explicit reconciliation."""
 from __future__ import annotations
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, replace, asdict
 from datetime import timedelta
 import hashlib
 import uuid
@@ -51,6 +51,9 @@ def _check(conn):
 @dataclass(frozen=True)
 class TransportReceipt:
     provider_receipt: str
+    destination: object = None
+    message_id: int | None = None
+    method: str | None = None
 
 
 @dataclass(frozen=True)
@@ -104,12 +107,14 @@ class DeliveryExecutor:
 
     def deliver_result(self, *, owner, job_id, destination_ref, upper_bound, effect_lease=None):
         with self.store.transaction() as tx:
-            job = tx.conn.execute('SELECT status,result_ref FROM pa_jobs.jobs WHERE owner=%s AND id=%s', (owner, job_id)).fetchone()
+            job = tx.conn.execute('SELECT status,result_ref,payload FROM pa_jobs.jobs WHERE owner=%s AND id=%s', (owner, job_id)).fetchone()
             if job is None or job['status'] != 'completed':
                 raise CapabilityDenied('completed owner-bound result required')
             result = tx.get(owner, 'result', job['result_ref'], version=1)
             if result is None or not isinstance(result.payload.get('text'), str):
                 raise StorageError('result unavailable')
+            from prm.storage.jobs import JobQueue
+            request_input = JobQueue(self.store.target)._input(tx, owner, job['payload'])
             payload = {'text': result.payload['text'], 'result_ref': result.object_id, 'result_digest': result.digest,
                        'data_class':result.payload.get('data_class','private_archive'),
                        'data_classes':result.payload.get('data_classes',[result.payload.get('data_class','private_archive')]),
@@ -132,6 +137,28 @@ class DeliveryExecutor:
                        != ('result', result.object_id, result.version, result.digest)):
                     raise CapabilityDenied('effect lease does not bind the exact result')
                 JobQueue(self.store.target)._fenced(tx, effect_lease)
+        # Versioned payload identity is additive. Never rewrite old digests or
+        # redispatch an existing legacy/unknown attempt during an upgrade.
+        prior = self.attempt(owner=owner, delivery_id='answer_' + job_id)
+        if prior:
+            if (prior['destination_ref'] != destination_ref or prior['source_ref'] != job_id
+                or prior['digest'] != _canonical(prior['payload'])[1]
+                or prior['payload'].get('result_ref') != result.object_id or prior['payload'].get('result_digest') != result.digest):
+                raise StateConflict('stored delivery identity differs')
+            return prior
+        from .transports import BoundedTelegramSender
+        if type(self.sender) is BoundedTelegramSender:
+            from prm.storage.telegram import TelegramBindings
+            if self.sender.destination_ref != destination_ref: raise CapabilityDenied('selected delivery destination differs')
+            route = request_input.payload.get('telegram_envelope', {}).get('destination')
+            if route is not None and route != asdict(self.sender.destination): raise CapabilityDenied('answer destination differs from input route')
+            payload.update({'schema_version': 'telegram.delivery.v2', 'telegram_method': 'sendMessage',
+                            'telegram_destination': asdict(self.sender.destination), 'result_version': result.version})
+            if 'telegram_navigation' not in payload:
+                bindings = TelegramBindings(JobQueue(self.store.target), owner=owner, destination=self.sender.destination)
+                rows = [[{'text': label, 'callback_data': bindings.issue_control(command=command, job_id=job_id,
+                    response_ref=result.object_id, response_version=result.version)}] for label, command in (('Статус', 'status'), ('Результат', 'result'))]
+                payload['telegram_navigation'] = {'kind': 'inline_keyboard', 'inline_keyboard': rows}
         if len(payload['text'])<=3800:
             return self._deliver(owner=owner, delivery_id='answer_' + job_id, kind='answer', source_ref=job_id,
                 destination_ref=destination_ref, payload=payload, upper_bound=upper_bound, effect_lease=effect_lease)
@@ -300,6 +327,9 @@ class DeliveryExecutor:
                 try:
                     from .transports import BoundedTelegramSender
                     if type(self.sender) is BoundedTelegramSender:
+                        if payload.get('schema_version') == 'telegram.delivery.v2' and (
+                            payload.get('telegram_method') != 'sendMessage' or payload.get('telegram_destination') != asdict(self.sender.destination)):
+                            raise CapabilityDenied('sealed Telegram method/route differs')
                         result=self.sender.send_with_options(destination_ref,payload['text'],row['attempt_ref'],
                             navigation=payload.get('telegram_navigation'),parse_mode=payload.get('telegram_parse_mode'))
                     else:result = self.sender(destination_ref, payload['text'], row['attempt_ref'])
@@ -311,6 +341,23 @@ class DeliveryExecutor:
                     raise
                 if tx.conn.closed:
                     raise StorageError('final scope connection lost; retain unknown attempt')
+                if payload.get('schema_version') == 'telegram.delivery.v2':
+                    if (type(result) is not TransportReceipt or result.method != payload['telegram_method']
+                        or result.destination is None or asdict(result.destination) != payload['telegram_destination']
+                        or type(result.message_id) is not int or result.message_id <= 0):
+                        raise StorageError('exact Telegram receipt identity unavailable')
+                    from prm.storage.jobs import JobQueue
+                    from prm.storage.telegram import TelegramBindings
+                    from prm.telegram_contracts import TelegramMessageBinding
+                    queue = JobQueue(self.store.target)
+                    job = tx.conn.execute('SELECT payload FROM pa_jobs.jobs WHERE owner=%s AND id=%s', (owner, source_ref)).fetchone()
+                    input_item = queue._input(tx, owner, job['payload'])
+                    metadata = input_item.payload.get('telegram_envelope', {})
+                    TelegramBindings(queue, owner=owner, destination=result.destination).bind_message_in(tx,
+                        TelegramMessageBinding(owner, result.destination, result.message_id, source_ref,
+                            response_ref=payload['result_ref'], response_version=payload['result_version'],
+                            delivery_ref=delivery_id, origin_kind='bot', source_revision_ref=metadata.get('source_revision_ref'),
+                            source_revision=metadata.get('source_revision', 1)))
                 return result
         try:
             result = self.registry.execute_reserved_groups(tuple(tuple(decision.reservation for decision in group) for group in groups), transport)

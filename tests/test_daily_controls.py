@@ -38,9 +38,11 @@ def test_opaque_selection_callback_is_owner_route_and_expiry_bound(pai):
         'message': {'chat': {'id': 42, 'type': 'private'}}, 'data': token}}
     assert ingress.receive(callback) is None
     callback['callback_query']['from']['id'] = 42
+    callback['update_id'] = 96105
     callback['callback_query']['message']['message_thread_id'] = 3
     assert 'недоступ' in ingress.receive(callback).text
     callback['callback_query']['message'].pop('message_thread_id')
+    callback['update_id'] = 96106
     assert ingress.receive(callback).job_id == a.job_id
     # Navigation controls never authorize an action or repeat a completed send.
     assert 'cancelled' in ingress.receive(callback).text

@@ -58,3 +58,16 @@ no identity row after rollback; the added identity metadata is counted explicitl
 `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python -m pytest -q tests/test_daily_controls.py::test_control_identity_cannot_cross_into_compute_route tests/test_daily_controls.py::test_deletion_removes_control_choices_and_prevents_replay_retarget tests/test_daily_controls.py::test_stop_update_replay_after_restart_keeps_original_target tests/test_daily_controls.py::test_effect_claim_between_status_and_cancel_preserves_unknown_fence tests/test_pai_ingress_jobs.py::test_enqueue_failure_rolls_back_inbox_and_never_acknowledges`:
 **exit 0, 5 passed / 47.38s**, zero skips. R01/R04 require only a narrow
 closure on the next committed SHA; no second full package review.
+
+## Final narrow closure
+
+Fresh read-only turn `/root/daily01_p1_recheck` reviewed exact
+`988da0e5f907f933168dc655e354ac713a004e64`, range `57f6e39..988da0e`, binary diff
+SHA-256 `ec882f20f72075a68a99a22c62244118341f91ee410d0b74ae8f3e706e2e4054`.
+Verdict **PASS: R01/R04 CLOSED for newly admitted state**; R02 remains closed.
+Memory reproduction exited 0: both cross-route changes fail closed, deletion
+removes copied titles/tombstones selection, replay does not cancel remaining B.
+No writes/network/provider/credentials; five PG passes inspected, not rerun.
+Existing pre-identity state was not backfilled or tested. R03 P2 remains.
+Local engineering closure allows the owner's requested next local package;
+non-Codex Go/governed/human acceptance is still not claimed.

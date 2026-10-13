@@ -1,7 +1,7 @@
 """Durable private ingress. Intake performs no research, transcription or effect."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict, replace
 from datetime import timedelta
 import hashlib
 import re
@@ -16,12 +16,16 @@ class IntakeReply:
     request_ref: str | None = None
     job_id: str | None = None
     navigation: dict | None = None
+    destination: object = None
+    callback_query_id: str | None = None
+    disposition: str = 'persisted'
+    source_job_refs: tuple[str, ...] = ()
 
 
 class TelegramJobIngress:
     """Explicit synthetic target and authenticated private owner, no env fallback."""
 
-    def __init__(self, queue: JobQueue, *, owner_ref: str, owner_chat_id: str, watch_scheduler=None, delivery_executor=None):
+    def __init__(self, queue: JobQueue, *, owner_ref: str, owner_chat_id: str, watch_scheduler=None, delivery_executor=None,bot_ref='bot_default'):
         if not owner_ref or len(owner_ref) > 128 or not re.fullmatch(r'[1-9][0-9]*', owner_chat_id):
             raise StorageError('explicit private owner required')
         self.queue = queue
@@ -32,11 +36,54 @@ class TelegramJobIngress:
         self.cancel_callback=None
         self.durable_results=False;self.delivery_upper_bound=None;self.destination_ref=None
         from prm.telegram_contracts import TelegramDestination
-        from prm.storage.telegram import TelegramBindings
-        self.telegram_destination = TelegramDestination(chat_id=owner_chat_id)
+        from prm.storage.telegram import TelegramBindings, TelegramInbox
+        self.telegram_destination = TelegramDestination(chat_id=owner_chat_id, bot_ref=bot_ref)
         self.bindings = TelegramBindings(queue, owner=owner_ref, destination=self.telegram_destination)
+        self.inbox = TelegramInbox(self.bindings)
+        self.allowed_updates = ('message', 'edited_message', 'callback_query')
+
+    def polling_offset(self):
+        return self.inbox.polling_offset()
+
+    def quarantine_update(self, update):
+        self.inbox.record_decision(update, kind='invalid_update', disposition='quarantined', quarantined=True)
+
+    def _reply_snapshot(self, binding):
+        if binding.delivery_ref:
+            local = self.queue.store.get(self.owner_ref, 'conversation', binding.delivery_ref)
+            if local and local.payload.get('status') == 'sent': return local.payload.get('text')
+            with self.queue.store.transaction() as tx:
+                row = tx.conn.execute('SELECT payload,digest,status FROM pa_delivery.attempts WHERE owner=%s AND id=%s', (self.owner_ref, binding.delivery_ref)).fetchone()
+                if row and row['status'] == 'sent' and _canonical(row['payload'])[1] == row['digest']: return row['payload']['text']
+        state = self.queue.status(owner=self.owner_ref, job_id=binding.job_ref)
+        if state:
+            item = self.queue.store.get(self.owner_ref, 'conversation', state['input_ref'])
+            if item: return item.payload.get('original_text', item.payload.get('query'))
+        return None
 
     def receive(self, update: dict) -> IntakeReply | None:
+        from prm.telegram_contracts import normalize_update, quote_matches
+        envelope = normalize_update(update, owner_chat_id=self.owner_chat_id, bot_ref=self.telegram_destination.bot_ref)
+        if not envelope.trusted_owner:
+            self.inbox.record_decision(update, kind=envelope.kind, disposition='rejected', quarantined=True)
+            return None
+        self.inbox.guard_identity(update)
+        if envelope.destination.message_thread_id is not None:
+            reply = IntakeReply('Управление в этой теме пока недоступно.', destination=envelope.destination,
+                                callback_query_id=envelope.callback_query_id, disposition='rejected')
+        elif envelope.kind == 'edited_message':
+            self.bindings.revise_source(update, envelope)
+            reply = IntakeReply('Исправление сохранено. Кнопки и подтверждения прежней версии недействительны. Новый запрос пока не запущен.', destination=envelope.destination)
+        else:
+            binding = self.bindings.for_message(envelope.destination, envelope.reply_to_message_id) if envelope.reply_to_message_id else None
+            if envelope.quote and binding:
+                envelope = replace(envelope, quote=replace(envelope.quote, verified=quote_matches(self._reply_snapshot(binding), envelope.quote)))
+            reply = self._receive(update, envelope, binding)
+            if reply is not None: reply = replace(reply, destination=envelope.destination, callback_query_id=envelope.callback_query_id)
+        self.inbox.record_decision(update, kind=envelope.kind, disposition=reply.disposition if reply else 'rejected', reply=reply)
+        return reply
+
+    def _receive(self, update, envelope, reply_binding):
         if not isinstance(update, dict) or type(update.get('update_id')) is not int or update['update_id'] < 0:
             raise StorageError('typed Telegram update ID required')
         callback = update.get('callback_query')
@@ -47,6 +94,9 @@ class TelegramJobIngress:
                 or chat.get('type') != 'private'):
             return None
         text = str(callback.get('data', '')) if isinstance(callback, dict) else str(message.get('text', '')).strip()
+        raw_text = text
+        if envelope.source_trust == 'untrusted_source' and not isinstance(callback, dict):
+            text = 'Поясни пересланный материал (недоверенные данные):\n' + text
         if message.get('message_thread_id') is not None:
             return IntakeReply('Управление в этой теме пока недоступно.')
         if isinstance(callback, dict):
@@ -65,10 +115,12 @@ class TelegramJobIngress:
         if text.casefold() in watch_words and self.watch_scheduler is not None:
             if message.get('voice') or message.get('voice_transcript'):
                 return IntakeReply('Управление наблюдением требует текста или нажатия показанной кнопки.')
+            if not self.inbox.begin_once(update): return IntakeReply('Этот запрос уже принят. Проверь текущее состояние наблюдения; автоматического повтора не было.')
             return self.watch_control(watch_words[text.casefold()],'')
         if parts and parts[0] == '/deliverystatus' and self.delivery_executor is not None:
             return IntakeReply(self.delivery_executor.describe(owner=self.owner_ref, delivery_id=parts[1] if len(parts) == 2 else ''))
         if parts and parts[0].startswith('/watch') and self.watch_scheduler is not None:
+            if not self.inbox.begin_once(update): return IntakeReply('Этот запрос уже принят. Проверь текущее состояние наблюдения; автоматического повтора не было.')
             return self.watch_control(parts[0], parts[1] if len(parts) == 2 else '')
         from .dispatch import parse_request_intent, IntentKind
         intent = parse_request_intent(text)
@@ -80,7 +132,9 @@ class TelegramJobIngress:
         body=None
         transcript = message.get('voice_transcript') or (voice or {}).get('transcript')
         if transcript:
-            body = {'query': str(transcript), 'input_kind': 'voice_transcript', 'mode': 'auto'}
+            query = str(transcript)
+            if envelope.source_trust == 'untrusted_source': query = 'Поясни пересланный материал (недоверенные данные):\n' + query
+            body = {'query': query, 'input_kind': 'voice_transcript', 'mode': 'auto'}
         elif voice:
             file_ref = voice.get('file_id')
             if not isinstance(file_ref, str) or not 0 < len(file_ref) <= 512:
@@ -100,31 +154,48 @@ class TelegramJobIngress:
                 return IntakeReply('Эта команда недоступна. Отправь вопрос или попроси статус, результат, отмену задачи.')
             body = {'query': intent.query, 'input_kind': 'text', 'mode': intent.mode}
             if intent.public_web_query: body['public_web_query'] = intent.public_web_query
-            body['original_text'] = text
+            body['original_text'] = raw_text
         else:
             return None
         if len(body.get('query', '').encode('utf-8')) > 16000:
             raise StorageError('request text exceeds its bound')
         body.update({'chat_id': self.owner_chat_id, 'actor_id': self.owner_chat_id,
                      'owner_chat_id': self.owner_chat_id, 'schema_version': 1})
+        body['telegram_envelope'] = asdict(envelope)
+        if envelope.reply_to_message_id is not None:
+            if reply_binding is None:
+                return IntakeReply('Исходное сообщение или его версия недоступны. Выбери доступный результат.', disposition='rejected')
+            state = self.queue.status(owner=self.owner_ref, job_id=reply_binding.job_ref)
+            result_ref = reply_binding.response_ref or (state.get('result_ref') if state else None)
+            if result_ref is None:
+                return IntakeReply('У выбранной задачи пока нет готового результата. Можно проверить её статус.', job_id=reply_binding.job_ref)
+            body['reply_target'] = {'job_ref': reply_binding.job_ref, 'result_ref': result_ref,
+                'result_version': reply_binding.response_version or 1, 'source_revision_ref': reply_binding.source_revision_ref,
+                'source_revision': reply_binding.source_revision}
         for field, value in (('message_id', message.get('message_id')),
                              ('reply_message_id', (message.get('reply_to_message') or {}).get('message_id'))):
             if value is not None:
                 if type(value) is not int or value <= 0: raise StorageError('typed positive Telegram message reference required')
                 body[field] = value
         key = 'telegram_' + str(update['update_id'])
+        if self.telegram_destination.bot_ref != 'bot_default':
+            key = 'telegram_' + hashlib.sha256(self.telegram_destination.bot_ref.encode()).hexdigest()[:16] + '_' + str(update['update_id'])
         request_ref = 'request_' + hashlib.sha256((self.owner_ref + ':' + key).encode()).hexdigest()[:32]
         with self.queue.store.transaction() as tx:
             # Inbox identity and queue admission share the same commit. A crash
             # before acknowledgement simply replays this exact immutable input.
             self.bindings._lineage_lock(tx)
             self.bindings.update_identity_in(tx, update)
+            source_ref, source_version = self.bindings.source_in(tx, envelope)
+            body['telegram_envelope'].update({'source_revision_ref': source_ref, 'source_revision': source_version})
             lock = int.from_bytes(hashlib.sha256((self.owner_ref + key).encode()).digest()[:8], 'big') % (2**63)
             tx.conn.execute('SELECT pg_advisory_xact_lock(%s)', (lock,))
             item = tx.get(self.owner_ref, 'conversation', request_ref, version=1)
             if item is not None and item.payload != body:
                 raise StateConflict('update ID reused with different content')
             item = item or tx.put(self.owner_ref, 'conversation', request_ref, body, expected_version=0)
+            if source_ref: self.bindings._dependency(tx, source_ref, request_ref)
+            if body.get('reply_target'): self.bindings._dependency(tx, body['reply_target']['result_ref'], request_ref, 'result')
             payload = {'schema_version': 1, 'input_namespace': 'conversation', 'input_ref': request_ref,
                        'input_version': 1, 'input_digest': item.digest, 'connection_ref': None,
                        'resource_ref': 'resource_local_request', 'purpose': 'local.assistant', 'consent_revision': 1}
@@ -134,7 +205,8 @@ class TelegramJobIngress:
             message_id = message.get('message_id')
             if message_id is not None:
                 from prm.telegram_contracts import TelegramMessageBinding
-                self.bindings.bind_message_in(tx, TelegramMessageBinding(self.owner_ref, self.telegram_destination, message_id, job))
+                self.bindings.bind_message_in(tx, TelegramMessageBinding(self.owner_ref, self.telegram_destination, message_id, job,
+                    source_revision_ref=source_ref, source_revision=source_version))
         return IntakeReply(f'Запрос сохранён. Задача {job}. /status {job}', request_ref, job)
 
     def resolve_control(self, command, *, explicit_ref=None, reply_message_id=None, update=None):
@@ -155,7 +227,8 @@ class TelegramJobIngress:
         labels = '\n'.join(f'{i}. {candidate.title}' for i, candidate in enumerate(target.candidates, 1))
         suffix = '\nЕсть и другие задачи; можно ответить на их карточку.' if target.has_more else ''
         return IntakeReply('Выбери задачу:\n' + labels + suffix,
-                           navigation={'kind': 'inline_keyboard', 'inline_keyboard': rows})
+                           navigation={'kind': 'inline_keyboard', 'inline_keyboard': rows},
+                           source_job_refs=tuple(candidate.job_ref for candidate in target.candidates))
 
     def watch_control(self, command, argument):
         scheduler = self.watch_scheduler
@@ -266,7 +339,9 @@ class RequestConversations:
 
     def __getattr__(self, name):
         method = getattr(self.store, name)
-        if name in {'clear', 'cancel_request'}:
+        if name not in {'load', 'start', 'active_or_start', 'begin_new_topic', 'record_response', 'offer_confirmation',
+                       'resolve_plain_yes', 'start_request', 'finish_request', 'cancel', 'is_cancelled', 'history',
+                       'history_for_model', 'user_prompts_for_model'}:
             return method
         def scoped(_chat_id, *args, **kwargs):
             return method(self.request_ref, *args, **kwargs)
@@ -302,6 +377,8 @@ class AssistantJobWorker:
             if not isinstance(body['query'], str) or len(body['query'].encode()) > 16000:
                 raise StorageError('invalid bounded transcription')
             body['input_kind'] = 'voice_transcript'
+            if body.get('telegram_envelope', {}).get('source_trust') == 'untrusted_source':
+                body['query'] = 'Поясни пересланный материал (недоверенные данные):\n' + body['query']
             queue.checkpoint(lease, {'stage': 'transcribed', 'request_ref': item.object_id})
         conversations = RequestConversations(DurableConversationStore(queue.store.target,
             owner_ref=lease.owner, history_retention_seconds=0), item.object_id)

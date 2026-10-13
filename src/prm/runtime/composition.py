@@ -20,7 +20,7 @@ class AssistantRuntime:
                  archive_resource_ref='resource_archive',
                  public_web_bounds=None,public_search_ref='resource_public_search',public_fetch_ref='resource_public_primary',public_upper_bound=None,
                  tariff_version=None,
-                 public_web_provider=None,deep_archive_reader=None,github_context_provider=None):
+                 public_web_provider=None,deep_archive_reader=None,github_context_provider=None,bot_ref='bot_default'):
         if registry.store.target!=target:raise StorageError('one shared runtime policy backend required')
         self.queue=JobQueue(target);self.settings=settings;self.owner_ref=owner_ref;self.owner_chat_id=owner_chat_id
         from prm.briefs import brief_owner_ref_from_authenticated_private_tuple
@@ -32,14 +32,23 @@ class AssistantRuntime:
         self.tariff_version=tariff_version
         self.archive_resource_ref=archive_resource_ref
         self.public_web_bounds=public_web_bounds;self.public_search_ref=public_search_ref;self.public_fetch_ref=public_fetch_ref;self.public_upper_bound=public_upper_bound
+        self._conversation_context = ContextVar('pa_reply_conversation', default=None)
         self.conversations=DurableConversationStore(target,owner_ref=owner_ref,history_retention_seconds=history_retention_seconds)
         from prm.storage.briefs import DurableBriefStore
         self.briefs=DurableBriefStore(target,owner_ref=owner_ref)
         self.public_web_provider=public_web_provider;self.deep_archive_reader=deep_archive_reader;self.github_context_provider=github_context_provider
-        self.ingress=TelegramJobIngress(self.queue,owner_ref=owner_ref,owner_chat_id=owner_chat_id)
+        self.ingress=TelegramJobIngress(self.queue,owner_ref=owner_ref,owner_chat_id=owner_chat_id,bot_ref=bot_ref)
         self.ingress.durable_results=True
         # Queue fencing stops this job. Cancelling it must preserve unrelated
         # focus, history and exact action confirmations in the shared dialogue.
+
+    @property
+    def conversations(self):
+        return self._conversation_context.get() or self._conversations
+
+    @conversations.setter
+    def conversations(self, value):
+        self._conversations = value
 
     def endpoint_for(self,role):
         profiles=getattr(self,'model_profile_registry',None)
@@ -86,8 +95,23 @@ class AssistantRuntime:
 
     def answer(self,request:OperatorRequest,*,request_ref,lease=None):
         marker=self.task_context.set(request_ref)
-        try:return self._answer(request,request_ref=request_ref,lease=lease)
-        finally:self.task_context.reset(marker)
+        conversation_marker = None
+        try:
+            if lease is not None:
+                with self.queue.store.transaction() as tx:
+                    body = self.queue._input(tx, self.owner_ref, lease.payload).payload
+                parent = body.get('reply_target')
+                if parent:
+                    if request.query.strip().casefold() in {'да', 'yes', 'подтверждаю'} or request.query.startswith('/actconfirm'):
+                        from prm.contracts import AssistantResult
+                        return AssistantResult(request_ref, 'confirmation_unavailable', 'chat', 'Reply на старый результат не подтверждает действие. Нужен текущий полностью показанный предпросмотр.')
+                    self._conversations.fork_result_context(request_ref, parent['result_ref'], parent['result_version'])
+                    from .ingress import RequestConversations
+                    conversation_marker = self._conversation_context.set(RequestConversations(self._conversations, request_ref))
+            return self._answer(request,request_ref=request_ref,lease=lease)
+        finally:
+            if conversation_marker is not None: self._conversation_context.reset(conversation_marker)
+            self.task_context.reset(marker)
 
     def _answer(self,request:OperatorRequest,*,request_ref,lease=None):
         if (request.chat_id,request.actor_id,request.owner_chat_id)!=(self.owner_chat_id,)*3:
@@ -130,7 +154,8 @@ class AssistantRuntime:
             resolution=self.conversations.resolve_plain_yes(request.chat_id,actor_id=request.actor_id,owner_chat_id=request.owner_chat_id,proposal_versions=versions)
             if resolution.status=='resolved':
                 with self.queue.store.transaction() as tx:
-                    visible=tx.conn.execute("SELECT 1 FROM pa_jobs.jobs j JOIN pa_delivery.attempts a ON a.owner=j.owner AND a.id='answer_'||j.id WHERE j.owner=%s AND a.status='sent' AND j.result_ref IS NOT NULL AND EXISTS(SELECT 1 FROM pa_runtime.object_versions v WHERE v.owner=j.owner AND v.namespace='result' AND v.object_id=j.result_ref AND v.payload->'payload'->>'proposal_ref'=%s AND v.payload->'payload'->>'version'=%s) LIMIT 1",(self.owner_ref,resolution.confirmation_ref.proposal_ref,resolution.confirmation_ref.proposal_version)).fetchone()
+                    from psycopg.types.json import Jsonb
+                    visible=tx.conn.execute("SELECT 1 FROM pa_jobs.jobs j JOIN pa_delivery.attempts a ON a.owner=j.owner AND a.id='answer_'||j.id WHERE j.owner=%s AND a.status='sent' AND ((a.payload->'telegram_destination'=%s) OR (NOT (a.payload ? 'telegram_destination') AND %s)) AND j.result_ref IS NOT NULL AND EXISTS(SELECT 1 FROM pa_runtime.object_versions v WHERE v.owner=j.owner AND v.namespace='result' AND v.object_id=j.result_ref AND v.payload->'payload'->>'proposal_ref'=%s AND v.payload->'payload'->>'version'=%s) LIMIT 1",(self.owner_ref,Jsonb(asdict(self.ingress.telegram_destination)),self.ingress.telegram_destination.bot_ref=='bot_default',resolution.confirmation_ref.proposal_ref,resolution.confirmation_ref.proposal_version)).fetchone()
                 if visible is None:return AssistantResult(request_ref,'confirmation_unavailable','chat','Подтверждение будет доступно после доставки полного текущего предпросмотра.')
                 if confirm_text in action_label:
                     with self.queue.store.transaction() as tx:
@@ -275,12 +300,14 @@ class AssistantRuntime:
         if state is None or not state.object_refs:return None
         from prm.conversation import CONVERSATION_TTL
         with self.queue.store.transaction() as tx:
+            from psycopg.types.json import Jsonb
             row=tx.conn.execute("""SELECT v.payload->'payload'->>'receipt_ref' AS receipt FROM pa_runtime.object_versions v
                 JOIN pa_jobs.jobs j ON j.owner=v.owner AND j.result_ref=v.object_id
                 JOIN pa_delivery.attempts a ON a.owner=j.owner AND a.id='answer_'||j.id AND a.status='sent'
                 WHERE v.owner=%s AND v.namespace='result' AND v.version=1 AND v.payload->'payload' ? 'receipt_ref'
+                AND ((a.payload->'telegram_destination'=%s) OR (NOT (a.payload ? 'telegram_destination') AND %s))
                 AND (v.payload->'payload'->'conversation'->'response_refs') ? %s
-                AND v.created_at>=%s ORDER BY v.created_at DESC LIMIT 1""",(self.owner_ref,state.object_refs[0].response_ref,state.expires_at-CONVERSATION_TTL)).fetchone()
+                AND v.created_at>=%s ORDER BY v.created_at DESC LIMIT 1""",(self.owner_ref,Jsonb(asdict(self.ingress.telegram_destination)),self.ingress.telegram_destination.bot_ref=='bot_default',state.object_refs[0].response_ref,state.expires_at-CONVERSATION_TTL)).fetchone()
         receipt=self.actions.store.get(row['receipt']) if row else None
         if receipt and state.current_confirmation_ref and receipt.proposal_ref!=state.current_confirmation_ref.proposal_ref:return None
         return receipt
@@ -439,7 +466,7 @@ def runtime_from_config(config,*,target,settings):
     validate_runtime_config(config)
     from prm.storage.policy import DurableCapabilityRegistry
     allowed={'owner_ref','owner_chat_id','budget_refs','job_budget','model','model_upper_bound','history_retention_seconds','model_resource_ref','archive_resource_ref',
-             'public_web','public_upper_bound','public_search_ref','public_fetch_ref','tariff_version','graph','github','canvas','artifact_root','media_root','local_services','speech','vision','delivery','media_download','model_profiles','quality_profile'}
+             'public_web','public_upper_bound','public_search_ref','public_fetch_ref','tariff_version','graph','github','canvas','artifact_root','media_root','local_services','speech','vision','delivery','media_download','model_profiles','quality_profile','bot_ref'}
     if not isinstance(config,dict) or set(config)-allowed or not {'owner_ref','owner_chat_id','budget_refs','job_budget'}<=set(config):
         raise StorageError('explicit complete runtime configuration required')
     registry=DurableCapabilityRegistry(target,budget_refs=tuple(config['budget_refs']),job_budget=config['job_budget'])
@@ -574,7 +601,7 @@ def runtime_from_config(config,*,target,settings):
         from .delivery import DeliveryExecutor
         value=dict(config['delivery']);key_ref=value.pop('token_env');upper=value.pop('upper_bound')
         if not key_ref.startswith('PAI_'):raise StorageError('explicit bot credential reference required')
-        root.delivery=DeliveryExecutor(target,registry=registry,sender=BoundedTelegramSender(token=os.environ[key_ref],owner_chat_id=root.owner_chat_id,**value))
+        root.delivery=DeliveryExecutor(target,registry=registry,sender=BoundedTelegramSender(token=os.environ[key_ref],owner_chat_id=root.owner_chat_id,bot_ref=root.ingress.telegram_destination.bot_ref,**value))
         root.ingress.delivery_executor=root.delivery;root.ingress.delivery_upper_bound=upper;root.ingress.destination_ref=value['destination_ref']
     if config.get('media_download'):
         from .media_download import TelegramMediaDownloader

@@ -15,7 +15,7 @@ RUNTIME_FIELDS = frozenset({'owner_ref', 'owner_chat_id', 'budget_refs', 'job_bu
     'model_upper_bound', 'history_retention_seconds', 'model_resource_ref', 'archive_resource_ref',
     'public_web', 'public_upper_bound', 'public_search_ref', 'public_fetch_ref', 'tariff_version',
     'graph', 'github', 'canvas', 'artifact_root', 'media_root', 'local_services', 'speech', 'vision',
-    'delivery', 'media_download', 'model_profiles', 'quality_profile'})
+    'delivery', 'media_download', 'model_profiles', 'quality_profile', 'bot_ref'})
 REQUIRED = frozenset({'owner_ref', 'owner_chat_id', 'budget_refs', 'job_budget'})
 MODEL_FIELDS = frozenset({'provider_ref', 'connection_ref', 'endpoint', 'model', 'token_env', 'timeout_seconds', 'synthetic_http'})
 SECRET_FIELDS = frozenset({'token', 'password', 'api_key', 'access_token', 'refresh_token', 'encryption_key', 'client_secret'})
@@ -115,6 +115,8 @@ def validate_runtime_config(config: dict) -> None:
     if type(retention) is not int or not 0 <= retention <= 30 * 86400: raise StorageError('invalid history retention')
     if config.get('quality_profile', 'balanced') not in {'economical', 'balanced', 'maximum'}:
         raise StorageError('invalid quality profile')
+    if 'bot_ref' in config and (not _reference(config['bot_ref']) or not config['bot_ref'].startswith('bot_')):
+        raise StorageError('invalid bot reference')
     for key in ('model_resource_ref', 'archive_resource_ref', 'public_search_ref', 'public_fetch_ref', 'tariff_version'):
         if key in config and not _reference(config[key]): raise StorageError('invalid runtime reference')
     for key in ('model_upper_bound', 'public_upper_bound'):

@@ -1,6 +1,6 @@
 """Persist the existing dialogue semantics; navigation and immutable results are separate."""
 from __future__ import annotations
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from datetime import datetime,timedelta
 from functools import wraps
 import hashlib
@@ -60,6 +60,33 @@ class DurableConversationStore(ConversationStore):
     def _lock(self,conn,conversation_id):
         value=int.from_bytes(hashlib.sha256((self.owner_ref+'\x1f'+conversation_id).encode()).digest()[:8],'big')%(2**63)
         conn.execute('SELECT pg_advisory_xact_lock(%s)',(value,))
+
+    def fork_result_context(self, request_ref, result_ref, result_version):
+        """Seed an explicit reply context without replacing the shared focus.
+
+        Only immutable owner-bound result content is copied; confirmations and
+        unrelated history are never inherited by a reply to an older answer.
+        """
+        from prm.runtime.deletion import lineage_lock
+        conversation_id = conversation_id_for(request_ref)
+        with self.store.transaction() as tx:
+            lineage_lock(tx.conn, self.owner_ref); self._lock(tx.conn, conversation_id)
+            existing = tx.conn.execute('SELECT * FROM pa_conversation.states WHERE owner=%s AND id=%s', (self.owner_ref, conversation_id)).fetchone()
+            parent = tx.get(self.owner_ref, 'result', result_ref, version=result_version)
+            if parent is None: raise StorageError('reply result version unavailable')
+            now = tx.conn.execute('SELECT clock_timestamp() AS now').fetchone()['now']
+            if existing and existing['expires'] > now: return self._decode(tx, existing['payload'])
+            local = ConversationStore()
+            state = local.record_response(request_ref, text=parent.payload['text'], item_texts=tuple(parent.payload['text'].splitlines()[:8]), now=now)
+            self._save(tx, state, existing['version'] if existing else None)
+            response_ref = state.object_refs[0].response_ref
+            if tx.conn.execute("SELECT to_regclass('pa_memory.dependencies') AS meta").fetchone()['meta'] is not None:
+                for namespace, ref in (('result', response_ref), ('conversation', request_ref)):
+                    tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',
+                        (self.owner_ref, 'result', result_ref, namespace, ref))
+        self.record_origin(response_ref, parent.payload.get('data_classes', (parent.payload.get('data_class', 'private_archive'),)),
+            source_scopes=parent.payload.get('payload', {}).get('source_scopes', ()), parent_response_ref=result_ref)
+        return state
     def _decode(self,tx,payload):
         data=dict(payload);objects=[]
         for ref in data['object_refs']:

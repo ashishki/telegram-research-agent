@@ -83,6 +83,13 @@ class JobQueue:
     def _input(self,tx,owner,payload):
         item=tx.get(owner,payload['input_namespace'],payload['input_ref'],version=payload['input_version'])
         if not item or item.digest!=payload['input_digest']:raise StorageError('job input identity/version/digest unavailable')
+        if item.payload.get('telegram_envelope') or item.payload.get('reply_target'):
+            from .telegram import TelegramBindings
+            from prm.telegram_contracts import TelegramDestination
+            metadata = item.payload.get('telegram_envelope', {})
+            route = metadata.get('destination', {})
+            if not isinstance(route, dict) or not route.get('chat_id'): raise StorageError('typed Telegram input route unavailable')
+            TelegramBindings(self, owner=owner, destination=TelegramDestination(**route)).request_current_in(tx, item)
         return item
     def enqueue_in(self,tx,*,owner,idempotency_key,payload,deadline,kind='compute.digest',mode='compute',priority=0,max_attempts=3):
         _check(tx.conn);_ref(owner);_ref(idempotency_key);payload=_payload(payload)
