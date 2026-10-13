@@ -230,6 +230,7 @@ def execute_public_web_research(
             "gaps": list(dict.fromkeys(gaps)),
         },
         "conflicts": conflicts,
+        "source_batch": _source_batch_metadata(access, bounds, fetched, "bounded_public_discovery"),
     }
 
 
@@ -282,6 +283,7 @@ def _result(
             "provider_adapter_supplied": provider_supplied,
             "bounds_configured": bounds is not None,
         },
+        "source_batch": _source_batch_metadata(access, bounds, [], status),
         "write_performed": False,
     }
 
@@ -416,6 +418,8 @@ def _fetch_candidate(provider: PublicWebProvider, candidate: Mapping[str, Any], 
         "source_url": source_url,
         "final_url": final_url,
         "source_kind": "public_web",
+        "publication_time": _timestamp(raw.get("published_at")),
+        "modified_time": _timestamp(headers.get("last-modified")),
         "source_group_id": str(source.hostname or "").casefold(),
         "status": "fetched",
         "coverage": "fetched_primary_source",
@@ -657,3 +661,13 @@ def _bounded(value: object, limit: int) -> str:
 
 def _now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _source_batch_metadata(access, bounds, fetched, reason):
+    from prm.source_contracts import SourceResource,SourceBatch
+    selected=[dict(item,source_version=item.get('content_hash')) for item in fetched if item.get('status')=='fetched']
+    resource=SourceResource(access.owner_ref if type(access)is PublicWebAccess else None,
+        access.fetch_resource_ref if type(access)is PublicWebAccess else 'resource_public_unselected','web','public')
+    batch=SourceBatch.from_items(selected,resource,checked_at=datetime.now(timezone.utc) if selected else None,
+        completeness='partial' if selected else 'unavailable',reason=reason)
+    return batch.metadata()

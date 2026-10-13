@@ -5,7 +5,7 @@ from contextvars import ContextVar
 import hashlib
 
 from prm.application import PersonalResearchAssistant
-from prm.capabilities import AuthorizationRequest
+from prm.capabilities import AuthorizationRequest,CapabilityDenied
 from prm.contracts import OperatorRequest
 from prm.storage.conversations import DurableConversationStore
 from prm.storage.jobs import JobQueue
@@ -20,7 +20,7 @@ class AssistantRuntime:
                  archive_resource_ref='resource_archive',
                  public_web_bounds=None,public_search_ref='resource_public_search',public_fetch_ref='resource_public_primary',public_upper_bound=None,
                  tariff_version=None,
-                 public_web_provider=None,deep_archive_reader=None,github_context_provider=None,bot_ref='bot_default'):
+                 public_web_provider=None,deep_archive_reader=None,github_context_provider=None,bot_ref='bot_default',intent_planner=False,planner_upper_bound=None):
         if registry.store.target!=target:raise StorageError('one shared runtime policy backend required')
         self.queue=JobQueue(target);self.settings=settings;self.owner_ref=owner_ref;self.owner_chat_id=owner_chat_id
         from prm.briefs import brief_owner_ref_from_authenticated_private_tuple
@@ -39,6 +39,10 @@ class AssistantRuntime:
         self.public_web_provider=public_web_provider;self.deep_archive_reader=deep_archive_reader;self.github_context_provider=github_context_provider
         self.ingress=TelegramJobIngress(self.queue,owner_ref=owner_ref,owner_chat_id=owner_chat_id,bot_ref=bot_ref)
         self.ingress.durable_results=True
+        from .focus import FocusStore
+        self.focus=FocusStore(self);self.ingress.focus_store=self.focus;self.queue.focus_store=self.focus
+        from .intent_planner import ScopedIntentPlanner
+        self.intent_planner=ScopedIntentPlanner(self,upper_bound=planner_upper_bound) if intent_planner else None
         # Queue fencing stops this job. Cancelling it must preserve unrelated
         # focus, history and exact action confirmations in the shared dialogue.
 
@@ -94,20 +98,31 @@ class AssistantRuntime:
         return AssistantResult(request_ref,value['status'],'research',value['text'],payload={**value,'source_data_class':'user_provided'})
 
     def answer(self,request:OperatorRequest,*,request_ref,lease=None):
+        if (request.chat_id,request.actor_id,request.owner_chat_id)!=(self.owner_chat_id,)*3 or lease is not None and lease.owner!=self.owner_ref:
+            raise StorageError('runtime request must preserve exact private owner')
         marker=self.task_context.set(request_ref)
         conversation_marker = None
+        ticket=self.focus.ticket(request_ref) if lease is not None else None
         try:
             if lease is not None:
                 with self.queue.store.transaction() as tx:
                     body = self.queue._input(tx, self.owner_ref, lease.payload).payload
+                from .focus import FencedConversations
+                conversation_marker=self._conversation_context.set(FencedConversations(self,request_ref,lease))
                 parent = body.get('reply_target')
+                if ticket and ticket.get('isolated') and ticket.get('target'):parent=ticket['target']
                 if parent:
                     if request.query.strip().casefold() in {'да', 'yes', 'подтверждаю'} or request.query.startswith('/actconfirm'):
                         from prm.contracts import AssistantResult
                         return AssistantResult(request_ref, 'confirmation_unavailable', 'chat', 'Reply на старый результат не подтверждает действие. Нужен текущий полностью показанный предпросмотр.')
+                    if ticket:
+                        try:self.focus.resolve(ticket,guard=lambda:None)
+                        except (StorageError,CapabilityDenied):
+                            from .conversation_plan import clarification
+                            return clarification(request_ref,'source_unavailable')
                     self._conversations.fork_result_context(request_ref, parent['result_ref'], parent['result_version'])
                     from .ingress import RequestConversations
-                    conversation_marker = self._conversation_context.set(RequestConversations(self._conversations, request_ref))
+                    self._conversation_context.set(RequestConversations(self._conversations, request_ref))
             return self._answer(request,request_ref=request_ref,lease=lease)
         finally:
             if conversation_marker is not None: self._conversation_context.reset(conversation_marker)
@@ -166,6 +181,12 @@ class AssistantRuntime:
                 receipt=self.actions.confirm_and_execute(resolution.confirmation_ref.proposal_ref,actor_ref=self.owner_ref)
                 return self.remember_action_outcome(request,request_ref,receipt,self.action_code(receipt))
             return AssistantResult(request_ref,'confirmation_unavailable','chat','Для подтверждения нужен один текущий видимый предпросмотр с точной версией.')
+        from prm.contracts import AssistantResult
+        from .conversation_plan import apply_conversation_plan
+        planned=apply_conversation_plan(self,request,intent,request_ref=request_ref,lease=lease,guard=guard)
+        if isinstance(planned,AssistantResult):return planned
+        if planned is not None:
+            request,intent=planned
         if request.query.startswith('/deep '):
             import json
             from .research import DurableResearchWorker
@@ -466,7 +487,7 @@ def runtime_from_config(config,*,target,settings):
     validate_runtime_config(config)
     from prm.storage.policy import DurableCapabilityRegistry
     allowed={'owner_ref','owner_chat_id','budget_refs','job_budget','model','model_upper_bound','history_retention_seconds','model_resource_ref','archive_resource_ref',
-             'public_web','public_upper_bound','public_search_ref','public_fetch_ref','tariff_version','graph','github','canvas','artifact_root','media_root','local_services','speech','vision','delivery','media_download','model_profiles','quality_profile','bot_ref'}
+             'public_web','public_upper_bound','public_search_ref','public_fetch_ref','tariff_version','graph','github','canvas','artifact_root','media_root','local_services','speech','vision','delivery','media_download','model_profiles','quality_profile','bot_ref','intent_planner','planner_upper_bound'}
     if not isinstance(config,dict) or set(config)-allowed or not {'owner_ref','owner_chat_id','budget_refs','job_budget'}<=set(config):
         raise StorageError('explicit complete runtime configuration required')
     registry=DurableCapabilityRegistry(target,budget_refs=tuple(config['budget_refs']),job_budget=config['job_budget'])

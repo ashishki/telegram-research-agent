@@ -201,6 +201,7 @@ class TelegramJobIngress:
             item = item or tx.put(self.owner_ref, 'conversation', request_ref, body, expected_version=0)
             if source_ref: self.bindings._dependency(tx, source_ref, request_ref)
             if body.get('reply_target'): self.bindings._dependency(tx, body['reply_target']['result_ref'], request_ref, 'result')
+            if getattr(self,'focus_store',None) is not None:self.focus_store.admit_in(tx,request_ref,body)
             payload = {'schema_version': 1, 'input_namespace': 'conversation', 'input_ref': request_ref,
                        'input_version': 1, 'input_digest': item.digest, 'connection_ref': None,
                        'resource_ref': 'resource_local_request', 'purpose': 'local.assistant', 'consent_revision': 1}

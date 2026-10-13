@@ -262,3 +262,6 @@ class AssistantResult:
             "final_answer_verification": dict(self.final_answer_verification),
             "route": dict(self.route),
         }
+
+# Source observations are additive; they never replace access/reservation carriers.
+from prm.source_contracts import SourceResource, SourceRecord, SourceBatch, EvidenceBundle

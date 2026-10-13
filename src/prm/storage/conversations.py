@@ -77,7 +77,10 @@ class DurableConversationStore(ConversationStore):
             now = tx.conn.execute('SELECT clock_timestamp() AS now').fetchone()['now']
             if existing and existing['expires'] > now: return self._decode(tx, existing['payload'])
             local = ConversationStore()
-            state = local.record_response(request_ref, text=parent.payload['text'], item_texts=tuple(parent.payload['text'].splitlines()[:8]), now=now)
+            text=parent.payload.get('text',parent.payload.get('display_text'))
+            if not isinstance(text,str):raise StorageError('read target has no immutable text')
+            items=parent.payload.get('item_texts') or tuple(text.splitlines()[:8])
+            state = local.record_response(request_ref, text=text, item_texts=tuple(items), now=now)
             self._save(tx, state, existing['version'] if existing else None)
             response_ref = state.object_refs[0].response_ref
             if tx.conn.execute("SELECT to_regclass('pa_memory.dependencies') AS meta").fetchone()['meta'] is not None:
@@ -119,26 +122,28 @@ class DurableConversationStore(ConversationStore):
                 WHERE owner=%s AND id=%s AND version=%s RETURNING id''',(state.expires_at,Jsonb(payload),self.owner_ref,state.conversation_id,old_version)).fetchone()
             if not changed:raise StateConflict('dialogue version changed')
     def _run(self,method,chat_id,*args,**kwargs):
+        with self.store.transaction() as tx:return self._run_in(tx,method,chat_id,*args,**kwargs)
+
+    def _run_in(self,tx,method,chat_id,*args,**kwargs):
         conversation_id=conversation_id_for(chat_id)
-        with self.store.transaction() as tx:
-            _check(tx.conn);self._lock(tx.conn,conversation_id)
-            now=tx.conn.execute('SELECT clock_timestamp() AS now').fetchone()['now']
-            row=tx.conn.execute('SELECT * FROM pa_conversation.states WHERE owner=%s AND id=%s FOR UPDATE',(self.owner_ref,conversation_id)).fetchone()
-            local=ConversationStore()
-            if row and row['expires']>now:local._states[conversation_id]=self._decode(tx,row['payload'])
-            kwargs['now']=now
-            result=getattr(local,method)(chat_id,*args,**kwargs)
-            state=local._states.get(conversation_id)
-            if state and method not in {'load','resolve_plain_yes','is_cancelled'}:
-                self._save(tx,state,row['version'] if row else None)
-                if method=='record_response' and self.history_retention_seconds:
-                    text=str(kwargs.get('text',''))[:2400]
-                    tx.conn.execute('INSERT INTO pa_conversation.history(owner,conversation_id,id,expires,payload) VALUES(%s,%s,%s,%s,%s)',
-                        (self.owner_ref,conversation_id,uuid.uuid4().hex,now+timedelta(seconds=self.history_retention_seconds),
-                         Jsonb({'role':'assistant','text':text,'response_ref':state.object_refs[0].response_ref})))
-            elif row and not state:
-                tx.conn.execute('DELETE FROM pa_conversation.states WHERE owner=%s AND id=%s',(self.owner_ref,conversation_id))
-            return result
+        _check(tx.conn);self._lock(tx.conn,conversation_id)
+        now=tx.conn.execute('SELECT clock_timestamp() AS now').fetchone()['now']
+        row=tx.conn.execute('SELECT * FROM pa_conversation.states WHERE owner=%s AND id=%s FOR UPDATE',(self.owner_ref,conversation_id)).fetchone()
+        local=ConversationStore()
+        if row and row['expires']>now:local._states[conversation_id]=self._decode(tx,row['payload'])
+        kwargs['now']=now
+        result=getattr(local,method)(chat_id,*args,**kwargs)
+        state=local._states.get(conversation_id)
+        if state and method not in {'load','resolve_plain_yes','is_cancelled'}:
+            self._save(tx,state,row['version'] if row else None)
+            if method=='record_response' and self.history_retention_seconds:
+                text=str(kwargs.get('text',''))[:2400]
+                tx.conn.execute('INSERT INTO pa_conversation.history(owner,conversation_id,id,expires,payload) VALUES(%s,%s,%s,%s,%s)',
+                    (self.owner_ref,conversation_id,uuid.uuid4().hex,now+timedelta(seconds=self.history_retention_seconds),
+                     Jsonb({'role':'assistant','text':text,'response_ref':state.object_refs[0].response_ref})))
+        elif row and not state:
+            tx.conn.execute('DELETE FROM pa_conversation.states WHERE owner=%s AND id=%s',(self.owner_ref,conversation_id))
+        return result
     def cancel_request(self,request_id,*,now=None):
         with self.store.transaction() as tx:
             _check(tx.conn)

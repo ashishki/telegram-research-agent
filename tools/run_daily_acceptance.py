@@ -8,7 +8,8 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 TESTS = ('tests/test_daily_entrypoint.py', 'tests/test_daily_controls.py', 'tests/test_daily_dispatch.py',
          'tests/test_daily_telegram_routes.py', 'tests/test_daily_telegram_transport.py',
-         'tests/test_daily_model_protocols.py', 'tests/test_daily_eval_manifest.py')
+         'tests/test_daily_model_protocols.py', 'tests/test_daily_eval_manifest.py',
+         'tests/test_daily_conversation.py', 'tests/test_daily_coverage.py')
 
 
 def main():

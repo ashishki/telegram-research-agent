@@ -232,10 +232,17 @@ class GraphMailAdapter:
         with self.store.transaction() as tx:
             account=tx.conn.execute('SELECT status FROM pa_connections.accounts WHERE owner=%s AND id=%s',(self.transport.owner_ref,self.transport.connection_ref)).fetchone()
             if not account or account['status']!='connected':raise CapabilityDenied('mail connection revoked')
-            rows=tx.conn.execute("SELECT payload FROM pa_sources.items WHERE owner=%s AND connection_ref=%s AND kind='mail' AND NOT deleted AND payload->>'scope_digest'=%s ORDER BY updated_at DESC LIMIT %s",
+            rows=tx.conn.execute("SELECT payload,version FROM pa_sources.items WHERE owner=%s AND connection_ref=%s AND kind='mail' AND NOT deleted AND payload->>'scope_digest'=%s ORDER BY updated_at DESC LIMIT %s",
                                 (self.transport.owner_ref,self.transport.connection_ref,selection.scope_digest,selection.max_items)).fetchall()
-        items=[row['payload'] for row in rows]
-        return {'text':'\n'.join(str(item.get('subject','Без темы'))+' — '+str(item.get('webLink','')) for item in items[:10]) or 'В выбранном покрытии писем нет.',
+        items=[{**row['payload'],'source_version':row['version'],'publication_time':None,'event_time':row['payload'].get('receivedDateTime')} for row in rows]
+        with self.store.transaction() as tx:
+            state=tx.conn.execute("SELECT completed,updated_at FROM pa_sources.sync WHERE owner=%s AND connection_ref=%s AND kind='mail' AND scope_digest=%s",(self.transport.owner_ref,self.transport.connection_ref,selection.scope_digest)).fetchone()
+            total=tx.conn.execute("SELECT count(*) AS n FROM pa_sources.items WHERE owner=%s AND connection_ref=%s AND kind='mail' AND NOT deleted AND payload->>'scope_digest'=%s",(self.transport.owner_ref,self.transport.connection_ref,selection.scope_digest)).fetchone()['n']
+        from prm.source_contracts import SourceResource,SourceBatch
+        resource=SourceResource(self.transport.owner_ref,selection.resource_ref,'mail','private_connector_metadata',connection_ref=self.transport.connection_ref,account_ref=self.transport.account_ref,scope_digest=selection.scope_digest)
+        complete=bool(state and state['completed'] and total==len(items))
+        batch=SourceBatch.from_items(items,resource,checked_at=state['updated_at'] if state else None,completeness='complete' if complete else 'partial',omitted_count=total-len(items),reason=None if complete else 'cache_or_enumeration_limit')
+        return {'source_batch':batch.metadata(),'text':'\n'.join(str(item.get('subject','Без темы'))+' — '+str(item.get('webLink','')) for item in items[:10]) or 'В выбранном покрытии писем нет.',
                 'items':items,'limitation':'Metadata does not prove reply obligation, deadline or body content. Exact wider scope is required when insufficient.'}
     def read_message(self,selection,message_ref):
         if selection.provider_id!='provider_microsoft_graph' or len(selection.folders)!=1 or not isinstance(message_ref,str) or not 0<len(message_ref)<=256:
@@ -287,8 +294,12 @@ class GraphMailAdapter:
                 'source_url':item.get('webLink') or 'https://graph.microsoft.com/v1.0/me/messages/'+quote(item['id'],safe=''),
                 'title':item.get('subject') or 'Письмо','support_span':item.get('subject') or 'Письмо без темы',
                 'posted_at':item['receivedDateTime'],'local_source_provenance':True,'source_kind':'mail',
-                'source_owner_ref':self.transport.owner_ref,'importance':'medium','source_state':'active'})
-        return output
+                'source_owner_ref':self.transport.owner_ref,'importance':'medium','source_state':'active',
+                'source_version':item.get('source_version'),'publication_time':None,'event_time':item['receivedDateTime']})
+        from prm.source_contracts import SourceResource,SourceBatch
+        metadata=summary['source_batch'];resource=SourceResource(**metadata['selected_resources'][0])
+        return SourceBatch.from_items(output,resource,checked_at=datetime.fromisoformat(metadata['checked_at']) if metadata['checked_at'] else None,
+            completeness=metadata['completeness'],omitted_count=metadata['omitted_count'],reason=metadata['reason'])
 
 
 class GraphCalendarAdapter:

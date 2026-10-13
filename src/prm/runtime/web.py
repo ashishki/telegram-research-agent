@@ -109,5 +109,9 @@ class GitHubReadProvider:
                     'source_url':'https://github.com/'+repository_ref+'/blob/'+sha+'/'+path,'blob_sha':document.get('sha')})
             except (CapabilityDenied,StorageError):raise
             except Exception:gaps.append('unavailable:'+path)
-        return {'repository_ref':repository_ref,'requested_ref':self.ref,'observed_ref':sha,'ref':sha,'items':items,'gaps':gaps,
+        from datetime import datetime,timezone
+        from prm.source_contracts import SourceResource,SourceBatch
+        scope=hashlib.sha256(json.dumps([sha,self.paths]).encode()).hexdigest()
+        batch=SourceBatch.from_items(items,SourceResource(self.owner_ref,self.repository_ref,'github','public',scope_digest=scope),checked_at=datetime.now(timezone.utc),completeness='partial' if gaps else 'complete',omitted_count=len(gaps),reason='selected_paths_unavailable' if gaps else None)
+        return {'source_batch':batch.metadata(),'repository_ref':repository_ref,'requested_ref':self.ref,'observed_ref':sha,'ref':sha,'items':items,'gaps':gaps,
                 'status':'partial' if gaps else 'read','read_only':True}

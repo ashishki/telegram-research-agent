@@ -24,7 +24,8 @@ class BriefRuntime:
     def build(self,*,topic,timezone_name,end_at=None,previous_document=None,comparison_document=None):
         zone=ZoneInfo(timezone_name);end=(end_at or datetime.now(timezone.utc)).astimezone(zone)
         window=BriefWindow(timezone_name,end-timedelta(days=7),end,datetime.now(timezone.utc))
-        evidence=[];coverage=[];limits=[];used_scopes=[]
+        from prm.source_contracts import SourceResource,SourceBatch,EvidenceBundle,normalize_source_batch
+        evidence=[];coverage=[];limits=[];used_scopes=[];batches=[]
         for hook in self.source_hooks:
             if hook.authorization_request.owner_ref!=self.root.owner_ref or hook.authorization_request.resource_ref!=hook.source_ref:
                 raise StorageError('Brief hook source scope differs')
@@ -33,26 +34,41 @@ class BriefRuntime:
             if not decision.allowed:
                 coverage.append(CoverageSource(hook.source_ref,'unavailable','scope denied'));continue
             try:
-                batch=self.root.registry.execute_reserved((decision.reservation,),lambda:hook.collector(window))
-                if not isinstance(batch,(list,tuple)) or len(batch)>48:raise StorageError('Brief source batch exceeds bound')
+                observed=self.root.registry.execute_reserved((decision.reservation,),lambda:hook.collector(window))
+                resource=SourceResource(self.root.owner_ref,hook.source_ref,'archive' if hook.authorization_request.data_class=='private_archive' else 'local',hook.authorization_request.data_class,connection_ref=hook.authorization_request.connection_ref)
+                if type(observed)is SourceBatch:
+                    if any(r.owner_ref!=resource.owner_ref or r.resource_ref!=resource.resource_ref or r.connection_ref!=resource.connection_ref or r.data_class!=resource.data_class for r in observed.selected_resources):raise StorageError('Brief selected resource/owner differs')
+                    batch=observed
+                else:batch=normalize_source_batch(observed,resource,checked_at=datetime.now(timezone.utc))
+                batches.append(batch)
+                if any(item.get('source_data_class',resource.data_class)!=resource.data_class for item in batch):raise StorageError('collector cannot relabel source privacy')
                 if any(item.get('local_source_provenance') and item.get('source_owner_ref')!=self.root.owner_ref for item in batch):
                     raise StorageError('Brief personal source owner differs')
-                evidence.extend(batch);coverage.append(CoverageSource(hook.source_ref,'checked'))
+                evidence.extend(batch);coverage.append(CoverageSource(hook.source_ref,'checked' if batch.completeness=='complete' else 'partial',batch.reason))
                 if batch:used_scopes.append(asdict(replace(hook.authorization_request,operation_ref=None)))
             except Exception:
                 # Only a still-unprepared reservation can be abandoned. A
                 # possibly processed collector retains its unknown fence/cost.
                 decision.reservation.abandon_before_transport()
                 coverage.append(CoverageSource(hook.source_ref,'unavailable','collection unavailable'))
+        bundle=EvidenceBundle.select(tuple(batches),maximum_items=20) if batches else None
+        if bundle:
+            evidence=[r.payload for r in bundle.selected]
+            if bundle.model_omitted_count:
+                limits.append('model_packet_omitted:'+str(bundle.model_omitted_count))
+                coverage=[replace(c,state='partial',reason='model_packet_bounded') if c.state=='checked' else c for c in coverage]
+            if bundle.conflict_count:limits.append('conflicting_source_versions:'+str(bundle.conflict_count))
         if not self.source_hooks:limits.append('selected_sources_unavailable')
         request=BriefBuildRequest(topic,window,tuple(evidence[:48]),self.root.owner_ref,tuple(coverage),tuple(limits),
             previous_document=previous_document,comparison_document=comparison_document,period_basis='explicit_requested_range')
         document=build_brief_document(request)
-        classes={item.get('source_data_class','private_archive' if item.get('local_archive_provenance') else 'private_connector_metadata') for item in evidence[:48]}
+        classes={item.resource.data_class for item in bundle.selected} if bundle else set()
         if self.editorial is not None:
             editorial=self.editorial(document,data_classes=classes) if type(self.editorial)is RuntimeBriefEditorial else self.editorial(document)
             if editorial is not None:document=build_brief_document(replace(request,editorial=editorial))
         dependencies=[item['dependency_ref'] for item in evidence[:48] if item.get('dependency_ref')]
+        if not hasattr(self.root.briefs,'pending_coverage'):self.root.briefs.pending_coverage={}
+        self.root.briefs.pending_coverage[document.content_digest]=bundle.metadata() if bundle else {'schema_version':'assistant.evidence_bundle.v1','received_count':0,'candidate_count':0,'selected_count':0,'cited_count':None,'batches':[]}
         self.root.briefs.pending_dependencies[document.content_digest]=dependencies
         self.root.briefs.pending_classes[document.content_digest]=tuple(sorted(classes)) or ('user_provided',)
         self.root.briefs.pending_scopes[document.content_digest]=used_scopes
@@ -69,7 +85,7 @@ class BriefRuntime:
         classes=self.root.briefs.pending_classes.get(document.content_digest,('private_archive','private_connector_content'))
         refs=result.payload.get('conversation',{}).get('response_refs',())
         if refs:self.root.conversations.record_origin(refs[0],classes,source_scopes=self.root.briefs.pending_scopes.get(document.content_digest,()))
-        return replace(result,payload={**result.payload,'source_data_classes':list(classes),'source_data_class':classes[0],'source_scopes':self.root.briefs.pending_scopes.get(document.content_digest,[])})
+        return replace(result,payload={**result.payload,'source_data_classes':list(classes),'source_data_class':classes[0],'source_scopes':self.root.briefs.pending_scopes.get(document.content_digest,[]),'source_coverage':self.root.briefs.pending_coverage.get(document.content_digest)})
 
 
 class RuntimeBriefEditorial:

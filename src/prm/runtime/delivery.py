@@ -242,23 +242,8 @@ class DeliveryExecutor:
                 raise CapabilityDenied('delivery day changed after preparation')
 
     def _source_current(self,tx,owner,payload):
-        scopes=payload.get('source_scopes',())
-        if len(scopes)>16:raise StorageError('bounded delivery source scopes required')
-        requests=[AuthorizationRequest(**scope) for scope in scopes]
-        chosen=[]
-        for request in requests:
-            if request.owner_ref!=owner:raise CapabilityDenied('delivery source owner differs')
-            decision,_,_=self.registry._decision(tx.conn,request)
-            if not decision.allowed:raise CapabilityDenied('delivery source was revoked')
-            chosen.append(replace(request,grant_ref=decision.grant_ref,expected_grant_revision=decision.grant_revision))
-        ids=sorted({request.grant_ref for request in chosen})
-        if ids:tx.conn.execute('SELECT grant_id FROM pa_policy.grants WHERE owner=%s AND grant_id=ANY(%s) ORDER BY grant_id FOR SHARE',(owner,ids)).fetchall()
-        for request in chosen:
-            decision,_,_=self.registry._decision(tx.conn,request)
-            if not decision.allowed:raise CapabilityDenied('delivery source scope changed')
-        for connection in sorted({request.connection_ref for request in chosen if request.provider_ref=='provider_microsoft_graph' and request.connection_ref}):
-            row=tx.conn.execute('SELECT status FROM pa_connections.accounts WHERE owner=%s AND id=%s FOR SHARE',(owner,connection)).fetchone()
-            if not row or row['status']!='connected':raise CapabilityDenied('delivery source disconnected')
+        from .source_access import source_current
+        source_current(tx,self.registry,owner,payload.get('source_scopes',()))
 
     def _deliver(self, *, owner, delivery_id, kind, source_ref, destination_ref, payload, upper_bound, effect_lease=None):
         if not isinstance(destination_ref, str) or not 0 < len(destination_ref) <= 128:

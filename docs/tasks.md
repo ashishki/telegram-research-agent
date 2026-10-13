@@ -12,6 +12,14 @@ Historical PRM-SN/RFX/UTD task records are preserved byte-for-byte at `docs/task
 
 ## Local daily implementation — 2026-10-13
 
+Package 4: D04 + D10, base `62a2909`, local synthetic-only. One accumulated
+review covers focus admission/completion/lineage, request isolation and planner
+schema/scope/no-repeat, additive source contracts and archive/web/Brief/research/
+connector coverage. Acceptance registered before implementation:
+`PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python -m pytest -q tests/test_daily_conversation.py tests/test_daily_coverage.py`.
+Affected conversation/source/native guards are regression floors, no full history.
+No personal account, paid model, services/production or external effect scope.
+
 Package 3: D05 + D06, base `980087f`, local synthetic-only. One accumulated
 review covers model descriptor/transport, scoped accounting/no-repeat integration,
 frozen 20-case manifest, trace/verifier and affected native fixture tests.

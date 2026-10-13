@@ -80,7 +80,8 @@ class JobQueue:
     def __init__(self,target,*,admission_limit=100):
         if type(admission_limit)is not int or not 1<=admission_limit<=10000:raise StorageError('bounded admission required')
         self.store=PostgresStore(target);self.admission_limit=admission_limit
-    def _input(self,tx,owner,payload):
+    def _input(self,tx,owner,payload,_depth=0):
+        if _depth>4:raise StorageError('source parent chain exceeds bound')
         item=tx.get(owner,payload['input_namespace'],payload['input_ref'],version=payload['input_version'])
         if not item or item.digest!=payload['input_digest']:raise StorageError('job input identity/version/digest unavailable')
         if item.payload.get('telegram_envelope') or item.payload.get('reply_target'):
@@ -90,6 +91,10 @@ class JobQueue:
             route = metadata.get('destination', {})
             if not isinstance(route, dict) or not route.get('chat_id'): raise StorageError('typed Telegram input route unavailable')
             TelegramBindings(self, owner=owner, destination=TelegramDestination(**route)).request_current_in(tx, item)
+        parent=item.payload.get('source_parent')
+        if parent is not None:
+            if not isinstance(parent,dict) or set(parent)!={'input_namespace','input_ref','input_version','input_digest'} or parent['input_namespace']!='conversation':raise StorageError('typed source parent reference required')
+            self._input(tx,owner,parent,_depth+1)
         return item
     def enqueue_in(self,tx,*,owner,idempotency_key,payload,deadline,kind='compute.digest',mode='compute',priority=0,max_attempts=3):
         _check(tx.conn);_ref(owner);_ref(idempotency_key);payload=_payload(payload)
@@ -186,6 +191,7 @@ class JobQueue:
                     tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',
                         (lease.owner,'result',parent_ref,'result',ref))
             tx.conn.execute("UPDATE pa_jobs.jobs SET status='completed',result_ref=%s,token=NULL,lease_until=NULL WHERE owner=%s AND id=%s",(ref,lease.owner,lease.job_id))
+            if getattr(self,'focus_store',None) is not None:self.focus_store.complete_in(tx,lease,ref,result)
             return ref
     def cancel(self,*,owner,job_id):
         with self.store.transaction() as tx:
