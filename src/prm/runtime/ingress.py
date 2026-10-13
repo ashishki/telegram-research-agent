@@ -157,8 +157,13 @@ class TelegramJobIngress:
             body['original_text'] = raw_text
         else:
             return None
-        if len(body.get('query', '').encode('utf-8')) > 16000:
-            raise StorageError('request text exceeds its bound')
+        # The raw owner input retains its 16KiB bound. A fixed trusted wrapper
+        # for forwarded material has a separately bounded allowance, so a
+        # valid maximum-size forward cannot poison the polling cursor.
+        limit = 16200 if envelope.source_trust == 'untrusted_source' else 16000
+        if len(body.get('query', '').encode('utf-8')) > limit:
+            from prm.telegram_contracts import TelegramEnvelopeError
+            raise TelegramEnvelopeError('request text exceeds its bound')
         body.update({'chat_id': self.owner_chat_id, 'actor_id': self.owner_chat_id,
                      'owner_chat_id': self.owner_chat_id, 'schema_version': 1})
         body['telegram_envelope'] = asdict(envelope)

@@ -312,6 +312,14 @@ class DeliveryExecutor:
                     lineage_lock(tx.conn,owner)
                     current=tx.get(owner,'result',payload['result_ref'],version=1)
                     if current is None or current.digest!=payload['result_digest']:raise CapabilityDenied('answer deleted or changed before delivery')
+                    from prm.storage.jobs import JobQueue
+                    queue = JobQueue(self.store.target)
+                    source_job = tx.conn.execute('SELECT payload FROM pa_jobs.jobs WHERE owner=%s AND id=%s', (owner, source_ref)).fetchone()
+                    if source_job is None: raise CapabilityDenied('answer source job unavailable')
+                    # Validate the original compute input before every send,
+                    # including multipart/legacy senders. Hold this same
+                    # lineage transaction through the actual HTTP invocation.
+                    input_item = queue._input(tx, owner, source_job['payload'])
                 if kind == 'watch':
                     # Collection locks source grants before the subscription;
                     # use the same order while retaining both through sender.
@@ -349,9 +357,6 @@ class DeliveryExecutor:
                     from prm.storage.jobs import JobQueue
                     from prm.storage.telegram import TelegramBindings
                     from prm.telegram_contracts import TelegramMessageBinding
-                    queue = JobQueue(self.store.target)
-                    job = tx.conn.execute('SELECT payload FROM pa_jobs.jobs WHERE owner=%s AND id=%s', (owner, source_ref)).fetchone()
-                    input_item = queue._input(tx, owner, job['payload'])
                     metadata = input_item.payload.get('telegram_envelope', {})
                     TelegramBindings(queue, owner=owner, destination=result.destination).bind_message_in(tx,
                         TelegramMessageBinding(owner, result.destination, result.message_id, source_ref,

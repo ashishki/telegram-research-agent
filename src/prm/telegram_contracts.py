@@ -144,6 +144,8 @@ def normalize_update(update, *, owner_chat_id, bot_ref='bot_default'):
             source = forward.get('chat' if forward['type'] == 'channel' else 'sender_chat', {})
             identifier = source.get('id') if isinstance(source, dict) else None
             if type(identifier) is int and -(2**63) < identifier < 2**63: origin['source_identity'] = str(identifier)
+            if forward['type'] == 'channel' and forward.get('message_id') is not None:
+                origin['message_id'] = _message_id(forward['message_id'], optional=False)
         forward = origin
     for key in ('text', 'caption', 'voice_transcript'):
         if key in message and (not isinstance(message[key], str) or len(message[key].encode()) > 16000):

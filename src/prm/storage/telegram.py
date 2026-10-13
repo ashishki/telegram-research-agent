@@ -90,7 +90,7 @@ class TelegramBindings:
                     tx.conn.execute("""UPDATE pa_jobs.jobs SET status=CASE WHEN mode='effect' AND attempts>0 THEN 'awaiting_reconciliation' ELSE 'cancelled' END,
                         token=NULL,lease_until=NULL WHERE owner=%s AND id=%s AND status IN ('queued','leased','running','retry_wait')""", (self.owner, job_ref))
                     if tx.conn.execute("SELECT to_regclass('pa_actions.proposals') AS meta").fetchone()['meta'] is not None:
-                        tx.conn.execute("UPDATE pa_actions.proposals SET status='cancelled' WHERE owner=%s AND status='prepared' AND (payload->'rationale_refs') ? %s",
+                        tx.conn.execute("UPDATE pa_actions.proposals SET status='cancelled' WHERE owner=%s AND status IN ('prepared','consumed') AND (payload->'rationale_refs') ? %s",
                             (self.owner, 'user_request:' + job['payload']['input_ref']))
             revision_ref = 'telegram_revision_' + hashlib.sha256((self.destination.bot_ref + ':' + str(envelope.update_id)).encode()).hexdigest()[:32]
             text = update['edited_message'].get('text', update['edited_message'].get('caption', ''))

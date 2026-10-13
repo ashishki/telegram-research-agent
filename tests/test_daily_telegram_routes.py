@@ -285,3 +285,72 @@ def test_bot_namespace_and_result_version_cannot_alias_other_job(pai):
     other = TelegramJobIngress(root.queue, owner_ref=root.owner_ref, owner_chat_id='42', bot_ref='bot_other')
     same_id = other.receive(update(98501, 'Synthetic other bot input'))
     assert same_id.job_id != a.job_id and same_id.request_ref != a.request_ref
+
+
+def test_source_edit_between_preparation_and_transport_blocks_old_send(pai, telegram_http, monkeypatch):
+    root = pai.root; executor = delivery(pai, telegram_http)
+    ack = completed(pai, 98601, 'Synthetic stale result must not be sent')
+    execute = root.registry.execute_reserved_groups
+    edits = []
+    def edit_before_transport(groups, transport, **kwargs):
+        if not edits:
+            edit = update(98602, 'Changed source', message_id=98601)
+            edits.append(root.ingress.receive({'update_id': 98602, 'edited_message': edit['message']}))
+        return execute(groups, transport, **kwargs)
+    monkeypatch.setattr(root.registry, 'execute_reserved_groups', edit_before_transport)
+    outcome = executor.deliver_result(owner=root.owner_ref, job_id=ack.job_id, destination_ref='destination_private', upper_bound=0)
+    assert outcome['status'] != 'sent'
+    assert telegram_http.requests == []
+
+
+def test_edit_after_confirmation_precommit_fences_action_and_keeps_unknown_receipt(pai, monkeypatch):
+    from tests.test_pai_control_polish import action, preview
+    root = action(pai)
+    ack = root.ingress.receive(update(98701, preview(pai)))
+    ref = root.worker().run_once()
+    proposal_ref = root.queue.store.get(root.owner_ref, 'result', ref).payload['payload']['proposal_ref']
+    root.delivery.deliver_result(owner=root.owner_ref, job_id=ack.job_id, destination_ref='destination_private', upper_bound=0)
+    execute = root.registry.execute_reserved
+    edits = []
+    def edit_before_invoke(reservations, invoke, **kwargs):
+        if not edits:
+            with root.queue.store.transaction() as tx:
+                assert tx.conn.execute('SELECT status FROM pa_actions.proposals WHERE owner=%s AND ref=%s', (root.owner_ref, proposal_ref)).fetchone()['status'] == 'consumed'
+            edit = update(98702, 'Changed source after confirmation', message_id=98701)
+            edits.append(root.ingress.receive({'update_id': 98702, 'edited_message': edit['message']}))
+        return execute(reservations, invoke, **kwargs)
+    monkeypatch.setattr(root.registry, 'execute_reserved', edit_before_invoke)
+    receipt = root.actions.confirm_and_execute(proposal_ref, actor_ref=root.owner_ref)
+    assert receipt.status == 'unknown'
+    assert not [entry for entry in pai.requests if entry[0] == 'write']
+    assert root.actions.confirm_and_execute(proposal_ref, actor_ref=root.owner_ref) == receipt
+
+
+def test_dispatch_winning_before_edit_preserves_unknown_receipt_and_no_replay(pai):
+    from tests.test_pai_control_polish import action, preview
+    root = action(pai)
+    ack = root.ingress.receive(update(98801, preview(pai)))
+    ref = root.worker().run_once()
+    proposal_ref = root.queue.store.get(root.owner_ref, 'result', ref).payload['payload']['proposal_ref']
+    root.delivery.deliver_result(owner=root.owner_ref, job_id=ack.job_id, destination_ref='destination_private', upper_bound=0)
+    receipt = root.actions.confirm_and_execute(proposal_ref, actor_ref=root.owner_ref)
+    assert receipt.status == 'unknown'
+    assert len([entry for entry in pai.requests if entry[0] == 'write']) == 1
+    edit = update(98802, 'Changed source after dispatch', message_id=98801)
+    root.ingress.receive({'update_id': 98802, 'edited_message': edit['message']})
+    assert root.actions.store.get(receipt.idempotency_key) == receipt
+    assert root.actions.confirm_and_execute(proposal_ref, actor_ref=root.owner_ref) == receipt
+    assert len([entry for entry in pai.requests if entry[0] == 'write']) == 1
+
+
+def test_maximum_size_forward_and_next_update_are_admitted(pai):
+    root = pai.root
+    text = '😀' * 4000
+    assert len(text.encode()) == 16000
+    first = root.ingress.receive(update(98901, text, forward_origin={'type': 'channel', 'chat': {'id': -100123}, 'message_id': 73, 'date': 1}))
+    body = root.queue.store.get(root.owner_ref, 'conversation', first.request_ref).payload
+    assert body['original_text'] == text
+    assert body['telegram_envelope']['forward_origin']['message_id'] == 73
+    assert body['telegram_envelope']['forward_origin']['source_identity'] == '-100123'
+    assert root.ingress.receive(update(98902, 'Valid next question')).job_id is not None
+    assert root.ingress.polling_offset() == 98903
