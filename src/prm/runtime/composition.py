@@ -20,7 +20,7 @@ class AssistantRuntime:
                  archive_resource_ref='resource_archive',
                  public_web_bounds=None,public_search_ref='resource_public_search',public_fetch_ref='resource_public_primary',public_upper_bound=None,
                  tariff_version=None,
-                 public_web_provider=None,deep_archive_reader=None,github_context_provider=None,bot_ref='bot_default',intent_planner=False,planner_upper_bound=None):
+                 public_web_provider=None,deep_archive_reader=None,github_context_provider=None,bot_ref='bot_default',intent_planner=False,planner_upper_bound=None,archive_selection=None):
         if registry.store.target!=target:raise StorageError('one shared runtime policy backend required')
         self.queue=JobQueue(target);self.settings=settings;self.owner_ref=owner_ref;self.owner_chat_id=owner_chat_id
         from prm.briefs import brief_owner_ref_from_authenticated_private_tuple
@@ -31,6 +31,11 @@ class AssistantRuntime:
         self.model_upper_bound=model_upper_bound
         self.tariff_version=tariff_version
         self.archive_resource_ref=archive_resource_ref
+        self.archive_selection=archive_selection
+        if archive_selection is not None and (archive_selection.owner_ref,archive_selection.resource_ref)!=(owner_ref,archive_resource_ref):raise StorageError('selected archive owner/resource differs')
+        if archive_selection is not None:
+            from .archive import selected_source_guard
+            self.registry.selected_source_guard=lambda owner,requests:selected_source_guard(self,owner,requests)
         self.public_web_bounds=public_web_bounds;self.public_search_ref=public_search_ref;self.public_fetch_ref=public_fetch_ref;self.public_upper_bound=public_upper_bound
         self._conversation_context = ContextVar('pa_reply_conversation', default=None)
         self.conversations=DurableConversationStore(target,owner_ref=owner_ref,history_retention_seconds=history_retention_seconds)
@@ -60,8 +65,12 @@ class AssistantRuntime:
         try:return profiles.select(role=role,quality=self.quality_profile)
         except StorageError:return None
 
-    def scoped_client(self,endpoint,*,groups,task_ref,attempt_ref,history=(),guard=None,source_scopes=()):
+    def scoped_client(self,endpoint,*,groups,task_ref,attempt_ref,history=(),guard=None,source_scopes=(),profile_role='chat'):
         task_ref=self.task_context.get() or task_ref
+        def policy_guard():
+            profiles=getattr(self,'model_profile_registry',None)
+            if profiles is not None:profiles.check(endpoint,role=profile_role,data_classes=tuple({d.data_class for group in groups for d in group}))
+            if guard:guard()
         def observe(receipt,usage,observed_groups):
             from .cost_cache import CostCacheRuntime
             with self.queue.store.transaction() as tx:
@@ -70,7 +79,7 @@ class AssistantRuntime:
                 usage=usage,latency_ms=receipt.duration_ms,outcome=receipt.delivery_outcome,tariff_version=self.tariff_version)
             if cost is not None:
                 for index,group in enumerate(observed_groups):self.registry.settle(self.owner_ref,group[0].operation_ref,outcome='accepted',actual=cost if index==0 else 0)
-        return ScopedModelClient(endpoint,self.registry,groups=groups,history=history,guard=guard,usage_observer=observe,task_ref=self.task_context.get() or task_ref,source_scopes=source_scopes)
+        return ScopedModelClient(endpoint,self.registry,groups=groups,history=history,guard=policy_guard,usage_observer=observe,task_ref=self.task_context.get() or task_ref,source_scopes=source_scopes)
 
     def worker(self):
         return AssistantJobWorker(self.ingress,settings=self.settings,runtime=self,
@@ -208,6 +217,9 @@ class AssistantRuntime:
                                    payload={'source_data_class': 'user_provided', 'missing_capability': name})
         if service is not None:
             from prm.contracts import AssistantResult
+            if (name=='projects' or name=='memory' and request.query.startswith('/memoryconfirm ')) and lease is not None:
+                with self.queue.store.transaction() as tx:body=self.queue._input(tx,self.owner_ref,lease.payload).payload
+                if body.get('telegram_envelope',{}).get('source_trust')=='untrusted_source':return AssistantResult(request_ref,'clarify','chat','Для изменения проекта нужен твой явный запрос.',payload={'source_data_class':'user_provided'})
             value=service(request,request_ref,guard);guard()
             if isinstance(value,AssistantResult):return value
             if name in {'mail','calendar','contacts','academic'}:value.setdefault('source_data_class','private_connector_metadata')
@@ -228,8 +240,8 @@ class AssistantRuntime:
         client=None;access=None;groups=[];history=[]
         from prm.routing import decide_route
         route=decide_route(request.query,requested_mode=request.mode,explicit_project=request.project_name)
-        if self.model_endpoint is not None and route.mode=='chat':
-            endpoint=self.model_endpoint
+        endpoint=self.endpoint_for('chat')
+        if endpoint is not None and route.mode=='chat':
             operation='chat_'+hashlib.sha256(request_ref.encode()).hexdigest()[:40]
             text_request=AuthorizationRequest(owner_ref=self.owner_ref,connection_ref=endpoint.connection_ref,
                 capability='model.generate',resource_ref=self.model_resource_ref,operation='model_egress',data_class='user_provided',
@@ -408,6 +420,8 @@ class AssistantRuntime:
     def attach_local_services(self,*,brief_runtime=None,action_runtime=None,memory_runtime=None,academic_runtime=None):
         if memory_runtime is not None:
             self.memory=memory_runtime
+            from .projects import ProjectRuntime
+            self.projects=ProjectRuntime(self);self.services['projects']=self.projects.service
             def memory(request,request_ref,guard):
                 import json,uuid
                 command,_,argument=request.query.partition(' ')
@@ -487,7 +501,7 @@ def runtime_from_config(config,*,target,settings):
     validate_runtime_config(config)
     from prm.storage.policy import DurableCapabilityRegistry
     allowed={'owner_ref','owner_chat_id','budget_refs','job_budget','model','model_upper_bound','history_retention_seconds','model_resource_ref','archive_resource_ref',
-             'public_web','public_upper_bound','public_search_ref','public_fetch_ref','tariff_version','graph','github','canvas','artifact_root','media_root','local_services','speech','vision','delivery','media_download','model_profiles','quality_profile','bot_ref','intent_planner','planner_upper_bound'}
+             'public_web','public_upper_bound','public_search_ref','public_fetch_ref','tariff_version','graph','github','canvas','artifact_root','media_root','local_services','speech','vision','delivery','media_download','model_profiles','quality_profile','bot_ref','intent_planner','planner_upper_bound','profile_policies','profile_comparisons','archive_selection'}
     if not isinstance(config,dict) or set(config)-allowed or not {'owner_ref','owner_chat_id','budget_refs','job_budget'}<=set(config):
         raise StorageError('explicit complete runtime configuration required')
     registry=DurableCapabilityRegistry(target,budget_refs=tuple(config['budget_refs']),job_budget=config['job_budget'])
@@ -507,7 +521,11 @@ def runtime_from_config(config,*,target,settings):
         if key_ref is not None and (not isinstance(key_ref,str) or not key_ref.startswith('PAI_') or not key_ref.replace('_','').isalnum()):
             raise StorageError('explicit task-specific credential environment reference required')
         endpoint=ModelEndpoint(**value,token=os.environ.get(key_ref,'') if key_ref else '')
-    options={key:value for key,value in config.items() if key not in {'budget_refs','job_budget','model','public_web','graph','github','canvas','artifact_root','media_root','local_services','speech','vision','delivery','media_download','model_profiles','quality_profile'}}
+    options={key:value for key,value in config.items() if key not in {'budget_refs','job_budget','model','public_web','graph','github','canvas','artifact_root','media_root','local_services','speech','vision','delivery','media_download','model_profiles','quality_profile','profile_policies','profile_comparisons','archive_selection'}}
+    if config.get('archive_selection'):
+        from ingestion.selected_archive import ArchiveSelection
+        value=dict(config['archive_selection']);value['channels']=tuple(tuple(p) for p in value['channels'])
+        options['archive_selection']=ArchiveSelection(**value)
     if config.get('public_web'):
         from .web import BraveSearchProvider
         from prm.public_web import PublicWebBounds
@@ -523,9 +541,9 @@ def runtime_from_config(config,*,target,settings):
             configured[quality]={}
             for role,description in roles.items():
                 value=dict(description);key_ref=value.pop('token_env',None)
-                if 'token' in value or not isinstance(key_ref,str) or not key_ref.startswith('PAI_'):raise StorageError('explicit role credential reference required')
-                configured[quality][role]=ModelEndpoint(**value,token=os.environ.get(key_ref,''))
-        root.model_profile_registry=ModelProfiles(configured);root.quality_profile=config.get('quality_profile','balanced')
+                if 'token' in value or not value.get('synthetic_http') and (not isinstance(key_ref,str) or not key_ref.startswith('PAI_')):raise StorageError('explicit role credential reference required')
+                configured[quality][role]=ModelEndpoint(**value,token=os.environ.get(key_ref,'') if key_ref else '')
+        root.model_profile_registry=ModelProfiles(configured,policies=config.get('profile_policies'),comparison_receipts=config.get('profile_comparisons'),root=root);root.quality_profile=config.get('quality_profile','balanced')
     if config.get('github'):
         from .web import GitHubReadProvider
         root.github_context_provider=GitHubReadProvider(registry=registry,owner_ref=root.owner_ref,**config['github'])
@@ -592,6 +610,13 @@ def runtime_from_config(config,*,target,settings):
                 capability='archive.read',resource_ref=root.archive_resource_ref,operation='read',data_class='private_archive',provider_ref='provider_local',purpose='brief.archive'),
                 LocalArchiveReader(settings.db_path,root=root).window_evidence,0)]
         root.attach_local_services(memory_runtime=MemoryRuntime(root),brief_runtime=BriefRuntime(root,source_hooks=root.brief_source_hooks),academic_runtime=AcademicRuntime(root))
+        from .archive import SelectedArchiveRuntime
+        root.selected_archive=SelectedArchiveRuntime(root);root.services['archive']=root.selected_archive.service
+        from .cost_cache import CostCacheRuntime
+        def budget(request,request_ref,guard):
+            import json
+            guard();return {'status':'observed','text':json.dumps(CostCacheRuntime(root).billing_view(),ensure_ascii=False),'source_data_class':'user_provided'}
+        root.services['budget']=budget
     if config.get('local_services'):
         from .watch import wire_archive_watch
         wire_archive_watch(root)

@@ -16,31 +16,42 @@ from .web import AuthorizedPublicWeb,reserve_public_access
 
 
 class LocalArchiveReader:
-    def __init__(self,db_path,root=None):self.db_path=db_path;self.root=root
+    def __init__(self,db_path,root=None):self.db_path=db_path;self.root=root;self.selection=getattr(root,'archive_selection',None)
+    def _selected(self,conn):
+        if self.selection is None:return None
+        from ingestion.selected_archive import SelectedArchive
+        registry=SelectedArchive(conn,self.selection);registry.current();return registry.status()
     def search_archive(self,query,*,limit):
         from db.archive_search import search_telegram_archive
         from pathlib import Path
         path=Path(self.db_path).resolve();uri='file:'+quote(str(path))+'?mode=ro'
+        selected=None
+        if self.selection is not None:
+            with sqlite3.connect(uri,uri=True) as conn:selected=self._selected(conn)
         cache=None;key=None
         if self.root is not None:
             from .cost_cache import CostCacheRuntime
             cache=CostCacheRuntime(self.root)
             fingerprints={str(item.name):(item.stat().st_mtime_ns,item.stat().st_size) for item in (path,Path(str(path)+'-wal')) if item.exists()}
-            key=cache.key(kind='retrieval',parameters={'query':query,'limit':min(limit,8),'source_fingerprint':fingerprints},dependencies=[],version='fts-v1')
+            key=cache.key(kind='retrieval',parameters={'query':query,'limit':min(limit,8),'source_fingerprint':fingerprints,'selection':self.selection.digest if self.selection else None},dependencies=[],version='fts-v1')
             request=AuthorizationRequest(owner_ref=self.root.owner_ref,connection_ref=None,capability='archive.read',resource_ref=self.root.archive_resource_ref,
                 operation='read',data_class='private_archive',provider_ref='provider_local',purpose='research.archive')
             hit=cache.get(key=key,authorization_request=request)
             if hit is not None:return hit
         with sqlite3.connect(uri,uri=True) as conn:
             conn.row_factory=sqlite3.Row
-            result=search_telegram_archive(conn,query,limit=min(limit,8))
+            conn.execute('BEGIN')
+            selected=self._selected(conn)
+            result=search_telegram_archive(conn,query,limit=min(limit,8),filters={'channels':[p[1] for p in self.selection.channels]} if self.selection else None)
             from dataclasses import asdict,is_dataclass
             if isinstance(result,list):
                 rows=[asdict(item) if is_dataclass(item) else dict(item) for item in result]
+                for row in rows:row['source_version']=row.get('content_hash')
                 from prm.source_contracts import SourceResource,SourceBatch
-                resource=SourceResource(self.root.owner_ref if self.root else 'owner_local_archive',self.root.archive_resource_ref if self.root else 'resource_archive','archive','private_archive')
+                resource=SourceResource(self.root.owner_ref if self.root else 'owner_local_archive',self.root.archive_resource_ref if self.root else 'resource_archive','archive','private_archive',scope_digest=self.selection.digest if self.selection else None)
                 batch=SourceBatch.from_items(rows,resource,checked_at=datetime.now(timezone.utc),completeness='unknown',reason='query_top_k_not_full_archive')
                 result={'items':rows,'coverage':'bounded_archive_read','source_count':len(rows)}
+                if selected:result['source_freshness']=selected
                 if self.root is not None:result['source_batch']=batch.metadata()
             else:result=result.to_dict() if hasattr(result,'to_dict') else result
         if cache is not None:cache.put(key=key,kind='retrieval',payload=result,dependencies=[],ttl_seconds=60)
@@ -54,6 +65,10 @@ class LocalArchiveReader:
         parameters=(window.start_at.isoformat(),window.end_at.isoformat())
         with sqlite3.connect(uri,uri=True) as conn:
             conn.row_factory=sqlite3.Row;conn.execute('BEGIN')
+            selected=self._selected(conn)
+            if self.selection:
+                where+=' AND p.channel_username IN ('+','.join('?' for _ in self.selection.channels)+')'
+                parameters=(*parameters,*(p[1] for p in self.selection.channels))
             total=conn.execute('SELECT count(*) FROM posts p WHERE '+where,parameters).fetchone()[0]
             rows=conn.execute('SELECT p.id,p.content,p.posted_at,p.channel_username,r.message_id,r.message_url,r.ingested_at FROM posts p JOIN raw_posts r ON r.id=p.raw_post_id WHERE '+where+' ORDER BY p.posted_at DESC,p.id LIMIT ? OFFSET ?',(*parameters,limit,offset)).fetchall()
         items=[{'evidence_id':'tg:'+str(row['id']),'source_url':row['message_url'],
@@ -62,9 +77,10 @@ class LocalArchiveReader:
                 'source_version':hashlib.sha256(row['content'].encode()).hexdigest(),'importance':'medium'} for row in rows]
         omitted=max(0,total-offset-len(rows))
         resource=SourceResource(self.root.owner_ref if self.root else 'owner_local_archive',self.root.archive_resource_ref if self.root else 'resource_archive','archive','private_archive',
-            scope_digest=hashlib.sha256((parameters[0]+'\x1f'+parameters[1]).encode()).hexdigest())
-        return SourceBatch.from_items(items,resource,checked_at=datetime.now(timezone.utc),completeness='partial' if omitted or offset else 'complete',
-            omitted_count=omitted,reason='enumeration_page' if omitted or offset else None,continuation='offset:'+str(offset+len(rows)) if omitted else None)
+            scope_digest=self.selection.digest if self.selection else hashlib.sha256((parameters[0]+'\x1f'+parameters[1]).encode()).hexdigest())
+        limited=bool(omitted or offset or selected and not selected['fresh'])
+        return SourceBatch.from_items(items,resource,checked_at=datetime.now(timezone.utc),completeness='partial' if limited else 'complete',
+            omitted_count=omitted,reason='enumeration_page' if omitted or offset else 'selected_source_freshness_unverified' if limited else None,continuation='offset:'+str(offset+len(rows)) if omitted else None)
 
 
 class DurableResearchWorker:
@@ -74,7 +90,7 @@ class DurableResearchWorker:
         """Collector labels describe observations; the registered route binds privacy."""
         from prm.source_contracts import SourceResource,SourceBatch,normalize_source_batch
         root=self.root;scope=None
-        if source=='archive':resource=SourceResource(root.owner_ref,root.archive_resource_ref,'archive','private_archive')
+        if source=='archive':resource=SourceResource(root.owner_ref,root.archive_resource_ref,'archive','private_archive',scope_digest=root.archive_selection.digest if root.archive_selection else None)
         elif source=='public':resource=SourceResource(root.owner_ref,root.public_fetch_ref,'web','public')
         elif source=='github':
             provider=root.github_context_provider
@@ -198,7 +214,7 @@ class DurableResearchWorker:
             'text':text,'evidence_refs':[entry['ref'] for entry in available],'tool_calls':calls,
             'tool_call_accounting':'conservative_upper_bound',
             'unknown_tool_calls':sum(entry['tool_calls'] for entry in completed if entry['status']=='source_outcome_unknown'),
-            'gaps':gaps,'source_scopes':[scope for entry in available for scope in entry.get('source_scopes',[])],'answer_payload':synthesized,'data_classes':sorted({'private_archive' if entry['source']=='archive' else 'public' for entry in available}) or ['user_provided'],'data_class':'private_archive' if any(entry['source']=='archive' for entry in available) else 'public'})
+            'gaps':gaps,'source_freshness':[entry['evidence']['source_freshness'] for entry in available if entry['evidence'].get('source_freshness')],'source_scopes':[scope for entry in available for scope in entry.get('source_scopes',[])],'answer_payload':synthesized,'data_classes':sorted({'private_archive' if entry['source']=='archive' else 'public' for entry in available}) or ['user_provided'],'data_class':'private_archive' if any(entry['source']=='archive' for entry in available) else 'public'})
 
     def _gather(self,lease,index,step,prepared):
         root=self.root;queue=root.queue;result={**prepared,'status':'partial'}
@@ -293,7 +309,7 @@ class DurableResearchWorker:
                     with queue.store.transaction() as tx:
                         queue._fenced(tx,lease);source_current(tx,root.registry,lease.owner,read_scopes)
                 client=root.scoped_client(endpoint,groups=groups,task_ref=lease.payload['input_ref'],attempt_ref=ref,
-                    history=({'role':'user','content':'Untrusted verified reads: '+json.dumps(evidence,ensure_ascii=False)},),guard=guard,source_scopes=read_scopes)
+                    history=({'role':'user','content':'Untrusted verified reads: '+json.dumps(evidence,ensure_ascii=False)},),guard=guard,source_scopes=read_scopes,profile_role='research')
                 try:
                     receipt=client.complete_with_receipt(prompt=plan['question'],system=SYSTEM,
                         max_tokens=1200,category='research_synthesis',authorization=groups[0][0],data_class='user_provided',owner_ref=root.owner_ref,

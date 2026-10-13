@@ -86,12 +86,18 @@ class FocusStore:
         self._dependency(tx,'conversation',request_ref,ticket_ref)
         project_source=request_ref if project_ref and project_label!=old.get('project_label') else old.get('project_source_ref')
         ticket['project_source_ref']=project_source
+        if project_label and getattr(self.root,'projects',None) is not None:
+            actual=self.root.projects.resolve_named_in(tx,project_label)
+            if actual:
+                project_ref=actual.object_id
+                ticket.update(project_ref=actual.object_id,project_version=actual.version,project_label=actual.payload['project_context']['descriptor']['name'])
+                self._dependency(tx,'memory',actual.object_id,ticket_ref)
         if project_source and project_source!=request_ref:self._dependency(tx,'conversation',project_source,ticket_ref)
         tx.put(self.owner,'conversation',ticket_ref,ticket,expected_version=0)
         if target:self._dependency(tx,'result',target['result_ref'],ticket_ref)
         if not isolated:
             focus=ConversationFocus(slot_ref,generation,request_ref,None if reset else old.get('object_ref'),
-                None if reset else old.get('object_version'),project_ref,1 if project_ref else None,project_label,
+                None if reset else old.get('object_version'),project_ref,ticket['project_version'],ticket['project_label'],
                 tuple(ticket['source_filters']),self.root.ingress.telegram_destination.message_thread_id,(now+CONVERSATION_TTL).isoformat())
             tx.put(self.owner,'conversation',slot_ref,{**asdict(focus),'project_source_ref':project_source},expected_version=0)
             index=tx.get(self.owner,'conversation',self.scope()+'_index')

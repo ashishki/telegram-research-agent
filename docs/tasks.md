@@ -12,6 +12,20 @@ Historical PRM-SN/RFX/UTD task records are preserved byte-for-byte at `docs/task
 
 ## Local daily implementation — 2026-10-13
 
+Package5: D07 + D08 + D09, base3bb16f3, same assigned branch, local/synthetic.
+One accumulated Deep Review covers versioned role/privacy/billing policies and
+paired promotion evidence, confirmed durable project versions/applicability,
+selected canonical archive import/sync metadata, edits/deletes/cursor/quota,
+freshness/selection/cache guards and native composition. Read the three cards,
+PRODUCT_ARCHITECTURE project/source sections and existing cost/memory/ingestion
+contracts. No actual key/account/session/tariff/production or service scope.
+Acceptance registered before source implementation:
+`PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python -m pytest -q tests/test_daily_profiles.py tests/test_daily_projects.py tests/test_daily_source_freshness.py`.
+Existing cost/policy, project descriptor and reaction/archive tests are affected
+regression floors. One independent local read-only full review after checks;
+critical findings get narrow independent rechecks before dependent work.
+No policy/approval-tool changes, no PG DDL/checksum reset, no full historical suite.
+
 Package 4: D04 + D10, base `62a2909`, local synthetic-only. One accumulated
 review covers focus admission/completion/lineage, request isolation and planner
 schema/scope/no-repeat, additive source contracts and archive/web/Brief/research/

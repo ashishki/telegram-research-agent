@@ -15,7 +15,7 @@ RUNTIME_FIELDS = frozenset({'owner_ref', 'owner_chat_id', 'budget_refs', 'job_bu
     'model_upper_bound', 'history_retention_seconds', 'model_resource_ref', 'archive_resource_ref',
     'public_web', 'public_upper_bound', 'public_search_ref', 'public_fetch_ref', 'tariff_version',
     'graph', 'github', 'canvas', 'artifact_root', 'media_root', 'local_services', 'speech', 'vision',
-    'delivery', 'media_download', 'model_profiles', 'quality_profile', 'bot_ref', 'intent_planner', 'planner_upper_bound'})
+    'delivery', 'media_download', 'model_profiles', 'quality_profile', 'bot_ref', 'intent_planner', 'planner_upper_bound', 'profile_policies', 'profile_comparisons', 'archive_selection'})
 REQUIRED = frozenset({'owner_ref', 'owner_chat_id', 'budget_refs', 'job_budget'})
 MODEL_FIELDS = frozenset({'provider_ref', 'connection_ref', 'endpoint', 'model', 'token_env', 'timeout_seconds', 'synthetic_http', 'capabilities'})
 SECRET_FIELDS = frozenset({'token', 'password', 'api_key', 'access_token', 'refresh_token', 'encryption_key', 'client_secret'})
@@ -129,12 +129,28 @@ def validate_runtime_config(config: dict) -> None:
     if config.get('model_profiles'):
         _mapping(config['model_profiles'], {'economical', 'balanced', 'maximum'})
         for roles in config['model_profiles'].values():
-            _mapping(roles, {'chat', 'research', 'extraction', 'vision', 'speech', 'judge'})
+            from .profiles import ROLES
+            _mapping(roles, ROLES)
             for value in roles.values(): _model(value)
         quality = config.get('quality_profile', 'balanced')
         quality = 'balanced' if quality == 'economical' else quality
         if not config['model_profiles'].get(quality, {}).get('chat'): raise StorageError('selected quality lacks chat')
         if 'balanced' not in config['model_profiles']: raise StorageError('balanced baseline profile required')
+    if 'profile_policies' in config:
+        from .profiles import RolePolicy
+        policies=config['profile_policies'];profiles=config.get('model_profiles',{})
+        if not isinstance(policies,dict) or set(policies)!=set(profiles):raise StorageError('role policies must bind configured profiles')
+        for quality,roles in policies.items():
+            if not isinstance(roles,dict) or set(roles)!=set(profiles[quality]):raise StorageError('role policy mapping differs')
+            for value in roles.values():RolePolicy.from_mapping(value)
+    if 'profile_comparisons' in config:
+        from .profiles import ROLES
+        _mapping(config['profile_comparisons'],ROLES)
+        if any(not _reference(v) or not v.startswith('profile_comparison_') for v in config['profile_comparisons'].values()):raise StorageError('durable comparison references required')
+    if 'archive_selection' in config:
+        from ingestion.selected_archive import ArchiveSelection
+        value=dict(config['archive_selection']);value['channels']=tuple(tuple(p) for p in value['channels']);selection=ArchiveSelection(**value)
+        if (selection.owner_ref,selection.resource_ref)!=(config['owner_ref'],config.get('archive_resource_ref','resource_archive')):raise StorageError('archive selection binding differs')
     sections = {
         'public_web': ({'token_env', 'bounds'}, {'token_env', 'bounds'}),
         'github': ({'repository_ref', 'ref', 'upper_bound', 'paths'}, {'repository_ref', 'ref', 'upper_bound'}),

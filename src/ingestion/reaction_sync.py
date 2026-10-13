@@ -7,6 +7,7 @@ from typing import Any, Mapping
 from config.settings import Settings
 from db.migrate import record_feedback, record_post_tag
 from output.reporting_period import ReportingPeriod, register_reporting_period_sqlite
+from prm.storage.postgres import StorageError
 
 
 LOGGER = logging.getLogger(__name__)
@@ -380,6 +381,7 @@ def _load_candidate_posts_with_count(
     limit: int,
     *,
     reporting_period: ReportingPeriod | None = None,
+    channel_usernames: tuple[str,...] = (),
 ) -> tuple[list[sqlite3.Row], int]:
     """Load a bounded page and the exact eligible population size."""
 
@@ -408,6 +410,9 @@ def _load_candidate_posts_with_count(
         where_params = (cutoff,)
         order_sql = "p.posted_at DESC, p.id DESC"
 
+    if channel_usernames:
+        where_sql+=' AND length(trim(p.content))>0 AND p.channel_username IN ('+','.join('?' for _ in channel_usernames)+')'
+        where_params=(*where_params,*channel_usernames)
     candidate_count = int(
         connection.execute(
             f"""
@@ -461,6 +466,7 @@ async def sync_reactions_with_outcome(
     days: int = 14,
     limit: int = 300,
     reporting_period: ReportingPeriod | None = None,
+    archive_selection=None,
 ) -> ReactionSyncOutcome:
     """Sync reactions and attest the personal reactions visible in this run."""
 
@@ -481,11 +487,16 @@ async def sync_reactions_with_outcome(
     with sqlite3.connect(settings.db_path) as connection:
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON;")
+        if archive_selection is not None:
+            from ingestion.selected_archive import SelectedArchive
+            if archive_selection.mode!='session':raise StorageError('import/forward never starts a Telegram session')
+            SelectedArchive(connection,archive_selection).current()
         candidates, candidate_count = _load_candidate_posts_with_count(
             connection,
             days=days,
             limit=limit,
             reporting_period=reporting_period,
+            channel_usernames=tuple(p[1] for p in archive_selection.channels) if archive_selection else (),
         )
 
         client = await make_client(settings)

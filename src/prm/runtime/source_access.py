@@ -41,6 +41,8 @@ def source_current(tx,registry,owner,scopes):
     for request in chosen:
         decision,_,_=registry._decision(tx.conn,request)
         if not decision.allowed:raise CapabilityDenied('delivery source scope changed')
+    selected_guard=getattr(registry,'selected_source_guard',None)
+    if selected_guard is not None:tx.hold_context(selected_guard(owner,tuple(requests)))
     for connection in sorted({request.connection_ref for request in chosen if request.provider_ref=='provider_microsoft_graph' and request.connection_ref}):
         row=tx.conn.execute('SELECT status FROM pa_connections.accounts WHERE owner=%s AND id=%s FOR SHARE',(owner,connection)).fetchone()
         if not row or row['status']!='connected':raise CapabilityDenied('delivery source disconnected')

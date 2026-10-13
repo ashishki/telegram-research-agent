@@ -84,7 +84,7 @@ def parse_plan_json(text,**kwargs):
 class ScopedIntentPlanner:
     def __init__(self,root,*,upper_bound=None):self.root,self.upper_bound=root,upper_bound
     def propose(self,query,*,request_ref,available_tools,available_sources,guard):
-        root=self.root;endpoint=root.endpoint_for('extraction')
+        root=self.root;endpoint=root.endpoint_for('planner')
         if endpoint is None:return None
         reference='intent_input_'+hashlib.sha256(request_ref.encode()).hexdigest()[:32]
         output='intent_outcome_'+hashlib.sha256(request_ref.encode()).hexdigest()[:32]
@@ -107,7 +107,7 @@ class ScopedIntentPlanner:
                 tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',(root.owner_ref,'conversation',request_ref,'conversation',reference))
                 tx.put(root.owner_ref,'conversation',output,{'status':'unknown','request_ref':request_ref},expected_version=0)
                 tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',(root.owner_ref,'conversation',request_ref,'conversation',output))
-            client=root.scoped_client(endpoint,groups=((decision,),),task_ref=reference,attempt_ref=decision.operation_ref,guard=guard)
+            client=root.scoped_client(endpoint,groups=((decision,),),task_ref=reference,attempt_ref=decision.operation_ref,guard=guard,profile_role='planner')
             receipt=client.complete_with_receipt(prompt=query,system=SYSTEM+' Registered tools: '+','.join(available_tools)+'. Selected source names: '+','.join(available_sources),
                 max_tokens=800,category='intent_plan',authorization=decision,data_class='user_provided',owner_ref=root.owner_ref,connection_ref=endpoint.connection_ref,resource_ref=root.model_resource_ref)
             plan=parse_plan_json(receipt.text,available_tools=available_tools,available_sources=available_sources)

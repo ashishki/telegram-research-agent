@@ -33,6 +33,8 @@ class RequestIntent:
 
 
 SERVICE_COMMANDS = {
+    'projects':('/projectpreview','/projectconfirm','/projects','/projectshow','/projectapply'),
+    'budget':('/budget',), 'archive':('/archives',),
     'actions': ('/actpreview', '/actedit', '/actconfirm', '/actreconcile'),
     'mail': ('/mail', '/mailread'), 'calendar': ('/calendar',), 'contacts': ('/contacts',),
     'academic': ('/academic', '/academicdone', '/academicstage', '/academicwatch'),

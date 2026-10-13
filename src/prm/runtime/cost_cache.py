@@ -35,14 +35,30 @@ def install_cost_cache(target):
 
 class CostCacheRuntime:
     def __init__(self,root):self.root=root;self.store=root.queue.store
-    def register_tariff(self,*,provider,model,version,input_per_million,cached_input_per_million,output_per_million,source_ref,valid_until):
+    def register_tariff(self,*,provider,model,version,input_per_million,cached_input_per_million,output_per_million,source_ref,valid_until,checked_at=None,currency='USD',billing_mode='meter',subscription_amount=None,overage_per_million=None,offpeak=None):
         rates=[Decimal(str(value)) for value in (input_per_million,cached_input_per_million,output_per_million)]
         if any(not value.is_finite() or value<0 for value in rates) or not source_ref.startswith('https://') or valid_until.tzinfo is None:
             raise StorageError('explicit sourced finite versioned tariff required')
-        payload={'input':str(rates[0]),'cache_read':str(rates[1]),'output':str(rates[2]),'source_ref':source_ref,'valid_until':valid_until.isoformat()}
+        checked_at=checked_at or datetime.now(timezone.utc)
+        if checked_at.tzinfo is None or checked_at>=valid_until or currency not in {'USD','EUR','CNY'} or billing_mode not in {'meter','subscription','hybrid'}:raise StorageError('explicit checked currency/billing policy required')
+        extras={}
+        for key,number in (('subscription_amount',subscription_amount),('overage_per_million',overage_per_million)):
+            if number is not None:
+                value=Decimal(str(number))
+                if not value.is_finite() or value<0:raise StorageError('finite explicit billing amount required')
+                extras[key]=str(value)
+            else:extras[key]=None
+        if offpeak is not None:
+            if not isinstance(offpeak,dict) or set(offpeak)!={'start_hour_utc','end_hour_utc','input','cache_read','output'} or any(type(offpeak[k])is not int or not 0<=offpeak[k]<=23 for k in ('start_hour_utc','end_hour_utc')) or offpeak['start_hour_utc']==offpeak['end_hour_utc']:raise StorageError('explicit offpeak UTC interval required')
+            offpeak=dict(offpeak)
+            for k in ('input','cache_read','output'):
+                rate=Decimal(str(offpeak[k]))
+                if not rate.is_finite() or rate<0:raise StorageError('finite offpeak price required')
+                offpeak[k]=str(rate)
+        payload={'input':str(rates[0]),'cache_read':str(rates[1]),'output':str(rates[2]),'source_ref':source_ref,'valid_until':valid_until.isoformat(),'checked_at':checked_at.isoformat(),'currency':currency,'billing_mode':billing_mode,**extras,'offpeak':offpeak}
         with self.store.transaction() as tx:
             tx.conn.execute('INSERT INTO pa_cache.tariffs VALUES(%s,%s,%s,%s)',(provider,model,version,Jsonb(payload)))
-    def record(self,*,task_ref,attempt_ref,provider,model,usage,latency_ms,outcome,tariff_version=None):
+    def record(self,*,task_ref,attempt_ref,provider,model,usage,latency_ms,outcome,tariff_version=None,observed_at=None):
         if outcome not in {'accepted','unknown','not_attempted','rejected'} or type(latency_ms)is not int or latency_ms<0:raise StorageError('bounded actual attempt metadata required')
         if not isinstance(usage,dict) or any(key not in {'input','cached_input','cache_write','output','reasoning','semantics'} for key in usage):
             raise StorageError('normalized provider usage required')
@@ -51,11 +67,21 @@ class CostCacheRuntime:
             if value is not None and (type(value)is not int or not 0<=value<=10000000):raise StorageError('invalid token count')
         cost=None
         with self.store.transaction() as tx:
+            old=tx.conn.execute('SELECT task_ref,provider,model,tariff_version,usage,cost_microdollars,latency_ms,outcome FROM pa_cache.usage WHERE owner=%s AND attempt_ref=%s',(self.root.owner_ref,attempt_ref)).fetchone()
+            if old:
+                if {k:v for k,v in old.items() if k!='cost_microdollars'}!={'task_ref':task_ref,'provider':provider,'model':model,'tariff_version':tariff_version,'usage':usage,'latency_ms':latency_ms,'outcome':outcome}:raise StateConflict('attempt cost cannot be counted twice with changed semantics')
+                return old['cost_microdollars']
+            moment=observed_at or datetime.now(timezone.utc)
+            if moment.tzinfo is None:raise StorageError('aware actual usage time required')
             if tariff_version is not None and usage.get('semantics')=='openai_chat_output_includes_reasoning':
                 row=tx.conn.execute('SELECT payload FROM pa_cache.tariffs WHERE provider=%s AND model=%s AND version=%s',(provider,model,tariff_version)).fetchone()
-                if row and datetime.fromisoformat(row['payload']['valid_until'])>datetime.now(timezone.utc) and all(usage.get(name)is not None for name in ('input','cached_input','output')):
+                if row and datetime.fromisoformat(row['payload'].get('checked_at','1970-01-01T00:00:00+00:00'))<=moment<datetime.fromisoformat(row['payload']['valid_until']) and row['payload'].get('currency','USD')=='USD' and row['payload'].get('billing_mode','meter')=='meter' and all(usage.get(name)is not None for name in ('input','cached_input','output')):
                     if usage['cached_input']>usage['input'] or usage.get('reasoning') is not None and usage['reasoning']>usage['output']:raise StorageError('provider token subsets inconsistent')
-                    price=row['payload'];cost=int(((usage['input']-usage['cached_input'])*Decimal(price['input'])+
+                    price=row['payload'];band=price.get('offpeak')
+                    if band:
+                        hour=moment.astimezone(timezone.utc).hour;start,end=band['start_hour_utc'],band['end_hour_utc']
+                        if start<=hour<end if start<end else hour>=start or hour<end:price=band
+                    cost=int(((usage['input']-usage['cached_input'])*Decimal(price['input'])+
                         usage['cached_input']*Decimal(price['cache_read'])+usage['output']*Decimal(price['output'])).to_integral_value(rounding=ROUND_CEILING))
             old=tx.conn.execute('SELECT task_ref,provider,model,tariff_version,usage,cost_microdollars,latency_ms,outcome FROM pa_cache.usage WHERE owner=%s AND attempt_ref=%s',
                                 (self.root.owner_ref,attempt_ref)).fetchone()
@@ -66,6 +92,12 @@ class CostCacheRuntime:
             else:tx.conn.execute('INSERT INTO pa_cache.usage VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
                                  (self.root.owner_ref,attempt_ref,task_ref,provider,model,tariff_version,Jsonb(usage),cost,latency_ms,outcome))
         return cost
+    def billing_view(self):
+        with self.store.transaction() as tx:
+            usage=tx.conn.execute('SELECT count(*) AS attempts,sum(cost_microdollars) AS metered_usd_microdollars,count(*) FILTER(WHERE cost_microdollars IS NULL) AS unknown_attempts FROM pa_cache.usage WHERE owner=%s',(self.root.owner_ref,)).fetchone()
+            tariffs=tx.conn.execute('SELECT provider,model,version,payload FROM pa_cache.tariffs ORDER BY provider,model,version').fetchall()
+            windows=tx.conn.execute('SELECT kind,capacity,reserved,consumed FROM pa_policy.windows WHERE owner=%s ORDER BY kind',(self.root.owner_ref,)).fetchall()
+        return {'usage':usage,'tariffs':tariffs,'budget_windows':windows,'budget_unit':'configured_policy_units','subscription_paid':None,'overage_billed':None,'invoice_verified':False}
     def task_cost(self,task_ref):
         with self.store.transaction() as tx:
             return tx.conn.execute('SELECT count(*) AS attempts,sum(cost_microdollars) AS known_microdollars,count(*) FILTER(WHERE cost_microdollars IS NULL) AS unknown_priced_attempts FROM pa_cache.usage WHERE owner=%s AND task_ref=%s',

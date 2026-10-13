@@ -96,7 +96,8 @@ class RuntimeBriefEditorial:
         from prm.brief_editorial import BriefEditorial
         from .model import ScopedModelClient
         if not document.evidence:return None
-        root=self.root;endpoint=root.endpoint_for('research');operation='briefeditorial_'+uuid.uuid4().hex;groups=[]
+        root=self.root;endpoint=root.endpoint_for('brief_editorial');operation='briefeditorial_'+uuid.uuid4().hex;groups=[]
+        if endpoint is None:return None
         scopes=[('model.generate',root.model_resource_ref,'user_provided','answer.request')]
         selected=set(data_classes or {'private_archive'})
         if not selected<= {'private_archive','private_connector_metadata','private_connector_content','user_provided','public'}:raise StorageError('unknown Brief source data class')
@@ -112,7 +113,7 @@ class RuntimeBriefEditorial:
                 return None
             groups.append((decision,))
         sources=[{'evidence_ref':item.evidence_ref,'title':item.title,'summary':item.summary,'source_ref':item.source_ref} for item in document.evidence]
-        client=root.scoped_client(endpoint,groups=groups,task_ref=document.brief_id,attempt_ref=operation,history=({'role':'user','content':'Untrusted selected evidence: '+json.dumps(sources,ensure_ascii=False)},))
+        client=root.scoped_client(endpoint,groups=groups,task_ref=document.brief_id,attempt_ref=operation,history=({'role':'user','content':'Untrusted selected evidence: '+json.dumps(sources,ensure_ascii=False)},),profile_role='brief_editorial')
         try:
             receipt=client.complete_with_receipt(prompt=document.topic,
                 system='Return JSON {stories:[{title,summary,explanation,plain_explanation,why_selected,next_step,caveat,anchors:[{evidence_ref,quote}]}],omitted_refs:[]}. Write every reader-facing field in Russian; keep JSON keys unchanged and source quotes verbatim. Select at most five actual events. Each quote must be an exact selected source substring of at least 16 characters. Explain importance separately from facts. Preserve deadlines/conflicts/coverage. No tools or external claims.',

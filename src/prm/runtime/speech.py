@@ -17,7 +17,8 @@ class SpeechTranscriber:
         self.root,self.endpoint,self.upper_bound,self.resource_ref=root,endpoint,upper_bound,resource_ref
         self.provider_ref=endpoint.provider_ref
     def __call__(self,asset,path,*,task_ref=None):
-        endpoint=self.endpoint
+        endpoint=self.root.endpoint_for('speech') if getattr(self.root,'model_profile_registry',None) is not None else self.endpoint
+        if endpoint is None or endpoint.capabilities is not None:raise StorageError('explicit speech workload route required')
         if asset.owner_ref!=self.root.owner_ref or asset.kind!='voice':raise CapabilityDenied('owned voice input required')
         decision=self.root.registry.authorize_and_reserve(AuthorizationRequest(owner_ref=self.root.owner_ref,connection_ref=endpoint.connection_ref,
             capability='media.transcribe',resource_ref=self.resource_ref or asset.media_ref,operation='model_egress',data_class='user_provided',
@@ -34,6 +35,8 @@ class SpeechTranscriber:
         http_attempted=False
         def transport():
             nonlocal http_attempted
+            profiles=getattr(self.root,'model_profile_registry',None)
+            if profiles is not None:profiles.check(endpoint,role='speech',data_classes=('user_provided',))
             request=Request(endpoint.endpoint,data=body,headers={'Authorization':'Bearer '+endpoint.token,'Content-Type':'multipart/form-data; boundary='+boundary})
             try:
                 http_attempted=True
@@ -47,6 +50,7 @@ class SpeechTranscriber:
             except ModelResponseInvalid:raise
             except (json.JSONDecodeError,UnicodeDecodeError):raise ModelResponseInvalid() from None
             except Exception:raise StorageError('speech transport outcome unknown; do not retry') from None
+            if profiles is not None:profiles.check(endpoint,role='speech',data_classes=('user_provided',))
             if not isinstance(value,dict):raise ModelResponseInvalid()
             text=value.get('text')
             if not isinstance(text,str) or len(text)>16000:raise ModelResponseInvalid()

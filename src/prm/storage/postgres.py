@@ -1,6 +1,6 @@
 """Process-local transactions on an explicitly identified synthetic PostgreSQL."""
 from __future__ import annotations
-from contextlib import contextmanager
+from contextlib import contextmanager,ExitStack
 from contextvars import ContextVar
 from dataclasses import dataclass
 import hashlib
@@ -236,7 +236,10 @@ class PostgresStore:
                     if repeatable_read:conn.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
                     conn.execute("SELECT set_config('idle_in_transaction_session_timeout',%s,true)", (str(_TRANSPORT_IDLE_MS.get()),))
                     if _version(conn)!=SCHEMA_VERSION:raise SchemaMismatch('runtime schema must be migrated explicitly')
-                    yield StateTransaction(conn)
+                    with ExitStack() as holds:
+                        state=StateTransaction(conn)
+                        state.hold_context=holds.enter_context
+                        yield state
             except psycopg.Error:
                 raise StorageError('state transaction failed and rolled back') from None
     def get(self,*args,**kwargs):

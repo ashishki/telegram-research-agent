@@ -20,7 +20,8 @@ class VisionAdapter:
         self.root,self.endpoint,self.upper_bound,self.resource_ref=root,endpoint,upper_bound,resource_ref
     def __call__(self,asset,question,path,*,task_ref=None):
         if asset.owner_ref!=self.root.owner_ref or asset.kind!='image' or asset.size_bytes>MAX_IMAGE_BYTES:raise CapabilityDenied('bounded owned image required')
-        endpoint=self.endpoint
+        endpoint=self.root.endpoint_for('vision') if getattr(self.root,'model_profile_registry',None) is not None else self.endpoint
+        if endpoint is None or endpoint.capabilities is not None:raise StorageError('explicit vision workload route required')
         decision=self.root.registry.authorize_and_reserve(AuthorizationRequest(owner_ref=self.root.owner_ref,connection_ref=endpoint.connection_ref,
             capability='media.vision',resource_ref=self.resource_ref or asset.media_ref,operation='model_egress',data_class='user_provided',
             provider_ref=endpoint.provider_ref,purpose='media.vision',operation_ref='vision_'+asset.media_ref),upper_bound=self.upper_bound)
@@ -39,6 +40,8 @@ class VisionAdapter:
         observed_usage={};http_attempted=False
         def transport():
             nonlocal http_attempted
+            profiles=getattr(self.root,'model_profile_registry',None)
+            if profiles is not None:profiles.check(endpoint,role='vision',data_classes=('user_provided',))
             try:
                 http_attempted=True
                 with build_opener(ProxyHandler({}),NoRedirect()).open(Request(endpoint.endpoint,data=body,headers={'Authorization':'Bearer '+endpoint.token,'Content-Type':'application/json'}),timeout=endpoint.timeout_seconds) as response:
@@ -51,6 +54,7 @@ class VisionAdapter:
             except ModelResponseInvalid:raise
             except (json.JSONDecodeError,UnicodeDecodeError):raise ModelResponseInvalid() from None
             except Exception:raise StorageError('vision transport outcome unknown; do not retry') from None
+            if profiles is not None:profiles.check(endpoint,role='vision',data_classes=('user_provided',))
             if not isinstance(value,dict):raise ModelResponseInvalid()
             choices=value.get('choices')
             if value.get('model')!=endpoint.model or not isinstance(choices,list) or len(choices)!=1 or not isinstance(choices[0],dict) or choices[0].get('finish_reason')!='stop':raise ModelResponseInvalid()

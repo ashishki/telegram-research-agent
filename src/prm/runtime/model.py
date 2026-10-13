@@ -111,7 +111,8 @@ class ScopedModelClient:
         self._called=True
         self.input_digest=digest
         self.attempt_ref=prepare_model_attempt(self.registry.store,owner=owner_ref,task_ref=self.task_ref or operations[0],
-            purpose=self.groups[0][0].purpose,operation_refs=operations,input_digest=digest)
+            purpose=self.groups[0][0].purpose,operation_refs=operations,input_digest=digest,
+            context_digest=hashlib.sha256(json.dumps(messages,sort_keys=True,ensure_ascii=False).encode()).hexdigest())
         started=time.monotonic();http_attempted=False;known_reply_error=None;accepted_reply=None;accounting_unconfirmed=False
         def transport():
             def attempted():

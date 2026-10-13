@@ -42,12 +42,16 @@ class MemoryRuntime:
         owner=brief_owner_ref_from_authenticated_private_tuple(chat_id,actor_id,owner_chat_id)
         if owner!=self.root.owner_ref:raise CapabilityDenied('explicit private memory owner required')
         return owner
-    def preview(self,*,object_ref,text,source_refs,kind='note',lifecycle='indexed',expected_version=0,chat_id,actor_id,owner_chat_id):
+    def preview(self,*,object_ref,text,source_refs,kind='note',lifecycle='indexed',expected_version=0,project_context=None,chat_id,actor_id,owner_chat_id):
         owner=self._owner(chat_id,actor_id,owner_chat_id)
-        if kind not in {'note','preference','learning'} or lifecycle not in self.LIFECYCLES or not isinstance(text,str) or not 0<len(text)<=12000:
+        if kind not in {'note','preference','learning','project'} or lifecycle not in self.LIFECYCLES or not isinstance(text,str) or not 0<len(text)<=12000:
             raise StorageError('bounded explicit memory content required')
         if not isinstance(source_refs,tuple) or not source_refs or len(source_refs)>16:raise StorageError('explicit provenance required')
         payload={'text':text,'source_refs':list(source_refs),'kind':kind,'lifecycle':lifecycle,'explicit_owner_request':True}
+        if kind=='project':
+            from .projects import validate_context
+            payload['project_context']=validate_context(project_context)
+        elif project_context is not None:raise StorageError('project context requires its explicit memory kind')
         _,digest=_canonical(payload);ref='memoryconfirm_'+uuid.uuid4().hex
         with self.store.transaction() as tx:
             tx.conn.execute('INSERT INTO pa_memory.previews(owner,id,object_ref,payload,digest,expected_version,expires) VALUES(%s,%s,%s,%s,%s,%s,%s)',
@@ -56,10 +60,20 @@ class MemoryRuntime:
     def confirm(self,preview_ref,*,chat_id,actor_id,owner_chat_id):
         owner=self._owner(chat_id,actor_id,owner_chat_id)
         with self.store.transaction() as tx:
+            from .deletion import lineage_lock
+            lineage_lock(tx.conn,owner)
             row=tx.conn.execute('SELECT * FROM pa_memory.previews WHERE owner=%s AND id=%s FOR UPDATE',(owner,preview_ref)).fetchone()
             now=tx.conn.execute('SELECT clock_timestamp() AS now').fetchone()['now']
             if not row or row['consumed'] or row['expires']<=now or _canonical(row['payload'])[1]!=row['digest']:raise StateConflict('memory preview changed, expired or consumed')
-            item=tx.put(owner,'memory',row['object_ref'],row['payload'],expected_version=row['expected_version'])
+            payload=row['payload']
+            if payload['kind']=='project':
+                context=self.root.projects.validate_in(tx,payload['project_context'],row['object_ref'])
+                context={**context,'descriptor':{**context['descriptor'],'owner_confirmation_status':'confirmed'}}
+                payload={**payload,'project_context':context,'project_confirmation':{'preview_ref':row['id'],'digest':row['digest']}}
+            item=tx.put(owner,'memory',row['object_ref'],payload,expected_version=row['expected_version'])
+            if payload['kind']=='project':
+                for b in context['source_bindings']:
+                    tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',(owner,b['namespace'],b['ref'],'memory',item.object_id))
             tx.conn.execute('UPDATE pa_memory.previews SET consumed=true WHERE owner=%s AND id=%s',(owner,preview_ref));return item
     def inspect(self,object_ref,*,chat_id,actor_id,owner_chat_id):
         owner=self._owner(chat_id,actor_id,owner_chat_id);return self.store.get(owner,'memory',object_ref)
