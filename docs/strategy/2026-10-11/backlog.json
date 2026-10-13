@@ -1,0 +1,2482 @@
+{
+  "schema_version": "pa.daily_strategy.backlog.v1",
+  "date": "2026-10-11",
+  "base_commit": "23312b8",
+  "status": "proposed_not_implemented",
+  "authority": "Research and implementation planning only in this session; future execution requires the assigned block. No live connections, private egress, production changes or external effects are authorized by this file.",
+  "legend": {
+    "K": "Код и synthetic проверки",
+    "C": "Конфигурация без личных секретов",
+    "L": "Реальное подключение или внешний canary после выбора scope",
+    "H": "Решение или проверка владельца",
+    "R": "Исследование или измерение",
+    "S": "Один небольшой законченный срез",
+    "M": "Два или три среза",
+    "L_size": "Разбить на несколько срезов до начала"
+  },
+  "common_contract": {
+    "status": "proposed",
+    "engineering_done": "Следующий кодирующий агент работает законченными пакетами: реализация → адресные проверки → один независимый Deep Review накопленного diff → исправления → следующий пакет. У каждого пакета один native ingress→use case→result результат. P0/P1 исправлены и независимо перепроверены узко до зависимой работы; повторное полное ревью/все тесты без нового существенного риска не запускаются. Некритические остатки фиксируются; 62 карточки не означают 62 полных ревью. Изменения egress/secrets/retention/confirmation/recovery получают требуемое риск-ревью до реального использования.",
+    "evidence": "Record exact SHA/diff, commands, pass/fail/skip, requested/observed model, public fixture hashes and unresolved live/operator gates. A test filename is not a pass. No private payloads in Git.",
+    "rollback": "Отключить новую способность или вернуть предыдущий совместимый код; не откатывать consumed/unknown receipts, revoke/tombstones и canonical source IDs. Для schema changes нужен отдельный forward-compatible recovery.",
+    "verification": "Существующие test paths перечислены как regression floor; предложенные tests/test_daily_* ещё не существуют и должны быть написаны/зарегистрированы. Только затронутый tier; полный исторический pytest запрещён.",
+    "formal_mapping": "PAI references mean reuse/coverage, never automatic completion or human approval. Do not modify formal statuses based solely on this plan."
+  },
+  "tasks": [
+    {
+      "id": "D01",
+      "title": "Однозначный runtime и безопасная проверка готовности",
+      "priority": "P0",
+      "stage": "G0",
+      "kind": [
+        "K",
+        "C"
+      ],
+      "depends_on": [],
+      "size": "M",
+      "goal": "Исполнитель и владелец понимают, какой путь реально будет запущен и чего ему не хватает.",
+      "change": "Добавить явный профиль durable запуска и offline config-check/doctor с версиями schema, capabilities и missing prerequisites. Без complete runtime config не молча переходить на другой продуктовый путь. Прежний путь доступен явно как compatibility. В preflight разделить offline validation и отдельно разрешаемые сетевые probes; запуск и миграция не выполняются.",
+      "components": [
+        "src/prm/cli.py",
+        "src/prm/runtime/composition.py",
+        "src/prm/runtime/setup.py",
+        "systemd/telegram-prm-assistant.service",
+        "docs/runbooks/assistant_runtime.md"
+      ],
+      "verification": "tests/test_prm_cli.py и tests/test_pai_operations_runtime.py; новые tests/test_daily_entrypoint.py: пустая/частичная/неверная config, неизвестное поле, выбранный legacy, coherent durable profile. Spy доказывает zero network/DDL/service start на help/check. Секреты не выводятся, process state не объявляется observed из config.",
+      "gate": "Личный target не требуется; synthetic config достаточно. Публикация service template не включает сервис.",
+      "legacy": [
+        "PAI-07",
+        "PAI-24",
+        "PAI-28"
+      ]
+    },
+    {
+      "id": "D02",
+      "title": "Статус отмена и возврат к задаче без ID",
+      "priority": "P0",
+      "stage": "G0",
+      "kind": [
+        "K"
+      ],
+      "depends_on": [
+        "D01"
+      ],
+      "size": "M",
+      "goal": "Длительная работа не заставляет владельца администрировать очередь.",
+      "change": "Разрешать status/result/cancel по reply/callback и одному активному job; при нескольких показывать короткие названия. Natural стоп относится к выбранной задаче, stop all явно отделён. Сохранять актуальную привязку Telegram message→job/result. Показать checkpoints, partial и unknown без модельной выдумки, не сбрасывать unrelated conversation при отмене одного job. Общий TelegramMessageBinding и route contract из TELEGRAM.md использовать уже здесь; D56 доводит их транспортную реализацию, D57 — native drafts/Stop. Не создавать второй resolver отмены. Job control не требует Rich Messages или включённых тем.",
+      "components": [
+        "src/prm/runtime/ingress.py",
+        "src/prm/runtime/presentation.py",
+        "src/prm/storage/jobs.py",
+        "src/bot/bot.py"
+      ],
+      "verification": "tests/test_pai_ingress_jobs.py, tests/test_pai_control_polish.py; tests/test_daily_controls.py: zero/one/two jobs, restart, late callback, другой actor, завершение одновременно с cancel, model outage. Cancel не стирает prepared/unknown effect и не отменяет другую задачу.",
+      "gate": "Первый блок работает через synthetic Telegram updates; настоящий bot позднее D27.",
+      "legacy": [
+        "PAI-06",
+        "PAI-07",
+        "PAI-09"
+      ]
+    },
+    {
+      "id": "D03",
+      "title": "Один типизированный диспетчер существующих способностей",
+      "priority": "P0",
+      "stage": "G0",
+      "kind": [
+        "K"
+      ],
+      "depends_on": [
+        "D01",
+        "D02"
+      ],
+      "size": "M",
+      "goal": "Команды и понятные обычные фразы вызывают те же use cases.",
+      "change": "Ввести RequestIntent/dispatch contract для chat, search, weekly, memory, status/cancel и preview. Перенести текущие command/prefix mappings в один adapter; добавить небольшой явно проверенный набор естественных формулировок. Никаких новых модельных tool loops в первом блоке. Неизвестное намерение передаётся существующему Chat; это ещё не универсальное понимание речи.",
+      "components": [
+        "src/prm/runtime/composition.py",
+        "src/prm/runtime/ingress.py",
+        "src/prm/routing.py",
+        "src/prm/contracts.py",
+        "src/prm/runtime/presentation.py"
+      ],
+      "verification": "tests/test_pai_chat_runtime.py, tests/test_pai_brief_runtime.py, tests/test_pai_control_polish.py; tests/test_daily_dispatch.py: slash/natural equivalence, новая тема, без capabilities, ambiguous yes, injected source instructions. Один и тот же handler и result schema, никакой второй grant registry.",
+      "gate": "Граница первого исполнения. Полное LLM понимание D04 отдельно; не рекламировать fixed phrase coverage как всеобщую поддержку.",
+      "legacy": [
+        "PAI-07",
+        "PAI-10",
+        "PAI-14"
+      ]
+    },
+    {
+      "id": "D04",
+      "title": "Понимание задачи и устойчивый фокус беседы",
+      "priority": "P0",
+      "stage": "G1",
+      "kind": [
+        "K"
+      ],
+      "depends_on": [
+        "D03",
+        "D05",
+        "D06"
+      ],
+      "size": "L",
+      "goal": "Ассистент выбирает инструменты и продолжает правильный объект без знания пользователем режимов.",
+      "change": "Добавить bounded schema-bound intent planner над RequestIntent, ConversationFocus с thread/project/object/version и source filters. Модель предлагает только доступные read/compose/preview steps; code валидирует plan. Приоритет reply→явная ссылка→active focus→однозначный recent. Новая тема создаёт новый фокус; старые документы доступны через lookup. Ввести reason для необходимого уточнения и stop conditions. Reply/quote/forward нормализуются D56; ConversationFocus сохраняет optional thread без автоматического смешения историй. Полная миграция ключей и параллельность по conversation — D59. Полученное из переписки содержание не становится owner instruction.",
+      "components": [
+        "src/prm/runtime/composition.py",
+        "src/prm/conversation.py",
+        "src/prm/storage/conversations.py",
+        "src/prm/contracts.py",
+        "src/prm/routing.py"
+      ],
+      "verification": "tests/test_pai_durable_conversation.py, tests/test_pai_product_sessions.py; tests/test_daily_conversation.py: 10–20 turns, вмешавшийся background result, второй пункт, исправление проекта, возврат после restart, no model, ambiguity, malformed plan, injection. Planner не подтверждает actions и не выдаёт новые permissions.",
+      "gate": "Synthetic fake planner сначала; real model evidence через D37. История личной беседы только после retention решения.",
+      "legacy": [
+        "PAI-05",
+        "PAI-10",
+        "PAI-13"
+      ]
+    },
+    {
+      "id": "D05",
+      "title": "Совместимые и наблюдаемые модельные адаптеры",
+      "priority": "P0",
+      "stage": "G1",
+      "kind": [
+        "K",
+        "R"
+      ],
+      "depends_on": [],
+      "size": "M",
+      "goal": "Выбранная модель работает через тот же product runtime, что и synthetic тесты.",
+      "change": "Выделить transport protocol и capability descriptor. Начать с нужного Chat Completions адаптера для Flash и GPT-4o, нормализовать token parameters/usage/stop reason и явное alias mapping. Responses/Messages добавлять при выборе кандидата. Сохранять exact endpoint/credential binding, deny redirect, schema bounds и unknown accounting. Для Go проверить допустимость нагрузки и корректный собственный client/session, не маскировку. Для эксперимента D57 добавить SSE/event stream как capability выбранного адаптера с cancel/usage/partial handling; не объявлять streaming доступным всем моделям по одному совместимому endpoint. Progress worker не зависит от model SSE.",
+      "components": [
+        "src/prm/runtime/model.py",
+        "src/prm/runtime/model_errors.py",
+        "src/prm/runtime/model_attempts.py",
+        "src/prm/runtime/speech.py",
+        "src/prm/runtime/vision.py"
+      ],
+      "verification": "tests/test_pai_chat_runtime.py, tests/test_pai_cost_cache.py; tests/test_daily_model_protocols.py с HTTP doubles: alias/snapshot, unsupported parameter, truncated response, 403, 429, timeout after request, output too large, usage mismatch, header redaction. Canary только после выбранного provider/data scope.",
+      "gate": "Никаких вызовов модели в этой планировочной сессии; unit tests без credentials. Provider compatibility не даёт privacy approval.",
+      "legacy": [
+        "PAI-10",
+        "PAI-23"
+      ]
+    },
+    {
+      "id": "D06",
+      "title": "Эталонные задачи и единый trace",
+      "priority": "P0",
+      "stage": "G0",
+      "kind": [
+        "K",
+        "R"
+      ],
+      "depends_on": [],
+      "size": "M",
+      "goal": "Каждое изменение сравнивается по поведению и результату, а не числу модулей.",
+      "change": "Создать первые 20 synthetic end-to-end задач и расширяемый manifest до 120 единиц MODELS_EVAL. Case хранит source snapshots, expected constraints, intended object binding и must-not-effects. Trace содержит visible turns, typed tool results, versions, errors, costs и latency без secrets. Переиспользовать native capture/test fixtures, сохранить historical datasets отдельно.",
+      "components": [
+        "tests/pai_runtime_fixtures.py",
+        "tests/test_pai_product_sessions.py",
+        "src/prm/runtime/evaluation.py",
+        "evals/assistant_judge/",
+        "tools/run_pai_acceptance.py"
+      ],
+      "verification": "tests/test_pai_product_sessions.py, tests/test_pai_acceptance_guard.py; tests/test_daily_eval_manifest.py: missing evidence/turn/required case fail, pass cannot come from matching keywords, train/dev/holdout source split, secrets scan на synthetic canaries. Recording не считается provider execution.",
+      "gate": "Эталон личной полезности дополняет владелец в D38; независимая часть готовится сейчас без его данных.",
+      "legacy": [
+        "PAI-26"
+      ]
+    },
+    {
+      "id": "D07",
+      "title": "Профили качества бюджеты и политика провайдеров",
+      "priority": "P0",
+      "stage": "G1",
+      "kind": [
+        "K",
+        "C",
+        "H"
+      ],
+      "depends_on": [
+        "D05",
+        "D06"
+      ],
+      "size": "M",
+      "goal": "Стоимость и передача личных данных управляются независимо от названия модели.",
+      "change": "Versioned role profiles chat/planner/research/brief_editorial/extraction/judge/media; tariffs и allowed data classes с checked_at/expiry. Подключить реальные paired receipts к economical promotion. Budget показывает subscription, meter, overage и unknown отдельно. Кэш ключуется scope/version; fallback только в заранее разрешённый набор, с cooldown и bounded attempts.",
+      "components": [
+        "src/prm/runtime/profiles.py",
+        "src/prm/runtime/cost_cache.py",
+        "src/prm/runtime/composition.py",
+        "src/prm/model_cost.py",
+        "src/prm/storage/policy.py"
+      ],
+      "verification": "tests/test_pai_cost_cache.py, tests/test_pai_durable_policy.py; tests/test_daily_profiles.py: role selection, expired privacy policy, отсутствующий receipt, unknown tariff/usage, revoked grant invalidates cache, peak/offpeak и валютные единицы. Missing provider не вызывает молчаливый приватный fallback.",
+      "gate": "Бюджет/egress выбирает владелец перед live. Изменение governed reviewer model не входит в product profile.",
+      "legacy": [
+        "PAI-03",
+        "PAI-23"
+      ]
+    },
+    {
+      "id": "D08",
+      "title": "Актуальные проекты и проверяемая применимость",
+      "priority": "P0",
+      "stage": "G1",
+      "kind": [
+        "K",
+        "H"
+      ],
+      "depends_on": [
+        "D03",
+        "D06"
+      ],
+      "size": "M",
+      "goal": "Находки связываются с реальными целями, а не с совпадением названия проекта.",
+      "change": "Переиспользовать project_portfolio_context: confirmed goal/blocker/next_proof/status/aliases. Добавить durable versioned ProjectContext, source refs и reviewed_at; 1–3 проекта для первого пилота. Карточка применимости содержит evidence связи, минимальный эксперимент и критерий отказа. Паузу/смену цели учитывать при очередной рекомендации.",
+      "components": [
+        "src/assistant/project_portfolio_context.py",
+        "src/assistant/project_context.py",
+        "src/prm/runtime/memory.py",
+        "src/prm/storage/conversations.py"
+      ],
+      "verification": "tests/test_project_portfolio_context.py, tests/test_project_context.py; tests/test_daily_projects.py: wrong alias, paused project, stale ref, goal change, unknown owner confirmation. Keyword match без связи не даёт уверенного action recommendation.",
+      "gate": "Synthetic проекты сначала; реальные цели выбираются без публикации в Git. Существующие profiles не массово перезаписывать.",
+      "legacy": [
+        "PAI-05",
+        "PAI-13",
+        "PAI-21"
+      ]
+    },
+    {
+      "id": "D09",
+      "title": "Выбранный Telegram архив и его свежесть",
+      "priority": "P0",
+      "stage": "G1",
+      "kind": [
+        "K",
+        "C",
+        "L"
+      ],
+      "depends_on": [
+        "D10"
+      ],
+      "size": "M",
+      "goal": "Пользователь понимает, какие каналы и периоды действительно прочитаны.",
+      "change": "Связать существующий ingestion/reaction sync с selected source registry: source allowlist, cursor, watermark, edit/delete, lag и quota. Сохранить canonical raw_posts/posts IDs и возможность поиска без enrichment. Предложить импорт/forward как ограниченный путь при отсутствии Telegram session; Bot API не выдавать за доступ ко всей истории.",
+      "components": [
+        "src/ingestion/",
+        "src/ingestion/reaction_sync.py",
+        "src/db/archive_search.py",
+        "src/prm/runtime/archive.py",
+        "src/prm/runtime/research.py"
+      ],
+      "verification": "tests/test_reaction_sync.py, tests/test_archive_search.py, tests/test_pai_archive_search.py; tests/test_daily_source_freshness.py: edits/deletes, duplicate ingest, cursor interruption, outage, reacted post without enrichment, old source watermark. No private DB read в обычном CI.",
+      "gate": "Реальный collector/session и разрешённые каналы только D27; не запускать старые report timers.",
+      "legacy": [
+        "PAI-11",
+        "PAI-27"
+      ]
+    },
+    {
+      "id": "D10",
+      "title": "Единый контракт источников и полноты",
+      "priority": "P0",
+      "stage": "G1",
+      "kind": [
+        "K"
+      ],
+      "depends_on": [
+        "D06"
+      ],
+      "size": "M",
+      "goal": "Ограниченная выборка не выглядит проверкой всех материалов.",
+      "change": "Ввести SourceBatch и EvidenceBundle: selected resources, checked_at, publication/event/discovery time, versions, pagination/continuation, completeness, omitted count if known, reason. Привести archive, web, Brief hooks и позже connectors к contract; лимит model packet отделить от source enumeration. Source IDs/account scopes сохраняются при объединении.",
+      "components": [
+        "src/prm/contracts.py",
+        "src/prm/runtime/research.py",
+        "src/prm/runtime/brief.py",
+        "src/prm/runtime/graph.py",
+        "src/prm/public_web.py"
+      ],
+      "verification": "tests/test_pai_archive_search.py, tests/test_pai_web_github.py, tests/test_pai_brief_runtime.py; tests/test_daily_coverage.py: >48 items, unavailable/empty/partial pages, date unknown, later source, boundary timestamps и conflict. Счётчики полученного/кандидатов/процитированного различаются.",
+      "gate": "Расширение contract аддитивное; старый collector без completeness считается bounded/unknown, не complete.",
+      "legacy": [
+        "PAI-11",
+        "PAI-12",
+        "PAI-14",
+        "PAI-17"
+      ]
+    },
+    {
+      "id": "D11",
+      "title": "Измеримый поиск RU EN и объединение retrieval путей",
+      "priority": "P1",
+      "stage": "G1",
+      "kind": [
+        "K",
+        "R"
+      ],
+      "depends_on": [
+        "D06",
+        "D10"
+      ],
+      "size": "M",
+      "goal": "Находить нужные материалы при перефразировании и другом языке запроса.",
+      "change": "Общий retrieval service над canonical FTS с query normalization, bounded expansions и source/project/time filters. Сравнить FTS, текущий hashed-vector fusion и learned candidate отдельно. Не делать curated atoms обязательными. Gold exact lookup, bilingual paraphrase и no-answer размечены до настройки; source diversity и dedup после candidate retrieval.",
+      "components": [
+        "src/db/archive_search.py",
+        "src/db/archive_vector.py",
+        "src/assistant/semantic_retrieval.py",
+        "src/prm/runtime/research.py",
+        "evals/retrieval/"
+      ],
+      "verification": "tests/test_archive_search.py, tests/test_archive_documents.py; frozen recall@20/nDCG@10/MRR/no-answer false positive по RU/EN и filters. Learned experiment D46 запускается только если есть типы промахов и ресурсная смета. Baseline receipts сохраняются.",
+      "gate": "Улучшение не предполагается из имени semantic. FTS позволяет начать пилот, если проходит agreed задачи.",
+      "legacy": [
+        "PAI-11",
+        "PAI-23",
+        "PAI-31"
+      ]
+    },
+    {
+      "id": "D12",
+      "title": "Естественный веб поиск и проверка свежести",
+      "priority": "P0",
+      "stage": "G1",
+      "kind": [
+        "K",
+        "L"
+      ],
+      "depends_on": [
+        "D04",
+        "D10"
+      ],
+      "size": "M",
+      "goal": "Изменчивые вопросы действительно проверяются по источникам без обязательного /web.",
+      "change": "Planner формирует public query и bounded discovery/fetch steps; reuse Brave и safe fetch. Private context не попадает в public query. Distinguish search snippet vs fetched source; exact timestamps/coverage. Для public domains подготовить расширяемую policy с network guard; частные источники строго выбраны. RSS выбранных первоисточников добавить как pull connector, если это уменьшает повторный поиск.",
+      "components": [
+        "src/prm/runtime/web.py",
+        "src/prm/public_web.py",
+        "src/prm/runtime/network_guard.py",
+        "src/prm/runtime/composition.py"
+      ],
+      "verification": "tests/test_pai_web_github.py, tests/test_assistant_web_search.py; tests/test_daily_web_route.py: fresh fact without keyword, no permission, stale snippet, malformed date, redirects/private IP/DNS cases, private text in query. Live Brave canary отдельно с receipt.",
+      "gate": "Отсутствие Brave key не останавливает tests и archive path; live search не подменять одним HTTP fetch.",
+      "legacy": [
+        "PAI-12",
+        "PAI-13",
+        "PAI-27"
+      ]
+    },
+    {
+      "id": "D13",
+      "title": "Контекст выбранного GitHub проекта",
+      "priority": "P1",
+      "stage": "G1",
+      "kind": [
+        "K",
+        "C",
+        "L"
+      ],
+      "depends_on": [
+        "D08",
+        "D10"
+      ],
+      "size": "M",
+      "goal": "Рекомендации учитывают актуальный код и проектные решения.",
+      "change": "Расширить existing exact-ref public reader: selected files, relevant issues/PR/releases с versions и cache invalidation. Private repositories через выбранный read-only fine-grained token либо GitHub App; prefer App для длительной установки, token допустим для ограниченного canary. Разделить account scope и model egress; exclude secrets/generated files и arbitrary repo execution.",
+      "components": [
+        "src/prm/runtime/web.py",
+        "src/assistant/project_context.py",
+        "src/prm/runtime/connections.py",
+        "src/prm/runtime/cost_cache.py"
+      ],
+      "verification": "tests/test_pai_web_github.py, tests/test_project_context.py; tests/test_daily_github_context.py: branch moved, pinned commit stable, missing path, 404 private access, issue injection, revoke/cached ref. Ответ показывает прочитанный SHA и не утверждает изменение репозитория.",
+      "gate": "Public path независим от private credential; repo write остаётся вне product полномочий.",
+      "legacy": [
+        "PAI-12",
+        "PAI-13",
+        "PAI-16"
+      ]
+    },
+    {
+      "id": "D14",
+      "title": "Синтез с отдельными фактами выводами и советами",
+      "priority": "P0",
+      "stage": "G1",
+      "kind": [
+        "K",
+        "R"
+      ],
+      "depends_on": [
+        "D05",
+        "D06",
+        "D10"
+      ],
+      "size": "M",
+      "goal": "Ответ помогает разобраться и решить, сохраняя проверяемость.",
+      "change": "Расширить ResearchResult типами fact/inference/recommendation. Facts требуют supporting spans; выводы имеют premises и неопределённость, рекомендации — цель/условия и не маскируются под факт. Измерить false reject нынешнего all-or-none verifier, разрешить partial supported blocks с явным пробелом. Сохранить строгие проверки numbers/entity/negation/URL; не снижать их ради красивого текста.",
+      "components": [
+        "src/prm/runtime/research_answer.py",
+        "src/assistant/claim_ledger.py",
+        "src/prm/synthesis.py",
+        "src/prm/archive_synthesis_transport.py",
+        "src/prm/contracts.py"
+      ],
+      "verification": "tests/test_claim_ledger.py, tests/test_pai_archive_search.py; tests/test_daily_synthesis.py: faithful paraphrase/translation, swapped actors, false number, contradiction, advice with absent premise, one bad claim among good. Отдельно groundedness precision и required fact recall.",
+      "gate": "Изменение verifier требует независимого read-only recheck и нового matched dataset evidence; старые pass не переносятся.",
+      "legacy": [
+        "PAI-11",
+        "PAI-13",
+        "PAI-14"
+      ]
+    },
+    {
+      "id": "D15",
+      "title": "Составное исследование с разумным завершением",
+      "priority": "P1",
+      "stage": "G1",
+      "kind": [
+        "K"
+      ],
+      "depends_on": [
+        "D04",
+        "D07",
+        "D12",
+        "D14"
+      ],
+      "size": "L",
+      "goal": "Ассистент сам делает необходимые промежуточные шаги и останавливается при достаточном ответе.",
+      "change": "Связать typed plan с существующим durable research worker: archive/web/selected project, independent parallel reads, gap-based additional wave, stopping by coverage/budget/deadline. Reuse proven deep_research planning logic после согласования contracts. Сохранить промежуточные evidence refs, поддержать продолжение exact result и обновление stale источников. Не расширять source scopes в ходе поиска.",
+      "components": [
+        "src/prm/runtime/research.py",
+        "src/prm/deep_research.py",
+        "src/prm/research_planner.py",
+        "src/prm/storage/jobs.py"
+      ],
+      "verification": "tests/test_pai_deep_research.py и tests/test_pai_load_recovery.py; tests/test_daily_research.py: useful second wave, sufficient first wave, insufficient budget, cancellation/restart между шагами, source conflict, cached expired grants. No blind replay prepared paid call.",
+      "gate": "Широкий multiwave live research — отдельное provider evidence; локальная механика проверяется без account.",
+      "legacy": [
+        "PAI-06",
+        "PAI-13"
+      ]
+    },
+    {
+      "id": "D16",
+      "title": "Полная выборка недели до лимита модели",
+      "priority": "P0",
+      "stage": "G1",
+      "kind": [
+        "K"
+      ],
+      "depends_on": [
+        "D10"
+      ],
+      "size": "M",
+      "goal": "Важное раннее событие и небольшой источник не пропадают из-за первых 48 записей.",
+      "change": "Заменить early LIMIT/slice на paginated bounded candidate enumeration и per-source quotas до общей оценки. Global caps отражать в SourceBatch coverage. Разделить all candidates, selected evidence, model packet и omitted material refs. Реализовать calendar-week/rolling window option с timezone. Сохранить возможность открыть не вошедшие материалы без второго raw corpus dump.",
+      "components": [
+        "src/prm/runtime/research.py",
+        "src/prm/runtime/brief.py",
+        "src/prm/briefs.py",
+        "src/prm/storage/briefs.py"
+      ],
+      "verification": "tests/test_pai_brief_runtime.py, tests/test_reporting_period.py; tests/test_daily_brief_selection.py: 200 archive items плюс late mail source, важное событие в начале недели, no content week, DST, removed/late publication, cap exceeded. Числа coverage вытекают из collector, не из LLM.",
+      "gate": "First fix protects selection integrity; полная персонализация D18 позже. Новый объём чтения bounded, egress не увеличивается автоматически.",
+      "legacy": [
+        "PAI-11",
+        "PAI-14"
+      ]
+    },
+    {
+      "id": "D17",
+      "title": "События новизна и противоречия",
+      "priority": "P1",
+      "stage": "G1",
+      "kind": [
+        "K",
+        "R"
+      ],
+      "depends_on": [
+        "D10",
+        "D16"
+      ],
+      "size": "M",
+      "goal": "Обзор показывает изменения, а не многократные пересказы одной новости.",
+      "change": "EventCluster с canonical URLs/content fingerprints и revisions; source independence сохраняется. Учитывать last surfaced/previous Brief, не считать discovered_at временем события. Семантическое объединение только с поддержкой, uncertain candidates остаются раздельными. Изменившийся срок/версия и correction не подавляются dedup.",
+      "components": [
+        "src/prm/briefs.py",
+        "src/prm/runtime/brief.py",
+        "src/prm/storage/briefs.py",
+        "src/output/editorial_memory.py"
+      ],
+      "verification": "tests/test_pai_brief_runtime.py; tests/test_daily_event_clusters.py: ten reposts/one primary, similar but different events, conflicting deadlines, weekly recurrence, title change, new revision. Измерить duplicate rate и gold event recall вместе.",
+      "gate": "До завершения semantic clustering допускается deterministic URL/fingerprint baseline с видимыми ограничениями.",
+      "legacy": [
+        "PAI-14",
+        "PAI-21"
+      ]
+    },
+    {
+      "id": "D18",
+      "title": "Обзор который помогает выбрать следующий шаг",
+      "priority": "P0",
+      "stage": "G1",
+      "kind": [
+        "K",
+        "H"
+      ],
+      "depends_on": [
+        "D08",
+        "D14",
+        "D16"
+      ],
+      "size": "M",
+      "goal": "Недельный Brief экономит внимание и связан с текущими проектами.",
+      "change": "Применить отдельные признаки importance/novelty/reliability/project applicability/reading cost; 3–5 событий, максимум несколько выбранных продолжений. Для каждого: что изменилось, почему важно, изучить/эксперимент/пропустить и evidence. Не требовать заполнения рубрик и не генерировать обязанности. D17 подключается как улучшение новизны после baseline.",
+      "components": [
+        "src/prm/brief_editorial.py",
+        "src/prm/runtime/brief.py",
+        "src/prm/briefs.py",
+        "src/prm/runtime/profiles.py"
+      ],
+      "verification": "tests/test_pai_brief_runtime.py, tests/test_pai_brief_polish.py; frozen candidate sets с owner/gold priorities, no-news, weak project linkage, opportunity vs obligation. Required important events retained, no invented importance fact/deadline; real usefulness отдельно D39.",
+      "gate": "Synthetic editorial evidence не заменяет оценку владельцем. Сам текст не создаёт задачи и расписания.",
+      "legacy": [
+        "PAI-14",
+        "PAI-23"
+      ]
+    },
+    {
+      "id": "D19",
+      "title": "Обсуждение документов и версий в беседе",
+      "priority": "P0",
+      "stage": "G1",
+      "kind": [
+        "K"
+      ],
+      "depends_on": [
+        "D04",
+        "D18"
+      ],
+      "size": "M",
+      "goal": "Обзор становится рабочим объектом, к которому легко вернуться.",
+      "change": "Привязать natural followups к Brief ID/version/story и document focus. Поддержать поясни/почему/применить/сократи/только тема/сравни/обнови/экспорт. Refresh создаёт новую версию с diff; style change сохраняет facts. Возврат из reader/Telegram reply адресует тот же объект; late completion не меняет focus автоматически. Rich Messages D58 — ещё одно представление этого же immutable документа. Object/version/story bindings общие с D56; ссылки и точный confirmation preview не заменять краткой rich карточкой.",
+      "components": [
+        "src/prm/application.py",
+        "src/prm/briefs.py",
+        "src/prm/storage/briefs.py",
+        "src/prm/runtime/presentation.py",
+        "src/prm/report_exports.py"
+      ],
+      "verification": "tests/test_assistant_report_dialogue.py, tests/test_pai_brief_polish.py; tests/test_daily_document_dialogue.py: две версии, два документа, ambiguous пункт2, revoked source, refresh vs restyle, new fact provenance. Telegram/HTML/PDF/MD содержат одну версию фактов.",
+      "gate": "Локальные artifacts достаточны для code gate; hosted mobile reader D25/D40 отдельно.",
+      "legacy": [
+        "PAI-05",
+        "PAI-14",
+        "PAI-15"
+      ]
+    },
+    {
+      "id": "D20",
+      "title": "Полезная обратная связь без работы по разметке",
+      "priority": "P1",
+      "stage": "G1",
+      "kind": [
+        "K",
+        "H"
+      ],
+      "depends_on": [
+        "D08",
+        "D18"
+      ],
+      "size": "M",
+      "goal": "Отбор постепенно учитывает владельца и остаётся объяснимым.",
+      "change": "Соединить существующие reaction/editorial/artifact feedback с versioned FeedbackEvent и new runtime. Полезно/не тема/уже знал/длинно/неверно/применил влияют на конкретный признак. Явное изменение предпочтения показывает область и отмену; passive reaction не меняет durable profile сама. Добавить why shown и необязательный weekly feedback prompt.",
+      "components": [
+        "src/output/editorial_memory.py",
+        "src/output/reaction_personalization.py",
+        "src/db/artifact_feedback.py",
+        "src/db/ai_report_feedback.py",
+        "src/prm/runtime/memory.py"
+      ],
+      "verification": "tests/test_artifact_feedback.py, tests/test_editorial_memory.py; tests/test_daily_feedback.py: no reaction unknown, all emoji positive interest, отмена правила, wrong target/version, learning state provenance, repeated signals not automatic confirmed preference. A/B selection replay показывает конкретное изменение.",
+      "gate": "Настройка logging/retention до personal usage. Не просить владельца маркировать каждый пост.",
+      "legacy": [
+        "PAI-14",
+        "PAI-21"
+      ]
+    },
+    {
+      "id": "D21",
+      "title": "Память которая помогает следующему вопросу",
+      "priority": "P0",
+      "stage": "G1",
+      "kind": [
+        "K",
+        "H"
+      ],
+      "depends_on": [
+        "D04",
+        "D08",
+        "D10"
+      ],
+      "size": "M",
+      "goal": "Полезный сохранённый контекст действительно используется и управляется владельцем.",
+      "change": "Context builder объединяет current task, bounded turns, relevant confirmed memory, project и selected source refs с раздельными grants. Улучшить memory retrieval сверх substring JSON, добавить explicit save/correct/inspect/forget/export natural flows. Для явной однозначной команды предложить save+undo policy, сохраняя preview до её принятия. Не вводить второй memory service.",
+      "components": [
+        "src/prm/runtime/memory.py",
+        "src/prm/memory_library.py",
+        "src/prm/storage/conversations.py",
+        "src/prm/runtime/composition.py",
+        "src/prm/runtime/deletion.py"
+      ],
+      "verification": "tests/test_pai_memory_runtime.py, tests/test_pai_durable_conversation.py; tests/test_daily_memory_context.py: remembered preference improves answer, unrelated memory excluded, expired/revoked source not recalled, corrected fact wins, conversation reset vs permanent memory, forget cascades. No inferred read/understood/applied.",
+      "gate": "Политика explicit save/undo — изменение UX semantics, не отмена existing подтверждений без решения.",
+      "legacy": [
+        "PAI-05",
+        "PAI-21"
+      ]
+    },
+    {
+      "id": "D22",
+      "title": "Настоящий private storage target",
+      "priority": "P0",
+      "stage": "G2",
+      "kind": [
+        "K",
+        "C"
+      ],
+      "depends_on": [
+        "D01"
+      ],
+      "size": "L",
+      "goal": "Личные данные могут храниться в проверяемой постоянной среде.",
+      "change": "Добавить отдельный PrivateTarget/protocol рядом со строгим SyntheticTarget, explicit identity/auth, app/migrator roles и staged versioned migrations. Убрать test-role coupling из новых migration definitions, не менять исторические checksum без migration. Secrets outside repo; connection config redacted; test environment отдельный. Подготовить private install manifest, не применять к production.",
+      "components": [
+        "src/prm/storage/postgres.py",
+        "src/prm/storage/",
+        "src/prm/runtime/setup.py",
+        "src/prm/runtime/composition.py",
+        "src/prm/cli.py"
+      ],
+      "verification": "tests/test_pai_storage.py, tests/test_pai_migration.py; tests/test_daily_private_target.py на отдельной disposable БД: wrong identity, privileged role, schema mismatch, DDL denied app role, auth failure redaction, additive migration/reopen, no ambient DSN fallback. Synthetic guard остаётся строгим.",
+      "gate": "Код/изолированный PG разрешены в будущем local block; реальный host/DSN/migration отдельный D27 grant и независимое security review.",
+      "legacy": [
+        "PAI-02",
+        "PAI-25",
+        "PAI-28"
+      ]
+    },
+    {
+      "id": "D23",
+      "title": "Retention backup и восстановление private среды",
+      "priority": "P0",
+      "stage": "G2",
+      "kind": [
+        "K",
+        "C",
+        "H"
+      ],
+      "depends_on": [
+        "D22"
+      ],
+      "size": "M",
+      "goal": "Потеря процесса или восстановление не теряют контекст и не повторяют действия.",
+      "change": "Применить existing backup/domain migration к private target и согласованным retention windows. Защитить backup/artifacts ключами и правами по threat model, записать restore order: authority/tombstones/fences до serving. Отдельно measured RPO/RTO на копии и storage/disk limits; rollback app/schema compatibility matrix.",
+      "components": [
+        "src/prm/runtime/operations.py",
+        "src/prm/runtime/migration.py",
+        "src/prm/runtime/deletion.py",
+        "src/prm/storage/artifacts.py",
+        "docs/runbooks/assistant_runtime.md"
+      ],
+      "verification": "tests/test_pai_migration.py, tests/test_pai_operations_runtime.py, tests/test_pai_memory_runtime.py; restore rehearsal на synthetic private-target copy с revoked grants, unknown effect, consumed confirmation, deleted source, interrupted artifact cleanup и disk full. Hash/count/refs parity и no replay.",
+      "gate": "Владелец выбирает сроки и backup destination перед private persistence. Нет обещания мгновенного удаления у provider/из старого backup.",
+      "legacy": [
+        "PAI-21",
+        "PAI-24",
+        "PAI-25"
+      ]
+    },
+    {
+      "id": "D24",
+      "title": "Один профиль запуска и наблюдаемое состояние",
+      "priority": "P0",
+      "stage": "G2",
+      "kind": [
+        "K",
+        "C"
+      ],
+      "depends_on": [
+        "D01",
+        "D02",
+        "D22"
+      ],
+      "size": "M",
+      "goal": "Запуск и поддержка не превращаются в отдельный ежедневный проект.",
+      "change": "Подготовить coherent ingress/compute/effect/scheduler configs и service templates с single poller/leader control, safe health/status, last successful job/source, classified error/backoff. Silent loop failures становятся safe diagnostic events и degraded status. Default background/writes off, emergency pause/drain/kill проверяемы. Startup сам не мигрирует.",
+      "components": [
+        "src/prm/runtime/service.py",
+        "src/prm/runtime/operations.py",
+        "src/prm/cli.py",
+        "systemd/pai-worker.service.example",
+        "systemd/telegram-prm-assistant.service"
+      ],
+      "verification": "tests/test_pai_operations_runtime.py, tests/test_pai_load_recovery.py; tests/test_daily_launch.py: duplicate process/poller, missing worker, invalid config, SIGTERM, crash loop, queue age, source failure. Preflight сообщает configured/observed раздельно. Никаких systemctl start в CI.",
+      "gate": "Deploy manifest готовится локально; actual service startup после выбранного host/cutover решения D27.",
+      "legacy": [
+        "PAI-24",
+        "PAI-28"
+      ]
+    },
+    {
+      "id": "D25",
+      "title": "Приватный reader удобный на телефоне",
+      "priority": "P1",
+      "stage": "G2",
+      "kind": [
+        "K",
+        "C",
+        "L",
+        "H"
+      ],
+      "depends_on": [
+        "D19",
+        "D22",
+        "D23"
+      ],
+      "size": "M",
+      "goal": "Полный обзор открывается из Telegram без технических заголовков авторизации.",
+      "change": "Добавить reviewed browser session exchange для exact owner/report/version, короткий одноразовый token→cookie flow, TLS/reverse proxy deployment contract, no indexing/cache/analytics и revoke checks. Tokens не в access logs/referrers; persisted sessions scoped and expiring. Return-to-chat сохраняет focus. Альтернатива на первом этапе — безопасная доставка существующего PDF/MD без публичного hosting. Сначала использовать native rich D58 там, где он покрывает задачу. Reader остаётся обычной приватной веб-страницей; Mini App исключён владельцем. Не требовать hosting ради первого Telegram-улучшения.",
+      "components": [
+        "src/prm/runtime/reader.py",
+        "src/prm/runtime/render.py",
+        "src/prm/report_exports.py",
+        "src/prm/storage/artifacts.py",
+        "src/prm/runtime/delivery.py"
+      ],
+      "verification": "tests/test_pai_report_runtime.py и tests/test_pai_brief_polish.py; tests/test_daily_reader_session.py: stolen/expired/replayed token, wrong owner/version, source revoke after open, restart, referrer/log leakage, mobile back-to-chat. Browser и PDF visual checks на synthetic документах.",
+      "gate": "Выбор hosting и домена позднее; он не блокирует Telegram/plain document pilot. Full reader acceptance остаётся отдельной.",
+      "legacy": [
+        "PAI-15",
+        "PAI-27",
+        "PAI-28"
+      ]
+    },
+    {
+      "id": "D26",
+      "title": "Короткая настройка источников и полномочий",
+      "priority": "P0",
+      "stage": "G2",
+      "kind": [
+        "K",
+        "C",
+        "H"
+      ],
+      "depends_on": [
+        "D07",
+        "D08",
+        "D23",
+        "D24"
+      ],
+      "size": "M",
+      "goal": "Владелец выбирает полезные настройки без инфраструктурной анкеты.",
+      "change": "Экран readiness/connections: реально доступные возможности, 1–3 проекта, выбранные sources/window, timezone, retention, provider/data mapping и budget. Понятные read/AI processing/background/write scopes с provider token breadth. Defaults предложены, sensitive values выбираются явно. Missing connector предлагает независимый доступный путь; consent revision сохраняется один раз. Для выбранного Secretary-коннектора D60 показывать отдельно BotFather capability, connection identity/rights, локальный peer allowlist, model egress и запрет write. Telegram UI selection не равна provider-verifiable полной истории; не расширять Telethon session.",
+      "components": [
+        "src/prm/runtime/connections.py",
+        "src/prm/runtime/presentation.py",
+        "src/prm/storage/policy.py",
+        "src/bot/",
+        "docs/runbooks/assistant_runtime.md"
+      ],
+      "verification": "tests/test_pai_connections.py, tests/test_pai_durable_policy.py; tests/test_daily_onboarding.py: skip source, change timezone, partial grant, expired policy, revoke, no key in chat, token-wide vs selected folder wording. Обычное разрешённое чтение не спрашивает согласие повторно.",
+      "gate": "Synthetic preview готовится до владельца; личные значения хранятся вне Git. Пользователь подтверждает конкретные настройки, не абстрактную свободу.",
+      "legacy": [
+        "PAI-03",
+        "PAI-16",
+        "PAI-27"
+      ]
+    },
+    {
+      "id": "D27",
+      "title": "Ограниченный canary реального чтения и запуска",
+      "priority": "P0",
+      "stage": "G2",
+      "kind": [
+        "L",
+        "C",
+        "H"
+      ],
+      "depends_on": [
+        "D09",
+        "D12",
+        "D23",
+        "D24",
+        "D26"
+      ],
+      "size": "M",
+      "goal": "Подтвердить реальный Telegram→assistant→source→answer путь на выбранных данных.",
+      "change": "Подготовить exact private-config commands, reviewed SHA/host/target/source/destination/model grants. Сначала test content/read-only foreground; source sync, one web discovery, answer delivery с message_id, cancel/revoke. После отдельного разрешения выполнить выбранный deploy profile и короткое наблюдение без mail writes; source failures локализовать. Reuse разрешённые scopes, не повторять общий запрос на разрешение. Через тот же выбранный bot/chat выполнить canary D56–D58: getMe capability snapshot, plain/rich final, draft/Stop, callback, observed client versions и rollback. Не активировать BotFather topics/business настройку автоматически. Provider acceptance и visual support записывать отдельно.",
+      "components": [
+        "docs/runbooks/assistant_runtime.md",
+        "src/prm/cli.py",
+        "src/prm/runtime/service.py",
+        "src/prm/runtime/delivery.py",
+        "docs/verification/PAI-pilot-access-20261010.md"
+      ],
+      "verification": "Actual receipts: exact SHA/config digest, real source version/message_id, 20 operator tasks из обновлённого packet, restart/cancel/revoke и restore prerequisites. В Git только sanitized metadata. Fetch, search, actual model, actual Telegram delivery фиксируются раздельно.",
+      "gate": "Требует конкретных источников, private storage/egress и запуска. При отсутствии доступа статус awaiting_resource только этой карточки; D28–D37 независимая разработка продолжается.",
+      "legacy": [
+        "PAI-27",
+        "PAI-28"
+      ]
+    },
+    {
+      "id": "D28",
+      "title": "Локальные черновики из обычного разговора",
+      "priority": "P1",
+      "stage": "G3",
+      "kind": [
+        "K"
+      ],
+      "depends_on": [
+        "D04",
+        "D14",
+        "D21"
+      ],
+      "size": "M",
+      "goal": "Делегирование начинается с качественного конкретного результата, который можно исправить.",
+      "change": "Natural request→local DraftDocument→versioned ActionProposal. Поддержать rewrite, recipient correction, exact timezone и attachments manifest; address lookup только из разрешённых contacts/explicit input. Локальный черновик доступен без account writes. Cloud draft явно отдельное действие. Показать краткий diff перед новым подтверждением; сохранить fully delivered preview binding. Локальные Telegram reply drafts из D61 используют тот же DraftDocument/ActionProposal. D62 добавляет отдельный business effect adapter; входящие и исходящие в source chat не подтверждают proposal. Exact disclosure из других личных источников виден владельцу до отправки.",
+      "components": [
+        "src/prm/runtime/actions.py",
+        "src/prm/confirmed_actions.py",
+        "src/prm/storage/actions.py",
+        "src/prm/runtime/composition.py",
+        "src/prm/conversation.py"
+      ],
+      "verification": "tests/test_pai_action_runtime.py, tests/test_pai_durable_actions.py; tests/test_daily_drafts.py: ambiguous recipient, tomorrow in timezone, changed attachment, old yes, two proposals, edit after delivery, local draft with no write grant. No inferred email address.",
+      "gate": "External send не входит в D28; effect engine переиспользуется без нового confirm bypass.",
+      "legacy": [
+        "PAI-04",
+        "PAI-20"
+      ]
+    },
+    {
+      "id": "D29",
+      "title": "Выбранная почта Microsoft с полным lifecycle",
+      "priority": "P1",
+      "stage": "G3",
+      "kind": [
+        "K",
+        "C",
+        "L",
+        "H"
+      ],
+      "depends_on": [
+        "D10",
+        "D22",
+        "D26"
+      ],
+      "size": "M",
+      "goal": "Ассистент находит, что требует ответа, и объясняет основания по настоящим письмам.",
+      "change": "Довести existing Graph OAuth/PKCE/vault/refresh/revoke и selected-folder delta до operator flow. Metadata triage отдельно от selected body/thread read; uncertain reply-needed не выдавать за факт. Paging, cursor reset, tombstones и link to original; messages с несколькими обязанностями не теряются. Mail candidates подключить к Brief/research без академической зависимости.",
+      "components": [
+        "src/prm/runtime/connections.py",
+        "src/prm/runtime/graph.py",
+        "src/prm/mail_connector.py",
+        "src/prm/runtime/connector_summary.py",
+        "src/prm/runtime/brief.py"
+      ],
+      "verification": "tests/test_pai_connections.py, tests/test_pai_graph_mail.py; tests/test_daily_mail_triage.py: metadata insufficient, thread pagination, moved/deleted mail, token refresh/revoke, expired delta, source injection. Live selected test folder: read/update/delete/revoke с protected receipts.",
+      "gate": "Выполнять live только если выбран Microsoft. Если выбран Google — D31 реализует тот же contract, не заставлять владельца заводить другой аккаунт.",
+      "legacy": [
+        "PAI-16",
+        "PAI-17",
+        "PAI-27"
+      ]
+    },
+    {
+      "id": "D30",
+      "title": "Календарь и адресаты в повседневном контексте",
+      "priority": "P1",
+      "stage": "G3",
+      "kind": [
+        "K",
+        "C",
+        "L",
+        "H"
+      ],
+      "depends_on": [
+        "D10",
+        "D22",
+        "D26"
+      ],
+      "size": "M",
+      "goal": "Понимать расписание и готовить реалистичные встречи без ошибок времени.",
+      "change": "Довести selected calendar/contacts read path: rolling window вместо навсегда фиксированной даты config, recurrence/exceptions, timezone conversion, free/busy, cancelled events, exact contact resolution. Связать mail+calendar duplicates, сохраняя разные source authority. Подготовка встречи использует fresh snapshot; read не включает invitations.",
+      "components": [
+        "src/prm/runtime/schedule.py",
+        "src/prm/schedule_connectors.py",
+        "src/prm/runtime/composition.py",
+        "src/prm/runtime/graph.py"
+      ],
+      "verification": "tests/test_pai_schedule_runtime.py, tests/test_assistant_contacts.py; tests/test_daily_calendar.py: DST repeated/missing hour, recurring exception, cancellation, all-day event, stale conflict, two same-name contacts. Actual selected calendar canary отдельно от fixture pass.",
+      "gate": "Выбор provider/calendar/contact sources нужен только для live. Read-only calendar даёт пользу до разрешения writes.",
+      "legacy": [
+        "PAI-18",
+        "PAI-27"
+      ]
+    },
+    {
+      "id": "D31",
+      "title": "Google адаптеры если выбраны владельцем",
+      "priority": "P1",
+      "stage": "G3",
+      "kind": [
+        "K",
+        "C",
+        "L",
+        "H"
+      ],
+      "depends_on": [
+        "D10",
+        "D22",
+        "D26"
+      ],
+      "size": "L",
+      "goal": "Поддерживать фактическую личную почту и календарь, не навязывая Microsoft.",
+      "change": "Реализовать Gmail/Google Calendar adapters по общему connection/read/draft/action contract, incremental history/sync tokens, minimal scopes и lifecycle. Сначала read, затем provider drafts/writes через общий executor. Reuse reviewed OAuth library при меньшей поверхности поддержки; проверить testing/published OAuth refresh lifecycle конкретного аккаунта. Не делать единый универсальный connector с десятками permissions.",
+      "components": [
+        "src/prm/runtime/connections.py",
+        "src/prm/mail_connector.py",
+        "src/prm/schedule_connectors.py",
+        "src/prm/runtime/actions.py",
+        "src/prm/runtime/connectors/google.py (новый)"
+      ],
+      "verification": "Общие connector contract tests плюс tests/test_daily_google.py: sync token expired, paging, draft write vs local draft, gmail.compose breadth, readonly grants, webhook/poll dedup, revoke/cleanup. Live test selected mailbox/calendar после scope decision.",
+      "gate": "Conditional provider branch: если не выбран Google, оставить deferred/not selected, не считать реализованным. Это не блокирует Microsoft и core daily loop.",
+      "legacy": [
+        "PAI-16",
+        "PAI-17",
+        "PAI-18",
+        "PAI-20"
+      ]
+    },
+    {
+      "id": "D32",
+      "title": "Настоящие подтверждённые письма и события",
+      "priority": "P1",
+      "stage": "G3",
+      "kind": [
+        "K",
+        "L",
+        "H"
+      ],
+      "depends_on": [
+        "D23",
+        "D28"
+      ],
+      "requires_one_of": [
+        [
+          "D29",
+          "D30"
+        ],
+        [
+          "D31"
+        ]
+      ],
+      "size": "M",
+      "goal": "Делегировать конкретную запись и понимать её фактический исход.",
+      "change": "Выбранный mail/calendar provider подключить к существующему bound executor и reconcile. Exact preview account/recipients/content/attachments/time/invite consequences, one-use expiry и current versions. Отдельно provider acceptance, created object и recipient delivery. Реализовать только поддержанную сверку; uncertain absence не разрешает повторную отправку.",
+      "components": [
+        "src/prm/runtime/actions.py",
+        "src/prm/storage/actions.py",
+        "src/prm/runtime/graph.py",
+        "src/prm/runtime/delivery.py"
+      ],
+      "verification": "tests/test_pai_action_runtime.py, tests/test_pai_durable_actions.py, tests/test_pai_delivery.py; actual controlled recipient/calendar: one effect, exact provider object, duplicate confirmation, timeout/202→unknown→reconcile, revoke race, edited proposal. Независимый safety review перед live.",
+      "gate": "Если выбран Google, D31 заменяет provider-specific D29/D30 prerequisites; semantic prerequisites те же. Доступ recipient/calendar и preview approval обязательны; эта сессия ничего не отправляет.",
+      "legacy": [
+        "PAI-04",
+        "PAI-20",
+        "PAI-27"
+      ]
+    },
+    {
+      "id": "D33",
+      "title": "Наблюдения которые редко отвлекают",
+      "priority": "P1",
+      "stage": "G3",
+      "kind": [
+        "K",
+        "L",
+        "H"
+      ],
+      "depends_on": [
+        "D02",
+        "D10",
+        "D17",
+        "D24",
+        "D26"
+      ],
+      "size": "M",
+      "goal": "Сообщать о значимом изменении и надёжно молчать при его отсутствии.",
+      "change": "Natural current-object→Watch preview с trigger/cadence/sources/expiry/quiet/caps/cost. Event-based novelty и per-topic importance, digest coalescing, no-news silent по политике, snooze/paused/done/revoke. Показать saved intent vs running scheduler. Для сроков fresh source check; urgent override только заранее выбранный.",
+      "components": [
+        "src/prm/runtime/watch.py",
+        "src/prm/runtime/scheduler.py",
+        "src/prm/watch_jobs.py",
+        "src/prm/runtime/delivery.py",
+        "src/prm/runtime/ingress.py"
+      ],
+      "verification": "tests/test_pai_watch_wiring.py, tests/test_pai_scheduler.py, tests/test_pai_delivery.py; tests/test_daily_watch_noise.py: duplicates/revisions, quiet DST, edited deadline, pause/revoke between enqueue/send, catch-up after outage, unknown send. Live 7-day receipt: due/checked/notified и user useful/noisy assessments.",
+      "gate": "Фоновые checks/delivery включаются отдельной selected subscription; состояние модели не является observed scheduler activity.",
+      "legacy": [
+        "PAI-08",
+        "PAI-09",
+        "PAI-27"
+      ]
+    },
+    {
+      "id": "D34",
+      "title": "Документы голос и изображения в общей беседе",
+      "priority": "P1",
+      "stage": "G3",
+      "kind": [
+        "K",
+        "L",
+        "H"
+      ],
+      "depends_on": [
+        "D04",
+        "D05",
+        "D21",
+        "D23"
+      ],
+      "size": "M",
+      "goal": "Можно передать привычный файл или голосовое и продолжить работу с ним.",
+      "change": "Довести existing media download/text extraction/OCR/speech/vision seams до естественного document focus и исправления транскрипции. Text-first PDF, page refs; docx/txt только по реальной потребности и isolated parsing. Allowlist types/size/decompression/time, no active content/network. Голосовой ответ опционален; важные факты доступны текстом. Входящий Telegram rich_message/quote/forward разбирается через normalized source envelope D56 и отдельный bounded rich block extractor; неподдержанный блок даёт явный partial/unsupported. Скрытое происхождение пересылки не восстанавливать выдуманным chat/message ID.",
+      "components": [
+        "src/prm/runtime/media.py",
+        "src/prm/runtime/media_download.py",
+        "src/prm/runtime/media_extract.py",
+        "src/prm/runtime/speech.py",
+        "src/prm/runtime/vision.py"
+      ],
+      "verification": "tests/test_pai_media_runtime.py; tests/test_daily_media_dialogue.py: scanned/text PDF, Cyrillic tables, malicious document, OCR date error, voice name correction, no vision grant, temp cleanup on cancel/failure. Real selected audio/image canary и page-grounded answer отдельно.",
+      "gate": "Private audio/image egress отдельно от text. Новый формат не разрешает arbitrary files или shell.",
+      "legacy": [
+        "PAI-22",
+        "PAI-27"
+      ]
+    },
+    {
+      "id": "D35",
+      "title": "Судья с доказательствами и полными диалогами",
+      "priority": "P0",
+      "stage": "G1",
+      "kind": [
+        "K",
+        "R"
+      ],
+      "depends_on": [
+        "D06"
+      ],
+      "size": "M",
+      "goal": "Оценка видит реальные основания ответа и пропущенные важные материалы.",
+      "change": "Общий judge case schema для answer/research/Brief/session: full visible turns, source spans/versions/dates, candidate set, tool outcomes, expected constraints и versions. Убрать обязательное молчаливое усечение до 4000 символов: bounded packet с completeness flag. Assessable/unknown для отсутствующих доказательств. Judges остаются advisory, output schema строго проверяется.",
+      "components": [
+        "tools/assistant_answer_judge.py",
+        "tools/assistant_visual_judge.py",
+        "tools/opencode_pool_review.py",
+        "src/prm/runtime/evaluation.py",
+        "evals/assistant_judge/"
+      ],
+      "verification": "Existing judge tests при наличии плюс tests/test_daily_judge_packets.py: URL without source yields unknown, missing middle turn rejected, omitted important candidate visible, injection in evidence, malformed verdict, blinded labels. Historical results не перезаписываются новой схемой.",
+      "gate": "Harness offline независимо от credentials; actual judge calls только выбранный provider/public data budget.",
+      "legacy": [
+        "PAI-23",
+        "PAI-26"
+      ]
+    },
+    {
+      "id": "D36",
+      "title": "Калибровка судьи и контроль смещения",
+      "priority": "P1",
+      "stage": "G1",
+      "kind": [
+        "K",
+        "R",
+        "H"
+      ],
+      "depends_on": [
+        "D35",
+        "D05"
+      ],
+      "size": "M",
+      "goal": "Высокая модельная оценка имеет проверенное значение.",
+      "change": "40 human-labelled pairs и 20 seeded faults, separate calibration/holdout. Blind A/B and swap, repeat/length/style/injection controls; second family judge на 20% и adjudication disagreements. Выход включает agreement/order consistency/repeat consistency/critical false negatives/confusion matrix и uncertainty. Сохранять requested/observed identity/effort.",
+      "components": [
+        "evals/assistant_judge/",
+        "tools/assistant_answer_judge.py",
+        "tools/assistant_visual_judge.py",
+        "docs/strategy/2026-10-11/MODELS_EVAL.md"
+      ],
+      "verification": "Offline rubric/packet checks; после provider grant actual calibration: proposed ≥80% human agreement, ≥90% swap/repeat consistency, zero seeded critical misses. Ниже порога judge не используется для promotion. Human labels не корректируются ради согласия с моделью.",
+      "gate": "Владелец размечает личную полезность ограниченной части; технические fault labels проверяет исполнитель. Калибровка не даёт safety acceptance.",
+      "legacy": [
+        "PAI-23",
+        "PAI-26",
+        "PAI-29"
+      ]
+    },
+    {
+      "id": "D37",
+      "title": "Сравнение моделей и фактической стоимости",
+      "priority": "P1",
+      "stage": "G1",
+      "kind": [
+        "K",
+        "R",
+        "L",
+        "H"
+      ],
+      "depends_on": [
+        "D05",
+        "D06",
+        "D07",
+        "D36"
+      ],
+      "size": "M",
+      "goal": "Выбрать рабочие роли на одинаковых задачах, включая запрошенный GPT-4o baseline.",
+      "change": "Исполнить MODELS_EVAL: capability canary→12-case screening→120-unit paired holdout для finalists→shadow pilot. Фиксировать source/prompt/tool/context budgets, cold/warm cache, availability windows, cost_per_success. Разные source datasets не смешивать. Promotion только после quality floors; inconclusive outcome сохраняет baseline.",
+      "components": [
+        "src/prm/runtime/profiles.py",
+        "src/prm/runtime/evaluation.py",
+        "evals/assistant_judge/",
+        "tools/assistant_answer_judge.py",
+        "src/prm/runtime/cost_cache.py"
+      ],
+      "verification": "Deterministic experiment manifest and dry-run cost estimate; actual receipts с requested/observed model, 403/429/timeout/usage/latency. Report wins/ties/losses и paired bootstrap по cases/sessions, not correlated turns. GPT-4o unavailable → missing baseline, не победа Go.",
+      "gate": "Budget и допустимость assistant traffic/egress должны быть выбраны. Если сравнительный доступ отсутствует, первый пилот использует разрешённый baseline с явной неопределённостью.",
+      "legacy": [
+        "PAI-23",
+        "PAI-26",
+        "PAI-27"
+      ]
+    },
+    {
+      "id": "D38",
+      "title": "Четырнадцать дней ежедневного использования",
+      "priority": "P0",
+      "stage": "G2",
+      "kind": [
+        "L",
+        "H",
+        "R"
+      ],
+      "depends_on": [
+        "D18",
+        "D19",
+        "D21",
+        "D27",
+        "D40"
+      ],
+      "size": "M",
+      "goal": "Доказать, что core assistant экономит работу на реальных задачах.",
+      "change": "После 20-task foreground session провести 14 дней read-focused pilot: свои запросы, поиск, save/return, project application и on-demand Brief. Брать ограниченную добровольную оценку полезности/переделки/минут; учитывать время настройки и исправлений. Не навязывать ежедневный чеклист. При source outage переключать только в разрешённый доступный путь.",
+      "components": [
+        "docs/verification/ (новый sanitized pilot receipt)",
+        "src/prm/runtime/evaluation.py",
+        "src/prm/runtime/operations.py",
+        "src/db/artifact_feedback.py"
+      ],
+      "verification": "20 задач: ≥16 полезных без существенной переделки как initial gate; добровольное использование ≥5/7 дней, weekly net time saved >0 и maintenance стремится ≤15min/week. Показать counts/unknowns; отсутствующее использование — факт для пересмотра, не автоматический провал человека. Telegram baseline и новая версия проходят одинаковые реальные задачи; считать ручные шаги, завершение без помощи, время до полезного результата, ошибочные привязки и затраты на настройку по TELEGRAM.md. D59/D60 условны и не задерживают основной пилот.",
+      "gate": "Личный operator pilot обязателен для утверждения ежедневной пользы. Его нельзя выполнить synthetic пользователем или judge.",
+      "legacy": [
+        "PAI-29"
+      ]
+    },
+    {
+      "id": "D39",
+      "title": "Четыре полезных недельных обзора",
+      "priority": "P1",
+      "stage": "G3",
+      "kind": [
+        "L",
+        "H",
+        "R"
+      ],
+      "depends_on": [
+        "D17",
+        "D18",
+        "D19",
+        "D20",
+        "D27",
+        "D40"
+      ],
+      "size": "M",
+      "goal": "Подтвердить качество отбора и долгосрочную пользу обзора.",
+      "change": "Начать параллельно D38 четыре последовательных weekly windows с заранее согласованным reading budget. Владелец отмечает главное пропущенное/лишнее и до трёх продолжений; сравнить с candidate coverage. Измерять cumulative duplicates, novelty, important misses и reading time. Не превращать непрочитанные пункты в долг и не считать recommended action выполненным.",
+      "components": [
+        "src/prm/runtime/brief.py",
+        "src/prm/storage/briefs.py",
+        "src/db/artifact_feedback.py",
+        "docs/verification/ (sanitized weekly receipt)"
+      ],
+      "verification": "Фактические четыре Brief IDs/versions, coverage, owner ratings, useful decisions/experiments, reading time 5–8min target, no critical deadline miss в выбранном coverage. Открытый документ не считается прочитанным. Пропуски расследуются по collector→ranker→editor цепочке. Один и тот же BriefDocument показывается текущим и rich renderer D58; оценивать время выбора продолжения, доступ к первоисточнику и шум, отдельно от редакционного качества.",
+      "gate": "Calendar duration нельзя заменить четырьмя synthetic генерациями в один день. Scheduled delivery только если включена владельцем.",
+      "legacy": [
+        "PAI-14",
+        "PAI-29"
+      ]
+    },
+    {
+      "id": "D40",
+      "title": "Приёмка интерфейса на реальном телефоне",
+      "priority": "P0",
+      "stage": "G2",
+      "kind": [
+        "K",
+        "H",
+        "L"
+      ],
+      "depends_on": [
+        "D02",
+        "D19",
+        "D27",
+        "D56",
+        "D57",
+        "D58"
+      ],
+      "size": "M",
+      "goal": "Ежедневный путь удобен в настоящем Telegram, а не только в browser fixture.",
+      "change": "Проверить short answer/card, status/cancel, reply binding, selection controls, exports на телефоне владельца. Reader добавляется после D25 отдельной записью, не блокируя text pilot. Исправить clipping, controls placement, Cyrillic/long links и лишний technical wording в затронутых templates. Единая сравнительная приёмка включает новые rich/draft/Stop/callback сценарии D56–D58. Ранний plain baseline можно снять в D27 до их завершения; enhanced acceptance требует всех трёх. Не создавать отдельный Telegram-пилот с дублирующими отчётами.",
+      "components": [
+        "src/prm/runtime/presentation.py",
+        "src/prm/runtime/delivery.py",
+        "src/prm/report_exports.py",
+        "docs/verification/ (visual acceptance receipt)"
+      ],
+      "verification": "tests/test_pai_brief_polish.py, tests/test_pai_control_polish.py; actual Telegram mobile session, synthetic public screenshots и owner rating. Long multipart controls относятся к correct object; mobile reader/HTML/PDF parity проверяется отдельно после D25. 12 сопоставимых задач (4 chat, 4 research, 4 Brief): 12/12 верных object/source bindings, минимум 10/12 без помощи, ориентир ≥25% меньше ручных действий против baseline; показывать actual counts, время и client/version. Native Stop не обещает откат отправленного эффекта. Один мобильный клиент владельца и desktop; неподтверждённые платформы unknown.",
+      "gate": "Human visual acceptance не заменяется Kimi verdict. Private screenshots остаются вне Git.",
+      "legacy": [
+        "PAI-09",
+        "PAI-15",
+        "PAI-29"
+      ]
+    },
+    {
+      "id": "D41",
+      "title": "Canvas и персональный академический модуль после снятия отсрочки",
+      "priority": "P2",
+      "stage": "G3",
+      "kind": [
+        "K",
+        "L",
+        "H"
+      ],
+      "depends_on": [
+        "D10",
+        "D26"
+      ],
+      "size": "M",
+      "goal": "Довести полный замысел без блокировки остальных источников университетским доступом.",
+      "change": "Сохранить disabled Canvas adapter; подготовить selected assignments/calendar/announcements lifecycle и owner stage. Связать разрешённую mail/calendar информацию с AcademicCandidate, сохранив conflicts, deadline precision, eligibility uncertainty и local/source done. После institutional access выполнить narrow canary; не собирать grades/roster/submissions по умолчанию. Общий coordinator согласовать с D52; не возвращать привязку всего Academic Inbox к наличию Canvas config.",
+      "components": [
+        "src/prm/runtime/academic.py",
+        "src/prm/academic_inbox.py",
+        "src/prm/storage/academic.py",
+        "src/prm/runtime/composition.py"
+      ],
+      "verification": "tests/test_pai_academic_runtime.py; pending actual selected course/source canary: missing permission, inconsistent deadline, edited/cancelled assignment, local done vs source completion, revoke. Mail-only academic useful path не объявляет Canvas connected.",
+      "gate": "Canvas institution access остаётся отложенным; его не запрашиваем сейчас. Nebula исследована отдельно по новому поручению владельца: D51–D54, ключ запросит владелец. Nebula-only/mail-only не зависят от Canvas. Полная программа не помечается done при обязательном незакрытом модуле.",
+      "legacy": [
+        "PAI-19",
+        "PAI-27",
+        "PAI-29"
+      ]
+    },
+    {
+      "id": "D42",
+      "title": "Сквозной отзыв экспорт и удаление",
+      "priority": "P1",
+      "stage": "G3",
+      "kind": [
+        "K",
+        "L",
+        "H"
+      ],
+      "depends_on": [
+        "D21",
+        "D23",
+        "D34"
+      ],
+      "requires_one_of": [
+        [
+          "D29",
+          "D30"
+        ],
+        [
+          "D31"
+        ]
+      ],
+      "size": "M",
+      "goal": "Владелец управляет накопленным контекстом и понимает границу удаления.",
+      "change": "Проверить новые projects/feedback/event clusters/reader sessions/connector caches на общую lineage/tombstones схему. Natural privacy overview/export/forget source с областью и исключениями. Отзыв немедленно блокирует serving/egress, physical cleanup может быть pending; backup/provider сроки явно показаны. Receipts сохраняют минимальную no-replay информацию. По мере выбора D59/D60 включить message/topic/presentation bindings, business revisions, InboxCandidate в общую deletion/lineage схему. После revoke запрещено продолжать serving старых источников; минимальные no-replay receipts не стираются. Реальный lifecycle выбранной ветки проверяется её карточкой, без зависимости Secretary от почты.",
+      "components": [
+        "src/prm/runtime/deletion.py",
+        "src/prm/runtime/memory.py",
+        "src/prm/runtime/reader.py",
+        "src/prm/runtime/migration.py",
+        "src/prm/runtime/cost_cache.py"
+      ],
+      "verification": "tests/test_pai_memory_runtime.py, tests/test_pai_migration.py, tests/test_pai_connections.py; tests/test_daily_privacy_cascade.py: concurrent new derived object, offline store, export pagination beyond1000, restore tombstones before reads, revoked session, pending cleanup. Независимый privacy recheck.",
+      "gate": "Provider-specific D31 заменяет D29/D30 где выбран Google. Live deletion preview должен описывать exact source/scope; canonical independent archive не удаляется случайно.",
+      "legacy": [
+        "PAI-16",
+        "PAI-21",
+        "PAI-25"
+      ]
+    },
+    {
+      "id": "D43",
+      "title": "Устойчивость в условиях реального хоста",
+      "priority": "P1",
+      "stage": "G3",
+      "kind": [
+        "K",
+        "L",
+        "R"
+      ],
+      "depends_on": [
+        "D24",
+        "D27"
+      ],
+      "size": "M",
+      "goal": "Сбой не требует постоянного внимания и не создаёт скрытых эффектов.",
+      "change": "Закрыть current extreme HTML-depth P2 с явной payload bound/fallback; instrument classified errors, queue admission, provider cooldown, disk pressure и clock skew. Проверить long provider calls/locks/cancel, split compute/effect capacity. Defined read retry policy не стирает unknown spend. Подготовить one-page incident flow и recovery evidence.",
+      "components": [
+        "src/prm/runtime/delivery.py",
+        "src/prm/runtime/service.py",
+        "src/prm/runtime/operations.py",
+        "src/prm/storage/jobs.py",
+        "src/prm/storage/policy.py"
+      ],
+      "verification": "tests/test_pai_delivery.py, tests/test_pai_load_recovery.py, tests/test_pai_end_to_end.py; controlled host fault rehearsal после разрешения: process kill, DB unavailable, quota429, disk full, clock/timezone, stale lease. Observe intake/cancel/lock latency и no repeated effects. Telegram update gap >24h, restart draft lease, stale native Stop, rich final unknown, 429 coalescing и Secretary disconnect по выбранным capabilities. Не обещать восстановление business history без подтверждённого API.",
+      "gate": "Host incident tests требуют выбранного безопасного окружения; не ломать работающие сервисы ради проверки.",
+      "legacy": [
+        "PAI-06",
+        "PAI-09",
+        "PAI-24",
+        "PAI-28"
+      ]
+    },
+    {
+      "id": "D44",
+      "title": "Приёмка полного ассистента по требованиям",
+      "priority": "P1",
+      "stage": "G4",
+      "kind": [
+        "R",
+        "H",
+        "L"
+      ],
+      "depends_on": [
+        "D25",
+        "D32",
+        "D33",
+        "D34",
+        "D39",
+        "D41",
+        "D42",
+        "D43",
+        "D37",
+        "D38",
+        "D47",
+        "D54"
+      ],
+      "size": "M",
+      "goal": "Полная готовность означает работающие сценарии и подтверждённую пользу.",
+      "change": "Сверить все 69 требований spec и 10 групп с latest exact SHA receipts; обновить product status слоями code/fixture/provider/visual/operator/formal. Выполнить текущий полный активный product tier только после значимого интеграционного изменения и scoped checks; независимые риск-ревью и настоящее human acceptance. Неподключённые обязательные источники остаются blocker. Для Nebula отдельно проверить receipts D51–D54 и выбранный scope; D55 условна, а ключ Nebula не закрывает Canvas gate.",
+      "components": [
+        "docs/PRODUCT_STATUS.md",
+        "docs/verification/PAI-requirement-evidence-20261010.md",
+        "tools/run_pai_acceptance.py",
+        "docs/design/PAI.design.json",
+        "docs/tasks.md"
+      ],
+      "verification": "Current registered spec matrix, zero unexpected skips/xfails, approved private live receipts, visual owner acceptance, 20-task plus prolonged pilot. Ни judge, ни CI expected rejection не создают approval. Conditional integrations отображаются по явному selected scope.",
+      "gate": "Пока обязательный D41 отложен, можно принять daily/other capabilities, но whole programme остаётся незавершённым. Не переименовывать в урезанную final версию. Telegram D56–D58 входят через D40/D38. D59/D60–D62 требуют явного решения выбора и собственных live/operator gates, когда выбраны; их неопределённость не блокирует core assistant. Невыбранная optional capability записывается как deferred/not-selected, а не implemented/PASS.",
+      "legacy": [
+        "PAI-26",
+        "PAI-27",
+        "PAI-28",
+        "PAI-29"
+      ]
+    },
+    {
+      "id": "D45",
+      "title": "Разделение больших модулей по действительным обязанностям",
+      "priority": "P2",
+      "stage": "G4",
+      "kind": [
+        "K"
+      ],
+      "depends_on": [
+        "D03",
+        "D06"
+      ],
+      "size": "L",
+      "goal": "Новый сценарий меняется в нескольких понятных местах без разрушения безопасности.",
+      "change": "Постепенно выделять conversation/research/briefs/connectors/jobs/actions внутри prm, SQL в repositories, presentation отдельно. Начать с изменяемых composition dispatch и Brief selection, затем exports/watch. Typed dependencies вместо scattered hasattr/service dict, normal formatting вместо semicolon chains. Compatibility wrappers сохраняют public imports до usage audit.",
+      "components": [
+        "src/prm/application.py",
+        "src/prm/runtime/composition.py",
+        "src/prm/briefs.py",
+        "src/prm/report_exports.py",
+        "src/prm/watch_jobs.py",
+        "src/bot/prm_handlers.py"
+      ],
+      "verification": "tests/test_prm_package_imports.py, tests/test_retrofit_boundaries.py плюс tests соответствующего перенесённого use case. Behavior/receipt parity на frozen fixtures, no new grant store/executor. Считать changed surfaces и time-to-change до/после, не только LOC.",
+      "gate": "Рефакторинг вплетать в продуктовые slices; массовый rename не предшествует ежедневному пилоту.",
+      "legacy": [
+        "PAI-07",
+        "PAI-10",
+        "PAI-14",
+        "PAI-24"
+      ]
+    },
+    {
+      "id": "D46",
+      "title": "Learned retrieval только при измеренном выигрыше",
+      "priority": "P2",
+      "stage": "G4",
+      "kind": [
+        "K",
+        "R",
+        "H"
+      ],
+      "depends_on": [
+        "D11",
+        "D23"
+      ],
+      "size": "M",
+      "goal": "Устранить реальные смысловые и bilingual промахи без ненужного сервиса.",
+      "change": "Сравнить локальный BGE-M3 или другой выбранный multilingual encoder и reranker с FTS/hashed baseline на gold misses. Derived index с source/version/grant keys, rebuild/delete и resource budget. Хранить vectors в простом локальном index для малого corpus; pgvector при измеренном объёме и выбранном ADR. External embeddings только scoped egress.",
+      "components": [
+        "src/db/archive_vector.py",
+        "src/db/archive_api_vector.py",
+        "evals/retrieval/",
+        "src/prm/runtime/cost_cache.py",
+        "src/prm/runtime/deletion.py"
+      ],
+      "verification": "Matched recall@20/nDCG@10, critical exact lookup retention, no-answer error, RAM/index build/query p95 и deletion/rebuild. Предлагаемый gate: ощутимый выигрыш на заранее выделенном классе промахов без regression и acceptable ops cost; threshold зафиксировать до run.",
+      "gate": "Conditional measured enhancement. Новая library/model download/index architecture нуждаются в pinned trust review и ADR, но FTS path продолжает работать.",
+      "legacy": [
+        "PAI-11",
+        "PAI-23",
+        "PAI-31"
+      ]
+    },
+    {
+      "id": "D47",
+      "title": "Понятные конфигурация промпты и зависимости",
+      "priority": "P1",
+      "stage": "G4",
+      "kind": [
+        "K",
+        "C"
+      ],
+      "depends_on": [
+        "D05",
+        "D07"
+      ],
+      "size": "M",
+      "goal": "Обновления воспроизводимы, а действующая конфигурация проверяется без чтения секретов.",
+      "change": "Схема runtime config с version/migration, role profiles и secret refs; safe example configs. Вынести затронутые prompts в versioned resources с input/output contracts. Зафиксировать воспроизводимый dependency lock/constraints и разделить runtime/eval/dev extras, сохранив совместимость Python и rendering. Inventories active/deprecated tools, no automatic latest upgrade. Bot API использует существующий urllib transport; новые методы не требуют миграции на aiogram/PTB или blind Telethon upgrade. Версионировать Telegram payload contracts, independent feature flags/capability evidence и lock выбранных dependencies. Telethon archive и BusinessConnection — разные коннекторы.",
+      "components": [
+        "src/prm/runtime/composition.py",
+        "src/prm/runtime/profiles.py",
+        "src/prm/runtime/research_answer.py",
+        "src/prm/brief_editorial.py",
+        "requirements.txt",
+        "requirements-playbook.txt"
+      ],
+      "verification": "tests/test_pai_chat_runtime.py, tests/test_pai_cost_cache.py; config schema fixtures, prompt hash changes and complete output parser tests; fresh isolated dependency resolution/build по утверждённым constraints. Не запускать paid eval при косметике prompts без semantic changes.",
+      "gate": "Версионирование не означает массовый перенос всех исторических prompts. Secrets/config реальной среды не переписывать.",
+      "legacy": [
+        "PAI-10",
+        "PAI-23",
+        "PAI-24"
+      ]
+    },
+    {
+      "id": "D48",
+      "title": "Короткая актуальная методика с проверками по риску",
+      "priority": "P1",
+      "stage": "G4",
+      "kind": [
+        "C",
+        "H",
+        "R"
+      ],
+      "depends_on": [],
+      "size": "M",
+      "goal": "Разработка не требует больше внимания, чем продукт приносит пользы.",
+      "change": "Предложить ADR с current authority, one task registry/current handoff/status receipt и review-by-risk. Вынести исторические model/budget amendments в receipts/config, сохранить immutable past records. Один принятый дизайн плюс delta reviews; документы/низкорисковая UX правка не запускают programme batches. Подготовить законный путь принятия будущих slices без подделки прежних missing approvals.",
+      "components": [
+        "AGENTS.md",
+        "docs/CODEX_PROMPT.md",
+        "docs/REVIEW_POLICY.md",
+        "docs/IMPLEMENTATION_CONTRACT.md",
+        "docs/PLAYBOOK_ADOPTION.md",
+        "docs/adr/",
+        "tools/playbook.py"
+      ],
+      "verification": "Pinned --check-pin и plan/reference/approval-guard checks; independent read-only policy review проверяет сохранение source/egress/effect/retention guards и human authority. Старые STOP/draft/planned не превращаются в approved. Сравнить overhead на следующих трёх slices, без заявленного заранее процента экономии.",
+      "gate": "Только предложение до принятия владельцем изменённой нормативной политики. Эта работа не блокирует независимый локальный first block по текущему assignment.",
+      "legacy": [
+        "PAI-00",
+        "PAI-01"
+      ]
+    },
+    {
+      "id": "D49",
+      "title": "Масштабирование только по эксплуатационному пределу",
+      "priority": "P2",
+      "stage": "G4",
+      "kind": [
+        "R",
+        "K",
+        "H"
+      ],
+      "depends_on": [
+        "D11",
+        "D23",
+        "D43"
+      ],
+      "size": "L",
+      "goal": "Добавлять инфраструктуру, только когда она уменьшает измеренную работу или задержку.",
+      "change": "Отдельные решения для Redis/broker, переноса archive FTS в PG и workflow framework. Trigger: устойчивый queue/lock/query SLO miss после локальных оптимизаций либо неприемлемая поддержка. Для каждой альтернативы benchmark, migration/rollback, authority/deletion parity и полный ops cost. Не объединять три замены в один обязательный релиз.",
+      "components": [
+        "src/prm/storage/jobs.py",
+        "src/prm/runtime/migration.py",
+        "src/db/archive_search.py",
+        "src/prm/runtime/cost_cache.py",
+        "docs/adr/"
+      ],
+      "verification": "Paired workload measurements до/после, outage/redelivery/cache stale/deletion tests и restore rehearsal. Отсутствие measured trigger означает keep current, а не недоделанную обязательную Redis feature.",
+      "gate": "Каждая условная замена получает отдельную карточку и ADR перед реализацией; production migration отдельно разрешается.",
+      "legacy": [
+        "PAI-30",
+        "PAI-31"
+      ]
+    },
+    {
+      "id": "D50",
+      "title": "Поддержка качества без постоянного присмотра",
+      "priority": "P2",
+      "stage": "G4",
+      "kind": [
+        "K",
+        "C",
+        "H"
+      ],
+      "depends_on": [
+        "D36",
+        "D38",
+        "D43",
+        "D47"
+      ],
+      "size": "M",
+      "goal": "Новые модели и источники не ломают полезность незаметно.",
+      "change": "Подготовить release checklist, compact regression pack, provider-policy expiry monitoring и controlled profile rollout/rollback. После изменения model alias/prompt/schema выполнить соответствующую калибровку. Периодический обзор source noise/maintenance и неиспользуемых capabilities; не собирать бесконечные traces. Пользователь управляет частотой обзора состояния.",
+      "components": [
+        "src/prm/runtime/profiles.py",
+        "src/prm/runtime/operations.py",
+        "src/prm/runtime/evaluation.py",
+        "evals/assistant_judge/",
+        "docs/runbooks/assistant_runtime.md"
+      ],
+      "verification": "Simulated provider policy expiry/model alias drift/quality regression; rollback profile без удаления receipts, no private fallback, alert dedup. На реальном пилоте наблюдать maintenance time и actionable alert ratio; schedules включаются только по выбранной настройке.",
+      "gate": "Политика upkeep предлагается, не создаёт сейчас внешних automation/timers. Новая модель не означает автоматическую private promotion.",
+      "legacy": [
+        "PAI-23",
+        "PAI-24",
+        "PAI-29"
+      ]
+    },
+    {
+      "id": "D51",
+      "title": "Nebula: полноценное подключение и надёжное обновление данных",
+      "priority": "P1",
+      "stage": "G1",
+      "kind": [
+        "K",
+        "C"
+      ],
+      "depends_on": [
+        "D10"
+      ],
+      "size": "L",
+      "goal": "Полностью поддержать полезные публичные данные Nebula и их жизненный цикл в ассистенте; успешный GET не является итогом работы.",
+      "change": "По UTD_NEBULA.md выбрать готовый официальный SDK при наличии, генерацию клиента из совместимого Swagger либо existing HTTP transport с typed adapter; записать решение по покрытию/актуальности/recovery/сопровождению. Ввести NebulaSelection, provider_nebula и SourceBatch. Покрыть academic calendars, course/section/professor lookup/relations, campus events/location, clubs/discounts; включать в личный scope по интересу. Первые calendar/course endpoints — промежуточный срез, не финальный стоп. Нормализовать envelope, offset pagination и nested events, primary URLs и stable IDs. Durable checkpoint/cache по dataset/selection/window, last_success и unknown upstream freshness; restart/resume, bounded retries/backoff, изоляция отказа, key rotation/revoke, cancellation и coverage. Использовать общие storage/jobs/HTTP, не расширять legacy collector allowlist. Выбор компонента api-tools возможен в D55 при обоснованном пробеле.",
+      "components": [
+        "src/prm/nebula_connector.py (новый)",
+        "src/prm/runtime/nebula.py (новый)",
+        "src/prm/capabilities.py",
+        "src/prm/runtime/setup.py",
+        "src/prm/public_web.py",
+        "docs/strategy/2026-10-11/UTD_NEBULA.md",
+        "src/prm/storage/jobs.py",
+        "src/prm/storage/postgres.py",
+        "docs/runbooks/assistant_runtime.md"
+      ],
+      "verification": "Новый tests/test_daily_nebula_connector.py: контракты всех целевых семейств; pagination+duplicate IDs, empty vs missing vs stale, даты/timezones, unsupported production field, 401/403/429/5xx и byte/time/call caps. Restart с checkpoint, повторная page без дублей, конкурентный sync, key rotation/revoke, cancel, schema drift одного dataset при работе остальных, исчезновение в partial не равно deletion. Credential redaction/cross-host redirect/forbidden method. Synthetic результаты явно отделены от реального D54; только затронутые HTTP/storage/policy tiers.",
+      "gate": "Разработку разделить на обозримые пакеты с готовым пользовательским результатом; ключ не нужен для synthetic контрактов. Полное выбранное покрытие и provider evidence обязательны перед объявлением готовности. Ключ и ранний contract canary — первые шаги D54, без автозапуска фоновых заданий.",
+      "legacy": [
+        "PA-12",
+        "PAI-03",
+        "PAI-11",
+        "PAI-19"
+      ]
+    },
+    {
+      "id": "D52",
+      "title": "Nebula в общем диалоге и Academic Inbox без Canvas",
+      "priority": "P1",
+      "stage": "G1",
+      "kind": [
+        "K",
+        "C"
+      ],
+      "depends_on": [
+        "D03",
+        "D10",
+        "D26",
+        "D51",
+        "D04",
+        "D08",
+        "D21"
+      ],
+      "size": "L",
+      "goal": "Все полезные сценарии UTD доступны в обычном разговоре с сохранением контекста и результатов, независимо от Canvas.",
+      "change": "Вынести регистрацию общего academic service из Canvas config branch. Независимые Nebula/Canvas/mail hooks, типизированный выбор источника в dispatcher, reply/result context. Normalized records связать с выбранным term/session/course и проектным контекстом; только actionable records становятся AcademicCandidate. Добавить обратно совместимую date precision/source text/session модель; date-only не превращается в точное время. Aggregator не переопределяет Canvas/primary evidence. Origin IDs и field-path дедлайна стабильны. Приватный профиль фильтрует публичный результат локально. Поддержать поиск/сравнение курсов, секций и преподавателей, объяснение prerequisites по источнику, выбор term/session, события/клубы/предложения/место. Разрешать неоднозначные названия уточнением; не требовать от владельца provider IDs. Follow-up, сохранение, проектные связи, correction/forget и возврат после рестарта используют D04/D08/D21. Сохранённые результаты держат версии/источники. Календарный draft/напоминание готовится общим Act-контуром D28/D32, с source/timezone и обычным подтверждением; открытая зависимость Act остаётся явной.",
+      "components": [
+        "src/prm/runtime/composition.py",
+        "src/prm/runtime/academic.py",
+        "src/prm/academic_inbox.py",
+        "src/prm/storage/academic.py",
+        "src/prm/runtime/ingress.py",
+        "src/prm/runtime/nebula.py (новый)"
+      ],
+      "verification": "Новый tests/test_daily_nebula_academic.py плюс tests/test_assistant_academic.py и tests/test_pai_academic_runtime.py по затронутому поведению. Nebula-only, mail-only и disabled Canvas; запрос→источники→follow-up; другой term/session, date-only, DST America/Chicago, conflict, stale, wrong owner, local_done не source_done. Ноль Canvas HTTP при Nebula-only. Не выводить enrollment/eligibility из каталога. Сценарии всех целевых datasets, natural ambiguity, сравнение с отсутствующим полем, сохранение→restart→продолжение, исправление personal context, revoke/forget; длинный список имеет полное coverage или честное продолжение, а не скрытую обрезку.",
+      "gate": "NB-1 — несколько законченных пакетов по результату, а не обязательство вместить D51/D52 в один большой diff. Deep Review между пакетами, исправления и узкий P0/P1 recheck. Готовность общего диалога/памяти задают D04/D08/D21. Canvas не нужен; real utility — D54.",
+      "legacy": [
+        "PAI-05",
+        "PAI-07",
+        "PAI-19"
+      ]
+    },
+    {
+      "id": "D53",
+      "title": "Nebula в Brief и Watch с отбором и первоисточниками",
+      "priority": "P1",
+      "stage": "G3",
+      "kind": [
+        "K",
+        "C",
+        "H"
+      ],
+      "depends_on": [
+        "D52",
+        "D17",
+        "D18",
+        "D20",
+        "D33"
+      ],
+      "size": "L",
+      "goal": "UTD-находки снимают работу: несколько важных изменений вместо дублирующей ленты кампуса.",
+      "change": "Подключить SourceBatch Nebula к общим BriefSourceHook/Watch. Объединять Localist/Nebula/официальные записи по исходному URL/ID и явным identity bindings; при неуверенном совпадении не сливать сроки автоматически. Отбор по term, интересу и применимости к проекту. Срочные даты проверять по первоисточнику с сохранением precision/conflicts; отсутствие primary делает срок uncertain. Watch создаётся через обычный preview, уведомляет о существенном изменении, соблюдает pause/quiet hours/caps. Calendar write идёт только через D28/D32. Feedback применяется общим способом. Сохранять sync/notification state и переживать restart/retry без повторов. Отмена/исчезновение события проверяется по полному окну/первоисточнику; частичный ответ не удаляет запись. Полезное разнообразие и полное выбранное окно важнее количества карточек. Сбой Nebula не останавливает Brief других источников; источник, freshness и partial видимы. После выбора тем регулярная работа обходится без ежедневной настройки.",
+      "components": [
+        "src/prm/runtime/brief.py",
+        "src/prm/runtime/academic.py",
+        "src/prm/runtime/watch.py",
+        "src/prm/storage/watch_jobs.py",
+        "src/external_watch/selection.py",
+        "src/external_watch/relevance.py",
+        "src/prm/runtime/nebula.py (новый)"
+      ],
+      "verification": "Новый tests/test_daily_nebula_brief_watch.py и tests/test_external_watch_selection.py при изменении общей selection. Дубль источников→одна карточка; исправление даты→один revision; отсутствие изменений→нет push; source outage→partial, не пустая успешная неделя; pause/revoke/cancel; конфликт primary/aggregator остаётся видимым. Synthetic weekly corpus не считается доказательством живой свежести. Restart между detect/enqueue/send, повторная доставка, shifted/removed event, mixed source outage и пропуск early-window items. Два живых Brief и actual Watch usefulness входят в D54, имитация результата недостаточна.",
+      "gate": "NB-2: один пакет/Deep Review/исправления. Real pilot после D54 и готового D27 runtime; background schedule требует выбора владельца. Не блокирует общий daily pilot или отключённый Canvas.",
+      "legacy": [
+        "PAI-09",
+        "PAI-14",
+        "PAI-19",
+        "PAI-27"
+      ]
+    },
+    {
+      "id": "D54",
+      "title": "Nebula: реальный запуск и приёмка ежедневной работы",
+      "priority": "P1",
+      "stage": "G2",
+      "kind": [
+        "C",
+        "L",
+        "H",
+        "R"
+      ],
+      "depends_on": [
+        "D52",
+        "D53",
+        "D27"
+      ],
+      "size": "M",
+      "goal": "Подтвердить полноценную работу выбранных возможностей в реальном ассистенте, включая надёжность и пользу в течение двух недель.",
+      "change": "Владелец запросит ключ по тексту UTD_NEBULA.md. Ранний шаг после D51/D52: настроить secret reference и проверить до 20 GET на одном term/двух датах/курсе, актуальные schema/quota/cache rules. Это canary, не финальная приёмка. Далее проверить каждое выбранное семейство endpoints и representative pagination/date/session случаи; сверить минимум 10 реальных записей с первоисточниками. На готовых D53/D27 выполнить 14 дней использования, два недельных Brief и 20 сценариев из UTD_NEBULA.md, совмещённых с D38/D39. Оценить добавочную пользу, coverage, latency cold/warm, обращения к API, стоимость и обслуживание. Act-сценарий проверить с D32; до его готовности не объявлять полную готовность подтверждаемых действий. Пробелы источника передать в D55, не закрывать обязательную способность формулировкой недоступно.",
+      "components": [
+        "src/prm/runtime/setup.py",
+        "docs/runbooks/assistant_runtime.md",
+        "docs/security/OWNER-ACCESS-REQUEST.md",
+        "docs/verification/nebula-canary-20261011.md (будущий receipt)",
+        "docs/strategy/2026-10-11/UTD_NEBULA.md"
+      ],
+      "verification": "Proposed targets: >=16/20 полезных результатов без существенной переделки; каждый выбранный dataset проверен реальным read; ноль выдуманных точных сроков, скрытых coverage gaps, duplicate alerts и неподтверждённых действий. Срочные даты подтверждены первоисточником или явно uncertain. Проверить recovery после restart/429/expired key/schema drift; fault injection помечать synthetic. Provider receipt содержит даты/schema hashes/coverage/latency/error counts без ключей и личных payloads. Владелец кратко оценивает 3–5 ответов и два Brief; не вести отдельный дневник. Ориентир обслуживания — общий бюджет ассистента 15 минут/неделю; скорость/SLO подтверждаются замерами, не предположением.",
+      "gate": "AND dependencies описывают завершение D54: D52/D53/D27. Подготовка ключа и ранний canary после D51/D52 разрешены как незавершённый подэтап параллельно NB-2. Код не становится ready по одному smoke. Отсутствие ключа/обязательного dataset остаётся конкретным открытым gate; остальные способности ассистента продолжаются. Canvas не требуется.",
+      "legacy": [
+        "PAI-27",
+        "PAI-29"
+      ]
+    },
+    {
+      "id": "D55",
+      "title": "Условно: довести пробел данных через готовый компонент или официальный источник",
+      "priority": "P2",
+      "stage": "G3",
+      "kind": [
+        "R",
+        "K",
+        "C",
+        "L"
+      ],
+      "depends_on": [
+        "D51"
+      ],
+      "size": "M",
+      "goal": "Закрыть обнаруженный пробел обязательного пользовательского сценария работающим источником, используя готовые компоненты там, где они подходят.",
+      "change": "При конкретном пробеле, обнаруженном в раннем canary или D54, сравнить официальный fetch, разрешённый импорт набора и подходящий компонент api-tools. Оценить pinned schema, provenance, freshness, права на данные, cache/model cost и сопровождение; язык Go сам по себе не причина отказа. Если выбран api-tools/другой способ, выполнить обозримый implementation пакет: изолированный runner либо повторное использование parser, bounded selected input/output, общий SourceBatch, состояние/recovery, diagnostics и отключение. Нельзя ограничиться запиской о возможном fallback и объявить задачу решённой. Hosted API остаётся основным там, где работает. Нет автоматического scraping fallback после denied/rate-limit; Mongo upload и платный parser требуют фактически выбранного назначения/доступа.",
+      "components": [
+        "docs/strategy/2026-10-11/UTD_NEBULA.md",
+        "docs/adr/ (только при новом архитектурном решении)",
+        "src/external_watch/adapters.py (оценить переиспользование, не менять автоматически)",
+        "src/prm/runtime/nebula.py (новый)",
+        "src/prm/nebula_connector.py (новый)",
+        "tests/test_daily_nebula_fallback.py (условный новый)",
+        "docs/runbooks/assistant_runtime.md"
+      ],
+      "verification": "Сравнить на обнаруженном сценарии coverage/точность/freshness/операционную цену. Выбранный fallback проходит fixtures, provenance, budgets, restart/retry/dedupe и разрешённую реальную проверку; source outage не становится пустым успехом. Deep Review на законченный пакет, адресный recheck находок. Если hosted API достаточен, явный not-needed с доказательством, без инфраструктуры ради полноты списка.",
+      "gate": "Запускается по подтверждённому пробелу после D51, не ждёт завершения D54 и не создаёт циклическую зависимость. Блокирует только приёмку затронутой обязательной способности; остальные работы продолжаются. Настоящие подключения/runner/private egress не разрешаются этим планом.",
+      "legacy": [
+        "PA-12",
+        "PAI-19"
+      ]
+    },
+    {
+      "id": "D56",
+      "title": "Telegram: точная адресация результатов и работающие controls",
+      "priority": "P0",
+      "stage": "G1",
+      "kind": [
+        "K",
+        "C"
+      ],
+      "depends_on": [
+        "D03"
+      ],
+      "size": "M",
+      "goal": "Любой reply, цитата и кнопка продолжают правильный результат; обычный диалог сохраняет контекст без режимов.",
+      "change": "Расширить bindings D02, не создавать параллельный ingress. Ввести TelegramDestination, UpdateEnvelope v2 и MessageBinding (bot/chat/thread/message/job/result/version/story/revision/scope). Сохранить reply/quote/forward provenance; edited_message — revision. Durable commit/reject/quarantine до offset advance; allowed_updates по реализованным handlers. Исправить передачу navigation и callback acknowledgement в настоящей durable polling ветке. Оpaque callbacks <=64 bytes разрешаются сервером. Общий bounded Bot API transport возвращает Accepted/KnownRejected/Unknown; owner-only wrapper сохранён. Method/route/payload/schema digest входит в delivery identity; старые receipts и multipart читаются. Неподдержанные topics не смешиваются с default history. Proposed DTO/storage paths создаются лишь если нет подходящих после D02/D04.",
+      "components": [
+        "src/bot/bot.py",
+        "src/prm/runtime/ingress.py",
+        "src/prm/runtime/transports.py",
+        "src/prm/runtime/delivery.py",
+        "src/prm/runtime/presentation.py",
+        "src/prm/runtime/composition.py",
+        "src/prm/telegram_contracts.py (proposed)",
+        "src/prm/storage/telegram.py (proposed)"
+      ],
+      "verification": "Новые tests/test_daily_telegram_routes.py и tests/test_daily_telegram_transport.py: actual polling→ingress→result→delivery с fake HTTP; update replay/conflicting body/DB failure; reply A после B; UTF-16 quote/hidden forward; edited source; чужой/expired callback; acknowledgement; inline markup reaches transport; timeout-after-dispatch остаётся unknown. Existing floor: tests/test_pai_ingress_jobs.py, tests/test_pai_delivery.py, tests/test_prm_bot_dispatch.py; conversation tier только при изменении ключей.",
+      "gate": "Без аккаунтов/сети на локальном code gate. После scoped checks и одного Deep Review перейти к dependency-ready D57/D58; настоящий Telegram route/receipt проверяется в D27/D40. Нельзя выводить readiness из helper-only unit tests.",
+      "legacy": [
+        "D02",
+        "D04",
+        "PAI-06",
+        "PAI-07",
+        "PAI-09",
+        "PAI-14"
+      ],
+      "design_refs": [
+        "TELEGRAM.md",
+        "telegram_evidence.json"
+      ]
+    },
+    {
+      "id": "D57",
+      "title": "Telegram: честный прогресс, потоковый preview и остановка",
+      "priority": "P1",
+      "stage": "G1",
+      "kind": [
+        "K",
+        "C",
+        "R"
+      ],
+      "depends_on": [
+        "D56",
+        "D02",
+        "D24",
+        "D05"
+      ],
+      "size": "L",
+      "goal": "Долгая работа понятна и управляется одним нажатием, без потока уведомлений и потерянных результатов.",
+      "change": "JobQueue/worker events проецируются в ProgressEvent и PresentationState; сначала одна редактируемая status card, затем sendMessageDraft/sendRichMessageDraft. Draft nonzero ID + job/generation/route binding записывается до отправки, один foreground lease на chat/thread до проверки client concurrency. Coalesce frames, react retry_after, не показывать ложный процент. Native stopped_message_generation не имеет from: проверить owner private route/thread/active binding, поставить durable cancel fence и прекратить будущие calls/frames; попытаться оборвать transport, не обещать provider cancellation или undo effects. Draft живёт 30 секунд и требует отдельного durable final send; keep_on_stop=false. Проверенный partial хранится явно. SSE в D05 включать по matched latency/quality эксперименту; Search/Brief публикуют verified blocks. Unknown final исключает fallback/replay, legacy callbacks/text stop остаются.",
+      "components": [
+        "src/prm/runtime/worker.py",
+        "src/prm/storage/jobs.py",
+        "src/prm/runtime/model.py",
+        "src/prm/runtime/ingress.py",
+        "src/prm/runtime/transports.py",
+        "src/prm/runtime/delivery.py",
+        "src/prm/runtime/presentation.py",
+        "src/prm/storage/telegram.py (proposed)"
+      ],
+      "verification": "Новый tests/test_daily_telegram_progress.py: native Stop без actor field, другой route/old draft, cancel vs completion/effect, restart lease, two jobs, 429, no provider SSE, 30s expiry, dropped stream/unknown spend/final unknown, no unverified text. Existing test_pai_workers.py и test_pai_delivery.py; model tier если затронут. В D40 измерить ack/first useful/cancel latency (предлагаемый ориентир ack <=2s) и число сообщений; маленькие выборки показывать числами. Model SSE лучше только при измеренном выигрыше без падения grounding.",
+      "gate": "Разбить на два законченных среза: truthful status/cancel, затем native draft/stream. Локальная разработка без bot; реальные client/Stop/limits — D27/D40. Нет draft capability — status card работает. Не заявлять native или user benefit PASS по synthetic тесту.",
+      "legacy": [
+        "D02",
+        "D05",
+        "D24",
+        "PAI-07",
+        "PAI-08",
+        "PAI-09"
+      ],
+      "design_refs": [
+        "TELEGRAM.md",
+        "telegram_evidence.json"
+      ]
+    },
+    {
+      "id": "D58",
+      "title": "Telegram: полноценные интерактивные отчёты из общего документа",
+      "priority": "P1",
+      "stage": "G1",
+      "kind": [
+        "K",
+        "C"
+      ],
+      "depends_on": [
+        "D56",
+        "D19"
+      ],
+      "size": "M",
+      "goal": "Читать вывод, проверять источник и продолжать исследование внутри Telegram без потери полной версии отчёта.",
+      "change": "Pure renderer BriefDocument/answer→InputRichMessage.blocks: heading/paragraph/compact table/details/references/buttons. Один source of truth, exact object/version/story callbacks. Локально ограничить 32768 UTF-8 characters, 500 nested blocks, depth16, 50 media, 20 columns; делить по разделам без silent loss. Trusted controls/URLs формирует сервер, модель не выдаёт исполняемый JSON. sendRichMessage и editMessageText.rich_message проходят общий delivery ledger. Full exact action preview остаётся обязательным. Plain/HTML/PDF/MD fallback того же digest после known format rejection; unknown send не повторять. Feature flag независим от topics/Secretary/hosting.",
+      "components": [
+        "src/prm/briefs.py",
+        "src/prm/runtime/presentation.py",
+        "src/prm/runtime/transports.py",
+        "src/prm/runtime/delivery.py",
+        "src/prm/report_exports.py",
+        "src/prm/telegram_rich.py (proposed)"
+      ],
+      "verification": "Новый tests/test_daily_telegram_rich.py: Cyrillic/emoji/count limits, deep details, large table, citations parity, missing/changed source, spoofed button/link, long full preview, known reject vs unknown, same document across renderers. Existing tests/test_pai_brief_runtime.py, tests/test_pai_brief_polish.py, tests/test_pai_delivery.py по затронутым частям. Actual mobile/desktop rendering и useful follow-up — общий D40; getMe не доказывает клиентскую совместимость.",
+      "gate": "Локальный renderer можно готовить параллельно D57 после согласования D56. Реальный canary требует только выбранный bot/chat и synthetic/public report; business connection не нужна. Rich off восстанавливает совместимое представление, сохраняя старые receipts/bindings.",
+      "legacy": [
+        "D19",
+        "D40",
+        "PAI-05",
+        "PAI-14",
+        "PAI-15"
+      ],
+      "design_refs": [
+        "TELEGRAM.md",
+        "telegram_evidence.json"
+      ]
+    },
+    {
+      "id": "D59",
+      "title": "Условно: темы для параллельных личных исследований",
+      "priority": "P2",
+      "stage": "G2",
+      "kind": [
+        "R",
+        "K",
+        "C",
+        "L",
+        "H"
+      ],
+      "depends_on": [
+        "D56",
+        "D04",
+        "D57",
+        "D27"
+      ],
+      "size": "L",
+      "goal": "Возвращаться к двум длительным работам без смешения контекста и обязательной ручной организации.",
+      "change": "Сначала canary private topics BotFather/getMe на выбранном test bot; feature off по умолчанию. Conversation key v2 owner+bot+chat+thread, null сохраняет default history; TopicBinding отдельно от project/grants. Route всех drafts/finals/controls и exact confirmation учитывает thread. Rename/close не удаляют память; темы создаются по запросу или выбранной политике, не на каждый вопрос. Queue serialize по conversation с owner budget/concurrency cap вместо безусловного owner-wide compute lock. Default conversation остаётся полноценной. Rollback отключает новые темы, сохраняет существующие bindings и explicit return-to-main без слияния историй.",
+      "components": [
+        "src/prm/conversation.py",
+        "src/prm/storage/conversations.py",
+        "src/prm/storage/jobs.py",
+        "src/prm/runtime/ingress.py",
+        "src/prm/runtime/composition.py",
+        "src/prm/runtime/transports.py",
+        "src/prm/storage/telegram.py (proposed)"
+      ],
+      "verification": "Новый tests/test_daily_telegram_topics.py: default migration, 2 topics/8 interleaved turns, reply/yes/stop across threads, late completion, restart, close/rename, stale generation and budget. Existing conversation/worker/ingress tiers по изменениям. Real two-task comparison с reply-only baseline: ноль context leaks, правильный resume, меньше ручных переключений либо явно выбранное удобство владельца; current clients recorded.",
+      "gate": "Аккаунтные настройки сейчас не менять. До canary можно завершать fixtures/migration code. Если темы не помогают или недоступны, оставить off с объяснением; D56–D58 и общий daily pilot не ждут D59. Not-selected не считать implemented.",
+      "legacy": [
+        "D04",
+        "D27",
+        "D40",
+        "PAI-10",
+        "PAI-13"
+      ],
+      "design_refs": [
+        "TELEGRAM.md",
+        "telegram_evidence.json"
+      ]
+    },
+    {
+      "id": "D60",
+      "title": "Secretary: управляемое чтение выбранных переписок",
+      "priority": "P1",
+      "stage": "G3",
+      "kind": [
+        "R",
+        "K",
+        "C",
+        "L",
+        "H"
+      ],
+      "depends_on": [
+        "D56",
+        "D26",
+        "D23",
+        "D10"
+      ],
+      "size": "L",
+      "goal": "Подключить конкретные входящие как источник, сохраняя owner control plane и запрет исходящих действий.",
+      "change": "Сначала выделенная test connection и peer: проверить доступные read/deny-write rights, one-bot slot, редакции/удаления/disconnect и фактическую полноту. BotFather Secretary Mode использует BusinessConnection; реализовать business_connection/business_message/edited/deleted handlers отдельно от owner commands. Verify connection.user, revision,is_enabled, Telegram selection плюс local peer allowlist; никакого guessed history API. Нормализовать source IDs (bot/connection/peer/message/revision) в существующий source/lineage contract. Outage gap явно виден; не включать Telethon backfill. Минимальный getBusinessConnection до доверия, no LLM before scope. Разделить read/storage/model/background/notification grants. Incoming и собственные сообщения в source chat не подтверждают actions; не mark-as-read. Revocation/reconnect инвалидируют старые derived objects/scopes.",
+      "components": [
+        "src/bot/bot.py",
+        "src/prm/runtime/ingress.py",
+        "src/prm/runtime/connections.py",
+        "src/prm/runtime/telegram_business.py (proposed)",
+        "src/prm/storage/telegram.py (proposed)",
+        "src/prm/storage/policy.py",
+        "src/prm/contracts.py"
+      ],
+      "verification": "Новый tests/test_daily_telegram_business_read.py: forged owner connection, peer outside scope, same message ID in different connection, edit/delete/tombstone, reconnect, revocation race, update gap, incoming prompt injection, no outbound calls. Existing connections/policy/revoke tiers по изменениям. Canary 1–2 выбранных test chats доказывает реальные receive/rights/lifecycle; private payload вне Git. Full history/echo не объявлять подтверждёнными.",
+      "gate": "Только выбранная ветка: локальный код без аккаунтов; live requires конкретное чтение/retention, отдельно model egress. Если провайдер не позволяет ограничить token rights до read, показать фактическую широту и enforce deny-write локально; не выдавать это за provider restriction. При отказе оставить forwarding путь. D60 не зависит от topics, Canvas или mail.",
+      "legacy": [
+        "D10",
+        "D26",
+        "D42",
+        "PAI-03",
+        "PAI-16",
+        "PAI-21"
+      ],
+      "design_refs": [
+        "TELEGRAM.md",
+        "telegram_evidence.json"
+      ]
+    },
+    {
+      "id": "D61",
+      "title": "Secretary: обязательства, важные входящие и локальные ответы",
+      "priority": "P1",
+      "stage": "G3",
+      "kind": [
+        "K",
+        "H",
+        "L"
+      ],
+      "depends_on": [
+        "D60",
+        "D21",
+        "D28",
+        "D33"
+      ],
+      "size": "L",
+      "goal": "Ассистент снимает работу по разбору переписки и подготовке ответа, не превращая каждое сообщение в уведомление.",
+      "change": "InboxCandidate с source quote/revision, requester/promisor, action, deadline precision/timezone, uncertainty, project/status; reuse Academic deadline/conflict rules и D33 quiet/dedup/caps. Отличать просьбу/обещание/идею и факт от model inference. Сводка важных входящих и DraftDocument доставляются только в owner assistant chat. Поддержать snooze/dismiss/почему/исправить/подготовь ответ, в общем фокусе без Secretary mode selector. Source edit/delete/revoke инвалидирует derived candidate/draft и требует re-evaluation. Не подтягивать нерелевантный личный контекст; межисточниковое раскрытие явно показывать. Никаких send/read-receipt/auto-reply эффектов.",
+      "components": [
+        "src/prm/runtime/telegram_business.py (proposed)",
+        "src/prm/runtime/academic.py",
+        "src/prm/runtime/actions.py",
+        "src/prm/confirmed_actions.py",
+        "src/prm/runtime/composition.py",
+        "src/prm/runtime/presentation.py",
+        "src/prm/watch_jobs.py",
+        "src/prm/storage/telegram.py (proposed)"
+      ],
+      "verification": "Новый tests/test_daily_telegram_secretary.py: source instructions, vague dates, reversed speaker, already completed obligation, edit/delete, repeated message, quiet hours, wrong project, unrelated private content in draft. 30 размеченных synthetic conversations: предложенный gate >=9/10 существенных обязательств и <=2/20 false actionable. Затем 7–14 дней на 1–2 выбранных чатах: реальные пропуски/ложные уведомления, полезность drafts и суммарное сэкономленное внимание; числа/ошибки, не inflated accuracy.",
+      "gate": "Synthetic quality и owner-only delivery сначала; пилот после D60 scopes/выбора модели. Live usefulness отдельно от passing extraction. При шуме отключить push и сохранить on-demand inbox/drafts; не требовать ежедневной разметки владельцем.",
+      "legacy": [
+        "D21",
+        "D28",
+        "D33",
+        "D41",
+        "PAI-19",
+        "PAI-20",
+        "PAI-21"
+      ],
+      "design_refs": [
+        "TELEGRAM.md",
+        "telegram_evidence.json"
+      ]
+    },
+    {
+      "id": "D62",
+      "title": "Secretary: точный подтверждённый ответ от имени владельца",
+      "priority": "P1",
+      "stage": "G3",
+      "kind": [
+        "K",
+        "L",
+        "H"
+      ],
+      "depends_on": [
+        "D61",
+        "D28",
+        "D23"
+      ],
+      "size": "L",
+      "goal": "Отправить проверенный владельцем ответ конкретному собеседнику через существующую защиту действий.",
+      "change": "Добавить typed telegram.business_reply в общий ActionProposal/effect engine, отдельный Telegram adapter вместо Graph assumptions. Exact preview: connection/account/peer/reply target, полный body/entities/attachments, source and draft versions, expiry и disclosure refs. Confirmation только owner control chat, single-use/version-bound. Перед effect проверить connection revision/right, входящее в 24h window, recipient/source grant, cancel fence; outgoing source message не approval. Telegram success Message сохраняется с exact identity; dispatch timeout unknown без blind retry или plain/MTProto fallback. Canary проверяет возможность exact reconciliation по собственному echo; до доказательства этого manual unknown reconciliation. Read receipts/delete/profile/gifts остаются вне action allowlist.",
+      "components": [
+        "src/prm/confirmed_actions.py",
+        "src/prm/runtime/actions.py",
+        "src/prm/storage/actions.py",
+        "src/prm/runtime/telegram_business.py (proposed)",
+        "src/prm/runtime/transports.py",
+        "src/prm/runtime/delivery.py",
+        "src/prm/runtime/presentation.py"
+      ],
+      "verification": "Новый tests/test_daily_telegram_business_actions.py + affected tests/test_pai_durable_actions.py/test_pai_action_runtime.py: changed peer/body/source/scope/connection, stale yes, expired24h, duplicate confirmation, revoke/cancel race, unknown send/reconcile. Отдельный approved test-peer send: exact message_id/account/recipient/body receipt и отсутствие второго эффекта; acceptance != recipient read. Privacy tests на перенос секрета из другого чата.",
+      "gate": "Код/fixtures без write credentials. Личный read grant не даёт send; перед canary конкретный peer/message/action scope, не общее разрешение секретарю. Если подтверждённой reconciliation нет — честно unknown и без автоповтора. Полезные D60/D61 продолжают работать без D62.",
+      "legacy": [
+        "D28",
+        "D32 (reuse effect engine, not dependency on mail access)",
+        "PAI-04",
+        "PAI-20"
+      ],
+      "design_refs": [
+        "TELEGRAM.md",
+        "telegram_evidence.json"
+      ]
+    }
+  ],
+  "requirements_coverage": {
+    "CHAT-01": [
+      "D03",
+      "D04",
+      "D38"
+    ],
+    "CHAT-02": [
+      "D04",
+      "D19",
+      "D59"
+    ],
+    "SEARCH-01": [
+      "D12",
+      "D14",
+      "D27"
+    ],
+    "BRIEF-01": [
+      "D18",
+      "D39"
+    ],
+    "CONNECT-01": [
+      "D10",
+      "D29",
+      "D30",
+      "D31",
+      "D51",
+      "D54",
+      "D60"
+    ],
+    "ACT-01": [
+      "D28",
+      "D32",
+      "D62"
+    ],
+    "QUALITY-01": [
+      "D06",
+      "D35",
+      "D38",
+      "D44"
+    ],
+    "MIGRATION-01": [
+      "D09",
+      "D22",
+      "D23"
+    ],
+    "UX-01": [
+      "D01",
+      "D26",
+      "D56"
+    ],
+    "UX-02": [
+      "D18",
+      "D19",
+      "D40",
+      "D58"
+    ],
+    "UX-03": [
+      "D04",
+      "D19",
+      "D56",
+      "D59"
+    ],
+    "UX-04": [
+      "D02",
+      "D15",
+      "D57"
+    ],
+    "UX-05": [
+      "D02",
+      "D32",
+      "D43",
+      "D57",
+      "D62"
+    ],
+    "MEM-01": [
+      "D04"
+    ],
+    "MEM-02": [
+      "D21",
+      "D42"
+    ],
+    "MEM-03": [
+      "D08",
+      "D20",
+      "D21"
+    ],
+    "SEARCH-02": [
+      "D04",
+      "D11",
+      "D12"
+    ],
+    "SEARCH-03": [
+      "D15"
+    ],
+    "SEARCH-04": [
+      "D14"
+    ],
+    "EVIDENCE-01": [
+      "D10"
+    ],
+    "EVIDENCE-02": [
+      "D14",
+      "D17"
+    ],
+    "EVIDENCE-03": [
+      "D12"
+    ],
+    "RAG-01": [
+      "D11",
+      "D46"
+    ],
+    "BRIEF-02": [
+      "D18",
+      "D39"
+    ],
+    "BRIEF-03": [
+      "D19",
+      "D58"
+    ],
+    "BRIEF-04": [
+      "D16",
+      "D17",
+      "D18"
+    ],
+    "VISUAL-01": [
+      "D19",
+      "D40",
+      "D58"
+    ],
+    "VISUAL-02": [
+      "D25",
+      "D40"
+    ],
+    "VISUAL-03": [
+      "D19",
+      "D40",
+      "D58"
+    ],
+    "VISUAL-04": [
+      "D19",
+      "D25"
+    ],
+    "BRIEF-05": [
+      "D16"
+    ],
+    "BRIEF-06": [
+      "D10",
+      "D16"
+    ],
+    "BRIEF-07": [
+      "D19",
+      "D58"
+    ],
+    "WATCH-01": [
+      "D33"
+    ],
+    "WATCH-02": [
+      "D33"
+    ],
+    "WATCH-03": [
+      "D02",
+      "D33"
+    ],
+    "WATCH-04": [
+      "D33",
+      "D43"
+    ],
+    "CONNECT-02": [
+      "D26",
+      "D29",
+      "D30",
+      "D31",
+      "D60"
+    ],
+    "CONNECT-03": [
+      "D26",
+      "D28",
+      "D32",
+      "D62"
+    ],
+    "ACADEMIC-01": [
+      "D41",
+      "D51",
+      "D52"
+    ],
+    "ACADEMIC-02": [
+      "D41",
+      "D52",
+      "D53"
+    ],
+    "ACADEMIC-03": [
+      "D41",
+      "D52"
+    ],
+    "ACADEMIC-04": [
+      "D41",
+      "D52",
+      "D53"
+    ],
+    "ACADEMIC-05": [
+      "D41",
+      "D52",
+      "D54"
+    ],
+    "PERM-01": [
+      "D07",
+      "D26",
+      "D32"
+    ],
+    "ACT-02": [
+      "D28",
+      "D32",
+      "D62"
+    ],
+    "ACT-03": [
+      "D28",
+      "D32",
+      "D62"
+    ],
+    "SEC-01": [
+      "D04",
+      "D12",
+      "D14",
+      "D34",
+      "D60",
+      "D61"
+    ],
+    "SEC-02": [
+      "D05",
+      "D07",
+      "D34"
+    ],
+    "SEC-03": [
+      "D23",
+      "D42",
+      "D60",
+      "D61",
+      "D62"
+    ],
+    "SEC-04": [
+      "D23",
+      "D26",
+      "D42",
+      "D60",
+      "D61",
+      "D62"
+    ],
+    "ARCH-01": [
+      "D03",
+      "D04",
+      "D45",
+      "D56",
+      "D59"
+    ],
+    "ARCH-02": [
+      "D10",
+      "D22",
+      "D42"
+    ],
+    "OPS-01": [
+      "D02",
+      "D15",
+      "D24",
+      "D43",
+      "D57"
+    ],
+    "OPS-02": [
+      "D23",
+      "D24",
+      "D43",
+      "D50"
+    ],
+    "MODEL-01": [
+      "D05",
+      "D07",
+      "D37"
+    ],
+    "MODEL-02": [
+      "D07",
+      "D37"
+    ],
+    "COST-01": [
+      "D07"
+    ],
+    "COST-02": [
+      "D07",
+      "D37"
+    ],
+    "MEDIA-01": [
+      "D34"
+    ],
+    "MEDIA-02": [
+      "D34"
+    ],
+    "MEDIA-03": [
+      "D19",
+      "D28",
+      "D34"
+    ],
+    "EVAL-01": [
+      "D06",
+      "D35",
+      "D36",
+      "D38"
+    ],
+    "EVAL-02": [
+      "D06",
+      "D37"
+    ],
+    "EVAL-03": [
+      "D38",
+      "D39",
+      "D40"
+    ],
+    "DONE-01": [
+      "D44"
+    ],
+    "PLAN-01": [
+      "D01",
+      "D03",
+      "D38"
+    ],
+    "PLAN-02": [
+      "D48"
+    ],
+    "PLAN-03": [
+      "D45",
+      "D47",
+      "D48"
+    ]
+  },
+  "conditional_prerequisites": "depends_on are AND. requires_one_of is OR between groups; every member of a selected group is required. A deployment using mixed providers must satisfy each selected provider contract. Stage labels describe outcomes, not a total ordering.",
+  "nebula_addendum": {
+    "design_ref": "UTD_NEBULA.md",
+    "owner_intent": "Owner requests a fully working daily integration, not a minimal adapter or smoke-only MVP. Owner will request key; current session remains documentation only. Canvas separately deferred.",
+    "packages": {
+      "NB-1": [
+        "D51",
+        "D52"
+      ],
+      "NB-2": [
+        "D53"
+      ],
+      "NB-3": [
+        "D54"
+      ],
+      "conditional": [
+        "D55"
+      ]
+    },
+    "note": "D54 completion requires D52/D53/D27; key preparation and initial contract canary can start earlier as explicitly incomplete substeps. D55 may start after D51 on a measured gap. Full Act also requires D32 under D44. No product implementation performed."
+  },
+  "telegram_decisions": {
+    "design_ref": "TELEGRAM.md",
+    "evidence_ref": "telegram_evidence.json",
+    "execution_source": "tasks in this backlog; no separate Telegram roadmap or implementation handoff",
+    "implement": [
+      "D56",
+      "D57",
+      "D58"
+    ],
+    "experiment_then_select": [
+      "D59",
+      "D60"
+    ],
+    "selected_secretary_continuation": [
+      "D61",
+      "D62"
+    ],
+    "deferred": [
+      "Guest Mode/inline cross-chat sharing",
+      "native checklist"
+    ],
+    "out_of_scope": [
+      "community UI",
+      "paid broadcast",
+      "managed bots",
+      "unconfirmed auto-replies",
+      "Mini App — explicitly excluded by owner on 2026-10-11, not deferred"
+    ],
+    "first_step": "D01-D03 if still open, then D56; D57/D58 when their shared dependencies are ready",
+    "optional_gates": "D59 and D60-D62 never gate the core daily assistant. Selection adds their own real integration/operator acceptance; no false PASS on missing access."
+  },
+  "scope_decisions": [
+    {
+      "date": "2026-10-11",
+      "feature": "Telegram Mini App",
+      "decision": "excluded_by_owner",
+      "effect": "Removed D63 from executable backlog, requirement coverage and rollout; ordinary private reader D25 and native rich reports D58 remain."
+    }
+  ]
+}

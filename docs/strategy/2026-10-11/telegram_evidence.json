@@ -1,0 +1,132 @@
+{
+  "schema_version": "pa.telegram_research.evidence.v1",
+  "date": "2026-10-11",
+  "base_commit": "23312b8",
+  "runtime_baseline": "0fbcfd1",
+  "status": "research_only",
+  "execution_plan": "BACKLOG.md; backlog.json; IMPLEMENTER_START.md",
+  "sources": [
+    {
+      "url": "https://core.telegram.org/bots/api",
+      "checked_on": "2026-10-11",
+      "snapshot_sha256": "54a4a6ba07b0d07dd61a9f32da4def9cbaec2bad78e45ee57d1a40360b5a9faf",
+      "snapshot_bytes": 860075,
+      "scope": "public documentation, not authenticated bot/client observation"
+    },
+    {
+      "url": "https://core.telegram.org/bots/features",
+      "checked_on": "2026-10-11",
+      "snapshot_sha256": "67ab8025a827542a0bc5bda25a858de7d227c84b2d12e1891ce4f3e1b58ab840",
+      "snapshot_bytes": 116941,
+      "scope": "public documentation, not authenticated bot/client observation"
+    },
+    {
+      "url": "https://core.telegram.org/api/bots/connected-business-bots",
+      "checked_on": "2026-10-11",
+      "snapshot_sha256": "19b2e50cfd96554743157116f4a95bd5647cbc5819d17dcb2b6527976f5a7d96",
+      "snapshot_bytes": 25714,
+      "scope": "public documentation, not authenticated bot/client observation"
+    },
+    {
+      "url": "https://core.telegram.org/bots/webapps",
+      "checked_on": "2026-10-11",
+      "snapshot_sha256": "8022f87a892698ecb0584b276091a835a2d8a32fbe98740f0c2f84d98f87071c",
+      "snapshot_bytes": 154671,
+      "scope": "public documentation, not authenticated bot/client observation"
+    },
+    {
+      "url": "https://core.telegram.org/bots/faq",
+      "checked_on": "2026-10-11",
+      "scope": "public documentation; read via web tool, no local hash"
+    },
+    {
+      "url": "https://telegram.org/tos/bot-developers#5-4-telegram-business",
+      "checked_on": "2026-10-11",
+      "scope": "public documentation; read via web tool, no local hash"
+    },
+    {
+      "url": "https://docs.telethon.dev/en/stable/",
+      "checked_on": "2026-10-11",
+      "scope": "public documentation; read via web tool, no local hash"
+    }
+  ],
+  "documented_bot_api": {
+    "version": "10.3",
+    "release_date": "2026-08-24",
+    "client_support": "not_observed"
+  },
+  "compatibility": {
+    "bot_transport": "urllib HTTP Bot API",
+    "telethon_role": "MTProto archive ingestion",
+    "requirements": "telethon>=1.36.0",
+    "installed_in_venv_pai": {
+      "Telethon": "1.42.0",
+      "httpx": "0.28.1",
+      "requests": "2.34.2",
+      "aiogram": "not_installed",
+      "python-telegram-bot": "not_installed"
+    },
+    "stable_telethon_docs": "1.45.0",
+    "production_environment": "not_inspected"
+  },
+  "local_probe": {
+    "command": "PYTHONPATH=src .venv-pai/bin/python /tmp/pa_telegram_probe_20261011.py",
+    "exit_code": 0,
+    "script_sha256": "6ee091ec563e638ea9acf43474945eecbfbddb3e20bc02b4c9b4a9d628e28f54",
+    "network": "socket.create_connection and socket.socket.connect blocked before calls",
+    "database": "not_used",
+    "results": {
+      "stop": true,
+      "edited_owner_message": true,
+      "business_message": true,
+      "inline_navigation_ignored": true,
+      "sender_signature": "(self, destination, text, attempt_ref, *, navigation=None, parse_mode=None)",
+      "conversation_key_signature": "(chat_id: 'str') -> 'str'",
+      "scope": "static/pure local probes; no DB/provider/client UI; ignored update is observed baseline, not acceptance"
+    },
+    "interpretation": "booleans true mean the update/navigation was ignored by current code; not feature acceptance"
+  },
+  "code_refs": [
+    "src/bot/bot.py",
+    "src/prm/runtime/ingress.py",
+    "src/prm/runtime/transports.py",
+    "src/prm/runtime/delivery.py",
+    "src/prm/conversation.py",
+    "src/prm/storage/conversations.py",
+    "src/prm/storage/jobs.py",
+    "src/prm/runtime/model.py",
+    "src/prm/confirmed_actions.py",
+    "src/prm/runtime/actions.py",
+    "src/prm/runtime/reader.py"
+  ],
+  "live_observations": [],
+  "pending": [
+    "selected bot/account capabilities and client versions",
+    "actual RichMessage/Draft/Stop rendering and semantics",
+    "private topic usability and isolation in real sessions",
+    "selected business connection/rights/peer scope and update lifecycle",
+    "business own-message echo/reconciliation feasibility",
+    "owner usefulness and attention cost"
+  ],
+  "non_actions": [
+    "no product/config/test edits",
+    "no personal account/token reads or connections",
+    "no BotFather getMe or message send",
+    "no deployment/service/migration",
+    "no paid inference",
+    "no commit/push/merge"
+  ],
+  "probe_limitations": [
+    "Pure ingress probe observes early returns; not an end-to-end runtime test.",
+    "API documents do not prove actual support on owner clients.",
+    "No independent reviewer invoked for this documentation packet."
+  ],
+  "scope_decisions": [
+    {
+      "date": "2026-10-11",
+      "feature": "Mini App",
+      "decision": "excluded_by_owner",
+      "note": "Public Mini Apps sources remain research history, not implementation scope."
+    }
+  ]
+}

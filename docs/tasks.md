@@ -8,6 +8,10 @@ The full target is `docs/PERSONAL_ASSISTANT_SPEC.md`. Exact slice scope, files, 
 
 Historical PRM-SN/RFX/UTD task records are preserved byte-for-byte at `docs/tasks.before-pa-20260918.md`; their statuses and evidence are not rewritten or imported as new PA completion. Read that snapshot only for a relevant maintenance issue. This graph is the new end-to-end goal, not permission to restart completed work or activate accounts/jobs.
 
+## Research handoff update — 2026-10-11
+
+The next coding agent uses the [daily strategy backlog](strategy/2026-10-11/BACKLOG.md), 62 proposed tasks in one queue. The additional [Nebula audit](strategy/2026-10-11/UTD_NEBULA.md) defines D51–D54 plus conditional D55. Owner will request the API key; Canvas remains deferred. Telegram D56–D62 and amendments to existing shared cards are integrated into this backlog: [design evidence](strategy/2026-10-11/TELEGRAM.md), one [implementer handoff](strategy/2026-10-11/IMPLEMENTER_START.md). D56 follows D01–D03; D57/D58 enter shared D27/D40 acceptance. Topics/Secretary have conditional gates, not a second roadmap. Mini App is excluded by the owner; D25 remains an ordinary private reader. This update changes no formal task statuses and claims no implementation/provider acceptance. Execution is in bounded packages with one Deep Review between packages, fixes, and narrow critical-finding rechecks.
+
 ## Current engineering evidence — 2026-10-10
 
 Runtime0fbcfd1:398 active PAI/69 exact IDs/10 scenarios, current code safety

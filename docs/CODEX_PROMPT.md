@@ -1,48 +1,82 @@
-# Current assignment — detailed docs and master integration
+# Current assignment — daily assistant strategy and implementation handoff
 
-2026-10-10 owner explicitly requested detailed documentation/README: stage,
-outcomes, unfinished/unproven work and reasons; merge all session work into
-master. ADR-019 records this Git authority. Edit on the assigned working branch,
-validate, merge preserving history; no direct source edits on master, reset,
-force push, production deploy or invented acceptance.
+The 2026-10-11 owner assignment requests independent research, product strategy,
+architecture and an executable plan for the next coding agent. This session is
+documentation only: no product implementation, personal connections, paid model
+inference, external effects, production migrations, services or timers.
 
-Read README -> PRODUCT_STATUS -> the dated evidence needed for the current slice.
-The full spec remains PERSONAL_ASSISTANT_SPEC. PAI design/requirements statuses
-remain draft/planned until genuine formal acceptance; no MVP reduction or restart
-of completed historical tasks/programme review batches.
+Completed research packet: [strategy index](strategy/2026-10-11/README.md).
+Read that index, [code audit](strategy/2026-10-11/CODE_AUDIT.md), then only the
+assigned cards in [backlog](strategy/2026-10-11/BACKLOG.md). It contains 62 proposed
+tasks, mapped to all 69 full-spec IDs; proposed status is not implementation,
+design approval or human acceptance. The current owner allows critical redesign
+and process simplification as proposals. Existing safety/approval records remain.
 
-Verified runtime/test code:0fbcfd1dde780724ad934aa66825afe17a6efc98.
-Actual full active PAI398/1164.34s,zero skips/failures,all69 IDs/10 scenarios;
-delivery43/127.72s,Brief77/100.04s,recovery33/260.43s. Premerge PRM/retrofit and
-final refs: PAI-master-integration-20261010.md/.json. Subsequent runtime unchanged;CI guard union correction4c2656c is separately63-test/118 ADVISORY verified.
+The first concrete implementation block for a subsequently assigned coding agent
+is **D01 → D02 → D03**: explicit runtime entrypoint/config check, natural job
+status/cancel/result, and a shared typed dispatcher over existing capabilities.
+Use [IMPLEMENTER_START](strategy/2026-10-11/IMPLEMENTER_START.md) for scope,
+interfaces, behavioral cases and exact commands. It can be developed locally on
+synthetic fixtures without personal access. Implementation starts only in that
+next assigned session; this research session stops after the checked packet.
 
-DeepSeek116 closed deletion P1 but found multipart recovery P1 (STOP). Six cases
-reproduced; shared dispatch/reconcile builder repaired it. Actual117 on0fbcfd1:
-ADVISORY/no P0/P1,470.397s,usage49125/19472/68597; extreme HTML nesting P2 remains.
-This is scoped engineering closure, not governed role/design/human acceptance.
+Owner clarification, 2026-10-11: the next coding agent implements in bounded
+packages, with Deep Review BETWEEN packages: implement, scoped checks, one
+independent review of the accumulated diff, fix findings, proceed. Recheck P0/P1
+fixes independently and narrowly; do not restart whole reviews/test suites for
+cosmetics or chase endless review cycles. Carry noncritical remaining findings
+explicitly. Sixty-two backlog cards do not imply sixty-two full review cycles.
 
-Owner selected another Go model, then enabled extra usage. Working capture:
-DeepSeek V4.1 Flash11 calls /6 sessions25 turns; text judge DeepSeek Pro/max
-requested,observed unknown,6/6 floor4 on every8 axes. Kimi fixed-content repaired
-renderer: pass,PDF/sources/dark5,mobile/hierarchy4. New V4.1 Brief5-page PDF has0
-clipping/browser errors. Do not conflate datasets or claim measured matched-model
-improvement. Original GLM/MiMo grades,115 quota429, legacy Flash/vision403, invalid
-fixture clocks and failures stay dated evidence. Production model/cost unknown.
+Source inspected: `23312b8` (master at research start). Current strategy branch:
+`codex/pa-daily-strategy-20261011`. Do not edit source on master, reset others'
+work or assume the old master-merge assignment authorizes a new deployment.
+Previous handoff is preserved in Git at `23312b8:docs/CODEX_PROMPT.md`.
 
-Live pilot needs selected Telegram/mail/calendar/resource/destination/scopes;
-missing-info question sent, private configurations not received. Concrete20-task
-packet: PAI-pilot-access-20261010.md. Brave discovery key not selected; actual
-GitHub exact-ref/public Python fetch observed. UTD/API owner-deferred. Current
-SyntheticTarget is not private/production storage. No actual mail/calendar writes,
-private corpus egress, service/timer startup or cutover in this work.
+Evidence baseline: runtime/test `0fbcfd1`, dated 398 active PAI checks /69 IDs/
+10 scenario groups; actual Go synthetic capture and public GitHub/Python reads;
+scoped engineering review117 ADVISORY, extreme HTML-depth P2 remains. CI guard
+correction `4c2656c` has separate review118; merge/remote CI receipt is
+[PAI-master-integration-20261010](verification/PAI-master-integration-20261010.md).
+No current personal/operator acceptance. SyntheticTarget is test-only; private
+storage and real startup require implementation and scoped selection.
 
-Raw formal contract has51 missing approvals; expected-rejection CI guard is not
-human acceptance. Preserve historical records and statuses. CI guard118:ADVISORY/no P0/P1,empty-draft robustness P2 retained. No further model calls or
-full PAI rerun for doc cosmetics; pin/reference/plan/appropriate CI checks suffice
-unless merge changes runtime bytes. No tokens/private account data in Git.
+The strategy identifies additional code-level gaps: optional durable startup,
+command/prefix routing, early 48-item Brief truncation, transport API differences,
+and incomplete daily personalization wiring. These are static findings, not a
+claim that historical passing tests failed. Current public Go documentation
+describes coding-agent traffic; runtime suitability, account availability and
+privacy must be assessed separately from the public catalog. No new winner over
+GPT-4o is claimed; a matched experiment and calibrated judge are specified.
 
-After integration stop at source/pilot gates. Next safe command:
+Continue the full Chat/Search/Brief/Watch/confirmed Act programme. Canvas
+remains owner-deferred. The owner additionally requested Nebula research/tasks
+and will request an API key: read [UTD_NEBULA](strategy/2026-10-11/UTD_NEBULA.md),
+D51–D54 plus conditional D55. There is currently no Nebula client in src.
+Nebula-only must work without Canvas; api-tools is an upstream ETL CLI, not a
+required client dependency. No key/connection/implementation occurred here.
+Owner clarification: deliver a fully working daily Nebula integration, not a
+minimal adapter or smoke-only MVP. D51–D54 cover useful datasets, durable
+sync/recovery, conversation/memory, Brief/Watch and a 14-day real pilot. D55
+closes measured gaps with suitable ready-made components; choose reuse by
+quality and maintainability, not line-count minimization. D54 completes after
+D52/D53/D27; its initial key/canary preparation may happen earlier.
+These external gates do not block independent work. Do not rerun completed
+historical tasks/reviews, immutable115/116/117 calls or full historical pytest.
+Do not forge the 51 missing formal approvals. Use current REVIEW_POLICY and the
+pinned tools/playbook.py entrypoint; keep engineering evidence separate from
+provider, visual, operator and formal acceptance.
+
+Telegram changes are integrated into this same backlog, not a separate roadmap.
+Read [TELEGRAM](strategy/2026-10-11/TELEGRAM.md) only as the design/evidence
+reference for assigned cards. After D01–D03, take D56; then dependency-ready
+D57/D58 feed the shared D27/D40 pilot. D59 topics are experimental; selected
+Secretary D60→D61→D62 separates read, local draft and confirmed send. Mini App is explicitly excluded by the owner; do not implement or reintroduce it
+as a conditional task. D25 remains an ordinary private reader. The optional
+topics/Secretary branches do not block the core assistant. Official API availability is not observed bot/client support.
+The only implementer handoff remains IMPLEMENTER_START; no separate TG phases.
+
+Next safe command:
 `PYTHONPATH=src .venv-pai/bin/python -m prm.cli --help`.
-Use current merge receipt for branch/ref. Do not rerun immutable115/116/117 scripts.
 
-Integration observed:master/origin anchor36a1cf4 published,both remote CI runs successful;final receipt metadata follows normally. Documentation complete. Stop at the selected-source/pilot gates;do not repeat historical tasks/reviews.
+Research commands/results, changed files and unresolved gates:
+[RESEARCH_RECEIPT](strategy/2026-10-11/RESEARCH_RECEIPT.md).

@@ -5,6 +5,10 @@ new source, store private records, start a timer, or send a notification.
 
 Last verified: 2026-09-18
 
+## Addendum — 2026-10-11
+
+This September brief is historical. Mail/Canvas/Academic code now exists; the old “Current repository truth” below must not be read as the current state. Nebula itself still has no runtime adapter. The owner will request a key and asked for a concrete plan: [current Nebula API/api-tools audit and D51–D55](strategy/2026-10-11/UTD_NEBULA.md). Canvas access remains separately deferred. No new live connection or product implementation was performed.
+
 ## Purpose
 
 This brief gives a future research agent a bounded way to investigate an

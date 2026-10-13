@@ -10,6 +10,7 @@
 
 | Вопрос | Документ |
 | --- | --- |
+| Стратегия ежедневной полезности и первый блок для кодирующего агента | [Исследование и 62 карточки от 11 октября](docs/strategy/2026-10-11/README.md) — план, без изменения runtime |
 | Что готово, чего нет и почему | [Подробный статус](docs/PRODUCT_STATUS.md) |
 | Доказательство каждого обязательства | [69 требований и 10 сценариев](docs/verification/PAI-requirement-evidence-20261010.md) |
 | Реальные команды, модели и результаты | [Проверка Go/пилота](docs/verification/PAI-go-pilot-20261010.md), [receipts JSON](docs/verification/PAI-go-pilot-20261010.json) |
@@ -29,7 +30,7 @@
 | **Brief** | Immutable документ, версии, источники, редакторская модель, HTML/PDF/Markdown, private reader, mobile light/dark. | Недельные личные материалы, человеческая полезность отбора, защищённый развёрнутый reader. |
 | **Watch** | Preview/confirm, durable расписание, локальные tick/сбор/квитанция тестового адаптера, quiet hours/caps/pause/revoke. | Недельная работа сервиса, настоящая Telegram-доставка и notification noise. |
 | **Act** | Точный preview, expiring one-use confirmation, executor, отдельный reconcile, `202 → unknown`, provider object и no-replay. | Настоящие test mail/calendar accounts, получение письма адресатом, запись выбранного календаря. |
-| **Connections / Academic** | OAuth/PKCE/vault, отдельные Graph/Canvas/calendar адаптеры, lifecycle и негативные HTTP fixtures; различение сроков/локального выполнения/подтверждения источника. | Реальный OAuth/аккаунты. UTD/Canvas API отложен владельцем. |
+| **Connections / Academic** | OAuth/PKCE/vault, отдельные Graph/Canvas/calendar адаптеры, lifecycle и негативные HTTP fixtures; различение сроков/локального выполнения/подтверждения источника. | Реальный OAuth/аккаунты. Canvas отложен; Nebula запланирована отдельно, ключ запросит владелец — [аудит и задачи](docs/strategy/2026-10-11/UTD_NEBULA.md). |
 | **Memory / Media** | Версии, explicit confirmation, provenance, forget/derived deletion; download/inspect/text layer/OCR/speech/vision seams и holdouts. | Личные retention настройки и реальные разрешённые speech/OCR/provider данные. |
 | **Operations / Cost** | Grants/revoke, reserve/settle, unknown fences, leases/checkpoints/recovery, status, backup/restore и selected-domain migration rehearsal. | Production target/cutover, аварии настоящего хоста, SLO и фактическая стоимость полезной задачи. |
 
@@ -60,7 +61,7 @@
 ## Что отделяет локальную версию от полного принятия
 
 1. Не выбраны конкретные Telegram/test mail/calendar/resource/destination и scopes.
-2. UTD/API отложен владельцем; fixture contract не является institutional access.
+2. Canvas остаётся отложенным. Nebula пока не интегрирована: отдельные D51–D54 и ожидаемый запрос ключа не являются live connection; fixture contract не является institutional access.
 3. Brave discovery не испытан: ключ/область поиска не выбраны.
 4. Private/production storage и cutover не выполнены: `SyntheticTarget` намеренно ограничен test DB.
 5. Нет нескольких недель операторского пилота: полезность, пропущенные обязанности, noise, реальный p95 и стоимость успеха неизвестны.
