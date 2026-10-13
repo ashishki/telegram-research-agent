@@ -1,7 +1,9 @@
 # Первый блок реализации единого входа и управления задачами
 
 Execution overlay, 13 October: D01–D03 and D56 are implemented locally. Final
-local P1 rechecks: `988da0e` and `d231d9a`. D05 + D06 source/review `2318bbe`, fixes `e10365e`; next ready package D04 + D10 after P1 closure;
+local P1 rechecks: `988da0e` and `d231d9a`. D05 + D06 source/review `2318bbe`, fixes `e10365e`.
+D04 + D10 source/review71704c4, initial repairs2a20da4, final fix/narrow PASS0287f87.
+All package P1 including new R09 closed locally. Next ready package: D07 + D08 + D09;
 read [current handoff](../../CODEX_PROMPT.md) and [backlog receipts](BACKLOG.md).
 The non-Codex Go/governed/human gates remain open; local review is separate.
 The original first-block instructions below are design context, not a request

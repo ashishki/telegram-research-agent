@@ -19,7 +19,7 @@
     "engineering_done": "Следующий кодирующий агент работает законченными пакетами: реализация → адресные проверки → один независимый Deep Review накопленного diff → исправления → следующий пакет. У каждого пакета один native ingress→use case→result результат. P0/P1 исправлены и независимо перепроверены узко до зависимой работы; повторное полное ревью/все тесты без нового существенного риска не запускаются. Некритические остатки фиксируются; 62 карточки не означают 62 полных ревью. Изменения egress/secrets/retention/confirmation/recovery получают требуемое риск-ревью до реального использования.",
     "evidence": "Record exact SHA/diff, commands, pass/fail/skip, requested/observed model, public fixture hashes and unresolved live/operator gates. A test filename is not a pass. No private payloads in Git.",
     "rollback": "Отключить новую способность или вернуть предыдущий совместимый код; не откатывать consumed/unknown receipts, revoke/tombstones и canonical source IDs. Для schema changes нужен отдельный forward-compatible recovery.",
-    "verification": "D01-D03, D56 and D05/D06 daily acceptance files now exist and are registered in project_verification. The daily runner uses the existing strict zero-skip acceptance guard. Other proposed daily tests belong to their package; only affected tiers, no full historical pytest.",
+    "verification": "Nine implemented daily acceptance files are registered in the project verifier via the strict zero-skip runner. Use package-specific tiers during implementation; no full historical pytest.",
     "formal_mapping": "PAI references mean reuse/coverage, never automatic completion or human approval. Do not modify formal statuses based solely on this plan."
   },
   "tasks": [
@@ -153,7 +153,12 @@
         "PAI-05",
         "PAI-10",
         "PAI-13"
-      ]
+      ],
+      "engineering_status": "local_review_p1_closed_go_route_pending",
+      "source_sha": "71704c43406ee5bff112d654a1329e0b0278f67c",
+      "implementation_receipt": "../../verification/DAILY-package-04-D04-D10-20261013.md",
+      "local_code_sha": "0287f87c16f400d1a0b48e7a20763d45486ffb65",
+      "local_review_receipt": "../../verification/DAILY-package-04-local-review-20261013.md"
     },
     {
       "id": "D05",
@@ -341,7 +346,12 @@
         "PAI-12",
         "PAI-14",
         "PAI-17"
-      ]
+      ],
+      "engineering_status": "local_review_p1_closed_go_route_pending",
+      "source_sha": "71704c43406ee5bff112d654a1329e0b0278f67c",
+      "implementation_receipt": "../../verification/DAILY-package-04-D04-D10-20261013.md",
+      "local_code_sha": "0287f87c16f400d1a0b48e7a20763d45486ffb65",
+      "local_review_receipt": "../../verification/DAILY-package-04-local-review-20261013.md"
     },
     {
       "id": "D11",
@@ -2611,13 +2621,79 @@
         "loopback_model_requests": 35,
         "quality_score": null,
         "independent_holdout": false
+      },
+      {
+        "id": "daily-04",
+        "tasks": [
+          "D04",
+          "D10"
+        ],
+        "status": "local_review_p1_closed_go_route_pending",
+        "source_sha": "71704c43406ee5bff112d654a1329e0b0278f67c",
+        "diff_base": "62a2909819c9062e8c2fec7d3dcb62bf58e32934",
+        "reviewed_sha": "71704c43406ee5bff112d654a1329e0b0278f67c",
+        "diff_sha256": "f62c4be950c46714c85bd005b4e402552299d870b1ff12ad07daaeb33f56ae38",
+        "review_route": "independent_local_readonly",
+        "policy_go_route_satisfied": false,
+        "receipt": "../../verification/DAILY-package-04-D04-D10-20261013.md",
+        "next_block_after_gate": [
+          "D07",
+          "D08",
+          "D09"
+        ],
+        "repair_sha": "2a20da43b5c54a3d71b54c559a4e61ed0cff0784",
+        "recheck_diff_sha256": "c299a852025776bbe84a2db556c464cefc856f83d28fe7b1d1f6fdb8dfe06a34",
+        "review_receipt": "../../verification/DAILY-package-04-local-review-20261013.md",
+        "remaining_findings": [],
+        "trace_receipt": "../../evidence/daily-package-04-20261013-transcript.json",
+        "trace_sha256": "ccf3a0d93bba5d0e9f5713c40123d2d7566f214e227e1fcd44b082465d80abac",
+        "trace_source_sha": "71704c43406ee5bff112d654a1329e0b0278f67c",
+        "native_dialogue_turns": 20,
+        "loopback_answer_requests": 20,
+        "quality_score": null,
+        "independent_holdout": false,
+        "limitations": [
+          "Local independent review does not satisfy non-Codex Go/governed/human acceptance.",
+          "No personal archive/account/client/provider or operator evidence.",
+          "Project labels are ephemeral focus; real project records remain D08.",
+          "Second-item/shorten bind selected text; model explanation quality is unverified.",
+          "20-turn fake-planner/loopback capture is on pre-repair source71704c4; current native tests separately exercise repairs."
+        ],
+        "final_code_sha": "0287f87c16f400d1a0b48e7a20763d45486ffb65",
+        "recheck_sha": "0287f87c16f400d1a0b48e7a20763d45486ffb65",
+        "additional_repair_diff_sha256": "46e9edb722d19ae5380aa049831061b9d941dfd5c1849db9f962abed9df7233e",
+        "closed_findings": [
+          "DAILY04-R01",
+          "DAILY04-R02",
+          "DAILY04-R03",
+          "DAILY04-R04",
+          "DAILY04-R05",
+          "DAILY04-R06",
+          "DAILY04-R07",
+          "DAILY04-R08",
+          "DAILY04-R09"
+        ],
+        "intermediate_recheck": {
+          "sha": "2a20da43b5c54a3d71b54c559a4e61ed0cff0784",
+          "verdict": "STOP_SHIP",
+          "finding": "DAILY04-R09 P1 scheduled existing-attempt replay collision",
+          "diff_sha256": "a4e7898ef753ff6697a57fede57f4de8b3d9dc400e8fee54ac7b1d08d9a334f6"
+        },
+        "final_scoped_checks": {
+          "passed": 5,
+          "failed": 0,
+          "skipped": 0,
+          "duration_seconds": 20.18,
+          "scope": "R09 scheduled receipt replay and affected delivery authority/no-repeat guards"
+        }
       }
     ],
     "live_evidence": "none",
     "operator_acceptance": "none",
     "next_dependency_ready_package": [
-      "D04",
-      "D10"
+      "D07",
+      "D08",
+      "D09"
     ]
   }
 }

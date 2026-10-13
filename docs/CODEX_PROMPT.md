@@ -49,10 +49,32 @@ Old capture is regression evidence; current acceptance needs the repaired packet
 No independent holdout/provider usefulness score: initial20 are dev cases, full
 120-unit target remains. Native subsystem events and assistant turns are distinct.
 
-Next dependency-ready coherent package after local P1 closure: **D04 + D10** —
-bounded conversation planner/focus and source contracts. Read both cards/context
-before declaring diff boundaries. D07/D08 can proceed independently; D09/D14/D16
-need D10. D57 still needs D24; D58 needs D19. Do not rerun completed daily tiers
+**D04 + D10:** bounded schema planner, immutable foreground focus/admission,
+old-result/project-context isolation, source identities/completeness and distinct
+received/eligible/selected/cited counts. Original source/full review `71704c4`;
+initial repairs `2a20da4`, final fix/recheck `0287f87`. [Package ledger](verification/DAILY-package-04-D04-D10-20261013.md)
+and [frozen findings/recheck](verification/DAILY-package-04-local-review-20261013.md).
+One full local review found six P1/two P2. Narrow recheck2a20da4 closed these but
+found new P1 R09 in scheduled receipt replay. Final narrow PASS on0287f87 closes
+all package findings, no open P0/P1. Affected five-file tier78 passed/two missing-scope
+fixture failures; final two-node repairs plus pure coverage7 passed/6.28s,
+zero skips; final R09/serving/delivery tier5 passed/20.18s. Shared model-client
+floor10 passed/41.30s. Counts overlap; no second full review. Local closure does
+not fill non-Codex Go/governed/human gates.
+Actual20-turn [transcript](evidence/daily-package-04-20261013-transcript.json) uses
+fake plans/loopback answers on71704c4 before privacy repairs; it proves dialog
+mechanics, not provider understanding or post-fix security acceptance. Current
+synthetic native tests exercise repaired boundaries. Project labels remain
+ephemeral context; second-item/shorten views bind exact source text; model
+explanation quality, real projects, wider search and useful Brief remain later
+cards/gates, not a reduced programme.
+
+Next dependency-ready coherent package after local P1 closure: **D07 + D08 + D09** —
+quality/budget/provider profiles, current project context and selected archive
+freshness. Read these cards/context before declaring test/review boundaries;
+continue independent local work if owner choices are missing. No real archive/
+session/account scan. D11/D14/D16 also depend on D10;
+D57 still needs D24; D58 needs D19. Do not rerun completed daily tiers
 without changed contracts, reproduced failures or substantial security risk.
 
 Cycle: coherent package → appropriate scoped checks → one fresh independent
@@ -91,7 +113,7 @@ remain dated on `0fbcfd1`. Formal draft/planned/review_required and 51 missing
 approvals remain unchanged. Legacy inputs without v2 revision pointers and
 actual simultaneous DB scheduling remain unverified; retain HTML-depth P2.
 
-Next safe command after local closure: `git show --stat e10365e`; read D04/D10/context refs.
-`tools/run_daily_acceptance.py` registers the seven implemented daily files in
+Next safe command: `git show --stat 0287f87`; read D07/D08/D09/context refs.
+`tools/run_daily_acceptance.py` registers the nine implemented daily files in
 the existing project verifier. Run only appropriate scoped checks; no full
 historical pytest, private target or repeated immutable115–118 calls.

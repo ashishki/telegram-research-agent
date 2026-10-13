@@ -24,8 +24,29 @@ bounded HTTP/SSE, durable observed model/usage/stop и frozen manifest/trace д�
 20 cases/35 loopback model calls, offline mechanics_met:true. [Packet](evidence/daily-package-03-fixed-20261013-traces.json). Исходные20 — dev cases;
 120-unit target сохраняется, независимый holdout/quality/provider/operator
 acceptance отсутствуют. R05 P2: blocking read может задержать отмену; после
-чтения принятие просроченного результата запрещено. Следующий готовый блок —
-D04 + D10; non-Codex Go/governed gates остаются открыты.
+чтения принятие просроченного результата запрещено. D04 + D10 реализован
+следующим локальным пакетом; non-Codex Go/governed gates остаются открыты.
+
+**Текущий пакет D04 + D10, 13 октября:** versioned focus admission и bounded
+intent plans, exact old-result binding, ephemeral project context, SourceBatch/
+EvidenceBundle с отдельными received/eligible/selected/cited/omitted counters.
+300 synthetic archive items перечисляются до выбора canonical20 Brief items;
+packet omission делает обзор partial. Native archive hooks привязаны к owner,
+privacy задаёт authorized route, response origins сохраняются, source revocation
+проверяется при serving, synthesis HTTP и delivery. Source/full local review
+`71704c4`, initial repairs `2a20da4`, final fix/recheck `0287f87`; [квитанция](verification/DAILY-package-04-D04-D10-20261013.md)
+и [находки](verification/DAILY-package-04-local-review-20261013.md). Один full
+review нашёл шесть P1/два P2. Narrow recheck2a20da4 закрыл их, но нашёл P1 R09
+в scheduled replay. Узкая независимая PASS на0287f87 закрывает все package
+findings; открытых P0/P1 нет. Исходный STOP и промежуточная ошибка сохранены.
+Affected tier78 passed/2 fixture failures, затем исправленные fixtures+pure checks
+7 passed/6.28s; final R09/delivery tier5 passed/20.18s; shared model floor10
+passed/41.30s, counts не суммируются. Второй full review не запускался.
+Actual20-turn synthetic transcript на71704c4 содержит fake planner/loopback;
+это dialogue mechanics до source repairs, не реальная модель/качество/польза.
+Следующий готовый пакет: D07 + D08 + D09. Ни аккаунты/платные
+вызовы/сервисы/production, ни provider/operator/human acceptance не выполнены.
+Полный Chat/Search/Brief/Watch/Act programme и исключение Mini App сохранены.
 
 Дата среза: **10 октября 2026**. Runtime/test/independent source SHA: `0fbcfd1dde780724ad934aa66825afe17a6efc98`. Документация и Git integration изменены позднее; фактические refs — в [merge receipt](verification/PAI-master-integration-20261010.md).
 

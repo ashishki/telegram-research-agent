@@ -19,6 +19,15 @@ connector coverage. Acceptance registered before implementation:
 `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python -m pytest -q tests/test_daily_conversation.py tests/test_daily_coverage.py`.
 Affected conversation/source/native guards are regression floors, no full history.
 No personal account, paid model, services/production or external effect scope.
+Source/full local review71704c4, initial repairs2a20da4; final fix/narrow PASS0287f87.
+Six P1/two P2 and new narrow-recheck P1 R09 closed; no open package P0/P1.
+[Receipt](verification/DAILY-package-04-D04-D10-20261013.md)
+and [frozen review](verification/DAILY-package-04-local-review-20261013.md).
+Final affected tier78 passed/2 missing-provenance fixture failures; repaired two
+fixtures+five pure nodes7 passed/6.28s, model-client floor10 passed/41.30s,
+final R09/delivery tier5 passed/20.18s. One full review, narrow repairs only.
+Formal statuses below stay unchanged; next ready local package is
+D07/D08/D09.20-turn transcript is synthetic71704c4 dialogue mechanics only.
 
 Package 3: D05 + D06, base `980087f`, local synthetic-only. One accumulated
 review covers model descriptor/transport, scoped accounting/no-repeat integration,
@@ -26,7 +35,7 @@ frozen 20-case manifest, trace/verifier and affected native fixture tests.
 Acceptance registered before implementation:
 `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python -m pytest -q tests/test_daily_model_protocols.py tests/test_daily_eval_manifest.py`.
 Regression floors: model/cost/session/acceptance tests, scoped to affected behavior.
-Source/full local review `2318bbe`; fix/narrow P1 closure `e10365e`. No provider/account/paid calls; non-Codex Go/governed review remains separate. Next coherent block: D04 + D10.
+Source/full local review `2318bbe`; fix/narrow P1 closure `e10365e`. No provider/account/paid calls; non-Codex Go/governed review remains separate. D04 + D10 followed as package4; current handoff above.
 
 Package 2: D56, after local independent closure of DAILY01-R01/R02/R04 on
 988da0e. The owner's next-package instruction continues local work; non-Codex
