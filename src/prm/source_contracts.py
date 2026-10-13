@@ -152,26 +152,33 @@ class EvidenceBundle:
     selected: tuple[SourceRecord,...] = field(repr=False)
     candidate_count: int
     cited_count: int | None = None
+    excluded_refs: tuple[str,...] = ()
 
     def __post_init__(self):
         if not isinstance(self.batches,tuple) or not self.batches or len(self.batches)>16 or any(type(b)is not SourceBatch for b in self.batches):raise StorageError('typed evidence batches required')
         if not isinstance(self.selected,tuple) or len(self.selected)>48 or any(type(r)is not SourceRecord or not any(r in b.items for b in self.batches) for r in self.selected):raise StorageError('selected evidence outside received source snapshots')
         identities={r.evidence_ref for b in self.batches for r in b.items}
-        if type(self.candidate_count)is not int or self.candidate_count!=len(identities) or len({r.evidence_ref for r in self.selected})!=len(self.selected):raise StorageError('actual distinct candidate count required')
+        if not isinstance(self.excluded_refs,tuple) or len(set(self.excluded_refs))!=len(self.excluded_refs) or not set(self.excluded_refs)<=identities:raise StorageError('excluded projections must bind received evidence')
+        eligible=identities-set(self.excluded_refs)
+        if type(self.candidate_count)is not int or self.candidate_count!=len(eligible) or len({r.evidence_ref for r in self.selected})!=len(self.selected) or not {r.evidence_ref for r in self.selected}<=eligible:raise StorageError('actual distinct eligible candidate count required')
         if self.cited_count is not None and (type(self.cited_count)is not int or not 0<=self.cited_count<=len(self.selected)):raise StorageError('actual cited subset count required')
 
     @classmethod
-    def select(cls,batches,*,maximum_items):
+    def select(cls,batches,*,maximum_items,eligible_refs=None):
         if not isinstance(batches,tuple) or not 1<=len(batches)<=16 or any(type(b)is not SourceBatch for b in batches) or type(maximum_items)is not int or not 0<=maximum_items<=48:raise StorageError('bounded typed evidence selection required')
         if len({r.owner_ref for b in batches for r in b.selected_resources})!=1:raise StorageError('evidence owners differ')
+        identities={r.evidence_ref for b in batches for r in b.items}
+        if eligible_refs is not None and (not isinstance(eligible_refs,frozenset) or not eligible_refs<=identities):raise StorageError('eligible projections must bind received evidence')
+        excluded_set=identities-eligible_refs if eligible_refs is not None else set()
+        excluded=tuple(sorted(excluded_set))
         candidates=[];seen=set();index=0
         while any(index<len(b.items) for b in batches):
             for batch in batches:
                 if index<len(batch.items):
                     item=batch.items[index]
-                    if item.evidence_ref not in seen:candidates.append(item);seen.add(item.evidence_ref)
+                    if item.evidence_ref not in seen and item.evidence_ref not in excluded_set:candidates.append(item);seen.add(item.evidence_ref)
             index+=1
-        return cls(batches,tuple(candidates[:maximum_items]),len(candidates))
+        return cls(batches,tuple(candidates[:maximum_items]),len(candidates),excluded_refs=excluded)
 
     @property
     def received_count(self):return sum(len(b.items) for b in self.batches)
@@ -195,4 +202,5 @@ class EvidenceBundle:
         return {'schema_version':'assistant.evidence_bundle.v1','batches':[b.metadata() for b in self.batches],
             'received_count':self.received_count,'candidate_count':self.candidate_count,'selected_count':len(self.selected),
             'model_omitted_count':self.model_omitted_count,'cited_count':self.cited_count,'conflict_count':self.conflict_count,
+            'projection_rejected_count':len(self.excluded_refs),
             'selected_evidence':[r.metadata() for r in self.selected]}

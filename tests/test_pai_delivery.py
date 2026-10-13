@@ -17,6 +17,12 @@ from prm.storage.jobs import install_jobs
 from prm.storage.policy import install_policy
 from prm.storage.postgres import migrate, StateConflict
 from prm.storage.testing import PostgresSandbox
+from dataclasses import asdict
+from prm.capabilities import AuthorizationRequest
+
+
+def synthetic_archive_scope(owner):
+    return asdict(AuthorizationRequest(owner_ref=owner,connection_ref=None,capability='archive.read',resource_ref='resource_synthetic_archive',operation='read',data_class='private_archive',provider_ref='provider_local',purpose='research.archive'))
 
 
 @pytest.fixture(scope='module')
@@ -39,6 +45,9 @@ def grants(case):
             capability=capability, resource_refs=('destination_private',), operations=(operation,), data_classes=(data_class,),
             purpose=purpose, provider_policy=ProviderPolicy(('provider_telegram',), maximum_request_count=100),
             issued_at=datetime.now(timezone.utc) - timedelta(days=1), expires_at=datetime.now(timezone.utc) + timedelta(days=30), revision=1))
+    registry.register_grant(CapabilityGrant(grant_id='grant_synthetic_source',owner_ref=sub.owner_ref,connection_ref=None,
+        capability='archive.read',resource_refs=('resource_synthetic_archive',),operations=('read',),data_classes=('private_archive',),purpose='research.archive',
+        provider_policy=ProviderPolicy(('provider_local',),maximum_request_count=100),issued_at=datetime.now(timezone.utc)-timedelta(days=1),expires_at=datetime.now(timezone.utc)+timedelta(days=30),revision=1))
 
 
 def completed(case):
@@ -51,7 +60,7 @@ def completed(case):
     job = scheduler.queue.enqueue(owner=sub.owner_ref, idempotency_key='foreground', payload=payload,
         deadline=datetime.now(timezone.utc) + timedelta(minutes=5))
     lease = scheduler.queue.claim(owner=sub.owner_ref)
-    scheduler.queue.complete(lease, {'text': 'Synthetic answer', 'request_ref': 'request_foreground'})
+    scheduler.queue.complete(lease, {'text': 'Synthetic answer', 'request_ref': 'request_foreground','data_classes':['private_archive'],'source_scopes':[synthetic_archive_scope(sub.owner_ref)]})
     return job
 
 
@@ -230,7 +239,7 @@ def test_multipart_not_started_does_not_claim_absence_after_prior_send(case,acce
     job=scheduler.queue.enqueue(owner=sub.owner_ref,idempotency_key='multipart_not_started',deadline=datetime.now(timezone.utc)+timedelta(minutes=5),
         payload={'schema_version':1,'input_namespace':'conversation','input_ref':item.object_id,'input_version':1,'input_digest':item.digest,
             'connection_ref':None,'resource_ref':'resource_multipart','purpose':'local.assistant','consent_revision':1})
-    scheduler.queue.complete(scheduler.queue.claim(owner=sub.owner_ref),{'text':'Synthetic '*800,'data_class':'private_archive'})
+    scheduler.queue.complete(scheduler.queue.claim(owner=sub.owner_ref),{'text':'Synthetic '*800,'data_class':'private_archive','source_scopes':[synthetic_archive_scope(sub.owner_ref)]})
     calls=[]
     def sender(destination,text,attempt):
         if len(calls)==accepted_parts:raise KnownDeliveryNotStarted()
@@ -385,7 +394,7 @@ def test_multipart_missing_part_cannot_be_reconciled_by_one_aggregate_receipt(ca
     job=scheduler.queue.enqueue(owner=sub.owner_ref,idempotency_key='parts_reconciliation',deadline=datetime.now(timezone.utc)+timedelta(minutes=5),
         payload={'schema_version':1,'input_namespace':'conversation','input_ref':item.object_id,'input_version':1,'input_digest':item.digest,
             'connection_ref':None,'resource_ref':'resource_parts','purpose':'local.assistant','consent_revision':1})
-    scheduler.queue.complete(scheduler.queue.claim(owner=sub.owner_ref),{'text':'Synthetic '*800,'data_class':'private_archive'})
+    scheduler.queue.complete(scheduler.queue.claim(owner=sub.owner_ref),{'text':'Synthetic '*800,'data_class':'private_archive','source_scopes':[synthetic_archive_scope(sub.owner_ref)]})
     calls=[]
     def sender(*args):
         calls.append(args)
@@ -410,7 +419,7 @@ def test_aggregate_preparation_without_parts_never_authorizes_second_dispatch(ca
     job=scheduler.queue.enqueue(owner=sub.owner_ref,idempotency_key='aggregate_fence',deadline=datetime.now(timezone.utc)+timedelta(minutes=5),
         payload={'schema_version':1,'input_namespace':'conversation','input_ref':item.object_id,'input_version':1,'input_digest':item.digest,
             'connection_ref':None,'resource_ref':'resource_aggregate','purpose':'local.assistant','consent_revision':1})
-    scheduler.queue.complete(scheduler.queue.claim(owner=sub.owner_ref),{'text':'Synthetic '*800,'data_class':'private_archive'})
+    scheduler.queue.complete(scheduler.queue.claim(owner=sub.owner_ref),{'text':'Synthetic '*800,'data_class':'private_archive','source_scopes':[synthetic_archive_scope(sub.owner_ref)]})
     calls=[];executor=DeliveryExecutor(store.target,registry=registry,sender=lambda *args:calls.append(args))
     def interrupted(**kwargs):raise OSError('synthetic stop after aggregate fence, before child preparation')
     with monkeypatch.context() as stopped:
@@ -506,7 +515,11 @@ def test_long_mixed_source_answer_records_parts_and_never_resends_unknown(pai):
         payload={'schema_version':1,'input_namespace':'conversation','input_ref':item.object_id,'input_version':1,'input_digest':item.digest,
             'connection_ref':None,'resource_ref':'resource_parts','purpose':'local.assistant','consent_revision':1})
     lease=root.queue.claim(owner=owner,kinds=('compute.digest',))
-    root.queue.complete(lease,{'text':'Synthetic long answer. '*400,'data_class':'private_archive','data_classes':['private_archive','private_connector_content']})
+    source_scopes=[]
+    for kind in ('private_archive','private_connector_content'):
+        allow(pai,'archive.read','resource_synthetic_archive',kind,'research.archive',provider='provider_local',connection=None,operation='read')
+        scope=synthetic_archive_scope(owner);scope['data_class']=kind;source_scopes.append(scope)
+    root.queue.complete(lease,{'text':'Synthetic long answer. '*400,'data_class':'private_archive','data_classes':['private_archive','private_connector_content'],'source_scopes':source_scopes})
     calls=[]
     def sender(destination,text,attempt):
         calls.append((destination,text,attempt))

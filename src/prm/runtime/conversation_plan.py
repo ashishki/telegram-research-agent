@@ -22,7 +22,7 @@ def clarification(request_ref,reason):return AssistantResult(request_ref,'clarif
 
 def _read_view(root,request_ref,ticket,plan,guard):
     if ticket is None or not ticket.get('target'):return clarification(request_ref,'missing_target')
-    try:item=root.focus.resolve(ticket,guard=guard)
+    try:item,classes,scopes=root.focus.resolve(ticket,guard=guard)
     except (StorageError,CapabilityDenied):return clarification(request_ref,'ambiguous_target' if ticket.get('ambiguous') else 'source_unavailable')
     payload=item.payload;details=payload.get('payload',{})
     text=payload.get('text',payload.get('display_text'))
@@ -37,9 +37,8 @@ def _read_view(root,request_ref,ticket,plan,guard):
         if len(items)<plan.item_index:return clarification(request_ref,'missing_target')
         text=items[plan.item_index-1]
     elif plan.steps[0].argument=='shorten':text=text.strip().split('\n\n')[0][:800]
-    classes=payload.get('data_classes',details.get('source_data_classes',[payload.get('data_class','user_provided')]))
     return AssistantResult(request_ref,'ok','chat',text,payload={'response_ref':item.object_id,'bound_result_version':item.version,
-        'source_data_classes':list(classes),'source_data_class':classes[0],'source_scopes':details.get('source_scopes',payload.get('source_scopes',[])),
+        'source_data_classes':list(classes),'source_data_class':classes[0],'source_scopes':list(scopes),
         'conversation':{'response_refs':[item.object_id]},'task_plan':json.loads(json.dumps(plan.to_dict()))})
 
 

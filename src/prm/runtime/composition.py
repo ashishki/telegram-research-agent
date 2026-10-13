@@ -60,7 +60,7 @@ class AssistantRuntime:
         try:return profiles.select(role=role,quality=self.quality_profile)
         except StorageError:return None
 
-    def scoped_client(self,endpoint,*,groups,task_ref,attempt_ref,history=(),guard=None):
+    def scoped_client(self,endpoint,*,groups,task_ref,attempt_ref,history=(),guard=None,source_scopes=()):
         task_ref=self.task_context.get() or task_ref
         def observe(receipt,usage,observed_groups):
             from .cost_cache import CostCacheRuntime
@@ -70,7 +70,7 @@ class AssistantRuntime:
                 usage=usage,latency_ms=receipt.duration_ms,outcome=receipt.delivery_outcome,tariff_version=self.tariff_version)
             if cost is not None:
                 for index,group in enumerate(observed_groups):self.registry.settle(self.owner_ref,group[0].operation_ref,outcome='accepted',actual=cost if index==0 else 0)
-        return ScopedModelClient(endpoint,self.registry,groups=groups,history=history,guard=guard,usage_observer=observe,task_ref=self.task_context.get() or task_ref)
+        return ScopedModelClient(endpoint,self.registry,groups=groups,history=history,guard=guard,usage_observer=observe,task_ref=self.task_context.get() or task_ref,source_scopes=source_scopes)
 
     def worker(self):
         return AssistantJobWorker(self.ingress,settings=self.settings,runtime=self,
@@ -360,7 +360,7 @@ class AssistantRuntime:
         from prm.capabilities import AuthorizationRequest
         self.brief_source_hooks.append(BriefSourceHook(self.archive_resource_ref,AuthorizationRequest(owner_ref=self.owner_ref,
             connection_ref=None,capability='archive.read',resource_ref=self.archive_resource_ref,operation='read',data_class='private_archive',
-            provider_ref='provider_local',purpose='brief.archive'),LocalArchiveReader(self.settings.db_path).window_evidence,0))
+            provider_ref='provider_local',purpose='brief.archive'),LocalArchiveReader(self.settings.db_path,root=self).window_evidence,0))
         if mail_selection is not None:
             adapter=GraphMailAdapter(transport)
             def mail(request,request_ref,guard):
@@ -590,7 +590,7 @@ def runtime_from_config(config,*,target,settings):
             from .research import LocalArchiveReader
             root.brief_source_hooks=[BriefSourceHook(root.archive_resource_ref,AuthorizationRequest(owner_ref=root.owner_ref,connection_ref=None,
                 capability='archive.read',resource_ref=root.archive_resource_ref,operation='read',data_class='private_archive',provider_ref='provider_local',purpose='brief.archive'),
-                LocalArchiveReader(settings.db_path).window_evidence,0)]
+                LocalArchiveReader(settings.db_path,root=root).window_evidence,0)]
         root.attach_local_services(memory_runtime=MemoryRuntime(root),brief_runtime=BriefRuntime(root,source_hooks=root.brief_source_hooks),academic_runtime=AcademicRuntime(root))
     if config.get('local_services'):
         from .watch import wire_archive_watch

@@ -30,6 +30,23 @@ class FakePlanner:
     def propose(self,query,**kwargs):self.calls.append((query,kwargs));return self.value(query) if callable(self.value) else self.value
 
 
+def test_raw_response_alias_uses_origin_and_fresh_source_permissions(pai):
+    from dataclasses import asdict
+    from prm.capabilities import AuthorizationRequest
+    root=pai.root
+    source=allow(pai,'archive.read',root.archive_resource_ref,'private_archive','research.archive',provider='provider_local',connection=None,operation='read')
+    scope=asdict(AuthorizationRequest(owner_ref=root.owner_ref,connection_ref=None,capability='archive.read',resource_ref=root.archive_resource_ref,operation='read',data_class='private_archive',provider_ref='provider_local',purpose='research.archive'))
+    state=root._conversations.record_response('42',text='Synthetic private response canary',topic='Synthetic')
+    ref=state.object_refs[0].response_ref
+    root._conversations.record_origin(ref,('private_archive',),source_scopes=(scope,))
+    root.intent_planner=FakePlanner(plan(intent='followup',steps=[{'tool':'result.view','argument':''}],binding='bound'))
+    _,served=request(pai,119001,'Покажи '+ref)
+    assert served['data_classes']==['private_archive'] and served['payload']['source_scopes']==[scope]
+    root.registry.revoke_grant(source.grant_id,owner_ref=root.owner_ref)
+    _,denied=request(pai,119002,'Покажи '+ref)
+    assert denied['status']=='clarify' and 'canary' not in denied['text'] and not pai.requests
+
+
 def test_late_foreground_result_does_not_replace_new_focus_or_history(pai):
     root=pai.root
     a=root.ingress.receive(incoming(110001,'Synthetic A'))

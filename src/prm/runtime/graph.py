@@ -229,15 +229,14 @@ class GraphMailAdapter:
         return MailFetchPage(tuple(output),cursor,cursor is not None)
 
     def summary(self,selection):
-        with self.store.transaction() as tx:
+        with self.store.transaction(repeatable_read=True) as tx:
             account=tx.conn.execute('SELECT status FROM pa_connections.accounts WHERE owner=%s AND id=%s',(self.transport.owner_ref,self.transport.connection_ref)).fetchone()
             if not account or account['status']!='connected':raise CapabilityDenied('mail connection revoked')
             rows=tx.conn.execute("SELECT payload,version FROM pa_sources.items WHERE owner=%s AND connection_ref=%s AND kind='mail' AND NOT deleted AND payload->>'scope_digest'=%s ORDER BY updated_at DESC LIMIT %s",
                                 (self.transport.owner_ref,self.transport.connection_ref,selection.scope_digest,selection.max_items)).fetchall()
-        items=[{**row['payload'],'source_version':row['version'],'publication_time':None,'event_time':row['payload'].get('receivedDateTime')} for row in rows]
-        with self.store.transaction() as tx:
             state=tx.conn.execute("SELECT completed,updated_at FROM pa_sources.sync WHERE owner=%s AND connection_ref=%s AND kind='mail' AND scope_digest=%s",(self.transport.owner_ref,self.transport.connection_ref,selection.scope_digest)).fetchone()
             total=tx.conn.execute("SELECT count(*) AS n FROM pa_sources.items WHERE owner=%s AND connection_ref=%s AND kind='mail' AND NOT deleted AND payload->>'scope_digest'=%s",(self.transport.owner_ref,self.transport.connection_ref,selection.scope_digest)).fetchone()['n']
+        items=[{**row['payload'],'source_version':row['version'],'publication_time':None,'event_time':row['payload'].get('receivedDateTime')} for row in rows]
         from prm.source_contracts import SourceResource,SourceBatch
         resource=SourceResource(self.transport.owner_ref,selection.resource_ref,'mail','private_connector_metadata',connection_ref=self.transport.connection_ref,account_ref=self.transport.account_ref,scope_digest=selection.scope_digest)
         complete=bool(state and state['completed'] and total==len(items))

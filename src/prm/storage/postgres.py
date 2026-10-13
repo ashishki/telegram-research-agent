@@ -228,10 +228,12 @@ class PostgresStore:
         if not isinstance(target,SyntheticTarget):raise StorageError('explicit typed target required')
         self.target=target
     @contextmanager
-    def transaction(self)->Iterator[StateTransaction]:
+    def transaction(self,*,repeatable_read=False)->Iterator[StateTransaction]:
+        if type(repeatable_read)is not bool:raise StorageError('explicit transaction snapshot mode required')
         with self.target.connect() as conn:
             try:
                 with conn.transaction():
+                    if repeatable_read:conn.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
                     conn.execute("SELECT set_config('idle_in_transaction_session_timeout',%s,true)", (str(_TRANSPORT_IDLE_MS.get()),))
                     if _version(conn)!=SCHEMA_VERSION:raise SchemaMismatch('runtime schema must be migrated explicitly')
                     yield StateTransaction(conn)

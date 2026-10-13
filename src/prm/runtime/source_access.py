@@ -2,6 +2,29 @@
 from dataclasses import replace
 from prm.capabilities import AuthorizationRequest,CapabilityDenied
 from prm.storage.postgres import StorageError
+import hashlib
+
+
+PROTECTED=frozenset({'private_archive','private_connector_metadata','private_connector_content'})
+
+
+def result_provenance(tx,owner,item):
+    """Canonical response origins and both existing durable result layouts."""
+    if item.object_id.startswith('response_'):
+        ref='response_origin_'+hashlib.sha256(item.object_id.encode()).hexdigest()[:32]
+        origin=tx.get(owner,'conversation',ref)
+        if origin is None or origin.payload.get('response_ref')!=item.object_id:
+            raise StorageError('response provenance unavailable')
+        classes=origin.payload['data_classes'];scopes=origin.payload.get('source_scopes',[])
+    else:
+        details=item.payload.get('payload',{})
+        classes=item.payload.get('data_classes',details.get('source_data_classes',[item.payload.get('data_class','private_archive')]))
+        scopes=details.get('source_scopes',item.payload.get('source_scopes',[]))
+    if not isinstance(classes,(list,tuple)) or not classes:raise StorageError('result data classes unavailable')
+    if not isinstance(scopes,(list,tuple)) or len(scopes)>16:raise StorageError('bounded result source authority required')
+    if not set(classes)<= {'model_generated','private_archive','private_connector_metadata','private_connector_content','user_provided','public'}:raise StorageError('unknown result data class')
+    if not set(classes)&PROTECTED<={s.get('data_class') for s in scopes}:raise CapabilityDenied('protected result source authority unavailable')
+    return tuple(classes),tuple(scopes)
 
 
 def source_current(tx,registry,owner,scopes):

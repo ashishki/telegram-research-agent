@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import datetime,timedelta,timezone
 from dataclasses import asdict
 import hashlib
+import json
+import re
 import sqlite3
 from urllib.parse import quote
 
@@ -67,6 +69,51 @@ class LocalArchiveReader:
 
 class DurableResearchWorker:
     def __init__(self,root):self.root=root
+
+    def _source_batch(self,source,value,metadata=None):
+        """Collector labels describe observations; the registered route binds privacy."""
+        from prm.source_contracts import SourceResource,SourceBatch,normalize_source_batch
+        root=self.root;scope=None
+        if source=='archive':resource=SourceResource(root.owner_ref,root.archive_resource_ref,'archive','private_archive')
+        elif source=='public':resource=SourceResource(root.owner_ref,root.public_fetch_ref,'web','public')
+        elif source=='github':
+            provider=root.github_context_provider
+            if provider is None:raise StorageError('GitHub source unavailable')
+            if metadata:
+                sha=value.get('observed_ref')
+                if not isinstance(sha,str) or not re.fullmatch(r'[a-f0-9]{40}',sha):raise StorageError('GitHub snapshot unavailable')
+                scope=hashlib.sha256(json.dumps([sha,provider.paths]).encode()).hexdigest()
+            resource=SourceResource(root.owner_ref,provider.repository_ref,'github','public',scope_digest=scope)
+        else:raise StorageError('unsupported research source')
+        rows=value.get('fetched_sources',[]) if source=='public' else value.get('items',[])
+        if source=='public':rows=[r for r in rows if r.get('status')=='fetched']
+        if any(row.get('source_data_class',resource.data_class)!=resource.data_class or
+               row.get('source_owner_ref',root.owner_ref)!=root.owner_ref for row in rows):raise StorageError('research item privacy/owner differs')
+        if metadata:
+            if metadata.get('schema_version')!='assistant.source_batch.v1' or metadata.get('selected_resources')!=[resource.to_dict()]:raise StorageError('research selected source route differs')
+            return SourceBatch.from_items(rows,resource,checked_at=datetime.fromisoformat(metadata['checked_at']) if metadata['checked_at'] else None,
+                completeness=metadata['completeness'],omitted_count=metadata['omitted_count'],reason=metadata['reason'])
+        return normalize_source_batch(rows,resource,checked_at=datetime.now(timezone.utc))
+
+    def _read_scopes(self,step):
+        """Stored read scopes must still match the server-selected source route."""
+        root=self.root;source=step['source'];scopes=step.get('source_scopes',[])
+        if not scopes:raise CapabilityDenied('research source authority unavailable')
+        expected={
+            'archive':{('archive.read',root.archive_resource_ref,'private_archive','provider_local','research.archive')},
+            'public':{('web.search',root.public_search_ref,'public','provider_public_web','public.search'),('web.fetch',root.public_fetch_ref,'public','provider_public_web','public.fetch')},
+            'github':{('github.repository_context',root.github_context_provider.repository_ref if root.github_context_provider else None,'public','provider_github','project.context')},
+        }[source]
+        seen=set();requests=[];observed=set()
+        for scope in scopes:
+            request=AuthorizationRequest(**scope)
+            identity=(request.capability,request.resource_ref,request.data_class,request.provider_ref,request.purpose)
+            if request.owner_ref!=root.owner_ref or request.connection_ref is not None or request.operation!='read' or identity not in expected:raise CapabilityDenied('research stored source scope differs')
+            observed.add(identity)
+            key=json.dumps(scope,sort_keys=True)
+            if key not in seen:seen.add(key);requests.append(scope)
+        if observed!=expected:raise CapabilityDenied('research source scopes incomplete')
+        return requests
 
     def enqueue(self,plan,*,idempotency_key):
         required={'schema_version','question','steps','max_tool_calls','deadline_seconds'}
@@ -137,13 +184,13 @@ class DurableResearchWorker:
                 value=future.result();completed.append(value)
                 queue.checkpoint(lease,{'phase':'gather','completed_refs':[entry['ref'] for entry in completed]})
         queue.checkpoint(lease,{'phase':'gap_check','completed_refs':[entry['ref'] for entry in completed]})
-        available=[entry for entry in completed if entry['status']=='gathered']
-        gaps=[entry['source']+': '+entry['status'] for entry in completed if entry['status']!='gathered']
-        if len(completed)<len(plan['steps']):gaps.append('tool_call_limit')
         # Use the same application synthesis/verification for the archive wave;
         # preserve separately gathered public/ref evidence and explicit gaps.
         queue.checkpoint(lease,{'phase':'synthesis','completed_refs':[entry['ref'] for entry in completed]})
         synthesized=self._synthesize(plan,completed,lease)
+        available=[entry for entry in completed if entry['status']=='gathered']
+        gaps=[entry['source']+': '+entry['status'] for entry in completed if entry['status']!='gathered']
+        if len(completed)<len(plan['steps']):gaps.append('tool_call_limit')
         queue.checkpoint(lease,{'phase':'verify','completed_refs':[entry['ref'] for entry in completed]})
         from .research_answer import coverage_text
         text=synthesized['text']+'\n\n'+coverage_text(completed,len(plan['steps']),synthesized['source_refs'],gaps,found_count=synthesized.get('found_count'))
@@ -183,20 +230,8 @@ class DurableResearchWorker:
                 if root.github_context_provider is None:raise StorageError('GitHub source unavailable')
                 result['evidence']=root.github_context_provider.read_repository_context(step['query'])
                 result['source_scopes']=[asdict(AuthorizationRequest(owner_ref=root.owner_ref,connection_ref=None,capability='github.repository_context',resource_ref=root.github_context_provider.repository_ref,operation='read',data_class='public',provider_ref='provider_github',purpose='project.context'))]
-            from prm.source_contracts import SourceResource,SourceBatch,normalize_source_batch
             value=result['evidence']
-            metadata=value.get('source_batch')
-            records=value.get('fetched_sources',[]) if step['source']=='public' else value.get('items',[])
-            if step['source']=='public':records=[r for r in records if r.get('status')=='fetched']
-            if metadata:
-                resource=SourceResource(**metadata['selected_resources'][0])
-                if resource.owner_ref!=root.owner_ref:raise StorageError('research source owner differs')
-                batch=SourceBatch.from_items(records,resource,checked_at=datetime.fromisoformat(metadata['checked_at']) if metadata['checked_at'] else None,
-                    completeness=metadata['completeness'],omitted_count=metadata['omitted_count'],reason=metadata['reason'])
-            else:
-                resource=SourceResource(root.owner_ref,root.archive_resource_ref if step['source']=='archive' else root.public_fetch_ref if step['source']=='public' else root.github_context_provider.repository_ref,
-                    'archive' if step['source']=='archive' else 'web' if step['source']=='public' else 'github','private_archive' if step['source']=='archive' else 'public')
-                batch=normalize_source_batch(records,resource,checked_at=datetime.now(timezone.utc))
+            batch=self._source_batch(step['source'],value,value.get('source_batch'))
             result['source_batch']=batch.metadata()
             result['status']='gathered'
         except Exception:result['status']='source_unavailable'
@@ -212,30 +247,27 @@ class DurableResearchWorker:
         import json
         root=self.root;queue=root.queue;ref='research_synthesis_'+lease.job_id
         previous=queue.store.get(lease.owner,'result',ref,version=1)
-        if previous is not None:return previous.payload
-        from prm.source_contracts import SourceResource,SourceBatch,EvidenceBundle,normalize_source_batch
-        batches=[];classes=set()
+        from prm.source_contracts import EvidenceBundle
+        from .source_access import source_current
+        batches=[];classes=set();eligible_refs=set();read_scopes=[]
         for step in completed:
             if step['status']!='gathered':continue
-            value=step['evidence'];metadata=step.get('source_batch')
-            rows=value.get('fetched_sources',[]) if step['source']=='public' else value.get('items',[])
-            if step['source']=='public':rows=[r for r in rows if r.get('status')=='fetched']
-            if metadata:
-                resource=SourceResource(**metadata['selected_resources'][0])
-                batch=SourceBatch.from_items(rows,resource,checked_at=datetime.fromisoformat(metadata['checked_at']) if metadata['checked_at'] else None,
-                    completeness=metadata['completeness'],omitted_count=metadata['omitted_count'],reason=metadata['reason'])
-            else:
-                resource=SourceResource(root.owner_ref,root.archive_resource_ref if step['source']=='archive' else 'resource_'+step['source'],
-                    'archive' if step['source']=='archive' else 'web' if step['source']=='public' else 'github','private_archive' if step['source']=='archive' else 'public')
-                batch=normalize_source_batch(rows,resource,checked_at=datetime.now(timezone.utc))
-            eligible=[]
+            try:
+                batch=self._source_batch(step['source'],step['evidence'],step.get('source_batch'))
+                scopes=self._read_scopes(step)
+                with queue.store.transaction() as tx:
+                    queue._fenced(tx,lease);source_current(tx,root.registry,lease.owner,scopes)
+            except (StorageError,CapabilityDenied,ValueError,KeyError,TypeError):
+                if previous is not None:raise CapabilityDenied('cached synthesis source unavailable') from None
+                step['status']='source_unavailable';continue
+            read_scopes.extend(scopes)
             for record in batch.items:
                 item=record.payload;source=item.get('source_url') or item.get('message_url');span=item.get('support_span') or item.get('snippet') or item.get('text') or item.get('content')
-                if isinstance(source,str) and source.startswith('https://') and isinstance(span,str) and span.strip():eligible.append(record)
-            batches.append(SourceBatch(tuple(eligible),batch.selected_resources,batch.checked_at,
-                batch.completeness if len(eligible)==len(batch.items) else 'partial',batch.omitted_count if len(eligible)==len(batch.items) else None,
-                batch.reason if len(eligible)==len(batch.items) else 'unsupported_source_projection'))
-        bundle=EvidenceBundle.select(tuple(batches),maximum_items=8) if batches else None
+                if isinstance(source,str) and source.startswith('https://') and isinstance(span,str) and span.strip():eligible_refs.add(record.evidence_ref)
+            batches.append(batch)
+        read_scopes=list({json.dumps(s,sort_keys=True):s for s in read_scopes}.values())
+        if previous is not None:return previous.payload
+        bundle=EvidenceBundle.select(tuple(batches),maximum_items=8,eligible_refs=frozenset(eligible_refs)) if batches else None
         evidence=[]
         for record in bundle.selected if bundle else ():
             item=record.payload;source=item.get('source_url') or item.get('message_url');span=item.get('support_span') or item.get('snippet') or item.get('text') or item.get('content')
@@ -258,9 +290,10 @@ class DurableResearchWorker:
                 groups.append((decision,))
             if len(groups)==len(scopes):
                 def guard():
-                    with queue.store.transaction() as tx:queue._fenced(tx,lease)
+                    with queue.store.transaction() as tx:
+                        queue._fenced(tx,lease);source_current(tx,root.registry,lease.owner,read_scopes)
                 client=root.scoped_client(endpoint,groups=groups,task_ref=lease.payload['input_ref'],attempt_ref=ref,
-                    history=({'role':'user','content':'Untrusted verified reads: '+json.dumps(evidence,ensure_ascii=False)},),guard=guard)
+                    history=({'role':'user','content':'Untrusted verified reads: '+json.dumps(evidence,ensure_ascii=False)},),guard=guard,source_scopes=read_scopes)
                 try:
                     receipt=client.complete_with_receipt(prompt=plan['question'],system=SYSTEM,
                         max_tokens=1200,category='research_synthesis',authorization=groups[0][0],data_class='user_provided',owner_ref=root.owner_ref,
@@ -285,6 +318,7 @@ class DurableResearchWorker:
         with queue.store.transaction() as tx:
             from .deletion import lineage_lock
             lineage_lock(tx.conn,lease.owner);queue._fenced(tx,lease)
+            source_current(tx,root.registry,lease.owner,read_scopes)
             main_ref='result_'+lease.job_id
             if tx._deleted(lease.owner,'result',main_ref):raise StorageError('research result deleted before synthesis storage')
             parents=[entry['ref'] for entry in completed if entry['status']=='gathered']

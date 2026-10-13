@@ -106,6 +106,7 @@ class DeliveryExecutor:
             return tx.conn.execute('SELECT * FROM pa_delivery.attempts WHERE owner=%s AND id=%s', (owner, delivery_id)).fetchone()
 
     def deliver_result(self, *, owner, job_id, destination_ref, upper_bound, effect_lease=None):
+        prior = self.attempt(owner=owner, delivery_id='answer_' + job_id)
         with self.store.transaction() as tx:
             job = tx.conn.execute('SELECT status,result_ref,payload FROM pa_jobs.jobs WHERE owner=%s AND id=%s', (owner, job_id)).fetchone()
             if job is None or job['status'] != 'completed':
@@ -115,10 +116,14 @@ class DeliveryExecutor:
                 raise StorageError('result unavailable')
             from prm.storage.jobs import JobQueue
             request_input = JobQueue(self.store.target)._input(tx, owner, job['payload'])
-            payload = {'text': result.payload['text'], 'result_ref': result.object_id, 'result_digest': result.digest,
-                       'data_class':result.payload.get('data_class','private_archive'),
-                       'data_classes':result.payload.get('data_classes',[result.payload.get('data_class','private_archive')]),
-                       'request_ref': result.payload.get('request_ref'),'source_scopes':result.payload.get('payload',{}).get('source_scopes',[])}
+            if prior:payload=dict(prior['payload'])
+            else:
+                from .source_access import result_provenance
+                classes,scopes=result_provenance(tx,owner,result)
+                payload = {'text': result.payload['text'], 'result_ref': result.object_id, 'result_digest': result.digest,
+                           'data_class':result.payload.get('data_class',classes[0]),
+                           'data_classes':list(classes),
+                           'request_ref': result.payload.get('request_ref'),'source_scopes':list(scopes)}
             options=result.payload.get('payload',{})
             if options.get('telegram_navigation') is not None:
                 from .transports import navigation_markup
@@ -139,7 +144,6 @@ class DeliveryExecutor:
                 JobQueue(self.store.target)._fenced(tx, effect_lease)
         # Versioned payload identity is additive. Never rewrite old digests or
         # redispatch an existing legacy/unknown attempt during an upgrade.
-        prior = self.attempt(owner=owner, delivery_id='answer_' + job_id)
         if prior:
             if (prior['destination_ref'] != destination_ref or prior['source_ref'] != job_id
                 or prior['digest'] != _canonical(prior['payload'])[1]

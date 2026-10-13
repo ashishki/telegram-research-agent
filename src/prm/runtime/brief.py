@@ -40,10 +40,10 @@ class BriefRuntime:
                     if any(r.owner_ref!=resource.owner_ref or r.resource_ref!=resource.resource_ref or r.connection_ref!=resource.connection_ref or r.data_class!=resource.data_class for r in observed.selected_resources):raise StorageError('Brief selected resource/owner differs')
                     batch=observed
                 else:batch=normalize_source_batch(observed,resource,checked_at=datetime.now(timezone.utc))
-                batches.append(batch)
                 if any(item.get('source_data_class',resource.data_class)!=resource.data_class for item in batch):raise StorageError('collector cannot relabel source privacy')
                 if any(item.get('local_source_provenance') and item.get('source_owner_ref')!=self.root.owner_ref for item in batch):
                     raise StorageError('Brief personal source owner differs')
+                batches.append(batch)
                 evidence.extend(batch);coverage.append(CoverageSource(hook.source_ref,'checked' if batch.completeness=='complete' else 'partial',batch.reason))
                 if batch:used_scopes.append(asdict(replace(hook.authorization_request,operation_ref=None)))
             except Exception:
