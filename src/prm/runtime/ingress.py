@@ -118,6 +118,7 @@ class TelegramJobIngress:
             # Inbox identity and queue admission share the same commit. A crash
             # before acknowledgement simply replays this exact immutable input.
             self.bindings._lineage_lock(tx)
+            self.bindings.update_identity_in(tx, update)
             lock = int.from_bytes(hashlib.sha256((self.owner_ref + key).encode()).digest()[:8], 'big') % (2**63)
             tx.conn.execute('SELECT pg_advisory_xact_lock(%s)', (lock,))
             item = tx.get(self.owner_ref, 'conversation', request_ref, version=1)

@@ -44,14 +44,35 @@ class TelegramBindings:
         self._dependency(tx, job['payload']['input_ref'], ref)
         return item
 
-    def _dependency(self, tx, parent_ref, child_ref):
+    def _dependency(self, tx, parent_ref, child_ref, parent_namespace='conversation'):
         if tx.conn.execute("SELECT to_regclass('pa_memory.dependencies') AS table_ref").fetchone()['table_ref'] is not None:
             tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',
-                            (self.owner, 'conversation', parent_ref, 'conversation', child_ref))
+                            (self.owner, parent_namespace, parent_ref, 'conversation', child_ref))
 
     def _lineage_lock(self, tx):
         from prm.runtime.deletion import lineage_lock
         lineage_lock(tx.conn, self.owner)
+
+    def update_identity_ref(self, update_id):
+        return 'telegram_update_' + hashlib.sha256((self.destination.bot_ref + ':' + str(update_id)).encode()).hexdigest()[:32]
+
+    def update_identity_in(self, tx, update):
+        try:
+            raw = json.dumps(update, sort_keys=True, separators=(',', ':'), ensure_ascii=False, allow_nan=False).encode()
+        except (TypeError, ValueError, RecursionError):
+            raise StorageError('bounded immutable update required') from None
+        if len(raw) > 65536: raise StorageError('update exceeds bound')
+        digest = hashlib.sha256(raw).hexdigest()
+        ref = self.update_identity_ref(update['update_id'])
+        tx._object_lock(self.owner, 'conversation', ref)
+        prior = tx.get(self.owner, 'conversation', ref)
+        if prior:
+            if prior.payload['input_digest'] != digest: raise StateConflict('update ID reused with different content')
+        else:
+            # Minimal no-replay identity intentionally has no source text. A
+            # source deletion must not make its immutable update ID reusable.
+            tx.put(self.owner, 'conversation', ref, {'schema_version': 'telegram.update_identity.v1', 'input_digest': digest}, expected_version=0)
+        return digest
 
     def freeze_control_selection(self, update, resolve):
         """Commit the exact target/ambiguity before an idempotent job control.
@@ -69,6 +90,7 @@ class TelegramBindings:
         ref = 'telegram_control_input_' + hashlib.sha256((self.destination.bot_ref + ':' + str(update['update_id'])).encode()).hexdigest()[:32]
         with self.store.transaction() as tx:
             self._lineage_lock(tx)
+            self.update_identity_in(tx, update)
             tx._object_lock(self.owner, 'conversation', ref)
             item = tx.get(self.owner, 'conversation', ref)
             if item:
@@ -77,6 +99,13 @@ class TelegramBindings:
             selection = asdict(resolve())
             tx.put(self.owner, 'conversation', ref, {'schema_version': 'telegram.control_intake.v1',
                 'input_digest': digest, 'selection': selection}, expected_version=0)
+            jobs = {item['job_ref'] for item in selection['candidates']}
+            if selection['job_ref']: jobs.add(selection['job_ref'])
+            for job_ref in jobs:
+                job = tx.conn.execute('SELECT payload FROM pa_jobs.jobs WHERE owner=%s AND id=%s', (self.owner, job_ref)).fetchone()
+                if job is not None:
+                    self.queue._input(tx, self.owner, job['payload'])
+                    self._dependency(tx, job['payload']['input_ref'], ref, job['payload']['input_namespace'])
             return selection
 
     def for_message(self, route, message_id):

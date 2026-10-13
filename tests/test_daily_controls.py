@@ -172,3 +172,28 @@ def test_effect_claim_between_status_and_cancel_preserves_unknown_fence(pai, mon
     state = root.queue.status(owner=root.owner_ref, job_id=job)
     assert state['status'] == 'awaiting_reconciliation' and state['attempts'] == 1
     with pytest.raises(StateConflict): root.queue.heartbeat(claims[0])
+
+
+def test_control_identity_cannot_cross_into_compute_route(pai):
+    root = pai.root
+    root.ingress.receive(update(96901, 'Synthetic active'))
+    root.ingress.receive(update(96902, 'Стоп'))
+    with pytest.raises(StateConflict): root.ingress.receive(update(96902, '/chat changed request'))
+    ack = root.ingress.receive(update(96903, 'Synthetic second'))
+    with pytest.raises(StateConflict): root.ingress.receive(update(96903, 'Стоп'))
+    assert root.queue.status(owner=root.owner_ref, job_id=ack.job_id)['status'] == 'queued'
+
+
+def test_deletion_removes_control_choices_and_prevents_replay_retarget(pai):
+    from prm.runtime.deletion import delete_derived_in
+    root = pai.root
+    a = root.ingress.receive(update(96911, 'Synthetic sensitive title A'))
+    b = root.ingress.receive(update(96912, 'Synthetic remaining B'))
+    stop = update(96913, 'Стоп')
+    root.ingress.receive(stop)
+    with root.queue.store.transaction() as tx:
+        delete_derived_in(tx, owner=root.owner_ref, namespace='conversation', object_ref=a.request_ref)
+        retained = tx.conn.execute('SELECT payload FROM pa_runtime.object_versions WHERE owner=%s', (root.owner_ref,)).fetchall()
+        assert 'Synthetic sensitive title A' not in str(retained)
+    with pytest.raises(StateConflict): root.ingress.receive(stop)
+    assert root.queue.status(owner=root.owner_ref, job_id=b.job_id)['status'] == 'queued'

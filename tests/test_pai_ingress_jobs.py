@@ -52,7 +52,8 @@ def test_enqueue_failure_rolls_back_inbox_and_never_acknowledges(sandbox):
         current.receive(update(21))
     with current.queue.store.transaction() as tx:
         assert tx.conn.execute('SELECT count(*) AS n FROM pa_runtime.object_heads WHERE owner=%s',
-                               (current.owner_ref,)).fetchone()['n'] == 1
+                               (current.owner_ref,)).fetchone()['n'] == 2
+        assert tx.get(current.owner_ref, 'conversation', current.bindings.update_identity_ref(21)) is None
     current.control('cancel', first.job_id)
     assert current.receive(update(21)).job_id
 

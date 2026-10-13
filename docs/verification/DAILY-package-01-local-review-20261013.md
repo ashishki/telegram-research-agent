@@ -38,3 +38,23 @@ the full package review for these fixes. The latest owner says “делай с�
 пакет”; local continuation is requested, while paid authorization and an explicit
 policy reviewer-route replacement remain absent. The implementer uses this
 transparent local engineering check and preserves the policy evidence gap.
+
+## Narrow recheck of 57f6e39
+
+Fresh agent `/root/daily01_p1_recheck` reviewed
+`57f6e39f57af57fcf4b6e622b3e30d6640a37c61`, range `d7368b4..57f6e39`, binary
+diff SHA-256 `321b2a1abfe5dd27a9bd19f0a391eb23cf539b4dc685c09ae6a7f7c14cd7820c`.
+Verdict **STOP**: R02 CLOSED; R01 remains P1 for same-ID cross-route changes;
+new R04 P1 for copied candidate titles without input deletion lineage. Three
+memory reproductions exited 0, with no filesystem/database/provider writes.
+
+Follow-through fix shares one immutable raw-update fingerprint between control
+and compute commits, and adds input namespace/ref lineage for each frozen
+selected/candidate job. The fingerprint retains no source text. Source deletion
+tombstones the frozen selection so replay fails closed rather than resolving a
+new job. Initial queue-admission test now also asserts the rejected update has
+no identity row after rollback; the added identity metadata is counted explicitly.
+
+`PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python -m pytest -q tests/test_daily_controls.py::test_control_identity_cannot_cross_into_compute_route tests/test_daily_controls.py::test_deletion_removes_control_choices_and_prevents_replay_retarget tests/test_daily_controls.py::test_stop_update_replay_after_restart_keeps_original_target tests/test_daily_controls.py::test_effect_claim_between_status_and_cancel_preserves_unknown_fence tests/test_pai_ingress_jobs.py::test_enqueue_failure_rolls_back_inbox_and_never_acknowledges`:
+**exit 0, 5 passed / 47.38s**, zero skips. R01/R04 require only a narrow
+closure on the next committed SHA; no second full package review.
