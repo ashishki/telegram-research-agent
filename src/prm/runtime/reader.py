@@ -43,6 +43,11 @@ class PrivateReportRuntime:
         document=self.root.briefs.get_persisted_document(authenticated_chat_id=self.root.owner_chat_id,
             authenticated_actor_id=self.root.owner_chat_id,authenticated_owner_chat_id=self.root.owner_chat_id,brief_id=brief_id,version=version)
         if document is None:return None
+        from .source_access import source_current
+        from prm.capabilities import CapabilityDenied
+        try:
+            with self.root.queue.store.transaction() as tx:source_current(tx,self.root.registry,self.root.owner_ref,self.root.briefs.source_scopes(brief_id,version),archive_snapshots=self.root.briefs.archive_snapshots(brief_id,version),require_snapshot=True)
+        except (StorageError,CapabilityDenied):return None
         from prm.capabilities import AuthorizationRequest
         for scope in self.root.briefs.source_scopes(brief_id,version):
             request=AuthorizationRequest(**scope)

@@ -157,9 +157,9 @@ class FocusStore:
             lineage_lock(tx.conn,self.owner);guard()
             item=tx.get(self.owner,'result',target['result_ref'],version=target['result_version'])
             if item is None:raise StorageError('focus result version unavailable')
-            from .source_access import source_current,result_provenance
+            from .source_access import source_current,result_provenance,result_archive_snapshots
             classes,scopes=result_provenance(tx,self.owner,item)
-            source_current(tx,self.root.registry,self.owner,scopes)
+            source_current(tx,self.root.registry,self.owner,scopes,archive_snapshots=result_archive_snapshots(tx,self.owner,item),require_snapshot=True)
             rows=tx.conn.execute("SELECT j.payload FROM pa_jobs.jobs j JOIN pa_runtime.object_versions v ON v.owner=j.owner AND v.namespace='result' AND v.object_id=j.result_ref AND v.version=1 WHERE j.owner=%s AND (j.result_ref=%s OR (v.payload->'payload'->'conversation'->'response_refs') ? %s)",(self.owner,target['result_ref'],target['result_ref'])).fetchall()
             for row in rows:self.root.queue._input(tx,self.owner,row['payload'])
             return item,classes,scopes

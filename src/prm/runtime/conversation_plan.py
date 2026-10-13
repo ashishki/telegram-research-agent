@@ -39,6 +39,7 @@ def _read_view(root,request_ref,ticket,plan,guard):
     elif plan.steps[0].argument=='shorten':text=text.strip().split('\n\n')[0][:800]
     return AssistantResult(request_ref,'ok','chat',text,payload={'response_ref':item.object_id,'bound_result_version':item.version,
         'source_data_classes':list(classes),'source_data_class':classes[0],'source_scopes':list(scopes),
+        'archive_snapshots':list(root._conversations.response_archive_snapshots(item.object_id)) if item.object_id.startswith('response_') else payload.get('payload',{}).get('archive_snapshots',payload.get('archive_snapshots',[])),
         'conversation':{'response_refs':[item.object_id]},'task_plan':json.loads(json.dumps(plan.to_dict()))})
 
 

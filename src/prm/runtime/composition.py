@@ -35,7 +35,7 @@ class AssistantRuntime:
         if archive_selection is not None and (archive_selection.owner_ref,archive_selection.resource_ref)!=(owner_ref,archive_resource_ref):raise StorageError('selected archive owner/resource differs')
         if archive_selection is not None:
             from .archive import selected_source_guard
-            self.registry.selected_source_guard=lambda owner,requests:selected_source_guard(self,owner,requests)
+            self.registry.selected_source_guard=lambda owner,requests,**kwargs:selected_source_guard(self,owner,requests,**kwargs)
         self.public_web_bounds=public_web_bounds;self.public_search_ref=public_search_ref;self.public_fetch_ref=public_fetch_ref;self.public_upper_bound=public_upper_bound
         self._conversation_context = ContextVar('pa_reply_conversation', default=None)
         self.conversations=DurableConversationStore(target,owner_ref=owner_ref,history_retention_seconds=history_retention_seconds)
@@ -65,11 +65,15 @@ class AssistantRuntime:
         try:return profiles.select(role=role,quality=self.quality_profile)
         except StorageError:return None
 
-    def scoped_client(self,endpoint,*,groups,task_ref,attempt_ref,history=(),guard=None,source_scopes=(),profile_role='chat'):
+    def scoped_client(self,endpoint,*,groups,task_ref,attempt_ref,history=(),guard=None,source_scopes=(),profile_role='chat',archive_snapshots=()):
         task_ref=self.task_context.get() or task_ref
+        profiles=getattr(self,'model_profile_registry',None)
+        binding=profiles.observed_binding(endpoint,profile_role) if profiles is not None and profiles.policies is not None else None
         def policy_guard():
             profiles=getattr(self,'model_profile_registry',None)
-            if profiles is not None:profiles.check(endpoint,role=profile_role,data_classes=tuple({d.data_class for group in groups for d in group}))
+            if profiles is not None:
+                profiles.check(endpoint,role=profile_role,data_classes=tuple({d.data_class for group in groups for d in group}))
+                if binding is not None and profiles.observed_binding(endpoint,profile_role)!=binding:raise StorageError('prepared profile policy binding changed')
             if guard:guard()
         def observe(receipt,usage,observed_groups):
             from .cost_cache import CostCacheRuntime
@@ -79,7 +83,7 @@ class AssistantRuntime:
                 usage=usage,latency_ms=receipt.duration_ms,outcome=receipt.delivery_outcome,tariff_version=self.tariff_version)
             if cost is not None:
                 for index,group in enumerate(observed_groups):self.registry.settle(self.owner_ref,group[0].operation_ref,outcome='accepted',actual=cost if index==0 else 0)
-        return ScopedModelClient(endpoint,self.registry,groups=groups,history=history,guard=policy_guard,usage_observer=observe,task_ref=self.task_context.get() or task_ref,source_scopes=source_scopes)
+        return ScopedModelClient(endpoint,self.registry,groups=groups,history=history,guard=policy_guard,usage_observer=observe,task_ref=self.task_context.get() or task_ref,source_scopes=source_scopes,archive_snapshots=archive_snapshots,profile_binding=binding)
 
     def worker(self):
         return AssistantJobWorker(self.ingress,settings=self.settings,runtime=self,
@@ -227,7 +231,7 @@ class AssistantRuntime:
             elif name=='actions':value['source_data_class']='private_connector_content'
             if value.get('status') not in {'preview'}:
                 state=self.conversations.record_response(request.chat_id,text=value['text'],topic='',item_texts=tuple(value['text'].splitlines()[:8]))
-                self.conversations.record_origin(state.object_refs[0].response_ref,value.get('source_data_classes',(value.get('source_data_class','user_provided'),)),source_scopes=value.get('source_scopes',()))
+                self.conversations.record_origin(state.object_refs[0].response_ref,value.get('source_data_classes',(value.get('source_data_class','user_provided'),)),source_scopes=value.get('source_scopes',()),archive_snapshots=value.get('archive_snapshots',()))
                 value['conversation']={'response_refs':[state.object_refs[0].response_ref]}
                 for ref in value.get('source_memory_refs',()):
                     self.memory.register_dependency(parent_namespace='memory',parent_ref=ref,child_namespace='result',child_ref=state.object_refs[0].response_ref)
@@ -271,6 +275,12 @@ class AssistantRuntime:
                 client=self.scoped_client(endpoint,groups=groups,history=history,guard=guard,task_ref=request_ref,attempt_ref=operation)
         options=dict(settings=self.settings,conversations=self.conversations,public_web_provider=self.public_web_provider,
                      briefs=self.briefs,public_web_bounds=self.public_web_bounds,deep_archive_reader=self.deep_archive_reader,github_context_provider=self.github_context_provider)
+        selected_facade=None
+        if self.archive_selection is not None:
+            from .archive import SelectedResearchFacade
+            from prm.research_facade import ArchiveScopedResearchFacade
+            selected_facade=SelectedResearchFacade(self,guard)
+            options['research_facade_factory']=lambda **kwargs:ArchiveScopedResearchFacade(selected_facade,question=kwargs['question'])
         public_access=None
         if request.public_web_query and self.public_web_provider is not None and self.public_web_bounds is not None:
             from .web import reserve_public_access,AuthorizedPublicWeb
@@ -279,11 +289,15 @@ class AssistantRuntime:
             if public_access is not None:
                 options['public_web_provider']=AuthorizedPublicWeb(self.public_web_provider,self.registry,public_access,guard=guard)
         from .archive import RuntimeArchiveTransport
-        options['archive_synthesis_transport']=RuntimeArchiveTransport(self,request_ref=request_ref,guard=guard,context_resource_ref=self.archive_resource_ref)
+        options['archive_synthesis_transport']=RuntimeArchiveTransport(self,request_ref=request_ref,guard=guard,context_resource_ref=self.archive_resource_ref,read_provenance=(lambda:(selected_facade.scopes,selected_facade.snapshots)) if selected_facade else None)
         if client is not None:options['llm_client']=client
         assistant=PersonalResearchAssistant(**options)
         try:
             result=assistant.answer(replace(request,model_access=access,public_web_access=public_access))
+            if selected_facade is not None and selected_facade.scopes:
+                from .source_access import source_current
+                with self.queue.store.transaction() as tx:source_current(tx,self.registry,self.owner_ref,selected_facade.scopes,archive_snapshots=selected_facade.snapshots,require_snapshot=True)
+                result=replace(result,payload={**result.payload,'source_scopes':selected_facade.scopes,'archive_snapshots':list(selected_facade.snapshots)})
             guard()
             if result.payload.get('model_call_attempted') and result.status=='ok' and type(access)is RuntimeModelAccess:
                 state=self.conversations.record_response(request.chat_id,text=result.text,topic='')
@@ -313,7 +327,7 @@ class AssistantRuntime:
                 elif request.public_web_query:classes=('public','private_archive')
                 else:classes=('private_archive',)
                 result=replace(result,payload={**result.payload,'source_data_classes':list(classes),'source_data_class':classes[0]})
-                if refs and not referenced and not result.route.get('conversation_control'):self.conversations.record_origin(refs[0],classes,source_scopes=result.payload.get('source_scopes',()))
+                if refs and not referenced and not result.route.get('conversation_control'):self.conversations.record_origin(refs[0],classes,source_scopes=result.payload.get('source_scopes',()),archive_snapshots=result.payload.get('archive_snapshots',()))
             return result
         finally:
             if public_access is not None:
@@ -422,6 +436,18 @@ class AssistantRuntime:
             self.memory=memory_runtime
             from .projects import ProjectRuntime
             self.projects=ProjectRuntime(self);self.services['projects']=self.projects.service
+            def memory_provenance(value,items):
+                import json
+                projects=[i for i in items if i.payload.get('kind')=='project']
+                if not projects:return value
+                classes={'user_provided'} if len(projects)==len(items) else set(value.get('source_data_classes',[value.get('source_data_class','user_provided')]))
+                scopes={};snapshots=set()
+                with self.queue.store.transaction() as tx:
+                    for item in projects:
+                        current=self.projects._get_in(tx,item.object_id,item.version)
+                        c,s,a=self.projects.provenance_in(tx,current);classes.update(c);snapshots.update(a)
+                        for scope in s:scopes[json.dumps(scope,sort_keys=True)]=scope
+                return {**value,'source_data_classes':sorted(classes),'source_data_class':sorted(classes)[0],'source_scopes':list(scopes.values()),'archive_snapshots':sorted(snapshots)}
             def memory(request,request_ref,guard):
                 import json,uuid
                 command,_,argument=request.query.partition(' ')
@@ -441,15 +467,16 @@ class AssistantRuntime:
                     return {'status':'preview','text':'Предпросмотр исправления: '+value['text']+'\n/memoryconfirm '+ref,'preview_ref':ref}
                 if command=='/memorysearch':
                     items=memory_runtime.search(argument,**actor)
-                    return {'status':'found' if items else 'not_found','text':'\n'.join(item.object_id+': '+json.dumps(item.payload,ensure_ascii=False) for item in items) or 'Записи не найдены.',
-                        'source_data_class':'private_connector_content','source_data_classes':['user_provided','private_connector_content'],'source_memory_refs':[item.object_id for item in items]}
+                    return memory_provenance({'status':'found' if items else 'not_found','text':'\n'.join(item.object_id+': '+json.dumps(item.payload,ensure_ascii=False) for item in items) or 'Записи не найдены.',
+                        'source_data_class':'private_connector_content','source_data_classes':['user_provided','private_connector_content'],'source_memory_refs':[item.object_id for item in items]},items)
                 if command=='/memoryexport':
-                    return {'status':'export','text':json.dumps(memory_runtime.export(**actor),ensure_ascii=False),'source_data_class':'private_connector_content',
-                        'source_data_classes':['user_provided','private_connector_content']}
+                    items=memory_runtime.export_objects(**actor)
+                    return memory_provenance({'status':'export','text':json.dumps([i.payload for i in items],ensure_ascii=False),'source_data_class':'private_connector_content',
+                        'source_data_classes':['user_provided','private_connector_content'],'source_memory_refs':[i.object_id for i in items]},items)
                 if command=='/forget':
                     value=memory_runtime.forget(argument,**actor);return {'status':value['deletion_state'],'text':('Память удалена. ' if value['deletion_state']=='complete' else 'Записи удалены, очистка файлов ещё ожидается. ')+value['backup_limitation'],'object_ref':argument}
                 item=memory_runtime.inspect(argument,**actor)
-                return {'status':'found' if item else 'not_found','text':item.payload.get('text',json.dumps(item.payload,ensure_ascii=False)) if item else 'Запись не найдена.','source_memory_refs':[item.object_id] if item else [],'source_data_class':'private_connector_content' if argument.startswith('academic_') else 'user_provided'}
+                return memory_provenance({'status':'found' if item else 'not_found','text':item.payload.get('text',json.dumps(item.payload,ensure_ascii=False)) if item else 'Запись не найдена.','source_memory_refs':[item.object_id] if item else [],'source_data_class':'private_connector_content' if argument.startswith('academic_') else 'user_provided'},[item] if item else [])
             self.services['memory']=memory
         if action_runtime is not None:
             self.actions=action_runtime

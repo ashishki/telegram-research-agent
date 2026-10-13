@@ -34,6 +34,7 @@ def install_selected_archive(conn):
       CREATE TABLE IF NOT EXISTS pa_archive_pages(owner TEXT NOT NULL,resource TEXT NOT NULL,page_id TEXT NOT NULL,digest TEXT NOT NULL,receipt TEXT NOT NULL,PRIMARY KEY(owner,resource,page_id));
       CREATE TABLE IF NOT EXISTS pa_archive_revisions(owner TEXT NOT NULL,resource TEXT NOT NULL,channel_id INTEGER NOT NULL,message_id INTEGER NOT NULL,revision INTEGER NOT NULL,digest TEXT NOT NULL,deleted INTEGER NOT NULL,PRIMARY KEY(owner,resource,channel_id,message_id));
       CREATE TABLE IF NOT EXISTS pa_archive_quota(owner TEXT NOT NULL,resource TEXT NOT NULL,day TEXT NOT NULL,used INTEGER NOT NULL,PRIMARY KEY(owner,resource,day));
+      CREATE TABLE IF NOT EXISTS pa_archive_epoch(owner TEXT PRIMARY KEY,epoch INTEGER NOT NULL);
     ''')
 
 
@@ -42,6 +43,7 @@ class SelectedArchive:
     def register(self):
         s=self.selection
         with self.conn:
+            self.conn.execute('INSERT INTO pa_archive_epoch VALUES(?,0) ON CONFLICT(owner) DO NOTHING',(s.owner_ref,))
             if self.conn.execute('SELECT 1 FROM pa_archive_selection WHERE owner<>? LIMIT 1',(s.owner_ref,)).fetchone():raise StorageError('canonical archive already belongs to another owner')
             for channel_id,username in s.channels:
                 if self.conn.execute('SELECT 1 FROM raw_posts WHERE channel_id=? AND channel_username<>? LIMIT 1',(channel_id,username)).fetchone():raise StorageError('canonical source channel identity differs')
@@ -65,7 +67,10 @@ class SelectedArchive:
         state=self.current();now=aware(now or datetime.now(timezone.utc))
         lag=max(0,int((now-aware(state['watermark'])).total_seconds())) if state['watermark'] else None
         fresh=lag is not None and lag<=self.selection.max_lag_seconds and state['outcome']=='complete' and self.selection.mode=='session'
-        return {**state,'mode':self.selection.mode,'selected_channels':[p[1] for p in self.selection.channels],'lag_seconds':lag,'fresh':fresh,'history_complete':False,'selected_scan_complete':fresh,
+        epoch=self.conn.execute('SELECT epoch FROM pa_archive_epoch WHERE owner=?',(self.selection.owner_ref,)).fetchone()
+        if not epoch:raise StorageError('canonical snapshot epoch unavailable')
+        snapshot=hashlib.sha256(json.dumps([state,epoch[0],fresh],sort_keys=True).encode()).hexdigest()
+        return {**state,'archive_snapshots':[snapshot],'mode':self.selection.mode,'selected_channels':[p[1] for p in self.selection.channels],'lag_seconds':lag,'fresh':fresh,'history_complete':False,'selected_scan_complete':fresh,
             'limitation':None if fresh else 'selected_import_or_forward_is_not_full_history' if self.selection.mode!='session' else 'incomplete_or_stale_enumeration'}
     def apply_page(self,*,page_id,expected_cursor,next_cursor,events,watermark,complete=False,checked_at=None):
         s=self.selection;checked_at=aware(checked_at or datetime.now(timezone.utc));watermark=aware(watermark)
@@ -89,13 +94,13 @@ class SelectedArchive:
                 self.conn.rollback();return json.loads(old[1])
             if state['cursor']!=expected_cursor:raise StateConflict('source cursor changed or page interrupted')
             if state['watermark'] and watermark<aware(state['watermark']):raise StateConflict('source watermark cannot move backwards')
-            day=checked_at.astimezone(timezone.utc).date().isoformat();quota=self.conn.execute('SELECT used FROM pa_archive_quota WHERE owner=? AND resource=? AND day=?',(s.owner_ref,s.resource_ref,day)).fetchone()
+            day=datetime.now(timezone.utc).date().isoformat();quota=self.conn.execute('SELECT used FROM pa_archive_quota WHERE owner=? AND resource=? AND day=?',(s.owner_ref,s.resource_ref,day)).fetchone()
             if (quota[0] if quota else 0)+len(events)>s.daily_quota:raise StorageError('selected source daily quota exhausted')
             changed=0
             for e in events:
                 key=(s.owner_ref,s.resource_ref,e['channel_id'],e['message_id'])
                 hashed=hashlib.sha256(json.dumps(e,sort_keys=True).encode()).hexdigest()
-                previous=self.conn.execute('SELECT revision,digest FROM pa_archive_revisions WHERE owner=? AND resource=? AND channel_id=? AND message_id=?',key).fetchone()
+                previous=self.conn.execute('SELECT revision,digest FROM pa_archive_revisions WHERE owner=? AND channel_id=? AND message_id=? ORDER BY revision DESC LIMIT 1',(s.owner_ref,e['channel_id'],e['message_id'])).fetchone()
                 if previous:
                     if previous[0]>e['revision']:continue
                     if previous[0]==e['revision']:
@@ -116,6 +121,7 @@ class SelectedArchive:
                 self.conn.execute('INSERT INTO pa_archive_revisions VALUES(?,?,?,?,?,?,?) ON CONFLICT(owner,resource,channel_id,message_id) DO UPDATE SET revision=excluded.revision,digest=excluded.digest,deleted=excluded.deleted',(*key,e['revision'],hashed,int(e['deleted'])));changed+=1
             self.conn.execute('INSERT INTO pa_archive_quota VALUES(?,?,?,?) ON CONFLICT(owner,resource,day) DO UPDATE SET used=used+excluded.used',(s.owner_ref,s.resource_ref,day,len(events)))
             outcome='complete' if complete else 'partial'
+            if changed:self.conn.execute('UPDATE pa_archive_epoch SET epoch=epoch+1 WHERE owner=?',(s.owner_ref,))
             self.conn.execute('UPDATE pa_archive_selection SET cursor=?,checked_at=?,watermark=?,outcome=? WHERE owner=? AND resource=?',(next_cursor,checked_at.isoformat(),watermark.isoformat(),outcome,s.owner_ref,s.resource_ref))
             receipt={'page_id':page_id,'changed':changed,'received':len(events),'cursor':next_cursor,'outcome':outcome,'scope_digest':s.digest,'mode':s.mode}
             self.conn.execute('INSERT INTO pa_archive_pages VALUES(?,?,?,?,?)',(s.owner_ref,s.resource_ref,page_id,digest,json.dumps(receipt,sort_keys=True)))

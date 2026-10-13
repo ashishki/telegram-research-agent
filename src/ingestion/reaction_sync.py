@@ -382,6 +382,7 @@ def _load_candidate_posts_with_count(
     *,
     reporting_period: ReportingPeriod | None = None,
     channel_usernames: tuple[str,...] = (),
+    channel_identities: tuple[tuple[int,str],...] = (),
 ) -> tuple[list[sqlite3.Row], int]:
     """Load a bounded page and the exact eligible population size."""
 
@@ -413,6 +414,9 @@ def _load_candidate_posts_with_count(
     if channel_usernames:
         where_sql+=' AND length(trim(p.content))>0 AND p.channel_username IN ('+','.join('?' for _ in channel_usernames)+')'
         where_params=(*where_params,*channel_usernames)
+    if channel_identities:
+        where_sql+=' AND ('+' OR '.join('(r.channel_id=? AND p.channel_username=?)' for _ in channel_identities)+')'
+        where_params=(*where_params,*(v for pair in channel_identities for v in pair))
     candidate_count = int(
         connection.execute(
             f"""
@@ -497,6 +501,7 @@ async def sync_reactions_with_outcome(
             limit=limit,
             reporting_period=reporting_period,
             channel_usernames=tuple(p[1] for p in archive_selection.channels) if archive_selection else (),
+            channel_identities=archive_selection.channels if archive_selection else (),
         )
 
         client = await make_client(settings)

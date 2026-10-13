@@ -213,7 +213,11 @@ class DurableConversationStore(ConversationStore):
         item=self.store.get(self.owner_ref,'conversation',ref)
         return tuple(item.payload.get('source_scopes',())) if item else ()
 
-    def record_origin(self,response_ref,data_classes,*,source_scopes=(),parent_response_ref=None):
+    def response_archive_snapshots(self,response_ref):
+        item=self.store.get(self.owner_ref,'conversation','response_origin_'+hashlib.sha256(response_ref.encode()).hexdigest()[:32])
+        return tuple(item.payload.get('archive_snapshots',())) if item else ()
+
+    def record_origin(self,response_ref,data_classes,*,source_scopes=(),parent_response_ref=None,archive_snapshots=()):
         classes=tuple(sorted(set(data_classes)))
         if not classes or not set(classes)<= {'model_generated','private_archive','private_connector_metadata','private_connector_content','user_provided','public'}:
             raise StorageError('explicit response origin classes required')
@@ -225,6 +229,7 @@ class DurableConversationStore(ConversationStore):
             if parent_response_ref and tx.get(self.owner_ref,'result',parent_response_ref) is None:raise StorageError('source response deleted')
             old=tx.get(self.owner_ref,'conversation',ref)
             payload={'response_ref':response_ref,'data_classes':list(classes),'source_scopes':list(source_scopes)}
+            if archive_snapshots:payload['archive_snapshots']=list(archive_snapshots)
             if old and old.payload!=payload:raise StateConflict('response origin cannot be relabelled')
             if old is None:tx.put(self.owner_ref,'conversation',ref,payload,expected_version=0)
             if tx.conn.execute("SELECT to_regclass('pa_memory.dependencies') AS meta").fetchone()['meta'] is not None:

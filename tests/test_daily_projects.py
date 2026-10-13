@@ -111,7 +111,7 @@ def test_project_applicability_preserves_private_source_scopes_and_revocation(pa
     c=context(pai,source);c['relationships']=[{'evidence_ref':evidence.object_id,'evidence_version':1,'evidence_digest':evidence.digest,'quote':'proof of the selected workflow','relation':'Owner-selected goal connection','experiment':'One synthetic run','reject_if':'No measured proof'}]
     p=root.projects.preview(object_ref='project_aurora',context=c,**actor);root.memory.confirm(p,**actor)
     _,output=request(pai,121100,'/projectapply '+json.dumps({'object_ref':'project_aurora','version':1,'evidence_ref':evidence.object_id}))
-    assert output['data_classes']==['private_archive'] and output['payload']['source_scopes']==[scope]
+    assert output['data_classes']==['private_archive','user_provided'] and output['payload']['source_scopes']==[scope]
     root.registry.revoke_grant(grant.grant_id,owner_ref=root.owner_ref)
     with pytest.raises(CapabilityDenied):root.projects.applicability(object_ref='project_aurora',version=1,evidence_ref=evidence.object_id,**actor)
 
@@ -122,3 +122,55 @@ def test_forwarded_project_confirmation_cannot_use_memory_alias(pai):
     ref=root.worker().run_once();output=root.queue.store.get(root.owner_ref,'result',ref).payload
     assert output['status']=='provider_egress_required' and root.memory.inspect('project_aurora',**actor) is None
     with root.queue.store.transaction() as tx:assert not tx.conn.execute('SELECT consumed FROM pa_memory.previews WHERE owner=%s AND id=%s',(root.owner_ref,preview)).fetchone()['consumed']
+
+
+def test_native_project_list_preserves_private_bound_goal_provenance(pai):
+    from tests.pai_runtime_fixtures import allow
+    from prm.capabilities import AuthorizationRequest
+    from dataclasses import asdict
+    root,actor,source=setup(pai)
+    allow(pai,'archive.read',root.archive_resource_ref,'private_archive','research.archive',provider='provider_local',connection=None,operation='read')
+    scope=asdict(AuthorizationRequest(owner_ref=root.owner_ref,connection_ref=None,capability='archive.read',resource_ref=root.archive_resource_ref,operation='read',data_class='private_archive',provider_ref='provider_local',purpose='research.archive'))
+    bound=root.queue.store.put(root.owner_ref,'result','project_private_goal',{'text':'Synthetic private constraint for the workflow','data_classes':['private_archive'],'source_scopes':[scope]},expected_version=0)
+    c=context(pai,source);c['descriptor']['current_goal']=bound.payload['text'];c['source_bindings']=[{'namespace':'result','ref':bound.object_id,'version':1,'digest':bound.digest}]
+    preview=root.projects.preview(object_ref='project_aurora',context=c,**actor);root.memory.confirm(preview,**actor)
+    _,shown=request(pai,121300,'/projects')
+    assert 'private_archive' in shown['data_classes'] and shown['payload']['source_scopes']==[scope]
+
+
+def test_deleting_relationship_evidence_cascades_project_quote_and_exports(pai):
+    from prm.runtime.deletion import delete_derived_in
+    root,actor,source=setup(pai)
+    evidence=root.queue.store.put(root.owner_ref,'result','quoted_evidence',{'text':'Synthetic quoted proof that must disappear.','data_classes':['user_provided']},expected_version=0)
+    c=context(pai,source);c['relationships']=[{'evidence_ref':evidence.object_id,'evidence_version':1,'evidence_digest':evidence.digest,'quote':'quoted proof that must disappear','relation':'Goal','experiment':'Check','reject_if':'No proof'}]
+    preview=root.projects.preview(object_ref='project_aurora',context=c,**actor);root.memory.confirm(preview,**actor)
+    with root.queue.store.transaction() as tx:delete_derived_in(tx,owner=root.owner_ref,namespace='result',object_ref=evidence.object_id)
+    assert root.memory.inspect('project_aurora',**actor) is None
+    assert 'quoted proof that must disappear' not in json.dumps(root.memory.export(**actor))
+
+
+def test_projectconfirm_wrong_kind_does_not_consume_or_write(pai):
+    root,actor,source=setup(pai)
+    preview=root.memory.preview(object_ref='ordinary_note',text='Synthetic ordinary note',source_refs=(source.object_id,),**actor)
+    with pytest.raises(StateConflict):root.memory.confirm(preview,expected_kind='project',**actor)
+    assert root.memory.inspect('ordinary_note',**actor) is None
+    with root.queue.store.transaction() as tx:assert not tx.conn.execute('SELECT consumed FROM pa_memory.previews WHERE owner=%s AND id=%s',(root.owner_ref,preview)).fetchone()['consumed']
+
+
+def test_generic_memory_and_transitive_project_views_preserve_private_origin(pai):
+    from tests.pai_runtime_fixtures import allow
+    from prm.capabilities import AuthorizationRequest,CapabilityDenied
+    from dataclasses import asdict
+    root,actor,source=setup(pai)
+    grant=allow(pai,'archive.read',root.archive_resource_ref,'private_archive','research.archive',provider='provider_local',connection=None,operation='read')
+    scope=asdict(AuthorizationRequest(owner_ref=root.owner_ref,connection_ref=None,capability='archive.read',resource_ref=root.archive_resource_ref,operation='read',data_class='private_archive',provider_ref='provider_local',purpose='research.archive'))
+    evidence=root.queue.store.put(root.owner_ref,'result','private_source_for_project',{'text':'Synthetic private project goal','data_classes':['private_archive'],'source_scopes':[scope]},expected_version=0)
+    c=context(pai,source);c['source_bindings']=[{'namespace':'result','ref':evidence.object_id,'version':1,'digest':evidence.digest}]
+    preview=root.projects.preview(object_ref='project_aurora',context=c,**actor);parent=root.memory.confirm(preview,**actor)
+    c=context(pai,source);c['descriptor']['name']='Beta';c['descriptor']['aliases']=['Beta'];c['source_bindings']=[{'namespace':'memory','ref':parent.object_id,'version':1,'digest':parent.digest}]
+    preview=root.projects.preview(object_ref='project_beta',context=c,**actor);root.memory.confirm(preview,**actor)
+    for index,text in enumerate(('/projectshow Beta','/memory project_beta','/memoryexport')):
+        _,output=request(pai,121500+index,text)
+        assert 'private_archive' in output['data_classes'] and output['payload']['source_scopes']==[scope]
+    root.registry.revoke_grant(grant.grant_id,owner_ref=root.owner_ref)
+    with pytest.raises(CapabilityDenied):root.memory.inspect('project_beta',**actor)

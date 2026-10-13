@@ -55,9 +55,9 @@ def wire_archive_watch(root):
     source=root.archive_resource_ref
     def collect(source_ref,subscription):
         now=_watch_time(root)
-        rows=LocalArchiveReader(root.settings.db_path).window_evidence(BriefWindow(subscription.timezone_name,now-timedelta(days=1),now,now))
+        rows=LocalArchiveReader(root.settings.db_path,root=root).window_evidence(BriefWindow(subscription.timezone_name,now-timedelta(days=1),now,now))
         return [WatchNotification(subscription.subscription_id,root.owner_ref,
             'subject_'+hashlib.sha256(item['evidence_id'].encode()).hexdigest()[:24],item['source_version'],'change',item['title'][:240],item['support_span'][:800],
-            'Новый материал в выбранном архиве.',source_ref,now,source_url=item['source_url'],data_class='private_archive') for item in rows]
+            'Новый материал в выбранном архиве.',source_ref,now,source_url=item['source_url'],data_class='private_archive',archive_snapshots=(rows.watermark,) if root.archive_selection and rows.watermark else ()) for item in rows]
     bound=getattr(getattr(root,'watch_collector',None),'upper_bound',0)
     _wire(root,source=source,binding={'connection_ref':None,'provider_ref':'provider_local','data_class':'private_archive'},collector=collect,upper_bound=bound)

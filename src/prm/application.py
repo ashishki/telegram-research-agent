@@ -87,11 +87,13 @@ class PersonalResearchAssistant:
         github_context_provider: GitHubContextProvider | None = None,
         briefs: BriefDocumentStore | None = None,
         archive_synthesis_transport=None,
+        research_facade_factory=None,
     ) -> None:
         self.settings = settings
         self.conversations = conversations or GLOBAL_CONVERSATIONS
         self.llm_client = llm_client
         self.archive_synthesis_transport=archive_synthesis_transport
+        self.research_facade_factory=research_facade_factory
         # There is intentionally no environment-derived default. Supplying an
         # adapter is a runtime integration decision, never a consequence of a
         # user asking a current-fact question.
@@ -356,7 +358,7 @@ class PersonalResearchAssistant:
             # Parse before archive candidate selection, then carry exactly this
             # object through retrieval and BriefDocument construction.
             brief_window, brief_period_basis = parse_requested_brief_window(request.query)
-        facade = build_research_facade(
+        facade = (self.research_facade_factory or build_research_facade)(
             settings=self.settings,
             question=route.retrieval_query if route.mode == "brief" else request.query,
             project_context_required=route.project_context_required,

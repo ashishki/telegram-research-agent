@@ -21,7 +21,7 @@ class LocalArchiveReader:
         if self.selection is None:return None
         from ingestion.selected_archive import SelectedArchive
         registry=SelectedArchive(conn,self.selection);registry.current();return registry.status()
-    def search_archive(self,query,*,limit):
+    def search_archive(self,query,*,limit,filters=None):
         from db.archive_search import search_telegram_archive
         from pathlib import Path
         path=Path(self.db_path).resolve();uri='file:'+quote(str(path))+'?mode=ro'
@@ -42,16 +42,19 @@ class LocalArchiveReader:
             conn.row_factory=sqlite3.Row
             conn.execute('BEGIN')
             selected=self._selected(conn)
-            result=search_telegram_archive(conn,query,limit=min(limit,8),filters={'channels':[p[1] for p in self.selection.channels]} if self.selection else None)
+            bound=dict(filters or {})
+            if self.selection:bound['channel_identities']=self.selection.channels
+            result=search_telegram_archive(conn,query,limit=min(limit,8),filters=bound)
             from dataclasses import asdict,is_dataclass
             if isinstance(result,list):
                 rows=[asdict(item) if is_dataclass(item) else dict(item) for item in result]
                 for row in rows:row['source_version']=row.get('content_hash')
                 from prm.source_contracts import SourceResource,SourceBatch
                 resource=SourceResource(self.root.owner_ref if self.root else 'owner_local_archive',self.root.archive_resource_ref if self.root else 'resource_archive','archive','private_archive',scope_digest=self.selection.digest if self.selection else None)
-                batch=SourceBatch.from_items(rows,resource,checked_at=datetime.now(timezone.utc),completeness='unknown',reason='query_top_k_not_full_archive')
+                batch=SourceBatch.from_items(rows,resource,checked_at=datetime.now(timezone.utc),completeness='unknown',reason='query_top_k_not_full_archive',watermark=selected['archive_snapshots'][0] if selected else None)
                 result={'items':rows,'coverage':'bounded_archive_read','source_count':len(rows)}
                 if selected:result['source_freshness']=selected
+                if selected:result['archive_snapshots']=selected['archive_snapshots']
                 if self.root is not None:result['source_batch']=batch.metadata()
             else:result=result.to_dict() if hasattr(result,'to_dict') else result
         if cache is not None:cache.put(key=key,kind='retrieval',payload=result,dependencies=[],ttl_seconds=60)
@@ -67,9 +70,9 @@ class LocalArchiveReader:
             conn.row_factory=sqlite3.Row;conn.execute('BEGIN')
             selected=self._selected(conn)
             if self.selection:
-                where+=' AND p.channel_username IN ('+','.join('?' for _ in self.selection.channels)+')'
-                parameters=(*parameters,*(p[1] for p in self.selection.channels))
-            total=conn.execute('SELECT count(*) FROM posts p WHERE '+where,parameters).fetchone()[0]
+                where+=' AND ('+' OR '.join('(r.channel_id=? AND p.channel_username=?)' for _ in self.selection.channels)+')'
+                parameters=(*parameters,*(v for pair in self.selection.channels for v in pair))
+            total=conn.execute('SELECT count(*) FROM posts p JOIN raw_posts r ON r.id=p.raw_post_id WHERE '+where,parameters).fetchone()[0]
             rows=conn.execute('SELECT p.id,p.content,p.posted_at,p.channel_username,r.message_id,r.message_url,r.ingested_at FROM posts p JOIN raw_posts r ON r.id=p.raw_post_id WHERE '+where+' ORDER BY p.posted_at DESC,p.id LIMIT ? OFFSET ?',(*parameters,limit,offset)).fetchall()
         items=[{'evidence_id':'tg:'+str(row['id']),'source_url':row['message_url'],
                 'title':row['content'].splitlines()[0][:180],'support_span':row['content'][:1200],
@@ -80,7 +83,7 @@ class LocalArchiveReader:
             scope_digest=self.selection.digest if self.selection else hashlib.sha256((parameters[0]+'\x1f'+parameters[1]).encode()).hexdigest())
         limited=bool(omitted or offset or selected and not selected['fresh'])
         return SourceBatch.from_items(items,resource,checked_at=datetime.now(timezone.utc),completeness='partial' if limited else 'complete',
-            omitted_count=omitted,reason='enumeration_page' if omitted or offset else 'selected_source_freshness_unverified' if limited else None,continuation='offset:'+str(offset+len(rows)) if omitted else None)
+            omitted_count=omitted,reason='enumeration_page' if omitted or offset else 'selected_source_freshness_unverified' if limited else None,continuation='offset:'+str(offset+len(rows)) if omitted else None,watermark=selected['archive_snapshots'][0] if selected else None)
 
 
 class DurableResearchWorker:
@@ -108,7 +111,7 @@ class DurableResearchWorker:
         if metadata:
             if metadata.get('schema_version')!='assistant.source_batch.v1' or metadata.get('selected_resources')!=[resource.to_dict()]:raise StorageError('research selected source route differs')
             return SourceBatch.from_items(rows,resource,checked_at=datetime.fromisoformat(metadata['checked_at']) if metadata['checked_at'] else None,
-                completeness=metadata['completeness'],omitted_count=metadata['omitted_count'],reason=metadata['reason'])
+                completeness=metadata['completeness'],omitted_count=metadata['omitted_count'],reason=metadata['reason'],watermark=metadata.get('watermark'))
         return normalize_source_batch(rows,resource,checked_at=datetime.now(timezone.utc))
 
     def _read_scopes(self,step):
@@ -214,7 +217,7 @@ class DurableResearchWorker:
             'text':text,'evidence_refs':[entry['ref'] for entry in available],'tool_calls':calls,
             'tool_call_accounting':'conservative_upper_bound',
             'unknown_tool_calls':sum(entry['tool_calls'] for entry in completed if entry['status']=='source_outcome_unknown'),
-            'gaps':gaps,'source_freshness':[entry['evidence']['source_freshness'] for entry in available if entry['evidence'].get('source_freshness')],'source_scopes':[scope for entry in available for scope in entry.get('source_scopes',[])],'answer_payload':synthesized,'data_classes':sorted({'private_archive' if entry['source']=='archive' else 'public' for entry in available}) or ['user_provided'],'data_class':'private_archive' if any(entry['source']=='archive' for entry in available) else 'public'})
+            'gaps':gaps,'archive_snapshots':sorted({s for e in available for s in e['evidence'].get('archive_snapshots',[])}),'source_freshness':[entry['evidence']['source_freshness'] for entry in available if entry['evidence'].get('source_freshness')],'source_scopes':[scope for entry in available for scope in entry.get('source_scopes',[])],'answer_payload':synthesized,'data_classes':sorted({'private_archive' if entry['source']=='archive' else 'public' for entry in available}) or ['user_provided'],'data_class':'private_archive' if any(entry['source']=='archive' for entry in available) else 'public'})
 
     def _gather(self,lease,index,step,prepared):
         root=self.root;queue=root.queue;result={**prepared,'status':'partial'}
@@ -265,18 +268,19 @@ class DurableResearchWorker:
         previous=queue.store.get(lease.owner,'result',ref,version=1)
         from prm.source_contracts import EvidenceBundle
         from .source_access import source_current
-        batches=[];classes=set();eligible_refs=set();read_scopes=[]
+        batches=[];classes=set();eligible_refs=set();read_scopes=[];snapshots=set()
         for step in completed:
             if step['status']!='gathered':continue
             try:
                 batch=self._source_batch(step['source'],step['evidence'],step.get('source_batch'))
                 scopes=self._read_scopes(step)
                 with queue.store.transaction() as tx:
-                    queue._fenced(tx,lease);source_current(tx,root.registry,lease.owner,scopes)
+                    queue._fenced(tx,lease);source_current(tx,root.registry,lease.owner,scopes,archive_snapshots=step['evidence'].get('archive_snapshots',()),require_snapshot=True)
             except (StorageError,CapabilityDenied,ValueError,KeyError,TypeError):
                 if previous is not None:raise CapabilityDenied('cached synthesis source unavailable') from None
                 step['status']='source_unavailable';continue
             read_scopes.extend(scopes)
+            snapshots.update(step['evidence'].get('archive_snapshots',()))
             for record in batch.items:
                 item=record.payload;source=item.get('source_url') or item.get('message_url');span=item.get('support_span') or item.get('snippet') or item.get('text') or item.get('content')
                 if isinstance(source,str) and source.startswith('https://') and isinstance(span,str) and span.strip():eligible_refs.add(record.evidence_ref)
@@ -307,9 +311,9 @@ class DurableResearchWorker:
             if len(groups)==len(scopes):
                 def guard():
                     with queue.store.transaction() as tx:
-                        queue._fenced(tx,lease);source_current(tx,root.registry,lease.owner,read_scopes)
+                        queue._fenced(tx,lease);source_current(tx,root.registry,lease.owner,read_scopes,archive_snapshots=snapshots,require_snapshot=True)
                 client=root.scoped_client(endpoint,groups=groups,task_ref=lease.payload['input_ref'],attempt_ref=ref,
-                    history=({'role':'user','content':'Untrusted verified reads: '+json.dumps(evidence,ensure_ascii=False)},),guard=guard,source_scopes=read_scopes,profile_role='research')
+                    history=({'role':'user','content':'Untrusted verified reads: '+json.dumps(evidence,ensure_ascii=False)},),guard=guard,source_scopes=read_scopes,profile_role='research',archive_snapshots=snapshots)
                 try:
                     receipt=client.complete_with_receipt(prompt=plan['question'],system=SYSTEM,
                         max_tokens=1200,category='research_synthesis',authorization=groups[0][0],data_class='user_provided',owner_ref=root.owner_ref,
@@ -334,7 +338,7 @@ class DurableResearchWorker:
         with queue.store.transaction() as tx:
             from .deletion import lineage_lock
             lineage_lock(tx.conn,lease.owner);queue._fenced(tx,lease)
-            source_current(tx,root.registry,lease.owner,read_scopes)
+            source_current(tx,root.registry,lease.owner,read_scopes,archive_snapshots=snapshots,require_snapshot=True)
             main_ref='result_'+lease.job_id
             if tx._deleted(lease.owner,'result',main_ref):raise StorageError('research result deleted before synthesis storage')
             parents=[entry['ref'] for entry in completed if entry['status']=='gathered']

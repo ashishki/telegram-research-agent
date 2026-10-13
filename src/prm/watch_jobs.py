@@ -207,8 +207,10 @@ class WatchNotification:
     data_class: str = "model_generated"
     source_url: str | None = None
     urgent: bool = False
+    archive_snapshots: tuple[str,...] = ()
 
     def __post_init__(self) -> None:
+        if not isinstance(self.archive_snapshots,tuple) or len(self.archive_snapshots)>16 or any(not isinstance(s,str) or not re.fullmatch('[a-f0-9]{64}',s) for s in self.archive_snapshots):raise ValueError('bounded archive snapshot required')
         _ref(self.subscription_id, field="subscription_id", pattern=_SUBSCRIPTION)
         _ref(self.owner_ref, field="owner_ref")
         _ref(self.subject_ref, field="subject_ref")
@@ -1915,7 +1917,7 @@ def _subscription_from_payload(payload: object) -> WatchSubscription:
 
 
 def _notification_payload(notification: WatchNotification) -> dict[str, object]:
-    return {
+    value = {
         "subscription_id": notification.subscription_id, "owner_ref": notification.owner_ref, "subject_ref": notification.subject_ref,
         "change_version": notification.change_version, "delivery_stage": notification.delivery_stage, "title": notification.title,
         "change_summary": notification.change_summary, "relevance_reason": notification.relevance_reason, "source_ref": notification.source_ref,
@@ -1925,6 +1927,8 @@ def _notification_payload(notification: WatchNotification) -> dict[str, object]:
         "data_class": notification.data_class, "source_url": notification.source_url,
         "urgent": notification.urgent,
     }
+    if notification.archive_snapshots:value['archive_snapshots']=list(notification.archive_snapshots)
+    return value
 
 
 def _notification_from_payload(payload: object) -> WatchNotification:
@@ -1932,7 +1936,7 @@ def _notification_from_payload(payload: object) -> WatchNotification:
         "subscription_id", "owner_ref", "subject_ref", "change_version", "delivery_stage", "title", "change_summary",
         "relevance_reason", "source_ref", "due_at", "source_deadline_at", "source_deadline_timezone", "data_class", "source_url", "urgent",
     }
-    if not isinstance(payload, Mapping) or set(payload) != fields:
+    if not isinstance(payload, Mapping) or set(payload)-{'archive_snapshots'} != fields:
         raise ValueError("stored notification is invalid")
     return WatchNotification(
         subscription_id=payload["subscription_id"], owner_ref=payload["owner_ref"], subject_ref=payload["subject_ref"],
@@ -1942,4 +1946,5 @@ def _notification_from_payload(payload: object) -> WatchNotification:
         source_deadline_at=None if payload["source_deadline_at"] is None else _parse_utc(payload["source_deadline_at"]),
         source_deadline_timezone=payload["source_deadline_timezone"],
         data_class=payload["data_class"], source_url=payload["source_url"], urgent=payload["urgent"],
+        archive_snapshots=tuple(payload.get('archive_snapshots',())),
     )

@@ -57,7 +57,7 @@ class MemoryRuntime:
             tx.conn.execute('INSERT INTO pa_memory.previews(owner,id,object_ref,payload,digest,expected_version,expires) VALUES(%s,%s,%s,%s,%s,%s,%s)',
                 (owner,ref,object_ref,Jsonb(payload),digest,expected_version,datetime.now(timezone.utc)+timedelta(minutes=10)))
         return ref
-    def confirm(self,preview_ref,*,chat_id,actor_id,owner_chat_id):
+    def confirm(self,preview_ref,*,chat_id,actor_id,owner_chat_id,expected_kind=None):
         owner=self._owner(chat_id,actor_id,owner_chat_id)
         with self.store.transaction() as tx:
             from .deletion import lineage_lock
@@ -65,6 +65,7 @@ class MemoryRuntime:
             row=tx.conn.execute('SELECT * FROM pa_memory.previews WHERE owner=%s AND id=%s FOR UPDATE',(owner,preview_ref)).fetchone()
             now=tx.conn.execute('SELECT clock_timestamp() AS now').fetchone()['now']
             if not row or row['consumed'] or row['expires']<=now or _canonical(row['payload'])[1]!=row['digest']:raise StateConflict('memory preview changed, expired or consumed')
+            if expected_kind is not None and row['payload']['kind']!=expected_kind:raise StateConflict('confirmation preview kind differs')
             payload=row['payload']
             if payload['kind']=='project':
                 context=self.root.projects.validate_in(tx,payload['project_context'],row['object_ref'])
@@ -74,9 +75,15 @@ class MemoryRuntime:
             if payload['kind']=='project':
                 for b in context['source_bindings']:
                     tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',(owner,b['namespace'],b['ref'],'memory',item.object_id))
+                for r in context['relationships']:
+                    tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',(owner,'result',r['evidence_ref'],'memory',item.object_id))
             tx.conn.execute('UPDATE pa_memory.previews SET consumed=true WHERE owner=%s AND id=%s',(owner,preview_ref));return item
     def inspect(self,object_ref,*,chat_id,actor_id,owner_chat_id):
-        owner=self._owner(chat_id,actor_id,owner_chat_id);return self.store.get(owner,'memory',object_ref)
+        owner=self._owner(chat_id,actor_id,owner_chat_id)
+        with self.store.transaction() as tx:
+            item=tx.get(owner,'memory',object_ref)
+            if item and item.payload.get('kind')=='project':return self.root.projects._get_in(tx,object_ref)
+            return item
     def forget(self,object_ref,*,chat_id,actor_id,owner_chat_id):
         owner=self._owner(chat_id,actor_id,owner_chat_id)
         from .deletion import delete_derived_in
@@ -105,10 +112,21 @@ class MemoryRuntime:
             rows=tx.conn.execute('''SELECT h.object_id FROM pa_runtime.object_heads h JOIN pa_runtime.object_versions v USING(owner,namespace,object_id,version)
                 WHERE h.owner=%s AND h.namespace='memory' AND position(lower(%s) in lower(v.payload::text))>0
                 ORDER BY h.object_id LIMIT %s''',(owner,query,limit)).fetchall()
-            return [item for row in rows if (item:=tx.get(owner,'memory',row['object_id'])) is not None]
+            output=[]
+            for row in rows:
+                item=tx.get(owner,'memory',row['object_id'])
+                if item and item.payload.get('kind')=='project':item=self.root.projects._get_in(tx,item.object_id)
+                if item:output.append(item)
+            return output
 
-    def export(self,*,chat_id,actor_id,owner_chat_id):
+    def export_objects(self,*,chat_id,actor_id,owner_chat_id):
         owner=self._owner(chat_id,actor_id,owner_chat_id)
         with self.store.transaction() as tx:
             rows=tx.conn.execute("SELECT object_id FROM pa_runtime.object_heads WHERE owner=%s AND namespace='memory' ORDER BY object_id LIMIT 1000",(owner,)).fetchall()
-            return [item.payload for row in rows if (item:=tx.get(owner,'memory',row['object_id'])) is not None]
+            output=[]
+            for row in rows:
+                item=tx.get(owner,'memory',row['object_id'])
+                if item and item.payload.get('kind')=='project':item=self.root.projects._get_in(tx,item.object_id)
+                if item:output.append(item)
+            return output
+    def export(self,**actor):return [i.payload for i in self.export_objects(**actor)]

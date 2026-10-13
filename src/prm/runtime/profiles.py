@@ -93,6 +93,7 @@ class ModelProfiles:
             if not policy.checked_at<=now<policy.expires_at:raise StorageError('expired role policy cannot authorize automatic alternatives')
             candidates+=list(policy.fallback_qualities);candidates=candidates[:policy.max_candidates]
         for q in dict.fromkeys(candidates):
+            if q=='economical' and manual_model is None and not self._promoted(role):continue
             endpoint=self.profiles.get(q,{}).get(role)
             if endpoint is None:continue
             if self.policies is not None:
@@ -105,6 +106,10 @@ class ModelProfiles:
         if self.policies is None:return
         matches=[q for q in self.profiles if self.profiles[q].get(role)==endpoint]
         if not matches or any(not self.policies[q][role].current(now,data_classes) for q in matches):raise StorageError('selected model role/privacy policy unavailable')
+    def observed_binding(self,endpoint,role):
+        matches=[q for q in self.profiles if self.profiles[q].get(role)==endpoint]
+        if len(matches)!=1:raise StorageError('unambiguous observed role policy binding required')
+        return self.binding(matches[0],role)
     def unavailable(self,*,role,quality,outcome):
         if outcome not in {'not_attempted','rejected'}:raise StorageError('unknown transport never authorizes a fallback or retry')
         if self.policies is None:raise StorageError('versioned cooldown policy required')
@@ -144,6 +149,7 @@ def _validate_observations(tx,root,baseline,candidate,bindings):
         ref=row.get('attempt_ref');observation=tx.get(root.owner_ref,'conversation',ref) if isinstance(ref,str) else None
         if ref in seen or not observation:raise StorageError('unique actual observation receipt required')
         seen.add(ref);value=observation.payload;actual=value.get('observation',{})
+        if value.get('profile_binding')!=bindings[0 if row in baseline else 1]:raise StorageError('actual role/profile policy version was not observed')
         if row['source_snapshot']!=value.get('context_digest') or not value.get('context_digest'):raise StorageError('actual paired context/source packet differs')
         task=tx.get(root.owner_ref,'conversation',value['task_ref'])
         if not task or task.digest!=row['input_digest'] or actual.get('provider_outcome')!='accepted' or actual.get('observed_model')!=row['observed_model'] or actual.get('requested_model')!=row['requested_model'] or value.get('input_digest')!=row.get('model_input_digest'):raise StorageError('paired receipt observation differs')

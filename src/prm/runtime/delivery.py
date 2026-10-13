@@ -118,12 +118,14 @@ class DeliveryExecutor:
             request_input = JobQueue(self.store.target)._input(tx, owner, job['payload'])
             if prior:payload=dict(prior['payload'])
             else:
-                from .source_access import result_provenance
+                from .source_access import result_provenance,result_archive_snapshots
                 classes,scopes=result_provenance(tx,owner,result)
                 payload = {'text': result.payload['text'], 'result_ref': result.object_id, 'result_digest': result.digest,
                            'data_class':result.payload.get('data_class',classes[0]),
                            'data_classes':list(classes),
                            'request_ref': result.payload.get('request_ref'),'source_scopes':list(scopes)}
+                snapshots=result_archive_snapshots(tx,owner,result)
+                if snapshots:payload['archive_snapshots']=list(snapshots)
             options=result.payload.get('payload',{})
             if options.get('telegram_navigation') is not None:
                 from .transports import navigation_markup
@@ -214,6 +216,7 @@ class DeliveryExecutor:
                        'data_class':notification.data_class,
                        'revision': note['revision'], 'notification_digest': _canonical(note['payload'])[1],
                        'source_scopes':source_scopes}
+            if notification.archive_snapshots:payload['archive_snapshots']=list(notification.archive_snapshots)
         return self._deliver(owner=owner, delivery_id='watch_' + notification_id, kind='watch', source_ref=notification_id,
             destination_ref=sub.destination_ref, payload=payload, upper_bound=upper_bound)
 
@@ -247,7 +250,7 @@ class DeliveryExecutor:
 
     def _source_current(self,tx,owner,payload):
         from .source_access import source_current
-        source_current(tx,self.registry,owner,payload.get('source_scopes',()))
+        source_current(tx,self.registry,owner,payload.get('source_scopes',()),archive_snapshots=payload.get('archive_snapshots',()),require_snapshot=True)
 
     def _deliver(self, *, owner, delivery_id, kind, source_ref, destination_ref, payload, upper_bound, effect_lease=None):
         if not isinstance(destination_ref, str) or not 0 < len(destination_ref) <= 128:

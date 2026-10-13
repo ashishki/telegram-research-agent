@@ -132,3 +132,25 @@ def test_media_cannot_inherit_chat_profile_or_bypass_role_expiry(pai):
     with pytest.raises(StorageError):VisionAdapter(root,endpoint=root.model_endpoint,upper_bound=0)(image,'Synthetic',media.path/image.media_ref)
     with pytest.raises(StorageError):SpeechTranscriber(root,endpoint=root.model_endpoint,upper_bound=0)(voice,media.path/voice.media_ref)
     assert not pai.requests
+
+
+def test_economical_fallback_cannot_bypass_paired_promotion_gate(pai):
+    base=pai.root.model_endpoint;cheap=replace(base,connection_ref='connection_candidate')
+    profiles=ModelProfiles({'balanced':{'chat':base},'economical':{'chat':cheap}},policies={'balanced':{'chat':policy(pai.now,fallback_qualities=('economical',),max_candidates=2)},'economical':{'chat':policy(pai.now)}},root=pai.root)
+    profiles.unavailable(role='chat',quality='balanced',outcome='not_attempted')
+    with pytest.raises(StorageError):profiles.select(role='chat',quality='balanced')
+
+
+def test_native_budget_serializes_priced_usage_without_currency_invention(pai):
+    from prm.runtime.cost_cache import CostCacheRuntime
+    from prm.runtime.composition import runtime_from_config
+    cache=CostCacheRuntime(pai.root)
+    cache.register_tariff(provider='provider_openai',model='fixture_model',version='budget_v1',input_per_million=2,cached_input_per_million=1,output_per_million=4,source_ref='https://example.test/tariff',valid_until=pai.now+timedelta(days=1))
+    cache.record(task_ref='budget_task',attempt_ref='budget_attempt',provider='provider_openai',model='fixture_model',usage={'input':100,'cached_input':20,'output':40,'reasoning':None,'semantics':'openai_chat_output_includes_reasoning'},latency_ms=1,outcome='accepted',tariff_version='budget_v1')
+    from types import SimpleNamespace
+    config={'owner_ref':pai.root.owner_ref,'owner_chat_id':'42','budget_refs':['request_full','job_full','day_full','month_full'],'job_budget':True,'local_services':True}
+    pai.root=runtime_from_config(config,target=pai.pg.app,settings=pai.root.settings)
+    _,output=request(pai,120400,'/budget')
+    import json
+    view=json.loads(output['text'])
+    assert view['usage']['metered_usd_microdollars']==340 and view['subscription_paid'] is None

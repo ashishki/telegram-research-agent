@@ -15,7 +15,7 @@ def setup(pai,mode='import',**limits):
     selection=ArchiveSelection(root.owner_ref,root.archive_resource_ref,1,((1,'@synthetic'),),mode=mode,**limits)
     archive=SelectedArchive(conn,selection);archive.register();root.settings.db_path=path;root.archive_selection=selection
     from prm.runtime.archive import selected_source_guard,SelectedArchiveRuntime
-    root.registry.selected_source_guard=lambda owner,scopes:selected_source_guard(root,owner,scopes)
+    root.registry.selected_source_guard=lambda owner,scopes,**kwargs:selected_source_guard(root,owner,scopes,**kwargs)
     root.selected_archive=SelectedArchiveRuntime(root);root.services['archive']=root.selected_archive.service
     return root,conn,archive
 
@@ -162,4 +162,103 @@ def test_selected_source_read_lock_is_held_through_pg_guard_and_released_on_exit
             source_current(tx,root.registry,root.owner_ref,[scope])
             with pytest.raises(BlockingIOError):fcntl.flock(other.fileno(),fcntl.LOCK_EX|fcntl.LOCK_NB)
         fcntl.flock(other.fileno(),fcntl.LOCK_EX|fcntl.LOCK_NB);fcntl.flock(other.fileno(),fcntl.LOCK_UN)
+    conn.close()
+
+
+def test_canonical_tombstone_is_global_across_overlapping_resource_scopes(pai):
+    root,conn,archive=setup(pai)
+    archive.apply_page(**page(pai,[event(pai,revision=3,deleted=True,text='')]))
+    other=SelectedArchive(conn,replace(archive.selection,resource_ref='resource_other'));other.register()
+    other.apply_page(**page(pai,[event(pai,revision=2,text='Synthetic resurrection attempt')]))
+    assert conn.execute('SELECT content FROM posts').fetchone()[0]==''
+    conn.close()
+
+
+def test_ordinary_native_research_cannot_egress_unselected_archive_channel(pai):
+    root,conn,archive=setup(pai)
+    archive.apply_page(**page(pai,[event(pai,text='Synthetic SELECTED CANARY experiment')]))
+    other=SelectedArchive(conn,replace(archive.selection,resource_ref='resource_other',channels=((2,'@unselected'),)));other.register()
+    other.apply_page(**page(pai,[event(pai,text='Synthetic UNSELECTED CANARY experiment',channel_id=2,message_id=2)]))
+    allow(pai,'archive.read',root.archive_resource_ref,'private_archive','research.archive',provider='provider_local',connection=None,operation='read')
+    allow(pai,'model.generate',root.model_resource_ref,'user_provided','answer.request')
+    allow(pai,'model.context_egress',root.archive_resource_ref,'private_archive','answer.context')
+    _,output=request(pai,122300,'/research Найди в Telegram Synthetic experiment')
+    packet=json.dumps(pai.requests,ensure_ascii=False)
+    assert 'UNSELECTED CANARY' not in packet and 'UNSELECTED CANARY' not in output['text']
+    assert output['payload']['source_scopes']
+    conn.close()
+
+
+def test_reused_username_cannot_admit_unselected_channel_id(pai):
+    root,conn,archive=setup(pai);archive.apply_page(**page(pai,[event(pai)]))
+    other=SelectedArchive(conn,replace(archive.selection,resource_ref='resource_other',channels=((2,'@synthetic'),)));other.register()
+    other.apply_page(**page(pai,[event(pai,channel_id=2,message_id=2)],page_id='other'))
+    result=LocalArchiveReader(root.settings.db_path,root=root).search_archive('Synthetic',limit=8)
+    assert result['source_count']==1 and result['items'][0]['channel_id']==1
+    conn.close()
+
+
+def test_saved_research_snapshot_is_blocked_after_canonical_edit_and_outage(pai):
+    root,conn,archive=setup(pai,mode='session');archive.apply_page(**page(pai,[event(pai)]))
+    allow(pai,'archive.read',root.archive_resource_ref,'private_archive','research.archive',provider='provider_local',connection=None,operation='read')
+    worker=DurableResearchWorker(root);job=worker.enqueue({'schema_version':1,'question':'Synthetic','steps':[{'source':'archive','query':'Synthetic'}],'max_tool_calls':1,'deadline_seconds':60},idempotency_key='stale_snapshot')
+    ref=worker.run_once();ticket={'target':{'result_ref':ref,'result_version':1}}
+    archive.apply_page(**page(pai,[event(pai,revision=2,text='Changed private source')],page_id='edited'))
+    with pytest.raises(StorageError):root.focus.resolve(ticket,guard=lambda:None)
+    from prm.runtime.delivery import DeliveryExecutor
+    allow(pai,'assistant.result_delivery','destination_changed','private_archive','answer.delivery',provider='provider_telegram',connection=None,operation='deliver')
+    calls=[];executor=DeliveryExecutor(root.queue.store.target,registry=root.registry,sender=lambda *args:calls.append(args))
+    assert executor.deliver_result(owner=root.owner_ref,job_id=job,destination_ref='destination_changed',upper_bound=0)['status']=='unknown' and not calls
+    conn.close()
+
+
+def test_historical_observation_dates_do_not_reset_today_import_quota(pai):
+    root,conn,archive=setup(pai,daily_quota=1)
+    first=pai.now-timedelta(days=3);second=pai.now-timedelta(days=2)
+    a=event(pai);a['posted_at']=(first-timedelta(hours=1)).isoformat()
+    archive.apply_page(**page(pai,[a],checked_at=first.isoformat(),watermark=first.isoformat()))
+    b=event(pai,message_id=2);b['posted_at']=(second-timedelta(hours=1)).isoformat()
+    with pytest.raises(StorageError):archive.apply_page(**page(pai,[b],page_id='historical2',checked_at=second.isoformat(),watermark=second.isoformat()))
+    assert conn.execute('SELECT day,used FROM pa_archive_quota').fetchone()==(datetime.now(timezone.utc).date().isoformat(),1)
+    conn.close()
+
+
+def test_saved_snapshot_outage_and_delete_prevent_model_synthesis_and_raw_alias_serving(pai):
+    from prm.runtime.research import DurableResearchWorker
+    root,conn,archive=setup(pai,mode='session');archive.apply_page(**page(pai,[event(pai)]))
+    allow(pai,'archive.read',root.archive_resource_ref,'private_archive','research.archive',provider='provider_local',connection=None,operation='read')
+    allow(pai,'model.generate',root.model_resource_ref,'user_provided','answer.request')
+    allow(pai,'model.context_egress',root.archive_resource_ref,'private_archive','research.synthesis.archive')
+    class ChangingWorker(DurableResearchWorker):
+        def _gather(self,*args):
+            step=super()._gather(*args)
+            with sqlite3.connect(root.settings.db_path) as updated:SelectedArchive(updated,archive.selection).outage()
+            return step
+    worker=ChangingWorker(root)
+    worker.enqueue({'schema_version':1,'question':'Synthetic','steps':[{'source':'archive','query':'Synthetic'}],'max_tool_calls':1,'deadline_seconds':60},idempotency_key='post_read_outage')
+    ref=worker.run_once();assert not pai.requests and root.queue.store.get(root.owner_ref,'result',ref).payload['status']=='partial'
+    archive.apply_page(**page(pai,[],page_id='recovered'))
+    _,answer=request(pai,122500,'/research Найди в Telegram Synthetic')
+    aliases=answer['payload']['conversation']['response_refs'];before=len(pai.requests)
+    archive.apply_page(**page(pai,[event(pai,revision=2,deleted=True,text='')],page_id='deleted_after_answer'))
+    with pytest.raises(StorageError):root.focus.resolve({'target':{'result_ref':aliases[0],'result_version':1}},guard=lambda:None)
+    assert len(pai.requests)==before
+    conn.close()
+
+
+def test_selected_window_and_reactions_filter_exact_identity_and_watch_carries_snapshot(pai):
+    from prm.briefs import BriefWindow
+    from ingestion.reaction_sync import _load_candidate_posts_with_count
+    from prm.runtime.watch import wire_archive_watch
+    from types import SimpleNamespace
+    root,conn,archive=setup(pai);archive.apply_page(**page(pai,[event(pai)]))
+    other=SelectedArchive(conn,replace(archive.selection,resource_ref='resource_other',channels=((2,'@synthetic'),)));other.register();other.apply_page(**page(pai,[event(pai,channel_id=2,message_id=2)],page_id='other'))
+    batch=LocalArchiveReader(root.settings.db_path,root=root).window_evidence(BriefWindow('UTC',pai.now-timedelta(days=1),pai.now,pai.now))
+    assert batch.received_count==1 and batch.watermark in archive.status()['archive_snapshots']
+    conn.row_factory=sqlite3.Row
+    rows,count=_load_candidate_posts_with_count(conn,7,200,channel_identities=archive.selection.channels)
+    assert len(rows)==count==1
+    wire_archive_watch(root)
+    note=root.watch_collector.collector(root.archive_resource_ref,SimpleNamespace(timezone_name='UTC',subscription_id='watch_'+('a'*32)))
+    assert len(note)==1 and note[0].archive_snapshots==tuple(archive.status()['archive_snapshots'])
     conn.close()

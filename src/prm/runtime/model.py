@@ -73,11 +73,12 @@ class RuntimeModelAccess:
 
 
 class ScopedModelClient:
-    def __init__(self, endpoint: ModelEndpoint, registry: DurableCapabilityRegistry, *, groups, history=(), guard=None,usage_observer=None,task_ref=None,source_scopes=()):
+    def __init__(self, endpoint: ModelEndpoint, registry: DurableCapabilityRegistry, *, groups, history=(), guard=None,usage_observer=None,task_ref=None,source_scopes=(),archive_snapshots=(),profile_binding=None):
         self.endpoint,self.registry,self.groups=endpoint,registry,tuple(tuple(group) for group in groups)
         self.history=tuple(history);self.guard=guard
         self.usage_observer=usage_observer;self.task_ref=task_ref;self.attempt_ref=None;self._called=False;self.input_digest=None
         self.source_scopes=tuple(dict(s) for s in source_scopes)
+        self.archive_snapshots=tuple(archive_snapshots);self.profile_binding=profile_binding
 
     def stream_with_receipt(self,*,on_event,cancelled=None,**kwargs):
         return self._complete(stream=True,on_event=on_event,cancelled=cancelled,**kwargs)
@@ -112,7 +113,7 @@ class ScopedModelClient:
         self.input_digest=digest
         self.attempt_ref=prepare_model_attempt(self.registry.store,owner=owner_ref,task_ref=self.task_ref or operations[0],
             purpose=self.groups[0][0].purpose,operation_refs=operations,input_digest=digest,
-            context_digest=hashlib.sha256(json.dumps(messages,sort_keys=True,ensure_ascii=False).encode()).hexdigest())
+            context_digest=hashlib.sha256(json.dumps(messages,sort_keys=True,ensure_ascii=False).encode()).hexdigest(),profile_binding=self.profile_binding)
         started=time.monotonic();http_attempted=False;known_reply_error=None;accepted_reply=None;accounting_unconfirmed=False
         def transport():
             def attempted():
@@ -123,7 +124,7 @@ class ScopedModelClient:
                 # Prepared model scopes already own their final locks here.
                 # Selected read grants stay locked until this HTTP call returns.
                 with self.registry.store.transaction() as source_tx:
-                    source_current(source_tx,self.registry,owner_ref,self.source_scopes)
+                    source_current(source_tx,self.registry,owner_ref,self.source_scopes,archive_snapshots=self.archive_snapshots,require_snapshot=True)
                     return adapter.send(body,before_request=attempted,on_event=on_event,cancelled=cancelled,guard=self.guard)
             return adapter.send(body,before_request=attempted,on_event=on_event,cancelled=cancelled,guard=self.guard)
         def checked_transport():

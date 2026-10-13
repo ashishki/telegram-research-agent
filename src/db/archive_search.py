@@ -29,6 +29,7 @@ class ArchiveSearchFilters:
     reactions: tuple[str, ...] = ()
     tags: tuple[str, ...] = ()
     project_names: tuple[str, ...] = ()
+    channel_identities: tuple[tuple[int,str],...] = ()
 
 
 @dataclass(frozen=True)
@@ -164,6 +165,9 @@ def _fetch_search_rows(
     params: list[object] = [fts_query]
 
     _append_in_filter(where_clauses, params, "p.channel_username", filters.channel_usernames)
+    if filters.channel_identities:
+        where_clauses.append('('+ ' OR '.join('(r.channel_id=? AND p.channel_username=?)' for _ in filters.channel_identities)+')')
+        params.extend(value for pair in filters.channel_identities for value in pair)
     _append_in_filter(where_clauses, params, "p.language_detected", filters.languages)
     if filters.date_from:
         where_clauses.append("p.posted_at >= ?")
@@ -231,6 +235,7 @@ def _coerce_filters(filters: ArchiveSearchFilters | Mapping[str, object] | None)
         reactions=tuple(_string_list(filters.get("reactions") or filters.get("reaction"))),
         tags=tuple(_string_list(filters.get("tags") or filters.get("tag"))),
         project_names=tuple(_string_list(filters.get("project_names") or filters.get("project_name"))),
+        channel_identities=tuple(tuple(p) for p in filters.get('channel_identities',())),
     )
 
 

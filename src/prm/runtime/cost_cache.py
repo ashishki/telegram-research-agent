@@ -97,6 +97,7 @@ class CostCacheRuntime:
             usage=tx.conn.execute('SELECT count(*) AS attempts,sum(cost_microdollars) AS metered_usd_microdollars,count(*) FILTER(WHERE cost_microdollars IS NULL) AS unknown_attempts FROM pa_cache.usage WHERE owner=%s',(self.root.owner_ref,)).fetchone()
             tariffs=tx.conn.execute('SELECT provider,model,version,payload FROM pa_cache.tariffs ORDER BY provider,model,version').fetchall()
             windows=tx.conn.execute('SELECT kind,capacity,reserved,consumed FROM pa_policy.windows WHERE owner=%s ORDER BY kind',(self.root.owner_ref,)).fetchall()
+        if usage['metered_usd_microdollars'] is not None:usage['metered_usd_microdollars']=int(usage['metered_usd_microdollars'])
         return {'usage':usage,'tariffs':tariffs,'budget_windows':windows,'budget_unit':'configured_policy_units','subscription_paid':None,'overage_billed':None,'invoice_verified':False}
     def task_cost(self,task_ref):
         with self.store.transaction() as tx:

@@ -35,8 +35,8 @@ class ProjectRuntime:
         item=tx.get(self.root.owner_ref,binding['namespace'],binding['ref'])
         if item is None or item.version!=binding['version'] or item.digest!=binding['digest']:raise StorageError('project source changed or deleted')
         if binding['namespace']=='result':
-            from .source_access import result_provenance,source_current
-            _,scopes=result_provenance(tx,self.root.owner_ref,item);source_current(tx,self.root.registry,self.root.owner_ref,scopes)
+            from .source_access import result_provenance,source_current,result_archive_snapshots
+            _,scopes=result_provenance(tx,self.root.owner_ref,item);source_current(tx,self.root.registry,self.root.owner_ref,scopes,archive_snapshots=result_archive_snapshots(tx,self.root.owner_ref,item),require_snapshot=True)
         return item
     def preview(self,*,object_ref,context,expected_version=0,**actor):
         context=validate_context(context)
@@ -57,7 +57,8 @@ class ProjectRuntime:
                 d=other.payload['project_context']['descriptor']
                 if aliases&{_alias(x) for x in [d['name'],*d['aliases']]}:raise StateConflict('project aliases are ambiguous')
         return context
-    def _get_in(self,tx,object_ref,version=None,allow_stale=False):
+    def _get_in(self,tx,object_ref,version=None,allow_stale=False,depth=0):
+        if depth>4:raise StorageError('bounded transitive project source graph required')
         item=tx.get(self.root.owner_ref,'memory',object_ref)
         if item is None or item.payload.get('kind')!='project' or version is not None and item.version!=version:raise StorageError('current project version unavailable')
         context=item.payload['project_context'];proof=item.payload.get('project_confirmation')
@@ -66,8 +67,28 @@ class ProjectRuntime:
         if not row or not row['consumed'] or row['object_ref']!=object_ref or row['digest']!=proof['digest'] or row['payload'].get('project_context')!={**context,'descriptor':{**context['descriptor'],'owner_confirmation_status':'unknown'}}:raise StorageError('project confirmation does not bind exact context')
         now=tx.conn.execute('SELECT clock_timestamp() AS now').fetchone()['now']
         if not allow_stale and not aware(context['reviewed_at'])<=now<aware(context['expires_at']):raise StorageError('project context needs owner recheck')
-        for binding in context['source_bindings']:self._live(tx,binding)
+        for binding in context['source_bindings']:
+            parent=self._live(tx,binding)
+            if binding['namespace']=='memory' and parent.payload.get('kind')=='project':self._get_in(tx,parent.object_id,binding['version'],False,depth+1)
+        for relation in context['relationships']:
+            evidence=self._live(tx,{'namespace':'result','ref':relation['evidence_ref'],'version':relation['evidence_version'],'digest':relation['evidence_digest']})
+            if relation['quote'] not in evidence.payload.get('text',evidence.payload.get('display_text','')):raise StorageError('relationship source quote changed')
         return item
+    def provenance_in(self,tx,item,depth=0):
+        if depth>4:raise StorageError('bounded transitive project provenance required')
+        from .source_access import result_provenance,result_archive_snapshots
+        classes={'user_provided'};scopes={};snapshots=set();context=item.payload['project_context']
+        bindings=[*context['source_bindings'],*({'namespace':'result','ref':r['evidence_ref'],'version':r['evidence_version'],'digest':r['evidence_digest']} for r in context['relationships'])]
+        for b in bindings:
+            parent=self._live(tx,b)
+            if b['namespace']=='result':c,s=result_provenance(tx,self.root.owner_ref,parent);a=result_archive_snapshots(tx,self.root.owner_ref,parent)
+            elif b['namespace']=='memory' and parent.payload.get('kind')=='project':
+                parent=self._get_in(tx,parent.object_id,b['version']);c,s,a=self.provenance_in(tx,parent,depth+1)
+            else:continue
+            classes.update(c);snapshots.update(a)
+            for scope in s:scopes[json.dumps(scope,sort_keys=True)]=scope
+        if len(scopes)>16:raise StorageError('bounded combined project source authority required')
+        return tuple(sorted(classes)),tuple(scopes.values()),tuple(sorted(snapshots))
     def get(self,object_ref,*,version=None,allow_stale=False,**actor):
         self.memory._owner(**actor)
         with self.store.transaction() as tx:return self._get_in(tx,object_ref,version,allow_stale)
@@ -91,12 +112,11 @@ class ProjectRuntime:
             evidence=self._live(tx,{'namespace':'result','ref':relation['evidence_ref'],'version':relation['evidence_version'],'digest':relation['evidence_digest']}) if relation else None
             allowed=project_action_recommendation_allowed(descriptor,direct_evidence=relation is not None)
             if relation and relation['quote'] not in evidence.payload.get('text',evidence.payload.get('display_text','')):allowed=False
-            from .source_access import result_provenance
-            classes,scopes=result_provenance(tx,self.root.owner_ref,evidence) if evidence else (('user_provided',),())
+            classes,scopes,snapshots=self.provenance_in(tx,item)
             return {'project_ref':item.object_id,'project_version':item.version,'goal':descriptor['current_goal'],'blocker':descriptor['current_blocker'],
                 'status':'candidate_experiment' if allowed else 'weak_watch','action_recommendation':allowed,
                 'relationship':relation if allowed else None,'next_proof':descriptor['next_proof'] if allowed else None,
-                'cost':'unknown','execution_authority':False,'human_usefulness':None,'source_data_classes':list(classes),'source_scopes':list(scopes)}
+                'cost':'unknown','execution_authority':False,'human_usefulness':None,'source_data_classes':list(classes),'source_scopes':list(scopes),'archive_snapshots':list(snapshots)}
     def service(self,request,request_ref,guard):
         actor={'chat_id':request.chat_id,'actor_id':request.actor_id,'owner_chat_id':request.owner_chat_id};self.memory._owner(**actor);guard()
         command,_,arg=request.query.partition(' ')
@@ -105,15 +125,20 @@ class ProjectRuntime:
             reference=self.preview(object_ref=value['object_ref'],context=value['context'],expected_version=value.get('version',0),**actor)
             return {'status':'preview','text':'Предпросмотр проекта: '+json.dumps(value['context'],ensure_ascii=False)+'\n/projectconfirm '+reference,'preview_ref':reference,'source_data_class':'user_provided'}
         if command=='/projectconfirm':
-            item=self.memory.confirm(arg,**actor)
+            item=self.memory.confirm(arg,expected_kind='project',**actor)
             if item.payload['kind']!='project':raise StorageError('project confirmation required')
-            return {'status':'saved','text':'Проект сохранён: '+item.payload['project_context']['descriptor']['name'],'source_data_class':'user_provided','source_memory_refs':[item.object_id]}
+            with self.store.transaction() as tx:classes,scopes,snapshots=self.provenance_in(tx,item)
+            return {'status':'saved','text':'Проект сохранён: '+item.payload['project_context']['descriptor']['name'],'source_data_class':classes[0],'source_data_classes':list(classes),'source_scopes':list(scopes),'archive_snapshots':list(snapshots),'source_memory_refs':[item.object_id]}
         if command=='/projectapply':value=json.loads(arg);output=self.applicability(**value,**actor);refs=[value['object_ref']]
         else:
             with self.store.transaction() as tx:
                 items=self.list_in(tx) if command=='/projects' or not arg else [self.resolve_named_in(tx,arg)]
                 items=[i for i in items if i]
+                classes={'user_provided'};scopes={};snapshots=set()
+                for i in items[:3]:
+                    c,s,a=self.provenance_in(tx,i);classes.update(c);snapshots.update(a)
+                    for scope in s:scopes[json.dumps(scope,sort_keys=True)]=scope
             output=[{'project_ref':i.object_id,'version':i.version,**{k:str(v)[:600] for k,v in i.payload['project_context']['descriptor'].items() if k in {'name','status','current_goal','current_blocker','next_proof'}}} for i in items[:3]];refs=[i.object_id for i in items[:3]]
-        classes=output.get('source_data_classes',['user_provided']) if isinstance(output,dict) else ['user_provided']
-        scopes=output.get('source_scopes',[]) if isinstance(output,dict) else []
-        return {'status':'found' if output else 'not_found','text':json.dumps(output,ensure_ascii=False),'source_data_class':classes[0],'source_data_classes':classes,'source_scopes':scopes,'source_memory_refs':refs}
+        if isinstance(output,list):classes=sorted(classes);scopes=list(scopes.values());snapshots=sorted(snapshots)
+        else:classes=output.get('source_data_classes',['user_provided']);scopes=output.get('source_scopes',[]);snapshots=output.get('archive_snapshots',[])
+        return {'status':'found' if output else 'not_found','text':json.dumps(output,ensure_ascii=False),'source_data_class':classes[0],'source_data_classes':classes,'source_scopes':scopes,'archive_snapshots':snapshots,'source_memory_refs':refs}

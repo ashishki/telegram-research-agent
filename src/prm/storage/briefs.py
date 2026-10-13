@@ -52,7 +52,7 @@ class DurableBriefStore(BriefDocumentStore):
                     if old.payload.get('storage_digest')!=digest:raise StateConflict('immutable Brief version differs')
                 else:
                     tx.put(owner,'result',ref,{'kind':'brief_manifest','brief_id':item.brief_id,'version':item.version,
-                        'content_digest':item.content_digest,'storage_digest':digest,'source_data_classes':list(self.pending_classes.get(item.content_digest,('private_archive','private_connector_content'))),'source_scopes':self.pending_scopes.get(item.content_digest,[])},expected_version=item.version-1)
+                        'content_digest':item.content_digest,'storage_digest':digest,'source_data_classes':list(self.pending_classes.get(item.content_digest,('private_archive','private_connector_content'))),'source_scopes':self.pending_scopes.get(item.content_digest,[]),'archive_snapshots':getattr(self,'pending_snapshots',{}).get(item.content_digest,[])},expected_version=item.version-1)
                     tx.conn.execute('INSERT INTO pa_briefs.documents VALUES(%s,%s,%s,%s,%s)',(owner,item.brief_id,item.version,digest,Jsonb(encoded)))
                 if tx.conn.execute("SELECT to_regclass('pa_memory.dependencies') AS meta").fetchone()['meta'] is not None:
                     for dependency in self.pending_dependencies.get(item.content_digest,()):
@@ -109,6 +109,9 @@ class DurableBriefStore(BriefDocumentStore):
     def source_scopes(self,brief_id,version):
         item=self.store.get(self.owner_ref,'result',self._document_ref(brief_id),version=version)
         return tuple(item.payload.get('source_scopes',())) if item else ()
+    def archive_snapshots(self,brief_id,version):
+        item=self.store.get(self.owner_ref,'result',self._document_ref(brief_id),version=version)
+        return tuple(item.payload.get('archive_snapshots',())) if item else ()
 
     def _decode_document(self,item):
         if item.payload.get('kind')!='brief_manifest':return _stored_document(item.payload)

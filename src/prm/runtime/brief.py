@@ -64,7 +64,7 @@ class BriefRuntime:
         document=build_brief_document(request)
         classes={item.resource.data_class for item in bundle.selected} if bundle else set()
         if self.editorial is not None:
-            editorial=self.editorial(document,data_classes=classes) if type(self.editorial)is RuntimeBriefEditorial else self.editorial(document)
+            editorial=self.editorial(document,data_classes=classes,source_scopes=used_scopes,archive_snapshots=tuple({b.watermark for b in batches if b.watermark}) if self.root.archive_selection else ()) if type(self.editorial)is RuntimeBriefEditorial else self.editorial(document)
             if editorial is not None:document=build_brief_document(replace(request,editorial=editorial))
         dependencies=[item['dependency_ref'] for item in evidence[:48] if item.get('dependency_ref')]
         if not hasattr(self.root.briefs,'pending_coverage'):self.root.briefs.pending_coverage={}
@@ -72,6 +72,8 @@ class BriefRuntime:
         self.root.briefs.pending_dependencies[document.content_digest]=dependencies
         self.root.briefs.pending_classes[document.content_digest]=tuple(sorted(classes)) or ('user_provided',)
         self.root.briefs.pending_scopes[document.content_digest]=used_scopes
+        if not hasattr(self.root.briefs,'pending_snapshots'):self.root.briefs.pending_snapshots={}
+        self.root.briefs.pending_snapshots[document.content_digest]=list({b.watermark for b in batches if b.watermark}) if self.root.archive_selection else []
         return document
 
     def answer(self,*,topic,timezone_name,end_at=None):
@@ -84,13 +86,14 @@ class BriefRuntime:
         result=assistant.render_brief_document(request,rebuild_brief_request(document),prepared_document=document)
         classes=self.root.briefs.pending_classes.get(document.content_digest,('private_archive','private_connector_content'))
         refs=result.payload.get('conversation',{}).get('response_refs',())
-        if refs:self.root.conversations.record_origin(refs[0],classes,source_scopes=self.root.briefs.pending_scopes.get(document.content_digest,()))
-        return replace(result,payload={**result.payload,'source_data_classes':list(classes),'source_data_class':classes[0],'source_scopes':self.root.briefs.pending_scopes.get(document.content_digest,[]),'source_coverage':self.root.briefs.pending_coverage.get(document.content_digest)})
+        snapshots=self.root.briefs.pending_snapshots.get(document.content_digest,[])
+        if refs:self.root.conversations.record_origin(refs[0],classes,source_scopes=self.root.briefs.pending_scopes.get(document.content_digest,()),archive_snapshots=snapshots)
+        return replace(result,payload={**result.payload,'archive_snapshots':snapshots,'source_data_classes':list(classes),'source_data_class':classes[0],'source_scopes':self.root.briefs.pending_scopes.get(document.content_digest,[]),'source_coverage':self.root.briefs.pending_coverage.get(document.content_digest)})
 
 
 class RuntimeBriefEditorial:
     def __init__(self,root):self.root=root
-    def __call__(self,document,*,data_classes=None):
+    def __call__(self,document,*,data_classes=None,source_scopes=(),archive_snapshots=()):
         import hashlib,json,uuid
         from prm.capabilities import AuthorizationRequest
         from prm.brief_editorial import BriefEditorial
@@ -113,7 +116,7 @@ class RuntimeBriefEditorial:
                 return None
             groups.append((decision,))
         sources=[{'evidence_ref':item.evidence_ref,'title':item.title,'summary':item.summary,'source_ref':item.source_ref} for item in document.evidence]
-        client=root.scoped_client(endpoint,groups=groups,task_ref=document.brief_id,attempt_ref=operation,history=({'role':'user','content':'Untrusted selected evidence: '+json.dumps(sources,ensure_ascii=False)},),profile_role='brief_editorial')
+        client=root.scoped_client(endpoint,groups=groups,task_ref=document.brief_id,attempt_ref=operation,history=({'role':'user','content':'Untrusted selected evidence: '+json.dumps(sources,ensure_ascii=False)},),profile_role='brief_editorial',source_scopes=source_scopes,archive_snapshots=archive_snapshots)
         try:
             receipt=client.complete_with_receipt(prompt=document.topic,
                 system='Return JSON {stories:[{title,summary,explanation,plain_explanation,why_selected,next_step,caveat,anchors:[{evidence_ref,quote}]}],omitted_refs:[]}. Write every reader-facing field in Russian; keep JSON keys unchanged and source quotes verbatim. Select at most five actual events. Each quote must be an exact selected source substring of at least 16 characters. Explain importance separately from facts. Preserve deadlines/conflicts/coverage. No tools or external claims.',
