@@ -40,6 +40,26 @@ runtime_from_config requires owner_ref/owner_chat_id/budget_refs/job_budget. Mod
 
 ## Foreground procedure
 
+D56 (13 October): the durable polling profile normalizes message/edited_message/
+callback_query, stores a decision and cursor before advancing, quarantines poison
+or conflicting updates, and retains the cursor on storage failure. Immediate
+replies and final deliveries have separate no-repeat attempts; timeout is unknown.
+Actual chat/thread/message receipts bind replies/buttons to a job/result/version.
+The configured bot_ref namespaces inputs; real bot identity/client support must
+still be observed in D27/D40. Foreign/business/native Stop updates cannot become
+owner controls; unsupported topics receive only an explanatory reply in that route.
+
+Reply to an older answer selects its immutable version and bounded request
+context. It does not borrow a newer confirmation or replace another focus.
+Quote verification uses UTF-16 offsets against an available exact message
+snapshot; unknown/hidden source identity remains unknown. Forwarded content is
+untrusted data. Editing an owner input saves a revision and invalidates old
+controls and prepared/consumed proposals. Consumed confirmations and unknown
+attempt receipts remain; they cannot be reopened or retried. An edit winning
+before final transport/action dispatch blocks it; if dispatch wins first, its
+receipt remains authoritative. Explicitly request a new computation if needed.
+Existing v1/multipart payloads retain their original checksums and no-replay state.
+
 1. Select the actual target/config and authenticated owner tuple.
 2. Check status/readiness and current grants/expiry/budgets.
 3. Accept intake durably; worker handles bounded computation.

@@ -14,7 +14,7 @@ One full accumulated review verdict: **STOP**. Frozen findings:
 | --- | --- | --- |
 | DAILY02-R01 | P1 | Source edit after preparation but before transport: original input was checked after sendMessage. Move original compute input/current revision validation before every answer sender call (v2/legacy/multipart), holding lineage through dispatch. |
 | DAILY02-R02 | P1 | Source edit between action's consumed precommit and adapter entry cancelled only prepared proposals. Invalidate prepared/consumed proposals under their existing row lock; preserve consumed confirmation and unknown attempt, with no reopen/retry. |
-| DAILY02-R03 | P2 | Valid 4,000-emoji forward (16,000 UTF-8 bytes) plus trust prefix hit plain StorageError and stalled the cursor. Keep the raw 16KiB bound, allow at most 200 fixed wrapper bytes and use typed pure validation errors for quarantine. |
+| DAILY02-R03 | P2 | Valid 4,000-emoji forward (16,000 UTF-8 bytes) plus trust prefix hit plain StorageError and stalled the cursor. Keep the raw 16,000-byte bound, allow at most 200 fixed wrapper bytes and use typed pure validation errors for quarantine. |
 | DAILY02-R04 | P2 | Channel forward dropped provider-supplied message_id. Preserve the validated positive message ID alongside declared chat identity/date; hidden identity stays unknown. |
 
 No additional P0/P1 established in immutable replay/quarantine, owner/thread,
@@ -35,6 +35,27 @@ After fixes, exact command:
 HTTP effects; dispatch-winning retains one unknown receipt and never repeats.
 Full forward text and channel message ID are retained; next update is admitted.
 
-Independent narrow R01/R02 closure is pending on the committed fix. Do not run
-a second full package review. R03/R04 are addressed by the same scoped fix;
-no unrelated full-test reruns or formal acceptance claims.
+Fix SHA: `d231d9a39f5928a8f89463c99fd086f42ecd1b88`.
+
+Independent narrow reviewer `/root/daily02_p1_recheck` inspected that committed
+SHA, range `8b56d8e..d231d9a`, binary diff SHA-256
+`a87aeb52b3c42387a99a8a6200d880ef61cfc68e2b61ae687059d90c7e92e130`.
+Verdict: **ADVISORY — DAILY02-R01/R02 closed for this exact local fix; no new
+P0/P1 within the narrow scope.** Requested model/effort: inherited defaults,
+no override; observed identity/effort unknown. Fresh read-only collaboration
+reviewer; no writes, DB, network, credentials or provider calls. The six reported
+PG/loopback passes were inspected, not independently rerun.
+
+R01 now validates original compute input/version/digest and current source/reply
+revision before both sender paths under the lineage transaction, including
+every multipart part. R02 invalidates prepared and consumed proposals using the
+same proposal row lock held through final adapter invocation. Edit-winning
+dispatch is denied; dispatch-winning edit waits, then invalidates the proposal
+without changing consumed confirmation or unknown attempt. Receipt-return
+paths still prohibit another execution.
+
+Actual simultaneous database scheduling, legacy inputs without v2 revision
+pointers, live providers and operator usefulness remain unverified. This closes
+local engineering findings only; non-Codex Go/governed review and human
+acceptance are still pending. R03/R04 are addressed by the same scoped fix and
+implementer checks; no second full package review was run.

@@ -1,14 +1,19 @@
 # Подробный статус Personal AI Assistant
 
 **Локальная реализация, 13 октября:** в ветке `codex/pa-daily-implementation-20261013`
-выполнен первый пакет daily backlog D01–D03 (`08fb32e`): explicit durable/compatibility
-entrypoint, offline config-check, typed dispatch и естественные job controls с
-durable reply bindings. [Квитанция](verification/DAILY-package-01-20261013.md):
-38 адресных проверок прошли, отдельно 52 regression floor. Независимый review
-нового пакета pending; reviewed SHA пока нет. Эти результаты не добавляют real
-provider/account evidence, remote CI или подтверждённую пользовательскую пользу.
-Следующий зависимый пакет — D56 после review gate. Датированный baseline ниже
-сохранён и не объявляется новой проверкой всего продукта.
+выполнены D01–D03 и следующий пакет **D56**: durable Telegram routing/reply/callback,
+acknowledgement, cursor/quarantine, bounded transport и source-edit fences.
+D01–D03: original/reviewed `08fb32e`, final P1 recheck `988da0e`;
+[квитанция](verification/DAILY-package-01-20261013.md) сохраняет 38 адресных
+проверок и отдельный floor 52. D56: original/reviewed `8b56d8e`, final fix/recheck
+`d231d9a`; [квитанция](verification/DAILY-package-02-D56-20261013.md) содержит
+точные перекрывающиеся проверки, реальный loopback polling→worker→HTTP и финальные
+6 passed /38.03s после исправлений. Один независимый локальный full review D56
+нашёл два P1/два P2; все исправлены, P1 независимо перепроверены узко.
+Это local engineering evidence; non-Codex Go/governed review и human acceptance
+остаются открыты. Реальные аккаунты/клиенты, remote CI и пользовательская польза
+не доказаны. Следующий dependency-ready пакет — D05 + D06. Датированный baseline
+ниже сохранён и не объявляется новой проверкой всего продукта.
 
 Дата среза: **10 октября 2026**. Runtime/test/independent source SHA: `0fbcfd1dde780724ad934aa66825afe17a6efc98`. Документация и Git integration изменены позднее; фактические refs — в [merge receipt](verification/PAI-master-integration-20261010.md).
 

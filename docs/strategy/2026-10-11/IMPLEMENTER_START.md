@@ -1,5 +1,12 @@
 # Первый блок реализации единого входа и управления задачами
 
+Execution overlay, 13 October: D01–D03 and D56 are implemented locally. Final
+local P1 rechecks: `988da0e` and `d231d9a`. Next ready package is D05 + D06;
+read [current handoff](../../CODEX_PROMPT.md) and [backlog receipts](BACKLOG.md).
+The non-Codex Go/governed/human gates remain open; local review is separate.
+The original first-block instructions below are design context, not a request
+to repeat these implementations/tests or activate accounts.
+
 Адресат: следующий кодирующий агент. Исходный исследованный код `23312b8`; предыдущая runtime verification `0fbcfd1`. Это единое задание на начало общего backlog: **D01 → D02 → D03 → D56**, затем dependency-ready D57/D58 и остальные карточки. Уже выполненные блоки не повторять; первым исполняется ближайший незакрытый. Реализация в исследовательской сессии не выполнялась. После назначения этого блока владельцем можно начинать с локального synthetic пути без повторного общего исследования. Аккаунты, платные вызовы, production, services/timers и внешние действия в блок не входят.
 
 ## Результат блока

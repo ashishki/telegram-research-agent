@@ -1,14 +1,15 @@
 # Приоритизированный пул исполнения
 
-62 карточки поверх существующей реализации, включая Nebula и новые возможности Telegram. Это единый backlog: отдельных очередей Telegram/Nebula нет. Источник карточек — [backlog.json](backlog.json). Исследование 11 октября не реализовывало эти задачи; назначение 13 октября разрешает последовательную локальную реализацию. D01–D03 реализованы локально на `08fb32e`, независимый review pending. Остальные карточки proposed; формальная приёмка отдельно. P0 — ближайшие препятствия полезному ежедневному контуру; P1 — развитие и качество выбранных способностей; P2 — последующие/условные улучшения, включая отложенный Canvas. Приоритет не равен обязательности: темы/Secretary имеют явные условия выбора; Mini App исключён владельцем; P2 не вычёркивает обязательные требования полного замысла.
+62 карточки поверх существующей реализации, включая Nebula и новые возможности Telegram. Это единый backlog: отдельных очередей Telegram/Nebula нет. Источник карточек — [backlog.json](backlog.json). Исследование 11 октября не реализовывало эти задачи; назначение 13 октября разрешает последовательную локальную реализацию. D01–D03 и D56 реализованы локально; независимые local read-only reviews и узкие P1 rechecks записаны. Non-Codex Go/governed/human gates остаются открыты. Остальные карточки proposed; формальная приёмка отдельно. P0 — ближайшие препятствия полезному ежедневному контуру; P1 — развитие и качество выбранных способностей; P2 — последующие/условные улучшения, включая отложенный Canvas. Приоритет не равен обязательности: темы/Secretary имеют явные условия выбора; Mini App исключён владельцем; P2 не вычёркивает обязательные требования полного замысла.
 
 ## Исполнение 13 октября 2026
 
 | Пакет | Код и локальные проверки | Deep Review | Следующий блок |
 | --- | --- | --- | --- |
-| D01–D03 | `08fb32e`; 32 новых acceptance + 6 safety holdouts = 38 passed; отдельный regression floor 52 passed | pending; reviewed SHA отсутствует; нужен scoped Go-review либо явно выбранная локальная замена | D56 после review gate |
+| D01–D03 | Original `08fb32e`; final fix `988da0e`; 38 acceptance/safety passed, отдельный floor 52; адресные fix checks в receipt | Local full review `08fb32e`; P1 узко закрыты на `988da0e`; Go/governed pending | D56 реализован следующим пакетом |
+| D56 | Original `8b56d8e`; final fix `d231d9a`; scoped PG/loopback checks, финальные 6 passed /38.03s | Один local full review `8b56d8e`; два P1/два P2 исправлены; P1 узко закрыты на `d231d9a`; Go/governed pending | D05 + D06 |
 
-[Квитанция пакета](../../verification/DAILY-package-01-20261013.md) сохраняет точные argv, результаты и первоначальные ошибки. Реальные подключения и пользовательская польза этим не доказаны. Working branch: `codex/pa-daily-implementation-20261013`.
+[D01–D03 checks](../../verification/DAILY-package-01-20261013.md), [local review](../../verification/DAILY-package-01-local-review-20261013.md), [D56 checks](../../verification/DAILY-package-02-D56-20261013.md) и [local review/P1 closure](../../verification/DAILY-package-02-local-review-20261013.md) сохраняют точные argv, результаты, первоначальные ошибки и SHA/diff provenance. Local independent evidence не выдаётся за разрешённый non-Codex Go route или human acceptance. Перекрывающиеся test counts не суммируются. Реальные подключения и пользовательская польза этим не доказаны. Working branch: `codex/pa-daily-implementation-20261013`.
 
 Типы: **K** код, **C** настройка, **L** реальное подключение, **H** решение/оценка владельца, **R** исследование/измерение. Размер S — один небольшой срез; M — 2–3 среза; L — разбить до начала. Это относительная сложность, не обещанные сроки.
 
@@ -100,7 +101,7 @@ PAI references mean reuse/coverage, never automatic completion or human approval
 <a id="d01"></a>
 ### D01 Однозначный runtime и безопасная проверка готовности
 
-**Engineering:** implemented_locally_review_pending, source `08fb32e`, [evidence](../../verification/DAILY-package-01-20261013.md). Formal/live/operator acceptance не заявлена.
+**Engineering:** local_review_p1_closed_go_route_pending; original/reviewed `08fb32e`, final fix/recheck `988da0e`, [checks](../../verification/DAILY-package-01-20261013.md), [review](../../verification/DAILY-package-01-local-review-20261013.md). Formal/live/operator acceptance не заявлена.
 
 P0 · G0 · K/C · размер M. Зависимости: нет.
 
@@ -119,7 +120,7 @@ P0 · G0 · K/C · размер M. Зависимости: нет.
 <a id="d02"></a>
 ### D02 Статус отмена и возврат к задаче без ID
 
-**Engineering:** implemented_locally_review_pending, source `08fb32e`, [evidence](../../verification/DAILY-package-01-20261013.md). D56 завершит outbound receipts, callback ack и route envelopes.
+**Engineering:** local_review_p1_closed_go_route_pending; original/reviewed `08fb32e`, final fix/recheck `988da0e`, [checks](../../verification/DAILY-package-01-20261013.md), [review](../../verification/DAILY-package-01-local-review-20261013.md). D56 добавил outbound receipts, callback ack и route envelopes; D57 остаётся отдельным progress/native Stop блоком.
 
 P0 · G0 · K · размер M. Зависимости: D01.
 
@@ -138,7 +139,7 @@ P0 · G0 · K · размер M. Зависимости: D01.
 <a id="d03"></a>
 ### D03 Один типизированный диспетчер существующих способностей
 
-**Engineering:** implemented_locally_review_pending, source `08fb32e`, [evidence](../../verification/DAILY-package-01-20261013.md). Это ограниченный deterministic mapping; универсальный planner и устойчивый фокус остаются D04.
+**Engineering:** local_review_p1_closed_go_route_pending; original/reviewed `08fb32e`, final fix/recheck `988da0e`, [checks](../../verification/DAILY-package-01-20261013.md), [review](../../verification/DAILY-package-01-local-review-20261013.md). Это ограниченный deterministic mapping; универсальный planner и устойчивый фокус остаются D04.
 
 P0 · G0 · K · размер M. Зависимости: D01, D02.
 
@@ -1044,6 +1045,8 @@ P2 · G3 · R/K/C/L · размер M. Зависимости: D51.
 
 <a id="d56"></a>
 ### D56 Telegram: точная адресация результатов и работающие controls
+
+**Engineering:** local_review_p1_closed_go_route_pending; original/full reviewed `8b56d8e`, final fix/narrow P1 recheck `d231d9a`. [Checks](../../verification/DAILY-package-02-D56-20261013.md), [frozen review/closure](../../verification/DAILY-package-02-local-review-20261013.md). No live/client/operator acceptance; no DDL/checksum rewrite. Legacy revision-pointer backfill and actual simultaneous DB scheduling unverified. D57/D58 retain their prerequisites.
 
 P0 · G1 · K/C · размер M. Зависимости: D03.
 
