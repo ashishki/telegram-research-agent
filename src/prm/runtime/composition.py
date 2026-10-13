@@ -38,7 +38,8 @@ class AssistantRuntime:
         self.public_web_provider=public_web_provider;self.deep_archive_reader=deep_archive_reader;self.github_context_provider=github_context_provider
         self.ingress=TelegramJobIngress(self.queue,owner_ref=owner_ref,owner_chat_id=owner_chat_id)
         self.ingress.durable_results=True
-        self.ingress.cancel_callback=lambda job_id:self.conversations.cancel(self.owner_chat_id)
+        # Queue fencing stops this job. Cancelling it must preserve unrelated
+        # focus, history and exact action confirmations in the shared dialogue.
 
     def endpoint_for(self,role):
         profiles=getattr(self,'model_profile_registry',None)
@@ -95,6 +96,20 @@ class AssistantRuntime:
             if lease is not None:
                 with self.queue.store.transaction() as tx:self.queue._fenced(tx,lease)
         guard()
+        from .dispatch import parse_request_intent, IntentKind
+        intent = parse_request_intent(request.query, requested_mode=request.mode)
+        control = {IntentKind.JOB_STATUS: 'status', IntentKind.JOB_RESULT: 'result', IntentKind.JOB_CANCEL: 'cancel'}.get(intent.kind)
+        if control is not None:
+            from prm.contracts import AssistantResult
+            reply = self.ingress.resolve_control(control, explicit_ref=intent.target_ref)
+            return AssistantResult(request_ref, 'job_control', 'chat', reply.text,
+                                   payload={'job_ref': reply.job_id, 'telegram_navigation': reply.navigation,
+                                            'source_data_class': 'user_provided'})
+        if intent.kind == IntentKind.UNSUPPORTED:
+            from prm.contracts import AssistantResult
+            return AssistantResult(request_ref, 'unsupported_command', 'chat', 'Эта команда недоступна. Отправь обычный вопрос.')
+        request = replace(request, query=intent.query, mode=intent.mode,
+                          public_web_query=intent.public_web_query or request.public_web_query)
         from .presentation import CONFIRM_LABELS,ACTION_CHECK
         confirm_text=request.query.strip().casefold()
         action_label={label.casefold():code for code,label in CONFIRM_LABELS.items()}
@@ -136,13 +151,15 @@ class AssistantRuntime:
             job=DurableResearchWorker(self).enqueue(plan,idempotency_key='deep_'+request_ref)
             return AssistantResult(request_ref,'queued','research','Исследование сохранено. Проверю выбранные источники и подготовлю ответ с цитатами и границами покрытия.\nСтатус: /status '+job+'\nОтмена: /cancel '+job,
                 payload={'job_ref':job,'source_data_class':'user_provided','source_data_classes':['user_provided']})
-        lowered=request.query.casefold()
-        service=None
-        for name,words in {'actions':('/actpreview','/actedit','/actconfirm','/actreconcile'),
-                           'mail':('/mail','что в почте','что требует ответа в почте'),'calendar':('/calendar','покажи календарь','конфликты расписания'),
-                           'contacts':('/contacts','найди адресата'),'academic':('/academic','покажи академическую сводку'),
-                           'memory':('/memory','/remember','/forget'),'media':('/transcriptedit',),'brief':('/weekly',)}.items():
-            if name in self.services and (request.mode!='chat' or request.query.startswith('/')) and any(lowered.startswith(word) for word in words):service=self.services[name];break
+        name = intent.service
+        service = self.services.get(name)
+        if name is not None and service is None:
+            from prm.contracts import AssistantResult
+            title = {'brief': 'Обзор недели', 'memory': 'Память', 'actions': 'Предпросмотр действия',
+                     'mail': 'Почта', 'calendar': 'Календарь', 'contacts': 'Контакты',
+                     'academic': 'Академические источники', 'media': 'Медиа'}.get(name, 'Способность')
+            return AssistantResult(request_ref, 'capability_unavailable', 'chat', title + ' пока не подключены. Можно задать обычный вопрос.',
+                                   payload={'source_data_class': 'user_provided', 'missing_capability': name})
         if service is not None:
             from prm.contracts import AssistantResult
             value=service(request,request_ref,guard);guard()
@@ -418,6 +435,8 @@ class AssistantRuntime:
 def runtime_from_config(config,*,target,settings):
     """Public configuration contains references; credentials stay in env only."""
     import os
+    from .config import validate_runtime_config
+    validate_runtime_config(config)
     from prm.storage.policy import DurableCapabilityRegistry
     allowed={'owner_ref','owner_chat_id','budget_refs','job_budget','model','model_upper_bound','history_retention_seconds','model_resource_ref','archive_resource_ref',
              'public_web','public_upper_bound','public_search_ref','public_fetch_ref','tariff_version','graph','github','canvas','artifact_root','media_root','local_services','speech','vision','delivery','media_download','model_profiles','quality_profile'}

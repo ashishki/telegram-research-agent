@@ -211,4 +211,28 @@ class JobQueue:
     def status(self,*,owner,job_id):
         with self.store.transaction() as tx:
             _check(tx.conn)
-            return tx.conn.execute('SELECT id,status,generation,attempts,checkpoint,result_ref,error_code FROM pa_jobs.jobs WHERE owner=%s AND id=%s',(owner,job_id)).fetchone()
+            return tx.conn.execute("SELECT id,status,generation,attempts,checkpoint,result_ref,error_code,mode,payload->>'input_ref' AS input_ref FROM pa_jobs.jobs WHERE owner=%s AND id=%s",(owner,job_id)).fetchone()
+
+    def control_candidates(self, *, owner, command, limit=9):
+        if command not in {'status', 'result', 'cancel'} or type(limit) is not int or not 1 <= limit <= 10:
+            raise StorageError('bounded job selection required')
+        with self.store.transaction() as tx:
+            _check(tx.conn)
+            active = ['queued', 'retry_wait', 'leased', 'running', 'awaiting_reconciliation']
+            states = ['completed'] if command == 'result' else active
+            rows = tx.conn.execute('''SELECT j.id,j.kind,j.status,v.payload FROM pa_jobs.jobs j
+                JOIN pa_runtime.object_versions v ON v.owner=j.owner AND v.namespace=j.payload->>'input_namespace'
+                AND v.object_id=j.payload->>'input_ref' AND v.version=(j.payload->>'input_version')::bigint
+                WHERE j.owner=%s AND j.status=ANY(%s) ORDER BY j.available_at DESC,j.id LIMIT %s''',
+                (owner, states, limit)).fetchall()
+            if not rows and command == 'status':
+                rows = tx.conn.execute('''SELECT j.id,j.kind,j.status,v.payload FROM pa_jobs.jobs j
+                    JOIN pa_runtime.object_versions v ON v.owner=j.owner AND v.namespace=j.payload->>'input_namespace'
+                    AND v.object_id=j.payload->>'input_ref' AND v.version=(j.payload->>'input_version')::bigint
+                    WHERE j.owner=%s AND j.available_at>clock_timestamp()-interval '1 day'
+                    ORDER BY j.available_at DESC,j.id LIMIT %s''', (owner, limit)).fetchall()
+            for row in rows:
+                title = row['payload'].get('query', '') if row['kind'] in {'compute.assistant', 'compute.research'} else ''
+                row['title'] = ' '.join(str(title).split())[:80] or 'Задача: ' + row['kind']
+                row.pop('payload')
+            return rows

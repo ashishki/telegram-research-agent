@@ -281,7 +281,9 @@ def run_bot(
                     decisions = issue_private_reply_authorizations(token=token, chat_id=owner_chat_id,
                         actor_id=owner_chat_id, owner_chat_id=owner_chat_id)
                     from .prm_handlers import send_message as send_private_message
+                    from prm.runtime.transports import navigation_markup
                     send_private_message(token, owner_chat_id, reply.text,
+                        reply_markup=navigation_markup(reply.navigation),
                         delivery_authorization=decisions[0] if decisions else None,
                         actor_id=owner_chat_id, owner_chat_id=owner_chat_id)
                 continue

@@ -9,7 +9,8 @@ Group=oc_you
 WorkingDirectory=/srv/openclaw-you/workspace/telegram-research-agent
 EnvironmentFile=/srv/openclaw-you/.env
 Environment=PYTHONPATH=/srv/openclaw-you/workspace/telegram-research-agent/src
-ExecStart=/srv/openclaw-you/venv/bin/python3 -m prm.cli assistant
+# Inactive synthetic template. Real storage/cutover is a separate assignment.
+ExecStart=/srv/openclaw-you/venv/bin/python3 -m prm.cli assistant --mode durable --synthetic-target /srv/openclaw-you/workspace/telegram-research-agent/data/pa-synthetic-target.json --runtime-config /srv/openclaw-you/workspace/telegram-research-agent/data/pa-runtime-config.json --owner-ref ${PAI_OWNER_REF} --owner-chat-id ${PAI_OWNER_CHAT_ID}
 Restart=on-failure
 RestartSec=10
 StandardOutput=journal

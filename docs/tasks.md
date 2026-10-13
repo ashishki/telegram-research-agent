@@ -10,6 +10,21 @@ Historical PRM-SN/RFX/UTD task records are preserved byte-for-byte at `docs/task
 
 ## Research handoff update — 2026-10-11
 
+## Local daily implementation — 2026-10-13
+
+The owner's active assignment lifts the research-only stop for local synthetic
+implementation. Working branch: `codex/pa-daily-implementation-20261013`.
+Package 1 is D01–D03, followed by D56 after the independent package gate.
+Acceptance registered before implementation:
+`PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python -m pytest -q tests/test_daily_entrypoint.py tests/test_daily_controls.py tests/test_daily_dispatch.py`.
+Cases cover explicit startup/offline validation, scoped job resolution and
+cancellation, restart, ambiguous/foreign callbacks, command/phrase equivalence,
+missing capabilities and confirmation/source boundaries. Regression floor is
+the six existing files in IMPLEMENTER_START. Review/receipt and current next
+command belong in CODEX_PROMPT and the daily backlog; formal PA/PAI statuses
+below remain unchanged. No personal connections, paid requests, production or
+external effects are authorized by this assignment.
+
 The next coding agent uses the [daily strategy backlog](strategy/2026-10-11/BACKLOG.md), 62 proposed tasks in one queue. The additional [Nebula audit](strategy/2026-10-11/UTD_NEBULA.md) defines D51–D54 plus conditional D55. Owner will request the API key; Canvas remains deferred. Telegram D56–D62 and amendments to existing shared cards are integrated into this backlog: [design evidence](strategy/2026-10-11/TELEGRAM.md), one [implementer handoff](strategy/2026-10-11/IMPLEMENTER_START.md). D56 follows D01–D03; D57/D58 enter shared D27/D40 acceptance. Topics/Secretary have conditional gates, not a second roadmap. Mini App is excluded by the owner; D25 remains an ordinary private reader. This update changes no formal task statuses and claims no implementation/provider acceptance. Execution is in bounded packages with one Deep Review between packages, fixes, and narrow critical-finding rechecks.
 
 ## Current engineering evidence — 2026-10-10

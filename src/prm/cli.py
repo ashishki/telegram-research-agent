@@ -16,10 +16,17 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="prm", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
     assistant_command = sub.add_parser("assistant", help="Run the private Telegram PRM assistant.")
+    assistant_command.add_argument('--mode', choices=('durable', 'compatibility'), default='durable')
     assistant_command.add_argument('--synthetic-target')
     assistant_command.add_argument('--owner-ref')
     assistant_command.add_argument('--owner-chat-id')
     assistant_command.add_argument('--runtime-config')
+    check = sub.add_parser('runtime-check', help='Offline config validation; no DB, credentials or startup.')
+    check.add_argument('--mode', choices=('durable', 'compatibility'), default='durable')
+    check.add_argument('--synthetic-target')
+    check.add_argument('--runtime-config')
+    check.add_argument('--owner-ref')
+    check.add_argument('--owner-chat-id')
     for name in ('runtime-install','runtime-status','runtime-tick','runtime-research-worker','runtime-backup','runtime-drain','runtime-kill','runtime-domain-export','runtime-domain-import','runtime-state-manifest','runtime-restore'):
         command=sub.add_parser(name)
         command.add_argument('--synthetic-target',required=True)
@@ -139,6 +146,38 @@ def _explicit_job_ingress(args):
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.command in {'assistant', 'runtime-check'}:
+        import json
+        from dataclasses import asdict, replace
+        from prm.runtime.config import check_runtime_configuration, load_public_json
+        from prm.storage.postgres import StorageError
+        config = target = None
+        file_errors = []
+        for name, limit in (('runtime_config', 8192), ('synthetic_target', 4096)):
+            path = getattr(args, name)
+            if path is not None:
+                try:
+                    value = load_public_json(path, limit=limit)
+                    if name == 'runtime_config': config = value
+                    else: target = value
+                except StorageError: file_errors.append('invalid_' + name + '_file')
+        summary = check_runtime_configuration(mode=args.mode, config=config, target=target,
+                                              owner_ref=args.owner_ref, owner_chat_id=args.owner_chat_id)
+        if file_errors: summary = replace(summary, valid=False, errors=summary.errors + tuple(file_errors))
+        if args.command == 'assistant' and args.mode == 'durable' and (not args.owner_ref or not args.owner_chat_id):
+            summary = replace(summary, valid=False, missing_prerequisites=summary.missing_prerequisites + ('complete_owner_tuple',))
+        if args.command == 'runtime-check' or not summary.valid:
+            print(json.dumps(asdict(summary), ensure_ascii=False))
+            return 0 if summary.valid else 2
+        settings = load_settings()
+        if args.mode == 'compatibility':
+            run_bot(settings, runtime_mode=BOT_RUNTIME_PRM_ASSISTANT)
+        else:
+            from prm.storage.postgres import SyntheticTarget
+            from prm.runtime.composition import runtime_from_config
+            root = runtime_from_config(config, target=SyntheticTarget.from_mapping(target), settings=settings)
+            run_bot(settings, runtime_mode=BOT_RUNTIME_PRM_ASSISTANT, job_ingress=root.ingress)
+        return 0
     if args.command.startswith('runtime-'):
         import json
         from pathlib import Path
@@ -209,25 +248,6 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(ingress.control(args.command[4:], args.job_id).text)
         return 0
     settings = load_settings()
-    if args.command == "assistant":
-        explicit = (args.synthetic_target, args.owner_ref, args.owner_chat_id)
-        if any(explicit) and not all(explicit):
-            raise ValueError('durable assistant requires target and complete owner tuple')
-        if all(explicit):
-            ingress=_explicit_job_ingress(args)
-            if args.runtime_config:
-                import json
-                from pathlib import Path
-                from prm.runtime.composition import runtime_from_config
-                path=Path(args.runtime_config)
-                if path.stat().st_size>8192:raise ValueError('runtime config exceeds bound')
-                root=runtime_from_config(json.loads(path.read_text()),target=ingress.queue.store.target,settings=settings)
-                if (root.owner_ref,root.owner_chat_id)!=(args.owner_ref,args.owner_chat_id):raise ValueError('runtime owner differs')
-                ingress=root.ingress
-            run_bot(settings, runtime_mode=BOT_RUNTIME_PRM_ASSISTANT, job_ingress=ingress)
-        else:
-            run_bot(settings, runtime_mode=BOT_RUNTIME_PRM_ASSISTANT)
-        return 0
     if args.command == "editorial-brief":
         return _run_editorial_brief(args, settings)
     assistant = PersonalResearchAssistant(settings=settings)

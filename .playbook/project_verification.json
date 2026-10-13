@@ -2,6 +2,13 @@
   "schema_version": "playbook.project_verification.v1",
   "checks": [
     {
+      "id": "daily_local_entry_controls",
+      "argv": ["{python}", "tools/run_daily_acceptance.py"],
+      "required": true,
+      "expected_exit_code": 0,
+      "timeout_seconds": 600
+    },
+    {
       "id": "playbook_contract",
       "argv": [
         "{python}",

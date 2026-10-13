@@ -14,6 +14,26 @@ The CLI contains assistant/job-status/job-cancel/job-result/job-worker and runti
 
 ## Target and configuration
 
+D01 (13 October): `assistant` now defaults explicitly to `--mode durable` and
+requires target, runtime config and the complete matching owner tuple before
+loading settings. The previous PRM bot route is selected only by
+`assistant --mode compatibility`; it refuses durable arguments. This is the
+existing PRM compatibility path, separate from the legacy report runtime.
+
+```bash
+PYTHONPATH=src .venv-pai/bin/python -m prm.cli runtime-check --help
+PYTHONPATH=src .venv-pai/bin/python -m prm.cli runtime-check --mode compatibility
+```
+
+For durable checks pass `--synthetic-target PUBLIC_TARGET_JSON` and
+`--runtime-config PUBLIC_RUNTIME_JSON`, optionally the owner tuple to compare.
+The checker reads only those bounded files. It performs no environment/key
+lookup, DB connection/migration or adapter/service startup. Its `valid` field
+reports offline configuration validation; observed process/schema/grants stay
+unknown. It does not establish account access, credential binding, egress
+permission or daily readiness. The systemd file is an inactive synthetic
+template with explicit durable arguments; it was not installed or enabled.
+
 Current durable adapter accepts only an identified SyntheticTarget. Its file has backend/host/port/database/user/instance_id/target, exact local pa-synthetic marker and nonprivileged pa_test roles. Reject ambient PG variables, default port5432 and a live database. Test fixture helper creates these values; never fill a real target with fake marker/roles to bypass the guard.
 
 runtime_from_config requires owner_ref/owner_chat_id/budget_refs/job_budget. Models/transports/sources use declared references and task-specific credential environment names, not raw credentials in JSON. Reader/media roots and selected accounts/providers are explicit. Missing provider/credential is unavailable, not consent or fallback to another private provider.
@@ -36,6 +56,15 @@ Watch preview includes source/cadence/quiet/cap/timezone/expiry. Confirmed inten
 Mail/calendar/Telegram writes require exact current preview/owner/version/expiry/one-use confirmation and separate execute/reconcile grants. 202 alone is unknown; SentItems is not recipient delivery. Multipart sends and reconcile share exact stored payloads. Do not resend an ambiguous aggregate or modify its digest to make reconciliation pass.
 
 ## Stop and recovery
+
+D02/D03: text “Что с задачей?”, “Стоп”, “Останови обзор”, “Верни результат”
+uses the same job controls as `/status`, `/cancel`, `/result`. A reply selects
+the exact bound input/message; several candidates require a short named choice
+with owner-bound opaque expiring buttons. Unknown replies do not guess a job.
+The queue fence cancels one computation and preserves unrelated dialogue.
+Started effects remain available for reconciliation. Returning a result still
+requires its separate delivery scope. Fixed phrase coverage is limited; D04
+adds the planner/focus, D56 completes outbound receipt/reply routing.
 
 Available primitives: runtime-drain stops new intake, runtime-kill disables egress, backup/restore and domain export/import preserve selected state/manifests/unknown/consumed fences. They require the actual explicit arguments and scopes. Missing/unknown provider outcome is preserved; stale snapshot cannot re-enable an effect. RPO/RTO/production rollback owner remain unmeasured.
 

@@ -188,10 +188,11 @@ def test_cli_explicit_durable_assistant_composition(sandbox, tmp_path, monkeypat
     observed = []
     monkeypatch.setattr(cli, 'load_settings', lambda: SimpleNamespace(db_path=':memory:'))
     monkeypatch.setattr(cli, 'run_bot', lambda settings, **kwargs: observed.append(kwargs))
-    assert cli.main(['assistant', '--synthetic-target', str(config), '--owner-ref', 'owner_cli', '--owner-chat-id', '42']) == 0
-    assert isinstance(observed[0]['job_ingress'], TelegramJobIngress)
-    with pytest.raises(ValueError, match='complete owner'):
-        cli.main(['assistant', '--synthetic-target', str(config)])
+    # D01 forbids the former partial-config durable fallback. The complete
+    # composition is covered by test_daily_entrypoint with the same PG fixture.
+    assert cli.main(['assistant', '--synthetic-target', str(config), '--owner-ref', 'owner_cli', '--owner-chat-id', '42']) == 2
+    assert cli.main(['assistant', '--synthetic-target', str(config)]) == 2
+    assert not observed
 
 
 def test_voice_transcript_and_raw_voice_are_queued_without_transcription(sandbox):

@@ -51,7 +51,21 @@ class BoundedTelegramSender:
 
 def navigation_markup(value):
     """Only bounded text keyboards; callbacks/URLs cannot be smuggled into metadata."""
-    if not isinstance(value,dict) or value.get('kind')!='reply_keyboard':return None
+    if not isinstance(value,dict):return None
+    if value.get('kind') == 'inline_keyboard':
+        import re
+        if set(value) != {'kind', 'inline_keyboard'}: raise StorageError('unknown inline control metadata')
+        rows = value['inline_keyboard']
+        if not isinstance(rows, list) or not 1 <= len(rows) <= 8: raise StorageError('bounded inline controls required')
+        for row in rows:
+            if not isinstance(row, list) or len(row) != 1: raise StorageError('bounded inline control row required')
+            button = row[0]
+            if (not isinstance(button, dict) or set(button) != {'text', 'callback_data'}
+                or not isinstance(button['text'], str) or not 1 <= len(button['text']) <= 90
+                or not isinstance(button['callback_data'], str) or not re.fullmatch(r'paic:[a-f0-9]{32}', button['callback_data'])):
+                raise StorageError('opaque job control required')
+        return {'inline_keyboard': rows}
+    if value.get('kind')!='reply_keyboard':return None
     if value.get('button_text')=='Показать полный бриф' and value.get('current_visible_brief_only') is True:
         return {'keyboard':[[{'text':'Показать полный бриф'}]],'resize_keyboard':True,'one_time_keyboard':True}
     if set(value)!={'kind','keyboard','resize_keyboard','one_time_keyboard'}:raise StorageError('unknown Telegram control metadata')

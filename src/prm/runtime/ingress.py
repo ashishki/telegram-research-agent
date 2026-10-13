@@ -31,6 +31,10 @@ class TelegramJobIngress:
         self.delivery_executor = delivery_executor
         self.cancel_callback=None
         self.durable_results=False;self.delivery_upper_bound=None;self.destination_ref=None
+        from prm.telegram_contracts import TelegramDestination
+        from prm.storage.telegram import TelegramBindings
+        self.telegram_destination = TelegramDestination(chat_id=owner_chat_id)
+        self.bindings = TelegramBindings(queue, owner=owner_ref, destination=self.telegram_destination)
 
     def receive(self, update: dict) -> IntakeReply | None:
         if not isinstance(update, dict) or type(update.get('update_id')) is not int or update['update_id'] < 0:
@@ -43,7 +47,13 @@ class TelegramJobIngress:
                 or chat.get('type') != 'private'):
             return None
         text = str(callback.get('data', '')) if isinstance(callback, dict) else str(message.get('text', '')).strip()
+        if message.get('message_thread_id') is not None:
+            return IntakeReply('Управление в этой теме пока недоступно.')
         if isinstance(callback, dict):
+            if text.startswith('paic:'):
+                selected = self.bindings.resolve_control(text, destination=self.telegram_destination)
+                if selected is None: return IntakeReply('Эта кнопка устарела или недоступна.')
+                return self.control(*selected)
             parts = text.split(':')
             if len(parts) != 3 or parts[0] != 'pai' or parts[1] not in {'status', 'cancel', 'result'}:
                 return IntakeReply('Это действие недоступно; подтверждение не использовано.')
@@ -60,10 +70,12 @@ class TelegramJobIngress:
             return IntakeReply(self.delivery_executor.describe(owner=self.owner_ref, delivery_id=parts[1] if len(parts) == 2 else ''))
         if parts and parts[0].startswith('/watch') and self.watch_scheduler is not None:
             return self.watch_control(parts[0], parts[1] if len(parts) == 2 else '')
-        if parts and parts[0] in {'/status', '/cancel', '/result'}:
-            if len(parts) != 2:
-                return IntakeReply('Укажи ID задачи после команды.')
-            return self.control(parts[0][1:], parts[1])
+        from .dispatch import parse_request_intent, IntentKind
+        intent = parse_request_intent(text)
+        control_kinds = {IntentKind.JOB_STATUS: 'status', IntentKind.JOB_CANCEL: 'cancel', IntentKind.JOB_RESULT: 'result'}
+        if intent.kind in control_kinds and not message.get('voice') and not message.get('voice_transcript'):
+            return self.resolve_control(control_kinds[intent.kind], explicit_ref=intent.target_ref,
+                                        reply_message_id=(message.get('reply_to_message') or {}).get('message_id'))
         voice = message.get('voice')
         body=None
         transcript = message.get('voice_transcript') or (voice or {}).get('transcript')
@@ -84,32 +96,28 @@ class TelegramJobIngress:
             body={'query':str(message.get('caption') or 'Ответь по содержимому файла.'),'input_kind':'text','mode':'auto',
                 'media_input':{'file_ref':selected['file_id'],'kind':kind,'mime_type':mime,'question':str(message.get('caption') or 'Ответь по содержимому файла.')}}
         elif text:
-            mode = 'auto'
-            if text.startswith('/'):
-                command, _, query = text.partition(' ')
-                if command in {'/memory','/memoryedit','/memorysearch','/memoryexport','/remember','/memoryconfirm','/forget','/actpreview','/actedit','/actconfirm','/actreconcile','/mail','/mailread','/calendar','/contacts','/academic','/academicdone','/academicstage','/academicwatch','/weekly','/transcriptedit','/deep'}:
-                    query=text;mode='auto'
-                elif command=='/web' and query.strip():
-                    body={'query':'Проверь свежий факт: '+query.strip(),'public_web_query':query.strip(),'input_kind':'text','mode':'research'}
-                    text=query.strip();mode='research'
-                elif command in {'/new'}:
-                    query=command;mode='chat'
-                elif command not in {'/auto', '/chat', '/research', '/brief'} or not query.strip():
-                    return IntakeReply('Отправь вопрос или /status, /result, /cancel с ID задачи.')
-                else:mode=command[1:]
-                text = query.strip()
-            if body is None:body = {'query': text, 'input_kind': 'text', 'mode': mode}
+            if intent.kind == IntentKind.UNSUPPORTED:
+                return IntakeReply('Эта команда недоступна. Отправь вопрос или попроси статус, результат, отмену задачи.')
+            body = {'query': intent.query, 'input_kind': 'text', 'mode': intent.mode}
+            if intent.public_web_query: body['public_web_query'] = intent.public_web_query
+            body['original_text'] = text
         else:
             return None
         if len(body.get('query', '').encode('utf-8')) > 16000:
             raise StorageError('request text exceeds its bound')
         body.update({'chat_id': self.owner_chat_id, 'actor_id': self.owner_chat_id,
                      'owner_chat_id': self.owner_chat_id, 'schema_version': 1})
+        for field, value in (('message_id', message.get('message_id')),
+                             ('reply_message_id', (message.get('reply_to_message') or {}).get('message_id'))):
+            if value is not None:
+                if type(value) is not int or value <= 0: raise StorageError('typed positive Telegram message reference required')
+                body[field] = value
         key = 'telegram_' + str(update['update_id'])
         request_ref = 'request_' + hashlib.sha256((self.owner_ref + ':' + key).encode()).hexdigest()[:32]
         with self.queue.store.transaction() as tx:
             # Inbox identity and queue admission share the same commit. A crash
             # before acknowledgement simply replays this exact immutable input.
+            self.bindings._lineage_lock(tx)
             lock = int.from_bytes(hashlib.sha256((self.owner_ref + key).encode()).digest()[:8], 'big') % (2**63)
             tx.conn.execute('SELECT pg_advisory_xact_lock(%s)', (lock,))
             item = tx.get(self.owner_ref, 'conversation', request_ref, version=1)
@@ -122,7 +130,25 @@ class TelegramJobIngress:
             now = tx.conn.execute('SELECT clock_timestamp() AS now').fetchone()['now']
             job = self.queue.enqueue_in(tx, owner=self.owner_ref, idempotency_key=key, payload=payload,
                                        deadline=now + timedelta(minutes=15), kind='compute.assistant')
+            message_id = message.get('message_id')
+            if message_id is not None:
+                from prm.telegram_contracts import TelegramMessageBinding
+                self.bindings.bind_message_in(tx, TelegramMessageBinding(self.owner_ref, self.telegram_destination, message_id, job))
         return IntakeReply(f'Запрос сохранён. Задача {job}. /status {job}', request_ref, job)
+
+    def resolve_control(self, command, *, explicit_ref=None, reply_message_id=None):
+        from .job_controls import resolve_job_target
+        target = resolve_job_target(self.queue, self.bindings, owner=self.owner_ref, destination=self.telegram_destination,
+                                    command=command, explicit_ref=explicit_ref, reply_message_id=reply_message_id)
+        if target.job_ref is not None: return self.control(command, target.job_ref)
+        if target.reason == 'unknown_reply': return IntakeReply('Задача для этого сообщения не найдена. Выбери её явно.')
+        if not target.candidates: return IntakeReply('Нет подходящей задачи. Можно отправить новый запрос.')
+        rows = [[{'text': candidate.title, 'callback_data': self.bindings.issue_control(command=command, job_id=candidate.job_ref)}]
+                for candidate in target.candidates]
+        labels = '\n'.join(f'{i}. {candidate.title}' for i, candidate in enumerate(target.candidates, 1))
+        suffix = '\nЕсть и другие задачи; можно ответить на их карточку.' if target.has_more else ''
+        return IntakeReply('Выбери задачу:\n' + labels + suffix,
+                           navigation={'kind': 'inline_keyboard', 'inline_keyboard': rows})
 
     def watch_control(self, command, argument):
         scheduler = self.watch_scheduler
@@ -199,6 +225,8 @@ class TelegramJobIngress:
         if state is None:
             return IntakeReply('Задача не найдена.')
         if command == 'cancel':
+            if state.get('mode') == 'effect' and state['attempts'] > 0:
+                return IntakeReply('Внешний эффект уже мог начаться. Его результат требует отдельной сверки; повторная отправка не выполнена.', job_id=job_id)
             cancelled = self.queue.cancel(owner=self.owner_ref, job_id=job_id)
             current=self.queue.status(owner=self.owner_ref,job_id=job_id)
             if cancelled and current['attempts']>0 and self.cancel_callback is not None:self.cancel_callback(job_id)
@@ -217,7 +245,11 @@ class TelegramJobIngress:
             if result is None:
                 raise StorageError('completed result unavailable')
             return IntakeReply(str(result.payload.get('text', 'Результат не содержит текста.')), result.payload.get('request_ref'), job_id)
-        return IntakeReply(f"{job_id}: {state['status']}; попытка {state['attempts']}.", job_id=job_id)
+        from .job_controls import progress_view
+        view = progress_view(state)
+        extra = ('\n' + view.checkpoint) if view.checkpoint else ''
+        if view.awaiting_reconciliation: extra += '\nВозможный внешний результат неизвестен; нужна сверка.'
+        return IntakeReply(f"{job_id}: {state['status']}; попытка {state['attempts']}." + extra, job_id=job_id)
 
 
 class RequestConversations:
