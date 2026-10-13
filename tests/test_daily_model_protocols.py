@@ -203,3 +203,26 @@ def test_sse_parser_bounds_wire_event_and_tool_authority():
     empty={'id':'fixture_stream','model':'fixture_model','choices':[{'index':0,'delta':{},'finish_reason':None}]}
     repeated=('data: '+json.dumps(empty)+'\n\n').encode()*2049
     with pytest.raises(ModelResponseInvalid):adapter._stream(BytesIO(repeated),lambda:None,None)
+
+
+@pytest.mark.parametrize('trigger',['cancel','deadline','guard'])
+def test_terminal_sse_read_rechecks_before_acceptance(trigger):
+    from io import BytesIO
+    from prm.runtime.model_errors import ModelStreamInterrupted
+    state={'changed':False}
+    base={'id':'fixture_stream','model':'fixture_model'}
+    chunks=[{**base,'choices':[{'index':0,'delta':{'content':'Synthetic result'},'finish_reason':'stop'}]},
+        {**base,'choices':[],'usage':{'prompt_tokens':1,'completion_tokens':1}}]
+    wire=''.join('data: '+json.dumps(c)+'\n\n' for c in chunks)+'data: [DONE]\n\n'
+    class Reader(BytesIO):
+        def readline(self,*args):
+            line=super().readline(*args)
+            if self.tell()==len(wire.encode()):state['changed']=True
+            return line
+    def guard():
+        if state['changed']:
+            if trigger=='guard':raise StorageError('synthetic source changed')
+            raise ModelStreamInterrupted(trigger)
+    endpoint=ModelEndpoint('provider_openai','connection_fixture','http://127.0.0.1:1/chat/completions','fixture_model','',synthetic_http=True,capabilities=ChatCapabilities(streaming=True))
+    with pytest.raises((ModelStreamInterrupted,StorageError)):
+        ChatCompletionsTransport(endpoint)._stream(Reader(wire.encode()),guard,None)

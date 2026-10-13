@@ -100,13 +100,23 @@ def validate_daily_manifest(value):
     if not isinstance(cases,list) or not 20<=len(cases)<=120:raise StorageError('first twenty native tasks required')
     ids=set();families={};sources={};groups={key:0 for key in DAILY_GROUPS}
     for case in cases:
-        fields={'case_id','group','language','split','scenario_family','driver','turns','sources','expected','must_not_effects','binding_contract'}
+        fields={'case_id','group','language','split','scenario_family','driver','turns','sources','expected','must_not_effects','binding_contract','receipt_contract'}
         if not isinstance(case,dict) or set(case)!=fields:raise StorageError('complete frozen daily case required')
         ref=case['case_id']
         if not isinstance(ref,str) or not re.fullmatch(r'DAILY-[0-9]{3}',ref) or ref in ids:raise StorageError('unique daily case identity required')
         ids.add(ref)
         if case['group'] not in groups or case['language'] not in {'ru','en'} or case['split'] not in {'train','dev','holdout'}:
             raise StorageError('typed daily group/language/split required')
+        contract=case['receipt_contract']
+        contract_fields={'required_tool','object_version','requested_model','observed_model','model_input_digests','turn_input_digests','view_kind'}
+        if not isinstance(contract,dict) or set(contract)!=contract_fields or contract['object_version']!=1 or type(contract['object_version'])is not int or contract['requested_model']!='fixture_model' or contract['observed_model']!='fixture_model' or contract['view_kind'] not in {'assistant_turns','subsystem_events'}:
+            raise StorageError('frozen native receipt contract required')
+        for key in ('model_input_digests','turn_input_digests'):
+            if not isinstance(contract[key],list) or len(contract[key])>20 or any(not isinstance(x,str) or not re.fullmatch('[a-f0-9]{64}',x) for x in contract[key]):raise StorageError('frozen input fingerprints required')
+        if contract['turn_input_digests']!=[hashlib.sha256(t.encode()).hexdigest() for t in case['turns']]:raise StorageError('frozen turn input changed')
+        driver=case['driver']
+        tool='model.generate' if driver.startswith(('chat_','dialogue_')) else 'archive.synthesize' if driver.startswith('archive_') else 'brief.build' if driver.startswith('brief_') else 'control.resolve' if driver.startswith('control_') else 'watch.lifecycle' if driver=='watch_pause' else 'action.dispatch' if driver=='action_unknown_repeat' else None
+        if contract['required_tool']!=tool or tool is None:raise StorageError('required driver tool contract changed')
         groups[case['group']]+=1
         if not isinstance(case['scenario_family'],str) or not case['scenario_family'] or not isinstance(case['driver'],str):raise StorageError('scenario and driver required')
         family=case['scenario_family']
@@ -139,7 +149,7 @@ def validate_daily_manifest(value):
 def load_daily_manifest(path):return validate_daily_manifest(_daily_json(path))
 
 
-def make_daily_trace(manifest,case,*,turns,objects,status,metrics,effects,duration_ms,cost_microdollars=None,errors=(),tool_results=(),model_observations=()):
+def make_daily_trace(manifest,case,*,turns,objects,status,metrics,effects,duration_ms,cost_microdollars=None,errors=(),tool_results=(),model_observations=(),turn_bindings=()):
     """Projection only: publish declared synthetic text, never arbitrary payloads."""
     if case not in manifest['cases']:raise StorageError('case is not bound to manifest')
     allowed=set(manifest['public_visible_texts'])|set(case['turns'])|{s['text'] for s in case['sources']}
@@ -153,9 +163,10 @@ def make_daily_trace(manifest,case,*,turns,objects,status,metrics,effects,durati
     value={'schema_version':'assistant.daily_trace.v1','evidence_layer':'local_synthetic','provider_execution':False,
         'human_acceptance':False,'case_id':case['case_id'],'manifest_digest':daily_digest(manifest),'case_digest':daily_digest(case),
         'source_snapshots':[{k:s[k] for k in ('source_id','sha256')} for s in case['sources']],
-        'visible_turns':visible,'objects':objects,'outcome':{'status':status,'metrics':metrics},'effects':effects,
+        'visible_turns':visible,'objects':[dict(o) for o in objects],'outcome':{'status':status,'metrics':metrics},'effects':effects,
         'duration_ms':duration_ms,'cost_microdollars':cost_microdollars,'errors':list(errors),
-        'tool_results':list(tool_results),'model_observations':list(model_observations)}
+        'tool_results':list(tool_results),'model_observations':list(model_observations),
+        'turn_bindings':[dict(b) for b in turn_bindings],'view_kind':case['receipt_contract']['view_kind']}
     verify_daily_trace(manifest,value)
     return value
 
@@ -163,11 +174,11 @@ def make_daily_trace(manifest,case,*,turns,objects,status,metrics,effects,durati
 def verify_daily_trace(manifest,trace):
     validate_daily_manifest(manifest)
     fields={'schema_version','evidence_layer','provider_execution','human_acceptance','case_id','manifest_digest','case_digest',
-        'source_snapshots','visible_turns','objects','outcome','effects','duration_ms','cost_microdollars','errors','tool_results','model_observations'}
+        'source_snapshots','visible_turns','objects','outcome','effects','duration_ms','cost_microdollars','errors','tool_results','model_observations','turn_bindings','view_kind'}
     if not isinstance(trace,dict) or set(trace)!=fields or trace['schema_version']!='assistant.daily_trace.v1' or trace['evidence_layer']!='local_synthetic' or trace['provider_execution'] is not False or trace['human_acceptance'] is not False:
         raise StorageError('complete local synthetic trace required')
     case=next((c for c in manifest['cases'] if c['case_id']==trace['case_id']),None)
-    if not case or trace['manifest_digest']!=daily_digest(manifest) or trace['case_digest']!=daily_digest(case):raise StorageError('trace manifest/case binding changed')
+    if not case or trace['view_kind']!=case['receipt_contract']['view_kind'] or trace['manifest_digest']!=daily_digest(manifest) or trace['case_digest']!=daily_digest(case):raise StorageError('trace manifest/case binding changed')
     if trace['source_snapshots']!=[{k:s[k] for k in ('source_id','sha256')} for s in case['sources']]:raise StorageError('trace source evidence missing or changed')
     turns=trace['visible_turns'];users=[];allowed=set(manifest['public_visible_texts'])|set(case['turns'])|{s['text'] for s in case['sources']}
     if not isinstance(turns,list) or not 2<=len(turns)<=40:raise StorageError('visible trace turns missing')
@@ -181,10 +192,14 @@ def verify_daily_trace(manifest,trace):
     objects=trace['objects']
     if not isinstance(objects,list) or not 1<=len(objects)<=64:raise StorageError('typed object evidence missing')
     for item in objects:
-        if (not isinstance(item,dict) or set(item)!={'kind','ref_digest','version','digest'} or item['kind'] not in {'result','source','job','brief','action_receipt','subscription'}
-            or type(item['version'])is not int or not 1<=item['version']<=1000000
+        if (not isinstance(item,dict) or set(item)!={'kind','ref_digest','version','digest','turn_index','input_sha256','status'} or item['kind'] not in {'result','source','job','brief','action_receipt','action_proposal','subscription'}
+            or type(item['version'])is not int or item['version']!=case['receipt_contract']['object_version']
+            or type(item['turn_index'])is not int or not 1<=item['turn_index']<=len(case['turns'])
+            or item['input_sha256']!=case['receipt_contract']['turn_input_digests'][item['turn_index']-1]
+            or not isinstance(item['status'],str) or not re.fullmatch('[a-z_]{1,80}',item['status'])
             or any(not isinstance(item[k],str) or not re.fullmatch('[a-f0-9]{64}',item[k]) for k in ('ref_digest','digest'))):raise StorageError('invalid object/version evidence')
     required_kind={'immutable_result':'result','source_snapshot':'source','durable_control':'job','exact_action_receipt':'action_receipt'}[case['binding_contract']]
+    if case['driver']=='watch_pause':required_kind='subscription'
     if not any(o['kind']==required_kind for o in objects):raise StorageError('intended object binding missing')
     outcome=trace['outcome']
     if not isinstance(outcome,dict) or set(outcome)!={'status','metrics'} or outcome['status'] not in SAFE_STATUSES or not isinstance(outcome['metrics'],dict) or set(outcome['metrics'])-TRACE_METRICS:raise StorageError('typed actual task outcome required')
@@ -196,11 +211,19 @@ def verify_daily_trace(manifest,trace):
     if not isinstance(trace['errors'],list) or len(trace['errors'])>20 or any(e not in {'provider_rejected','invalid_provider_response','unknown_outcome','scope_denied','source_outage','cancelled'} for e in trace['errors']):raise StorageError('bounded typed errors required')
     tools=trace['tool_results'];models=trace['model_observations']
     if not isinstance(tools,list) or not 1<=len(tools)<=32:raise StorageError('typed tool results missing')
+    if len(tools)!=1 or not isinstance(tools[0],dict):raise StorageError('typed required tool receipt missing')
+    if tools[0].get('tool')!=case['receipt_contract']['required_tool'] or tools[0].get('status')!=outcome['status']:
+        raise StorageError('required tool/outcome relationship changed')
+    expected_calls=outcome['metrics'].get('model_calls',0) if tools[0]['tool']=='model.generate' else outcome['metrics'].get('write_calls',0) if tools[0]['tool']=='action.dispatch' else 1
+    if tools[0].get('calls')!=expected_calls:raise StorageError('tool call evidence conflicts with observed effects')
     for tool in tools:
         if not isinstance(tool,dict) or set(tool)!={'tool','status','calls'} or tool['tool'] not in {'model.generate','archive.synthesize','brief.build','control.resolve','watch.lifecycle','action.dispatch'} or tool['status'] not in SAFE_STATUSES or type(tool['calls'])is not int or not 0<=tool['calls']<=1000:raise StorageError('typed bounded tool result required')
     if not isinstance(models,list) or len(models)!=outcome['metrics'].get('model_calls',0):raise StorageError('actual model observations missing')
+    if any(not isinstance(m,dict) for m in models):raise StorageError('typed model observation required')
+    if sorted(m.get('input_digest','') for m in models)!=case['receipt_contract']['model_input_digests']:raise StorageError('observed model input is not the frozen task')
     for model in models:
         if not isinstance(model,dict) or set(model)!={'requested_model','observed_model','finish_reason','protocol','usage','input_digest','duration_ms','provider_outcome'} or model['provider_outcome']!='accepted' or model['protocol']!='chat_completions' or model['finish_reason']!='stop':raise StorageError('complete observed model identity/stop/usage required')
+        if model['requested_model']!=case['receipt_contract']['requested_model'] or model['observed_model']!=case['receipt_contract']['observed_model']:raise StorageError('observed model identity changed')
         for key in ('requested_model','observed_model'):
             if not isinstance(model[key],str) or not re.fullmatch('[A-Za-z0-9_.:/-]{1,128}',model[key]):raise StorageError('actual requested/observed model required')
         if not isinstance(model['input_digest'],str) or not re.fullmatch('[a-f0-9]{64}',model['input_digest']) or type(model['duration_ms'])is not int or model['duration_ms']<0:raise StorageError('bounded model digest/latency required')
@@ -210,6 +233,20 @@ def verify_daily_trace(manifest,trace):
             if number is not None and (type(number)is not int or not 0<=number<=1000000):raise StorageError('invalid observed model usage')
         if usage['input'] is None or usage['output'] is None or usage['cached_input'] is not None and usage['cached_input']>usage['input'] or usage['reasoning'] is not None and usage['reasoning']>usage['output']:
             raise StorageError('accepted usage subsets inconsistent')
+    bindings=trace['turn_bindings']
+    if not isinstance(bindings,list) or len(bindings)!=len(case['turns']):raise StorageError('per-turn input/result bindings missing')
+    if len(objects)!=len(bindings):raise StorageError('unrelated extra object evidence')
+    for index,binding in enumerate(bindings,1):
+        required={'turn_index','input_sha256','kind','ref_digest','version','digest','status'}
+        if not isinstance(binding,dict) or set(binding)!=required or binding['turn_index']!=index or type(binding['turn_index'])is not int or binding['input_sha256']!=case['receipt_contract']['turn_input_digests'][index-1] or binding not in objects:
+            raise StorageError('input/result/turn relationship changed')
+        expected_kind='action_proposal' if case['driver']=='action_unknown_repeat' and index==1 else required_kind
+        if binding['kind']!=expected_kind:raise StorageError('intended per-turn result kind changed')
+    if bindings[-1]['status']!=outcome['status']:raise StorageError('final bound result/status differs')
+    if required_kind=='source':
+        source_objects=[o for o in objects if o['kind']=='source']
+        for source in case['sources']:
+            if not any(o['ref_digest']==hashlib.sha256(source['source_id'].encode()).hexdigest() and o['digest']==source['sha256'] for o in source_objects):raise StorageError('intended source ref/digest/version not bound')
     _public_strings(trace);daily_digest(trace)
     expected=case['expected']
     passed=outcome['status']==expected['status'] and all(type(outcome['metrics'].get(k))is type(v) and outcome['metrics'].get(k)==v for k,v in expected['metrics'].items()) and not any(effects.values())

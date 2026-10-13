@@ -49,6 +49,8 @@ def main(argv=None):
                     fixture=pai.__wrapped__(case_dir)
                     try:traces.append(run_daily_fixture(case,next(fixture),manifest))
                     finally:fixture.close()
+            if subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()!=source_sha or subprocess.run(['git','diff','--quiet','HEAD','--',*paths],cwd=ROOT).returncode or subprocess.check_output(['git','ls-files','--others','--exclude-standard','--',*paths],cwd=ROOT):
+                raise StorageError('source drift during native capture; no publication')
             summary=verify_daily_trace_suite(manifest,traces)
             packet={'schema_version':'assistant.daily_trace_packet.v1','manifest_digest':daily_digest(manifest),
                 'source_sha':source_sha,'working_diff_sha256':hashlib.sha256(diff).hexdigest(),'traces':traces,'summary':summary}

@@ -190,7 +190,11 @@ class ChatCompletionsTransport:
             try:check()
             except ModelStreamInterrupted as error:
                 error.partial_characters=sum(map(len,text));raise
-            line=response.readline(65537);wire+=len(line)
+            line=response.readline(65537)
+            try:check()
+            except ModelStreamInterrupted as error:
+                error.partial_characters=sum(map(len,text));raise
+            wire+=len(line)
             if wire>1048576 or len(line)>65536:raise ModelResponseInvalid()
             if not line:raise ModelStreamInterrupted('incomplete',partial_characters=sum(map(len,text)))
             if line in {b'\n',b'\r\n'}:
@@ -201,6 +205,7 @@ class ChatCompletionsTransport:
                 if raw==b'[DONE]':
                     if finish!='stop' or usage is None or not ''.join(text).strip():
                         raise ModelStreamInterrupted('incomplete',partial_characters=sum(map(len,text)))
+                    check()
                     return ModelReply(''.join(text),self.endpoint.model,model,finish,usage)
                 value=_json(raw)
                 if not isinstance(value,dict):raise ModelResponseInvalid()
@@ -221,7 +226,8 @@ class ChatCompletionsTransport:
                     size+=len(part.encode())
                     if size>24000:raise ModelResponseInvalid()
                     text.append(part)
-                    if on_event and part:on_event(ModelDelta(part,events))
+                    if on_event and part:
+                        check();on_event(ModelDelta(part,events))
                 reason=choice.get('finish_reason')
                 if reason is not None:
                     if reason!='stop':raise ModelResponseInvalid(finish_reason=reason if reason in {'length','content_filter','tool_calls'} else None)

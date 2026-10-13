@@ -44,7 +44,20 @@
         "provider_retry",
         "private_export"
       ],
-      "binding_contract": "immutable_result"
+      "binding_contract": "immutable_result",
+      "receipt_contract": {
+        "required_tool": "model.generate",
+        "object_version": 1,
+        "requested_model": "fixture_model",
+        "observed_model": "fixture_model",
+        "model_input_digests": [
+          "d83fe09d7e28c00bc08fce1a1d112151a422b07050bf7fa35075042235cb4841"
+        ],
+        "turn_input_digests": [
+          "50dd35b841dc6a4ac6f6fdc531711af714491d9f31532853cff38b6edb27f14f"
+        ],
+        "view_kind": "assistant_turns"
+      }
     },
     {
       "case_id": "DAILY-002",
@@ -74,7 +87,18 @@
         "provider_retry",
         "private_export"
       ],
-      "binding_contract": "immutable_result"
+      "binding_contract": "immutable_result",
+      "receipt_contract": {
+        "required_tool": "model.generate",
+        "object_version": 1,
+        "requested_model": "fixture_model",
+        "observed_model": "fixture_model",
+        "model_input_digests": [],
+        "turn_input_digests": [
+          "485ab3ddab901ddb9980d93c514e71ba7989c1eca2b011f10eff8f2ea76bd8bc"
+        ],
+        "view_kind": "assistant_turns"
+      }
     },
     {
       "case_id": "DAILY-003",
@@ -105,7 +129,18 @@
         "provider_retry",
         "private_export"
       ],
-      "binding_contract": "immutable_result"
+      "binding_contract": "immutable_result",
+      "receipt_contract": {
+        "required_tool": "model.generate",
+        "object_version": 1,
+        "requested_model": "fixture_model",
+        "observed_model": "fixture_model",
+        "model_input_digests": [],
+        "turn_input_digests": [
+          "a6c6c951ac4f2c7244c1f8e92401498622cff2f942e0beb909c64e983c97ef77"
+        ],
+        "view_kind": "assistant_turns"
+      }
     },
     {
       "case_id": "DAILY-004",
@@ -136,7 +171,18 @@
         "provider_retry",
         "private_export"
       ],
-      "binding_contract": "immutable_result"
+      "binding_contract": "immutable_result",
+      "receipt_contract": {
+        "required_tool": "model.generate",
+        "object_version": 1,
+        "requested_model": "fixture_model",
+        "observed_model": "fixture_model",
+        "model_input_digests": [],
+        "turn_input_digests": [
+          "cdc5ed90cb4b9a7540b24d1c45c23c851930c98b07b6885667114c9f95fb0a12"
+        ],
+        "view_kind": "assistant_turns"
+      }
     },
     {
       "case_id": "DAILY-005",
@@ -169,7 +215,23 @@
         "provider_retry",
         "private_export"
       ],
-      "binding_contract": "immutable_result"
+      "binding_contract": "immutable_result",
+      "receipt_contract": {
+        "required_tool": "model.generate",
+        "object_version": 1,
+        "requested_model": "fixture_model",
+        "observed_model": "fixture_model",
+        "model_input_digests": [
+          "1c6bb4354c9fdf3733e4fde2919c9c5720d47380f73590b03d7dbeec3e6e2892",
+          "6ed6eb6c9214ae8afec44973b40f3eae00d8a3046a4b50d1f34c73e1081b3c09"
+        ],
+        "turn_input_digests": [
+          "1d5bdae86ec9ec425c4e545e244e63a264c3a0fe6d2acafffc3eb26b5faf5d97",
+          "c84eba962a6c7b674088c1683ea409553e487cd68a9ceee1e5c4d2e831d4f8d9",
+          "769d541681b331a3b4be7ef98553b8d3d93d0a1680dd3e9fe75cb5b826d653ee"
+        ],
+        "view_kind": "assistant_turns"
+      }
     },
     {
       "case_id": "DAILY-006",
@@ -200,7 +262,20 @@
         "provider_retry",
         "private_export"
       ],
-      "binding_contract": "immutable_result"
+      "binding_contract": "immutable_result",
+      "receipt_contract": {
+        "required_tool": "model.generate",
+        "object_version": 1,
+        "requested_model": "fixture_model",
+        "observed_model": "fixture_model",
+        "model_input_digests": [
+          "fe9ae67da44a950348c196edba9ab7537a0d3ccd2cf82a06f2090871f4d458ca"
+        ],
+        "turn_input_digests": [
+          "44e56520e6c7102785650680e760f8fddcbeb708c0803a8d57a7c781d7a1ccfd"
+        ],
+        "view_kind": "assistant_turns"
+      }
     },
     {
       "case_id": "DAILY-007",
@@ -231,7 +306,20 @@
         "provider_retry",
         "private_export"
       ],
-      "binding_contract": "source_snapshot"
+      "binding_contract": "source_snapshot",
+      "receipt_contract": {
+        "required_tool": "archive.synthesize",
+        "object_version": 1,
+        "requested_model": "fixture_model",
+        "observed_model": "fixture_model",
+        "model_input_digests": [
+          "11be815d942131ac177c28dd3ac09496831b4276a0377b9727133c703222c5b5"
+        ],
+        "turn_input_digests": [
+          "0cc7f726abc4d35f1f5ac9b8be62119e4a2fd92cc02f9ea7f6d36a7deae0a20c"
+        ],
+        "view_kind": "subsystem_events"
+      }
     },
     {
       "case_id": "DAILY-008",
@@ -262,7 +350,18 @@
         "provider_retry",
         "private_export"
       ],
-      "binding_contract": "source_snapshot"
+      "binding_contract": "source_snapshot",
+      "receipt_contract": {
+        "required_tool": "archive.synthesize",
+        "object_version": 1,
+        "requested_model": "fixture_model",
+        "observed_model": "fixture_model",
+        "model_input_digests": [],
+        "turn_input_digests": [
+          "d65fe05ec334027ed8f326d9f7ab2408f0c7241eddbeca37f7502afdc195166a"
+        ],
+        "view_kind": "subsystem_events"
+      }
     },
     {
       "case_id": "DAILY-009",
@@ -293,7 +392,18 @@
         "provider_retry",
         "private_export"
       ],
-      "binding_contract": "source_snapshot"
+      "binding_contract": "source_snapshot",
+      "receipt_contract": {
+        "required_tool": "archive.synthesize",
+        "object_version": 1,
+        "requested_model": "fixture_model",
+        "observed_model": "fixture_model",
+        "model_input_digests": [],
+        "turn_input_digests": [
+          "0182ea3f368491f8af2ccc186d6700d45e2aa202efc1056efabf1714d5d18bf7"
+        ],
+        "view_kind": "subsystem_events"
+      }
     },
     {
       "case_id": "DAILY-010",
@@ -325,7 +435,20 @@
         "provider_retry",
         "private_export"
       ],
-      "binding_contract": "source_snapshot"
+      "binding_contract": "source_snapshot",
+      "receipt_contract": {
+        "required_tool": "archive.synthesize",
+        "object_version": 1,
+        "requested_model": "fixture_model",
+        "observed_model": "fixture_model",
+        "model_input_digests": [
+          "8f08eb5a87b3bc94b73e2a21ab883f56fec5ce05e488c5d45b9921c788501a2a"
+        ],
+        "turn_input_digests": [
+          "bccef1f8221e9605ff343a638cfc17531970693b5e4f76baf29a4b7b6ad41df7"
+        ],
+        "view_kind": "subsystem_events"
+      }
     },
     {
       "case_id": "DAILY-011",
@@ -356,7 +479,18 @@
         "provider_retry",
         "private_export"
       ],
-      "binding_contract": "immutable_result"
+      "binding_contract": "immutable_result",
+      "receipt_contract": {
+        "required_tool": "brief.build",
+        "object_version": 1,
+        "requested_model": "fixture_model",
+        "observed_model": "fixture_model",
+        "model_input_digests": [],
+        "turn_input_digests": [
+          "a2d104a1c89fee58de2c0a4d42dbc5a1cc1eee4c1b18038c6a1d82ee2e4d39d8"
+        ],
+        "view_kind": "subsystem_events"
+      }
     },
     {
       "case_id": "DAILY-012",
@@ -387,7 +521,18 @@
         "provider_retry",
         "private_export"
       ],
-      "binding_contract": "immutable_result"
+      "binding_contract": "immutable_result",
+      "receipt_contract": {
+        "required_tool": "brief.build",
+        "object_version": 1,
+        "requested_model": "fixture_model",
+        "observed_model": "fixture_model",
+        "model_input_digests": [],
+        "turn_input_digests": [
+          "59628da3a8944b266ccefb53273cf5e05510f0053bafbbab95de79d6ad4b0789"
+        ],
+        "view_kind": "subsystem_events"
+      }
     },
     {
       "case_id": "DAILY-013",
@@ -418,7 +563,18 @@
         "provider_retry",
         "private_export"
       ],
-      "binding_contract": "immutable_result"
+      "binding_contract": "immutable_result",
+      "receipt_contract": {
+        "required_tool": "brief.build",
+        "object_version": 1,
+        "requested_model": "fixture_model",
+        "observed_model": "fixture_model",
+        "model_input_digests": [],
+        "turn_input_digests": [
+          "b32d992d7097673314a2444397a8c953281430b3ee442d14f5a55923a1ea7010"
+        ],
+        "view_kind": "subsystem_events"
+      }
     },
     {
       "case_id": "DAILY-014",
@@ -459,7 +615,38 @@
         "provider_retry",
         "private_export"
       ],
-      "binding_contract": "immutable_result"
+      "binding_contract": "immutable_result",
+      "receipt_contract": {
+        "required_tool": "model.generate",
+        "object_version": 1,
+        "requested_model": "fixture_model",
+        "observed_model": "fixture_model",
+        "model_input_digests": [
+          "1905be9836753e32ef1c1fab6a840a5b8857e9ccd9d8a5ae673d8a3e871272da",
+          "4249e7fc62ec1acf731965a5ac4efa6b73e46f68316b93c31894bd5956c36053",
+          "53f4db52d6659b130b17730734d1a62ca1280e89c04268d2e0dee4d26f5636c5",
+          "63575cbaa0aebd9e0115acfa22a9b4328abe6422ff24cf8bb9dc6ef2dde3a2cf",
+          "69ff77d453abf7ae71e70bd1cc6b3cdf9e1a676e430d90bb0bd586f3051f7572",
+          "9474a29ca9135a7606d9fbbc46f77f2deaac3f509a9cee988d07923e0ce16916",
+          "e3a848c093ef0ae106055be59b4f200f0c1ccd9e9065856b0d8af068d90a701c",
+          "e94a9932d59866124fc4212ba8db85767034bb2a41942bf7f4d908a09bd1e829",
+          "f65655cc038fee2fee94a29ec11a8c32ad099278362d32d100cd563be686fc79",
+          "fd69bd0d50327ee2ac6db9464195fe5e1f664add2b8cf59b094336edd5ded9a8"
+        ],
+        "turn_input_digests": [
+          "e4347e2c6256ab218d8471b05150b220c20ca3bc14597d0bd0e36d486e74490e",
+          "4858778723dbbcd0374f707c6645c6f409840daa3ba166a3325cc5345174c8ef",
+          "c02db59b4342514f350129f44000b8966c7bbc002628cd649b72fcf0b046d65e",
+          "55d1b77523aa74729a139c8f041b8516d75b0d1f9027a4ec36a43441ce69ef9e",
+          "f383b5a0feac800f38942085cd29c402994dfa3c1f75588097dc10ad18d05876",
+          "7d2e247bcd57836294923cd363fad2d86b7441974746916d7cb8155491aa5fb5",
+          "95c989f7948057b53e6407416b1584aeca166b3f199e52cef15e76cf98e6c8fa",
+          "67d36d80b6ce92c628b80f51a74478c062150393930059642d7dfaa8e9fa101d",
+          "e013c6c56c5ce0f0eb865a7a86aca0e1f8bb3f8e0225b229689d3a37fdf0e47d",
+          "64b9f60a29ad1d998ece5e55ca0298c649936f9f6bc6110b489b33bced120c06"
+        ],
+        "view_kind": "assistant_turns"
+      }
     },
     {
       "case_id": "DAILY-015",
@@ -500,7 +687,38 @@
         "provider_retry",
         "private_export"
       ],
-      "binding_contract": "immutable_result"
+      "binding_contract": "immutable_result",
+      "receipt_contract": {
+        "required_tool": "model.generate",
+        "object_version": 1,
+        "requested_model": "fixture_model",
+        "observed_model": "fixture_model",
+        "model_input_digests": [
+          "03f0a5854fa5a40fd0365b67f1f0e1b4f3f3453d837277672d1e56e89059a64e",
+          "26dd091fb6fb868755bd314928094d3cfaf5fc3e704a49234f87d2b364ccbb1c",
+          "79af3d9f62caf9dac88bdc397861cd0f47d1aadf72b2623d62deaea187923dc2",
+          "7dcb60eb731e1dba8103242b61ce670093616c708cb62fae80d10081e394b2bf",
+          "80fd965d9a61aeef6b8375cfeb908ff7da90959eb1530dfa80c442bd6261d7e5",
+          "9953ba1a666fdab9d42b68236f7ed5a076ca4ab41b1d15d2994a3042840df88c",
+          "a05b45efc864371f4ef59b161a84146de3236136d81cd34be4910b1191c2502a",
+          "d19814c34e13de11f543a0886d1928cbbe018bc93532f97bef6a3b055896c52b",
+          "d4e36a47c113c65a1443a3b7e4def2c052b5662b13f9e3c93703bd5278ff30ee",
+          "fd1d76889a28e1fda8ac03ce31c279bbef7c249bda16d57adeaa69dd900ae014"
+        ],
+        "turn_input_digests": [
+          "2c43523776f890b1201b4fd26fe7d2f7e9ba363bcc8cbda193c9c51b3e1cbf8e",
+          "938454988dedff89964be6b0ba1dcdbd02bc42ee5aefcdcd7655d2cf02d2c6bb",
+          "8c52bd3c1c1723f52238422edf4d01c7b94fc87ebd75bf9a2bea20abf9b4006b",
+          "b9fc93b1f3ebc44689f567923258ef6805bb619c6a6cdf70931cb61936b988ef",
+          "9a8397b5ab132faf135f91964233928d4445e5d8cfac748cf6ac5c732675092e",
+          "75ea2ce4813be7edf2fe45c68bc00f820b32da7424652dc04bf46044423d3d51",
+          "4d8d35524f8e4f9e409918f391e4667e9505360f7aed5a4e66ba1e167f227b90",
+          "dc83303740274d80823c4561ce9f77eef5b0588b54730e68cc05aaff53fb8b9a",
+          "2ffa9ff5581b1ae4da8ea24ca466e5bef3ae646afd0910d531bd2160a2b58d2a",
+          "ed2173824ad3645b5e4b89df5eda62da4487d5d0e8f6d5fdffaf9806dfba5201"
+        ],
+        "view_kind": "assistant_turns"
+      }
     },
     {
       "case_id": "DAILY-016",
@@ -541,7 +759,37 @@
         "provider_retry",
         "private_export"
       ],
-      "binding_contract": "immutable_result"
+      "binding_contract": "immutable_result",
+      "receipt_contract": {
+        "required_tool": "model.generate",
+        "object_version": 1,
+        "requested_model": "fixture_model",
+        "observed_model": "fixture_model",
+        "model_input_digests": [
+          "10a83d091d4c5694bc0a4c14757fcc1960cf4d06f4d894fbf986be71fe09567f",
+          "27318e3a0a9d4a3c7827d101a0c1e7788b1838917724c753eda6ccf938ab4b44",
+          "7d2bd342132127fe577660bc4d425b48c233ad5b040e85459baa03a6b26cd3b7",
+          "a07c3a9edb9185d512ffaf14a0c0e30692928c348d22192f5513d9b8c1e0cef7",
+          "a1ac628cf14c76a06e9e323ae80c2ba6127934baa3c7f4f510a2c0e55551b10f",
+          "b0997d61113414a606245304f96059062fc557b3f19eb8d9e0fcd04bd86e9ae3",
+          "b608801aca7e9dc2d69c3d167f93cc14f234f9739a041be4fd7762bf1bc115f7",
+          "c9430689cd1e2e57700056f3f1f4621e2dfcc4aa4cbe5408bbbe7c1b3195f8e7",
+          "f746b8ca0d00abc47c3e01bb3d780db05658d9fd7fbc807475279da0990a934e"
+        ],
+        "turn_input_digests": [
+          "de20f163dcee0615021a05fc3ec6cf9b34c5b6688d0b811e834e855c857aae14",
+          "25237d9a3eb4181f429acdc5b15c5e632db3e00b8a649db8010a11ae1e3596a6",
+          "c239aca92a164dc89ffe6d0d0e9b531ddff3b79707ba9c311c00fb8790167173",
+          "5917d93fb0118acd2a3cffb8f86a2674387e7bdbe055d68645c0f0343875d326",
+          "dd2b4172389bc26ebc6a6e4bd3161ba39db3a1c3186df41e45253308f03a0626",
+          "44a38b9fa962d761c80e9e68a55c657a6b336f351502ffd73dbfd3d545e79d92",
+          "9291c69e865225d267e6d250d4f8cd66696ea49827861525574d99290d8e6727",
+          "a8737b8fcf1ac2d6f0708144ae8efde0cdce5e502f7294567a54eb29952b7ec1",
+          "c84eba962a6c7b674088c1683ea409553e487cd68a9ceee1e5c4d2e831d4f8d9",
+          "ad100d4540bd5a6bc7e4fdf5a3b9e4cc02f1453724796f80696d1e114bd4147d"
+        ],
+        "view_kind": "assistant_turns"
+      }
     },
     {
       "case_id": "DAILY-017",
@@ -576,7 +824,21 @@
         "provider_retry",
         "private_export"
       ],
-      "binding_contract": "durable_control"
+      "binding_contract": "durable_control",
+      "receipt_contract": {
+        "required_tool": "control.resolve",
+        "object_version": 1,
+        "requested_model": "fixture_model",
+        "observed_model": "fixture_model",
+        "model_input_digests": [],
+        "turn_input_digests": [
+          "3028279e7a8d0c7123494b03a63ee5141fffe61a5f5888cd04d6f1a63d46853c",
+          "44e56520e6c7102785650680e760f8fddcbeb708c0803a8d57a7c781d7a1ccfd",
+          "c07d4f104abc8f06e93b04fa110d31b792124015dd68473773c9ff7093298bb1",
+          "44e56520e6c7102785650680e760f8fddcbeb708c0803a8d57a7c781d7a1ccfd"
+        ],
+        "view_kind": "assistant_turns"
+      }
     },
     {
       "case_id": "DAILY-018",
@@ -610,7 +872,20 @@
         "provider_retry",
         "private_export"
       ],
-      "binding_contract": "durable_control"
+      "binding_contract": "durable_control",
+      "receipt_contract": {
+        "required_tool": "control.resolve",
+        "object_version": 1,
+        "requested_model": "fixture_model",
+        "observed_model": "fixture_model",
+        "model_input_digests": [],
+        "turn_input_digests": [
+          "1bfda76d12c0add859a1dd1a4d7154f438b2388f982e02c0600eb00b34d647de",
+          "723b2738b7f55656526247ecc0772d61b0f20c7a446dfc9ffbe4e16a7eb65932",
+          "44e56520e6c7102785650680e760f8fddcbeb708c0803a8d57a7c781d7a1ccfd"
+        ],
+        "view_kind": "assistant_turns"
+      }
     },
     {
       "case_id": "DAILY-019",
@@ -642,7 +917,19 @@
         "provider_retry",
         "private_export"
       ],
-      "binding_contract": "durable_control"
+      "binding_contract": "durable_control",
+      "receipt_contract": {
+        "required_tool": "watch.lifecycle",
+        "object_version": 1,
+        "requested_model": "fixture_model",
+        "observed_model": "fixture_model",
+        "model_input_digests": [],
+        "turn_input_digests": [
+          "fd5d06d3da05d606e8905ace24bbb2ecfa20c10185c8e9f37f5d5273ed5cdb4a",
+          "be5f8cd9b02f22e611265bec961c5730953e7c1f912692cc69ebe02bd85ad573"
+        ],
+        "view_kind": "subsystem_events"
+      }
     },
     {
       "case_id": "DAILY-020",
@@ -675,7 +962,20 @@
         "provider_retry",
         "private_export"
       ],
-      "binding_contract": "exact_action_receipt"
+      "binding_contract": "exact_action_receipt",
+      "receipt_contract": {
+        "required_tool": "action.dispatch",
+        "object_version": 1,
+        "requested_model": "fixture_model",
+        "observed_model": "fixture_model",
+        "model_input_digests": [],
+        "turn_input_digests": [
+          "1e28d1bface1e0209e34f3db132aa282f6b1e05b5108db5902848e444451624b",
+          "574ba9973189465fe66819754ed37a7090c5ee9358794647e2129b80541a8263",
+          "7718494764f231db07810d224227de102261e234ddc7197d1a083d4f55199377"
+        ],
+        "view_kind": "subsystem_events"
+      }
     }
   ]
 }
