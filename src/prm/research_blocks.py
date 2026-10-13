@@ -5,7 +5,7 @@ import hashlib,json,re
 from assistant.claim_ledger import verify_answer_against_evidence
 from prm.storage.postgres import StorageError
 
-VOCABULARY_VERSION='fact-projection-v3'
+VOCABULARY_VERSION='fact-projection-v4'
 WORDS={
     'service':'service','сервис':'service','reduced':'reduce','reduce':'reduce','сократил':'reduce','сократила':'reduce',
     'latency':'latency','задержку':'latency','задержка':'latency','to':'to','до':'to',
@@ -34,8 +34,13 @@ class ResearchBlock:
 
 def tokens(text):
     import unicodedata
+    def glyph(c):
+        name=unicodedata.name(c,'')
+        if 'MINUS' in name and 'PLUS' in name:return ' uncertain_sign '
+        if unicodedata.category(c)=='Pd' or any(word in name for word in ('MINUS','HYPHEN','DASH')):return '-'
+        return c
+    text=''.join(glyph(c) for c in text)
     text=''.join(c for c in unicodedata.normalize('NFKC',text) if unicodedata.category(c)!='Cf')
-    text=text.translate(str.maketrans({'−':'-','﹣':'-','－':'-','➖':'-','⁻':'-','₋':'-'}))
     text=re.sub(r'(?<!\w)([+-])\s+(?=\d)',r'\1',text)
     text=re.sub(r"\b(can't|cannot)\b",'can not',text.casefold())
     text=re.sub(r"\b(didn't|doesn't|don't|isn't|aren't|wasn't|weren't)\b",'not',text)

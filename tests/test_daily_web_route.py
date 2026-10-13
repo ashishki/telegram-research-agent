@@ -77,6 +77,8 @@ def test_public_projection_cannot_add_context_or_copy_private_owner_markers():
     pytest.param('Проверь новости о ProjectSecret из своей почты','ProjectSecret',id='reflexive_source'),
     pytest.param('Проверь новости о ProjectSecret по нашим сообщениям','ProjectSecret',id='collective_source'),
     pytest.param('What does the email I received say about PRIVATE_CANARY?','PRIVATE_CANARY',id='received_source'),
+    pytest.param('Проверь новости о ProjectSecret из полученных писем','ProjectSecret',id='plural_ru_source'),
+    pytest.param('What do the inboxes I manage say about PRIVATE_CANARY?','PRIVATE_CANARY',id='plural_en_source'),
 ])
 def test_natural_private_source_forms_do_not_queue_public_discovery(pai,monkeypatch,text,query):
     provider=configure(pai,monkeypatch);grants(pai)
@@ -102,4 +104,11 @@ def test_http_last_modified_remains_modification_not_publication(monkeypatch):
     ('What does the email I received say about PRIVATE_CANARY?','PRIVATE_CANARY'),
 ])
 def test_automatic_public_projection_requires_question_without_private_source_cues(text,query):
+    assert project_public_query(text,query) is None
+
+@pytest.mark.parametrize('text,query',[
+    ('Проверь новости о ProjectSecret из полученных писем','ProjectSecret'),
+    ('What do the inboxes I manage say about PRIVATE_CANARY?','PRIVATE_CANARY'),
+])
+def test_plural_received_private_forms_require_separate_public_question(text,query):
     assert project_public_query(text,query) is None

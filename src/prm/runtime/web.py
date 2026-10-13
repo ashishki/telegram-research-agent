@@ -26,10 +26,11 @@ def project_public_query(owner_text,proposed):
     # explicit possessive ("the email I received"). Automatic projection is
     # deliberately unavailable for such questions; owner supplies a separate
     # standalone public formulation. This is not semantic declassification.
-    private_source=r'\b(?:e[\s-]?mails?|mail(?:boxes|box|s)?|inbox|calendars?|diar(?:y|ies)|notes?|messages?|archives?|profiles?|projects?|почт\w*|письм\w*|календар\w*|дневник\w*|заметк\w*|сообщен\w*|архив\w*|профил\w*|проект\w*)\b'
+    private_source=r'\b(?:e[\s-]?mails?|mail(?:boxes|box|s)?|inbox(?:es)?|calendars?|diar(?:y|ies)|notes?|messages?|letters?|chats?|sms|dms|archives?|profiles?|projects?|почт\w*|пис(?:ьм|ем)\w*|календар\w*|дневник\w*|заметк\w*|сообщен\w*|переписк\w*|архив\w*|профил\w*|проект\w*)\b'
     reflexive=r'\b(?:сво(?:й|я|ё|е|и|его|ей|ю|ему|ем|ём|им|ими|их)|наш\w*)\b'
+    personal_context=r'\b(?:i|we|me|us|я|мы|мне|меня|нам|нас|received|saved|forwarded|got|manage|получ\w*|отправлен\w*|сохран[её]н\w*|личн\w*)\b'
     source_reference=r'\b(?:from|in|inside|из|в|по)\s+(?:(?:the|an|a|этой|этом|этих)\s+)?(?:email|e-mail|inbox|mailbox|mail|calendar|notes?|messages?|archive|profile|почт\w*|письм\w*|календар\w*|заметк\w*|сообщени\w*|архив\w*|профил\w*)\b'
-    if any(re.search(pattern,original,re.I) for pattern in (possessive,reflexive,private_source,source_reference)):return None
+    if any(re.search(pattern,original,re.I) for pattern in (possessive,reflexive,private_source,source_reference,personal_context)):return None
     private=(*_PRIVATE_QUERY_MARKERS,'мой проект','моего проекта','для моего','my project','my mail','моя почта','мои письма','my calendar','мой календарь')
     if any(marker in original.casefold() for marker in private) or re.search(r'(?i)\b(?:token|password|секрет|пароль)\b|[\w.+-]+@[\w.-]+\.[a-z]{2,}',original):return None
     if not query or query not in original or _validate_public_query(query,original_query=original)!='accepted':return None
