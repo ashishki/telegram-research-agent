@@ -53,11 +53,11 @@ class TelegramJobIngress:
             if text.startswith('paic:'):
                 selected = self.bindings.resolve_control(text, destination=self.telegram_destination)
                 if selected is None: return IntakeReply('Эта кнопка устарела или недоступна.')
-                return self.control(*selected)
+                return self.resolve_control(selected[0], explicit_ref=selected[1], update=update)
             parts = text.split(':')
             if len(parts) != 3 or parts[0] != 'pai' or parts[1] not in {'status', 'cancel', 'result'}:
                 return IntakeReply('Это действие недоступно; подтверждение не использовано.')
-            return self.control(parts[1], parts[2])
+            return self.resolve_control(parts[1], explicit_ref=parts[2], update=update)
         parts = text.split(maxsplit=1)
         watch_words={'подтвердить наблюдение':'/watchconfirm','проверить наблюдение':'/watchstatus',
                      'приостановить наблюдение':'/watchpause','возобновить наблюдение':'/watchresume',
@@ -75,7 +75,7 @@ class TelegramJobIngress:
         control_kinds = {IntentKind.JOB_STATUS: 'status', IntentKind.JOB_CANCEL: 'cancel', IntentKind.JOB_RESULT: 'result'}
         if intent.kind in control_kinds and not message.get('voice') and not message.get('voice_transcript'):
             return self.resolve_control(control_kinds[intent.kind], explicit_ref=intent.target_ref,
-                                        reply_message_id=(message.get('reply_to_message') or {}).get('message_id'))
+                                        reply_message_id=(message.get('reply_to_message') or {}).get('message_id'), update=update)
         voice = message.get('voice')
         body=None
         transcript = message.get('voice_transcript') or (voice or {}).get('transcript')
@@ -136,10 +136,16 @@ class TelegramJobIngress:
                 self.bindings.bind_message_in(tx, TelegramMessageBinding(self.owner_ref, self.telegram_destination, message_id, job))
         return IntakeReply(f'Запрос сохранён. Задача {job}. /status {job}', request_ref, job)
 
-    def resolve_control(self, command, *, explicit_ref=None, reply_message_id=None):
-        from .job_controls import resolve_job_target
-        target = resolve_job_target(self.queue, self.bindings, owner=self.owner_ref, destination=self.telegram_destination,
-                                    command=command, explicit_ref=explicit_ref, reply_message_id=reply_message_id)
+    def resolve_control(self, command, *, explicit_ref=None, reply_message_id=None, update=None):
+        from .job_controls import resolve_job_target, ResolvedJobTarget, JobCandidate
+        def resolve():
+            return resolve_job_target(self.queue, self.bindings, owner=self.owner_ref, destination=self.telegram_destination,
+                                      command=command, explicit_ref=explicit_ref, reply_message_id=reply_message_id)
+        if update is None: target = resolve()
+        else:
+            frozen = dict(self.bindings.freeze_control_selection(update, resolve))
+            frozen['candidates'] = tuple(JobCandidate(**value) for value in frozen['candidates'])
+            target = ResolvedJobTarget(**frozen)
         if target.job_ref is not None: return self.control(command, target.job_ref)
         if target.reason == 'unknown_reply': return IntakeReply('Задача для этого сообщения не найдена. Выбери её явно.')
         if not target.candidates: return IntakeReply('Нет подходящей задачи. Можно отправить новый запрос.')
@@ -225,10 +231,10 @@ class TelegramJobIngress:
         if state is None:
             return IntakeReply('Задача не найдена.')
         if command == 'cancel':
-            if state.get('mode') == 'effect' and state['attempts'] > 0:
-                return IntakeReply('Внешний эффект уже мог начаться. Его результат требует отдельной сверки; повторная отправка не выполнена.', job_id=job_id)
             cancelled = self.queue.cancel(owner=self.owner_ref, job_id=job_id)
             current=self.queue.status(owner=self.owner_ref,job_id=job_id)
+            if current['status'] == 'awaiting_reconciliation':
+                return IntakeReply('Будущие шаги остановлены. Внешний эффект уже мог начаться: результат требует отдельной сверки; повторная отправка не выполнена.', job_id=job_id)
             if cancelled and current['attempts']>0 and self.cancel_callback is not None:self.cancel_callback(job_id)
             if cancelled:
                 text='Задача отменена.'

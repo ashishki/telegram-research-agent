@@ -2,6 +2,8 @@
 from __future__ import annotations
 from dataclasses import asdict
 from datetime import datetime, timedelta
+import hashlib
+import json
 import re
 import uuid
 
@@ -50,6 +52,32 @@ class TelegramBindings:
     def _lineage_lock(self, tx):
         from prm.runtime.deletion import lineage_lock
         lineage_lock(tx.conn, self.owner)
+
+    def freeze_control_selection(self, update, resolve):
+        """Commit the exact target/ambiguity before an idempotent job control.
+
+        A crash after cancellation must never resolve the next remaining job.
+        The stored fingerprint binds the entire immutable update, without
+        retaining another copy of its text or source metadata.
+        """
+        try:
+            raw = json.dumps(update, sort_keys=True, separators=(',', ':'), ensure_ascii=False, allow_nan=False).encode()
+        except (TypeError, ValueError, RecursionError):
+            raise StorageError('bounded immutable control update required') from None
+        if len(raw) > 65536: raise StorageError('control update exceeds bound')
+        digest = hashlib.sha256(raw).hexdigest()
+        ref = 'telegram_control_input_' + hashlib.sha256((self.destination.bot_ref + ':' + str(update['update_id'])).encode()).hexdigest()[:32]
+        with self.store.transaction() as tx:
+            self._lineage_lock(tx)
+            tx._object_lock(self.owner, 'conversation', ref)
+            item = tx.get(self.owner, 'conversation', ref)
+            if item:
+                if item.payload['input_digest'] != digest: raise StateConflict('control update ID reused with different content')
+                return item.payload['selection']
+            selection = asdict(resolve())
+            tx.put(self.owner, 'conversation', ref, {'schema_version': 'telegram.control_intake.v1',
+                'input_digest': digest, 'selection': selection}, expected_version=0)
+            return selection
 
     def for_message(self, route, message_id):
         if type(message_id) is not int or message_id <= 0 or route != self.destination: return None

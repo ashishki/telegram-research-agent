@@ -183,7 +183,10 @@ class JobQueue:
     def cancel(self,*,owner,job_id):
         with self.store.transaction() as tx:
             _check(tx.conn)
-            row=tx.conn.execute("UPDATE pa_jobs.jobs SET status='cancelled',token=NULL,lease_until=NULL WHERE owner=%s AND id=%s AND status IN ('queued','retry_wait','leased','running') RETURNING id",(owner,job_id)).fetchone()
+            row=tx.conn.execute("""UPDATE pa_jobs.jobs SET
+                status=CASE WHEN mode='effect' AND attempts>0 THEN 'awaiting_reconciliation' ELSE 'cancelled' END,
+                token=NULL,lease_until=NULL WHERE owner=%s AND id=%s
+                AND status IN ('queued','retry_wait','leased','running') RETURNING id""",(owner,job_id)).fetchone()
             return bool(row)
     def retry_compute(self,lease,*,delay_seconds=1,error_code='compute_unavailable'):
         if lease.mode!='compute' or type(delay_seconds)is not int or not 1<=delay_seconds<=300:

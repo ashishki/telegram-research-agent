@@ -99,7 +99,7 @@ def test_started_effect_is_preserved_for_reconciliation(pai):
         payload={**payload['payload'], 'effect_key': 'synthetic_effect_key'}, deadline=payload['deadline'], kind='effect.dispatch', mode='effect')
     root.queue.claim(owner=root.owner_ref, modes=('effect',))
     assert 'сверки' in root.ingress.control('cancel', job).text
-    assert root.queue.status(owner=root.owner_ref, job_id=job)['status'] == 'leased'
+    assert root.queue.status(owner=root.owner_ref, job_id=job)['status'] == 'awaiting_reconciliation'
 
 
 def test_polling_passes_bound_choice_buttons(pai, monkeypatch):
@@ -130,3 +130,45 @@ def test_deleted_input_cannot_create_or_use_controls(pai):
     assert root.ingress.bindings.for_message(root.ingress.telegram_destination, 1) is None
     with pytest.raises(StorageError, match='input'):
         root.ingress.bindings.issue_control(command='status', job_id=ack.job_id)
+
+
+def test_stop_update_replay_after_restart_keeps_original_target(pai):
+    root = pai.root
+    first = root.ingress.receive(update(96801, 'Synthetic A'))
+    stop = update(96802, 'Стоп')
+    assert root.ingress.receive(stop).job_id == first.job_id
+    second = root.ingress.receive(update(96803, 'Synthetic B'))
+    restarted = TelegramJobIngress(root.queue, owner_ref=root.owner_ref, owner_chat_id='42')
+    assert restarted.receive(stop).job_id == first.job_id
+    assert root.queue.status(owner=root.owner_ref, job_id=second.job_id)['status'] == 'queued'
+
+
+def test_ambiguous_stop_replay_does_not_become_single_job_cancel(pai):
+    root = pai.root
+    a = root.ingress.receive(update(96811, 'Synthetic A'))
+    b = root.ingress.receive(update(96812, 'Synthetic B'))
+    stop = update(96813, 'Стоп')
+    assert root.ingress.receive(stop).job_id is None
+    root.queue.cancel(owner=root.owner_ref, job_id=a.job_id)
+    assert root.ingress.receive(stop).job_id is None
+    assert root.queue.status(owner=root.owner_ref, job_id=b.job_id)['status'] == 'queued'
+
+
+def test_effect_claim_between_status_and_cancel_preserves_unknown_fence(pai, monkeypatch):
+    root = pai.root
+    ack = root.ingress.receive(update(96821, 'Synthetic parent'))
+    with root.queue.store.transaction() as tx:
+        row = tx.conn.execute('SELECT payload,deadline FROM pa_jobs.jobs WHERE owner=%s AND id=%s', (root.owner_ref, ack.job_id)).fetchone()
+    job = root.queue.enqueue(owner=root.owner_ref, idempotency_key='synthetic_race_effect',
+        payload={**row['payload'], 'effect_key': 'synthetic_race_key'}, deadline=row['deadline'], mode='effect', kind='effect.dispatch')
+    cancel = root.queue.cancel
+    claims = []
+    def claimed_before_cancel(**kwargs):
+        claims.append(root.queue.claim(owner=root.owner_ref, modes=('effect',)))
+        return cancel(**kwargs)
+    monkeypatch.setattr(root.queue, 'cancel', claimed_before_cancel)
+    reply = root.ingress.control('cancel', job)
+    assert 'сверки' in reply.text
+    state = root.queue.status(owner=root.owner_ref, job_id=job)
+    assert state['status'] == 'awaiting_reconciliation' and state['attempts'] == 1
+    with pytest.raises(StateConflict): root.queue.heartbeat(claims[0])
