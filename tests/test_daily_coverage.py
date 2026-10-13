@@ -305,3 +305,22 @@ def test_protected_result_without_read_authority_is_not_dispatched(pai):
     executor=DeliveryExecutor(root.queue.store.target,registry=root.registry,sender=lambda *args:calls.append(args))
     with pytest.raises(CapabilityDenied):executor.deliver_result(owner=root.owner_ref,job_id=ack.job_id,destination_ref='destination_no_authority',upper_bound=0)
     assert not calls and executor.attempt(owner=root.owner_ref,delivery_id='answer_'+ack.job_id) is None
+
+
+def test_scheduled_existing_delivery_replay_keeps_full_attempt_row(pai):
+    from datetime import datetime,timezone
+    from prm.runtime.delivery import DeliveryExecutor,TransportReceipt
+    root=pai.root;calls=[]
+    ack=root.ingress.receive({'update_id':119801,'message':{'chat':{'id':42,'type':'private'},'from':{'id':42},'text':'Synthetic supplied delivery'}})
+    ref=root.queue.complete(root.queue.claim(owner=root.owner_ref,kinds=('compute.assistant',)),{'text':'Synthetic supplied answer','data_class':'user_provided','data_classes':['user_provided']})
+    item=root.queue.store.get(root.owner_ref,'result',ref)
+    root.queue.enqueue(owner=root.owner_ref,idempotency_key='daily_scheduled_replay',mode='effect',kind='effect.dispatch',deadline=datetime.now(timezone.utc)+timedelta(minutes=5),
+        payload={'schema_version':1,'input_namespace':'result','input_ref':ref,'input_version':item.version,'input_digest':item.digest,
+            'connection_ref':None,'resource_ref':'destination_daily_replay','purpose':'answer.delivery','consent_revision':1,'effect_key':'answer_'+ack.job_id})
+    lease=root.queue.claim(owner=root.owner_ref,kinds=('effect.dispatch',),modes=('effect',))
+    allow(pai,'assistant.result_delivery','destination_daily_replay','user_provided','answer.delivery',provider='provider_telegram',connection=None,operation='deliver')
+    def sender(*args):calls.append(args);return TransportReceipt('synthetic_replay_receipt')
+    executor=DeliveryExecutor(root.queue.store.target,registry=root.registry,sender=sender)
+    first=executor.deliver_result(owner=root.owner_ref,job_id=ack.job_id,destination_ref='destination_daily_replay',upper_bound=0,effect_lease=lease)
+    replay=executor.deliver_result(owner=root.owner_ref,job_id=ack.job_id,destination_ref='destination_daily_replay',upper_bound=0)
+    assert replay==first and first['status']=='sent' and len(calls)==1

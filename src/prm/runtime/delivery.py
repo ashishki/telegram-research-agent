@@ -132,8 +132,8 @@ class DeliveryExecutor:
             if options.get('telegram_parse_mode')=='HTML':payload['telegram_parse_mode']='HTML'
             if effect_lease is None and tx.conn.execute("SELECT 1 FROM pa_jobs.jobs WHERE owner=%s AND mode='effect' AND payload->>'effect_key'=%s LIMIT 1",
                 (owner,'answer_'+job_id)).fetchone():
-                prior=tx.conn.execute('SELECT 1 FROM pa_delivery.attempts WHERE owner=%s AND id=%s',(owner,'answer_'+job_id)).fetchone()
-                if prior is None:raise CapabilityDenied('scheduled answer delivery requires its current effect lease')
+                existing_attempt=tx.conn.execute('SELECT 1 FROM pa_delivery.attempts WHERE owner=%s AND id=%s',(owner,'answer_'+job_id)).fetchone()
+                if existing_attempt is None:raise CapabilityDenied('scheduled answer delivery requires its current effect lease')
             if effect_lease is not None:
                 from prm.storage.jobs import JobQueue
                 if (effect_lease.owner != owner or effect_lease.mode != 'effect'
