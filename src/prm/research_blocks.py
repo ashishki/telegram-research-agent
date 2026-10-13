@@ -5,7 +5,7 @@ import hashlib,json,re
 from assistant.claim_ledger import verify_answer_against_evidence
 from prm.storage.postgres import StorageError
 
-VOCABULARY_VERSION='fact-projection-v2'
+VOCABULARY_VERSION='fact-projection-v3'
 WORDS={
     'service':'service','сервис':'service','reduced':'reduce','reduce':'reduce','сократил':'reduce','сократила':'reduce',
     'latency':'latency','задержку':'latency','задержка':'latency','to':'to','до':'to',
@@ -33,6 +33,10 @@ class ResearchBlock:
 
 
 def tokens(text):
+    import unicodedata
+    text=''.join(c for c in unicodedata.normalize('NFKC',text) if unicodedata.category(c)!='Cf')
+    text=text.translate(str.maketrans({'−':'-','﹣':'-','－':'-','➖':'-','⁻':'-','₋':'-'}))
+    text=re.sub(r'(?<!\w)([+-])\s+(?=\d)',r'\1',text)
     text=re.sub(r"\b(can't|cannot)\b",'can not',text.casefold())
     text=re.sub(r"\b(didn't|doesn't|don't|isn't|aren't|wasn't|weren't)\b",'not',text)
     return tuple(v for raw in TOKEN.findall(text) if (v:=WORDS.get(raw,raw)))
@@ -54,7 +58,9 @@ def _source_context_matches(statement,quote,span):
     while position>=0:
         start=max(b for b in boundaries if b<=position);end=min(b for b in boundaries if b>=position+len(quote))
         context=span[start:end];source=tokens(context);subject=actor(context);name=first_name(context)
+        numeric=lambda ts:tuple(t for t in ts if re.fullmatch(r'[+-]?\d+(?:[.,]\d+)?',t))
         if (('not' in source)==('not' in candidate) and (set(source)&QUALIFIERS)==(set(candidate)&QUALIFIERS)
+            and (not numeric(candidate) or numeric(candidate)==numeric(source))
             and (subject is None or actor(statement)==subject) and (name is None or name in candidate)):
             return context
         position=span.find(quote,position+1)
@@ -73,6 +79,7 @@ def fact_proof(statement,quote,url,evidence):
     # Only a contiguous prefix may be shortened. Interior deletion can move a
     # number into another role or turn reported speech into a measured fact.
     if candidate!=support[:len(candidate)]:return None
+    if any(re.fullmatch(r'[+-]?\d+(?:[.,]\d+)?',t) for t in candidate) and candidate!=support:return None
     # Critical actors/numbers and word order are preserved by the token proof.
     # The legacy ledger checks the same mechanical projection, not an invented
     # semantic equivalence. Raw final text and exact quote stay in the block.

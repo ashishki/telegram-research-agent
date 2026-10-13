@@ -75,6 +75,14 @@ def test_numeric_role_signed_number_and_attribution_cannot_change_in_json_or_pla
     assert assess_blocks(packet(fact(text=claim,quote=span)),evidence) is None
     assert assessed_answer(claim.rstrip('. ')+' ('+URL+').',evidence,question='latency') is None
 
+@pytest.mark.parametrize('source_value,claim_value',[('20','−20'),('−20','20'),('20','－20'),('20','- 20')])
+def test_unicode_or_split_numeric_sign_cannot_be_lost(source_value,claim_value):
+    source=f'Service Alpha reduced latency to {source_value} milliseconds.'
+    claim=f'Service Alpha reduced latency to {claim_value} milliseconds.'
+    evidence=[{'source_url':URL,'support_span':source}]
+    assert fact_proof(claim,source,URL,evidence) is None
+    assert assessed_answer(claim.rstrip('. ')+' ('+URL+').',evidence,question='latency') is None
+
 from tests.pai_runtime_fixtures import pai,allow
 
 def test_actual_loopback_block_response_preserves_supported_subset_in_durable_worker_and_archive_transport(pai):
@@ -127,6 +135,8 @@ def test_actual_loopback_block_response_preserves_supported_subset_in_durable_wo
     ('Service Alpha reduced latency by 10 milliseconds to 40 milliseconds.','Service Alpha reduced latency by 40 milliseconds.'),
     ('Service Alpha reduced latency to 20 milliseconds.','Service Alpha reduced latency to -20 milliseconds.'),
     ('Service Alpha reported that Service Beta reduced latency to 40 milliseconds.','Service Alpha reduced latency to 40 milliseconds.'),
+    pytest.param('Service Alpha reduced latency to 20 milliseconds.','Service Alpha reduced latency to −20 milliseconds.',id='unicode_claim'),
+    pytest.param('Service Alpha reduced latency to −20 milliseconds.','Service Alpha reduced latency to 20 milliseconds.',id='unicode_source'),
 ])
 @pytest.mark.parametrize('structured',[True,False])
 def test_actual_scoped_json_and_plaintext_transports_reject_slot_mutations(pai,span,claim,structured):
@@ -171,7 +181,8 @@ def test_actual_scoped_json_and_plaintext_transports_reject_slot_mutations(pai,s
         assert outcome.text is None and outcome.status=='generated_answer_rejected' and len(calls)==2 and not pai.requests
     finally:server.shutdown();thread.join(timeout=5);server.server_close()
 
-def test_restart_cannot_trust_old_block_verifier_or_repeat_model_call(pai):
+@pytest.mark.parametrize('old_version',['fact-projection-v1','fact-projection-v2'])
+def test_restart_cannot_trust_old_block_verifier_or_repeat_model_call(pai,old_version):
     import sqlite3
     from tests.test_archive_search import _make_connection,_insert_post
     from prm.runtime.research import DurableResearchWorker,LocalArchiveReader
@@ -185,7 +196,7 @@ def test_restart_cannot_trust_old_block_verifier_or_repeat_model_call(pai):
             result=super()._gather(lease,*args)
             with root.queue.store.transaction() as tx:
                 tx.put(root.owner_ref,'result','research_synthesis_'+lease.job_id,{'status':'synthesized_verified','text':'Old unsupported fact',
-                    'verification':{'schema_version':'assistant.research_block_verification.v1','mechanism':'fact-projection-v1'}},expected_version=0)
+                    'verification':{'schema_version':'assistant.research_block_verification.v1','mechanism':old_version}},expected_version=0)
             return result
     worker=OldProofWorker(root);worker.enqueue({'schema_version':1,'question':'latency','steps':[{'source':'archive','query':'latency'}],
         'max_tool_calls':1,'deadline_seconds':60},idempotency_key='old_block_proof')

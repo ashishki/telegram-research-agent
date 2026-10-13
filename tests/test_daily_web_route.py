@@ -74,6 +74,9 @@ def test_public_projection_cannot_add_context_or_copy_private_owner_markers():
 @pytest.mark.parametrize('text,query',[
     ('What does my email say about Service Alpha renewal for PRIVATE_CANARY?','PRIVATE_CANARY'),
     ('Проверь новости о ProjectSecret из моей почты','ProjectSecret'),
+    pytest.param('Проверь новости о ProjectSecret из своей почты','ProjectSecret',id='reflexive_source'),
+    pytest.param('Проверь новости о ProjectSecret по нашим сообщениям','ProjectSecret',id='collective_source'),
+    pytest.param('What does the email I received say about PRIVATE_CANARY?','PRIVATE_CANARY',id='received_source'),
 ])
 def test_natural_private_source_forms_do_not_queue_public_discovery(pai,monkeypatch,text,query):
     provider=configure(pai,monkeypatch);grants(pai)
@@ -92,3 +95,11 @@ def test_http_last_modified_remains_modification_not_publication(monkeypatch):
     result=public._fetch_candidate(provider,{'source_url':url},bounds=PublicWebBounds(('official.example.test',)))
     assert result['publication_time'] is None and result['published_at'] is None
     assert result['modified_time'] and result['freshness_basis']=='modification'
+
+@pytest.mark.parametrize('text,query',[
+    ('Проверь новости о ProjectSecret из своей почты','ProjectSecret'),
+    ('Проверь новости о ProjectSecret по нашим сообщениям','ProjectSecret'),
+    ('What does the email I received say about PRIVATE_CANARY?','PRIVATE_CANARY'),
+])
+def test_automatic_public_projection_requires_question_without_private_source_cues(text,query):
+    assert project_public_query(text,query) is None

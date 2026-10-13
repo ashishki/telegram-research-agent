@@ -22,8 +22,14 @@ def project_public_query(owner_text,proposed):
     # references. Reject whole questions conservatively, never try to redact
     # a secret substring that a model labelled public.
     possessive=r'\b(?:my|mine|our|ours|private|personal|мой|моя|моё|мое|мои|моего|моей|мою|моему|моем|моём|моим|моими|моих|наш|наша|наши|нашего|нашей|наших)\b'
+    # Source-type wording itself may refer to private data even without an
+    # explicit possessive ("the email I received"). Automatic projection is
+    # deliberately unavailable for such questions; owner supplies a separate
+    # standalone public formulation. This is not semantic declassification.
+    private_source=r'\b(?:e[\s-]?mails?|mail(?:boxes|box|s)?|inbox|calendars?|diar(?:y|ies)|notes?|messages?|archives?|profiles?|projects?|почт\w*|письм\w*|календар\w*|дневник\w*|заметк\w*|сообщен\w*|архив\w*|профил\w*|проект\w*)\b'
+    reflexive=r'\b(?:сво(?:й|я|ё|е|и|его|ей|ю|ему|ем|ём|им|ими|их)|наш\w*)\b'
     source_reference=r'\b(?:from|in|inside|из|в|по)\s+(?:(?:the|an|a|этой|этом|этих)\s+)?(?:email|e-mail|inbox|mailbox|mail|calendar|notes?|messages?|archive|profile|почт\w*|письм\w*|календар\w*|заметк\w*|сообщени\w*|архив\w*|профил\w*)\b'
-    if re.search(possessive,original,re.I) or re.search(source_reference,original,re.I):return None
+    if any(re.search(pattern,original,re.I) for pattern in (possessive,reflexive,private_source,source_reference)):return None
     private=(*_PRIVATE_QUERY_MARKERS,'мой проект','моего проекта','для моего','my project','my mail','моя почта','мои письма','my calendar','мой календарь')
     if any(marker in original.casefold() for marker in private) or re.search(r'(?i)\b(?:token|password|секрет|пароль)\b|[\w.+-]+@[\w.-]+\.[a-z]{2,}',original):return None
     if not query or query not in original or _validate_public_query(query,original_query=original)!='accepted':return None
