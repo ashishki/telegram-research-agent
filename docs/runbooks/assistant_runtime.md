@@ -99,3 +99,8 @@ Source read, private-model egress, write and background work are separate. A mai
 ## Evidence
 
 Current398/69/10 proof, engineering117 closure, native model/control captures and portable artifacts: [PRODUCT_STATUS](../PRODUCT_STATUS.md), [Go report](../verification/PAI-go-pilot-20261010.md). Private receipts/screenshots stay outside Git; public examples contain only synthetic data. Git master integration does not start this runtime.
+
+D05/D06 model capabilities and frozen native trace procedures:
+[model protocols and daily evaluation](model_protocols_and_daily_eval.md).
+Selected text streaming/aliases never imply media, private-egress or background
+consent; known/unknown accounting and no-repeat fences remain in force.

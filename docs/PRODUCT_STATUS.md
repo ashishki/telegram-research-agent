@@ -12,8 +12,20 @@ D01–D03: original/reviewed `08fb32e`, final P1 recheck `988da0e`;
 нашёл два P1/два P2; все исправлены, P1 независимо перепроверены узко.
 Это local engineering evidence; non-Codex Go/governed review и human acceptance
 остаются открыты. Реальные аккаунты/клиенты, remote CI и пользовательская польза
-не доказаны. Следующий dependency-ready пакет — D05 + D06. Датированный baseline
+не доказаны. D05 + D06 выполнен следующим локальным пакетом; текущий срез ниже. Датированный baseline
 ниже сохранён и не объявляется новой проверкой всего продукта.
+
+**Следующий большой пакет, 13 октября — D05 + D06:** source/full local review
+`2318bbe`, focused repairs `e10365e`. Добавлены явные Chat capabilities/aliases,
+bounded HTTP/SSE, durable observed model/usage/stop и frozen manifest/trace для
+20 native synthetic tasks. [Квитанция](verification/DAILY-package-03-D05-D06-20261013.md)
+сохраняет падавшие проверки, source SHA и границы. Два P1 исправлены и закрыты
+узкой независимой перепроверкой на `e10365e`; post-fix capture завершён:
+20 cases/35 loopback model calls, offline mechanics_met:true. [Packet](evidence/daily-package-03-fixed-20261013-traces.json). Исходные20 — dev cases;
+120-unit target сохраняется, независимый holdout/quality/provider/operator
+acceptance отсутствуют. R05 P2: blocking read может задержать отмену; после
+чтения принятие просроченного результата запрещено. Следующий готовый блок —
+D04 + D10; non-Codex Go/governed gates остаются открыты.
 
 Дата среза: **10 октября 2026**. Runtime/test/independent source SHA: `0fbcfd1dde780724ad934aa66825afe17a6efc98`. Документация и Git integration изменены позднее; фактические refs — в [merge receipt](verification/PAI-master-integration-20261010.md).
 

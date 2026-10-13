@@ -35,11 +35,24 @@ pending. The new assignment did not separately authorize paid calls or select a
 review-policy replacement; do not silently claim either. No live/paid calls,
 credentials, personal accounts, production, services or timers used.
 
-Next dependency-ready coherent package: **D05 + D06** — bounded model protocol/
-capabilities/usage plus frozen synthetic evaluation and trace. Read those cards
-and relevant design/context before declaring its exact diff/review boundary.
-D04 depends on them; D57 additionally needs D24; D58 needs D19. Pending access
-never blocks independent local work. Do not rerun D01–D03/D56 or their full tiers
+**D05 + D06:** scoped Chat Completions capabilities/transport and opt-in SSE,
+actual alias/usage/stop observations without text/headers, strict native trace/
+acceptance tools and twenty frozen synthetic dev tasks. Original source/full
+review `2318bbe`; focused fix `e10365e`. [Package receipt](verification/DAILY-package-03-D05-D06-20261013.md)
+and [frozen review](verification/DAILY-package-03-local-review-20261013.md).
+Two P1 reproduced/fixed and independently closed on `e10365e`; post-fix native
+capture completed:20 cases/35 loopback model requests, mechanics_met:true.
+[Public synthetic packet](evidence/daily-package-03-fixed-20261013-traces.json)
+is verified offline; quality/provider/human acceptance remains false/unknown. R05 P2 remains: a blocking read can delay cancellation until
+return; post-read guards prevent late acceptance, not immediate interruption.
+Old capture is regression evidence; current acceptance needs the repaired packet.
+No independent holdout/provider usefulness score: initial20 are dev cases, full
+120-unit target remains. Native subsystem events and assistant turns are distinct.
+
+Next dependency-ready coherent package after local P1 closure: **D04 + D10** —
+bounded conversation planner/focus and source contracts. Read both cards/context
+before declaring diff boundaries. D07/D08 can proceed independently; D09/D14/D16
+need D10. D57 still needs D24; D58 needs D19. Do not rerun completed daily tiers
 without changed contracts, reproduced failures or substantial security risk.
 
 Cycle: coherent package → appropriate scoped checks → one fresh independent
@@ -78,7 +91,7 @@ remain dated on `0fbcfd1`. Formal draft/planned/review_required and 51 missing
 approvals remain unchanged. Legacy inputs without v2 revision pointers and
 actual simultaneous DB scheduling remain unverified; retain HTML-depth P2.
 
-Next safe command: `git show --stat d231d9a`; then read D05/D06/context refs.
-`tools/run_daily_acceptance.py` registers the five implemented daily files in
+Next safe command after local closure: `git show --stat e10365e`; read D04/D10/context refs.
+`tools/run_daily_acceptance.py` registers the seven implemented daily files in
 the existing project verifier. Run only appropriate scoped checks; no full
 historical pytest, private target or repeated immutable115–118 calls.

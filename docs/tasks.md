@@ -18,7 +18,7 @@ frozen 20-case manifest, trace/verifier and affected native fixture tests.
 Acceptance registered before implementation:
 `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python -m pytest -q tests/test_daily_model_protocols.py tests/test_daily_eval_manifest.py`.
 Regression floors: model/cost/session/acceptance tests, scoped to affected behavior.
-No provider/account/paid calls; non-Codex Go/governed review remains separate.
+Source/full local review `2318bbe`; fix/narrow P1 closure `e10365e`. No provider/account/paid calls; non-Codex Go/governed review remains separate. Next coherent block: D04 + D10.
 
 Package 2: D56, after local independent closure of DAILY01-R01/R02/R04 on
 988da0e. The owner's next-package instruction continues local work; non-Codex

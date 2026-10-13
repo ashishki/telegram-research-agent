@@ -19,7 +19,7 @@
     "engineering_done": "Следующий кодирующий агент работает законченными пакетами: реализация → адресные проверки → один независимый Deep Review накопленного diff → исправления → следующий пакет. У каждого пакета один native ingress→use case→result результат. P0/P1 исправлены и независимо перепроверены узко до зависимой работы; повторное полное ревью/все тесты без нового существенного риска не запускаются. Некритические остатки фиксируются; 62 карточки не означают 62 полных ревью. Изменения egress/secrets/retention/confirmation/recovery получают требуемое риск-ревью до реального использования.",
     "evidence": "Record exact SHA/diff, commands, pass/fail/skip, requested/observed model, public fixture hashes and unresolved live/operator gates. A test filename is not a pass. No private payloads in Git.",
     "rollback": "Отключить новую способность или вернуть предыдущий совместимый код; не откатывать consumed/unknown receipts, revoke/tombstones и canonical source IDs. Для schema changes нужен отдельный forward-compatible recovery.",
-    "verification": "D01-D03 entrypoint/controls/dispatch and D56 Telegram route/transport acceptance files now exist and are registered in project_verification. Other proposed daily tests must be created in their assigned package. Run only the affected tier; full historical pytest is prohibited.",
+    "verification": "D01-D03, D56 and D05/D06 daily acceptance files now exist and are registered in project_verification. The daily runner uses the existing strict zero-skip acceptance guard. Other proposed daily tests belong to their package; only affected tiers, no full historical pytest.",
     "formal_mapping": "PAI references mean reuse/coverage, never automatic completion or human approval. Do not modify formal statuses based solely on this plan."
   },
   "tasks": [
@@ -180,7 +180,14 @@
       "legacy": [
         "PAI-10",
         "PAI-23"
-      ]
+      ],
+      "engineering_status": "local_review_p1_closed_go_route_pending",
+      "source_sha": "2318bbe4f1e58af571583a7d3fedd3bcb55f34b1",
+      "implementation_receipt": "../../verification/DAILY-package-03-D05-D06-20261013.md",
+      "reviewed_sha": "2318bbe4f1e58af571583a7d3fedd3bcb55f34b1",
+      "final_code_sha": "e10365e4c41eb8d8585c9679450e6b2c94d96eaf",
+      "recheck_sha": "e10365e4c41eb8d8585c9679450e6b2c94d96eaf",
+      "review_receipt": "../../verification/DAILY-package-03-local-review-20261013.md"
     },
     {
       "id": "D06",
@@ -206,7 +213,14 @@
       "gate": "Эталон личной полезности дополняет владелец в D38; независимая часть готовится сейчас без его данных.",
       "legacy": [
         "PAI-26"
-      ]
+      ],
+      "engineering_status": "local_review_p1_closed_go_route_pending",
+      "source_sha": "2318bbe4f1e58af571583a7d3fedd3bcb55f34b1",
+      "implementation_receipt": "../../verification/DAILY-package-03-D05-D06-20261013.md",
+      "reviewed_sha": "2318bbe4f1e58af571583a7d3fedd3bcb55f34b1",
+      "final_code_sha": "e10365e4c41eb8d8585c9679450e6b2c94d96eaf",
+      "recheck_sha": "e10365e4c41eb8d8585c9679450e6b2c94d96eaf",
+      "review_receipt": "../../verification/DAILY-package-03-local-review-20261013.md"
     },
     {
       "id": "D07",
@@ -2557,13 +2571,53 @@
           "No personal account/client/provider or operator acceptance.",
           "Actual simultaneous DB scheduling and legacy source-pointer backfill are unverified."
         ]
+      },
+      {
+        "id": "daily-03",
+        "tasks": [
+          "D05",
+          "D06"
+        ],
+        "status": "local_review_p1_closed_go_route_pending",
+        "source_sha": "2318bbe4f1e58af571583a7d3fedd3bcb55f34b1",
+        "diff_base": "980087f92ae758e616200f57ccad1ea558aa1de4",
+        "reviewed_sha": "2318bbe4f1e58af571583a7d3fedd3bcb55f34b1",
+        "diff_sha256": "90de225bec9e1b8d21103e276447d8bd7a4d860540ad983d8b5c5d4242a1a051",
+        "receipt": "../../verification/DAILY-package-03-D05-D06-20261013.md",
+        "review_route": "independent_local_readonly",
+        "policy_go_route_satisfied": false,
+        "next_block_after_gate": [
+          "D04",
+          "D10"
+        ],
+        "live_evidence": "none",
+        "operator_acceptance": "none",
+        "final_code_sha": "e10365e4c41eb8d8585c9679450e6b2c94d96eaf",
+        "recheck_sha": "e10365e4c41eb8d8585c9679450e6b2c94d96eaf",
+        "recheck_diff_sha256": "b946977d423c651919cae11187b9bcbdee310d18924bc0499672fed0959b51ee",
+        "review_receipt": "../../verification/DAILY-package-03-local-review-20261013.md",
+        "remaining_findings": [
+          "DAILY03-R05 P2 blocking-read interruption"
+        ],
+        "limitations": [
+          "Local independent review is not non-Codex Go/governed/human acceptance.",
+          "First20 dev cases; independent holdout/quality/provider/operator evidence absent.",
+          "Trace integrity does not authenticate actual execution.",
+          "Post-read guards do not promptly interrupt one slow blocking read."
+        ],
+        "trace_receipt": "../../evidence/daily-package-03-fixed-20261013-traces.json",
+        "trace_sha256": "fb938d1c7b3ef12356ff4abecb9308bf549ec48ef4c72ac9b34d4e04e05fe35c",
+        "native_cases": 20,
+        "loopback_model_requests": 35,
+        "quality_score": null,
+        "independent_holdout": false
       }
     ],
     "live_evidence": "none",
     "operator_acceptance": "none",
     "next_dependency_ready_package": [
-      "D05",
-      "D06"
+      "D04",
+      "D10"
     ]
   }
 }

@@ -1,6 +1,6 @@
 # Приоритизированный пул исполнения
 
-62 карточки поверх существующей реализации, включая Nebula и новые возможности Telegram. Это единый backlog: отдельных очередей Telegram/Nebula нет. Источник карточек — [backlog.json](backlog.json). Исследование 11 октября не реализовывало эти задачи; назначение 13 октября разрешает последовательную локальную реализацию. D01–D03 и D56 реализованы локально; независимые local read-only reviews и узкие P1 rechecks записаны. Non-Codex Go/governed/human gates остаются открыты. Остальные карточки proposed; формальная приёмка отдельно. P0 — ближайшие препятствия полезному ежедневному контуру; P1 — развитие и качество выбранных способностей; P2 — последующие/условные улучшения, включая отложенный Canvas. Приоритет не равен обязательности: темы/Secretary имеют явные условия выбора; Mini App исключён владельцем; P2 не вычёркивает обязательные требования полного замысла.
+62 карточки поверх существующей реализации, включая Nebula и новые возможности Telegram. Это единый backlog: отдельных очередей Telegram/Nebula нет. Источник карточек — [backlog.json](backlog.json). Исследование 11 октября не реализовывало эти задачи; назначение 13 октября разрешает последовательную локальную реализацию. D01–D03, D56 и D05/D06 реализованы локально; независимые local read-only reviews и узкие P1 rechecks записаны. Non-Codex Go/governed/human gates остаются открыты. Остальные карточки proposed; формальная приёмка отдельно. P0 — ближайшие препятствия полезному ежедневному контуру; P1 — развитие и качество выбранных способностей; P2 — последующие/условные улучшения, включая отложенный Canvas. Приоритет не равен обязательности: темы/Secretary имеют явные условия выбора; Mini App исключён владельцем; P2 не вычёркивает обязательные требования полного замысла.
 
 ## Исполнение 13 октября 2026
 
@@ -8,6 +8,7 @@
 | --- | --- | --- | --- |
 | D01–D03 | Original `08fb32e`; final fix `988da0e`; 38 acceptance/safety passed, отдельный floor 52; адресные fix checks в receipt | Local full review `08fb32e`; P1 узко закрыты на `988da0e`; Go/governed pending | D56 реализован следующим пакетом |
 | D56 | Original `8b56d8e`; final fix `d231d9a`; scoped PG/loopback checks, финальные 6 passed /38.03s | Один local full review `8b56d8e`; два P1/два P2 исправлены; P1 узко закрыты на `d231d9a`; Go/governed pending | D05 + D06 |
+| D05 + D06 | Source `2318bbe`; focused fixes `e10365e`; bounded model protocols/observations и20 native dev traces; scoped checks/failures в receipt | Один local full review STOP на `2318bbe`; P1 закрыты узкой независимой перепроверкой на `e10365e`; Go/governed pending | D04 + D10 |
 
 [D01–D03 checks](../../verification/DAILY-package-01-20261013.md), [local review](../../verification/DAILY-package-01-local-review-20261013.md), [D56 checks](../../verification/DAILY-package-02-D56-20261013.md) и [local review/P1 closure](../../verification/DAILY-package-02-local-review-20261013.md) сохраняют точные argv, результаты, первоначальные ошибки и SHA/diff provenance. Local independent evidence не выдаётся за разрешённый non-Codex Go route или human acceptance. Перекрывающиеся test counts не суммируются. Реальные подключения и пользовательская польза этим не доказаны. Working branch: `codex/pa-daily-implementation-20261013`.
 
@@ -175,6 +176,8 @@ P0 · G1 · K · размер L. Зависимости: D03, D05, D06.
 <a id="d05"></a>
 ### D05 Совместимые и наблюдаемые модельные адаптеры
 
+**Engineering:** local_review_p1_closed_go_route_pending; source/full review `2318bbe`, focused fixes/narrow recheck `e10365e`. [Checks](../../verification/DAILY-package-03-D05-D06-20261013.md), [frozen review](../../verification/DAILY-package-03-local-review-20261013.md). No provider/holdout/operator acceptance; R05 blocking-read interruption P2 retained.
+
 P0 · G1 · K/R · размер M. Зависимости: нет.
 
 **Цель.** Выбранная модель работает через тот же product runtime, что и synthetic тесты.
@@ -191,6 +194,8 @@ P0 · G1 · K/R · размер M. Зависимости: нет.
 
 <a id="d06"></a>
 ### D06 Эталонные задачи и единый trace
+
+**Engineering:** local_review_p1_closed_go_route_pending; source/full review `2318bbe`, focused fixes/narrow recheck `e10365e`. [Checks](../../verification/DAILY-package-03-D05-D06-20261013.md), [frozen review](../../verification/DAILY-package-03-local-review-20261013.md). No provider/holdout/operator acceptance; R05 blocking-read interruption P2 retained.
 
 P0 · G0 · K/R · размер M. Зависимости: нет.
 

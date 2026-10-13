@@ -38,5 +38,23 @@ capture. These are dev regression fingerprints; no independent holdout, model
 quality or human usefulness is inferred. Packet/source/turn/model relationships
 are checked; the local producer/JSON is not cryptographically authenticated.
 
-Narrow independent R01/R02 recheck on the committed fix is pending. No second
-full review is requested. Non-Codex Go/governed/human gates remain open.
+Narrow independent reviewer `/root/daily03_p1_recheck` returned **PASS — R01/R02
+closed, no new P0/P1 within this fix scope** on
+`e10365e4c41eb8d8585c9679450e6b2c94d96eaf`; range `2318bbe..e10365e`, binary diff
+SHA-256 `b946977d423c651919cae11187b9bcbdee310d18924bc0499672fed0959b51ee`.
+Requested inherited defaults/no override; observed model/effort unknown. Fresh
+read-only collaboration process, no writes/pytest/DB/HTTP/provider/credentials.
+
+Independent committed-byte memory probes rejected all six delta/terminal
+cancel/deadline/source changes. Terminal cancel/deadline retained 16 partial
+characters and retry_allowed:false; unchanged stream accepted with stop/usage.
+The durable attempt/accounting paths were inspected and remain no-repeat.
+A trusted old DAILY-007 capture projected into repaired schema passed; thirteen
+independent source/ref/version/tool/status/call/model/input/result/binding/view
+mutations were denied. Source-ref/digest probes changed both object and binding;
+frozen source equality, not only two-copy disagreement, rejected them.
+Implementer PG/test counts were inspected, not independently rerun. R05 retained;
+trace integrity is not cryptographic execution authentication. No second full
+review ran. Non-Codex Go/governed/human gates remain open.
+
+Additional schema/drift checks: same P/--tb=short, `tests/test_daily_eval_manifest.py::test_capture_refuses_head_drift_before_publication tests/test_daily_eval_manifest.py::test_missing_cases_or_cross_split_source_and_scenario_leaks_fail tests/test_daily_eval_manifest.py::test_trace_requires_complete_typed_evidence_and_rejects_secret_canaries tests/test_daily_eval_manifest.py::test_suite_cannot_accept_missing_or_duplicate_cases`: exit 0, **15 passed /2.04s**.
