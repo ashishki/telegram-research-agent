@@ -1,82 +1,70 @@
-# Current assignment — daily assistant strategy and implementation handoff
+# Current assignment — local daily assistant implementation
 
-The 2026-10-11 owner assignment requests independent research, product strategy,
-architecture and an executable plan for the next coding agent. This session is
-documentation only: no product implementation, personal connections, paid model
-inference, external effects, production migrations, services or timers.
+Updated: 2026-10-13. Active owner assignment lifts the research/documentation-only
+stop and authorizes sequential local implementation of the agreed backlog.
+Branch: `codex/pa-daily-implementation-20261013`. Implementer uses the active
+session default model/reasoning, with no override. Preserve others' changes;
+no source edits on master, reset, force push or completed historical task reruns.
+Research documents were preserved unchanged at `2a1236c` (original source
+`23312b8`). The previous handoff remains in Git at `2a1236c:docs/CODEX_PROMPT.md`.
 
-Completed research packet: [strategy index](strategy/2026-10-11/README.md).
-Read that index, [code audit](strategy/2026-10-11/CODE_AUDIT.md), then only the
-assigned cards in [backlog](strategy/2026-10-11/BACKLOG.md). It contains 62 proposed
-tasks, mapped to all 69 full-spec IDs; proposed status is not implementation,
-design approval or human acceptance. The current owner allows critical redesign
-and process simplification as proposals. Existing safety/approval records remain.
+## Current package and stop point
 
-The first concrete implementation block for a subsequently assigned coding agent
-is **D01 → D02 → D03**: explicit runtime entrypoint/config check, natural job
-status/cancel/result, and a shared typed dispatcher over existing capabilities.
-Use [IMPLEMENTER_START](strategy/2026-10-11/IMPLEMENTER_START.md) for scope,
-interfaces, behavioral cases and exact commands. It can be developed locally on
-synthetic fixtures without personal access. Implementation starts only in that
-next assigned session; this research session stops after the checked packet.
+First dependency-ready package **D01–D03** is implemented locally on
+`08fb32e1a9c97f8041088e8427f9b9b80059c468`: explicit runtime profile/offline config
+check, natural status/cancel/result with durable reply bindings and opaque
+choices, and one typed dispatcher over existing capabilities.
+[Package receipt](verification/DAILY-package-01-20261013.md) records changed files,
+exact argv, passes/failures and limitations. Final focused acceptance/safety:
+38 passed, zero skips; separate regression floor: 52 passed.
 
-Owner clarification, 2026-10-11: the next coding agent implements in bounded
-packages, with Deep Review BETWEEN packages: implement, scoped checks, one
-independent review of the accumulated diff, fix findings, proceed. Recheck P0/P1
-fixes independently and narrowly; do not restart whole reviews/test suites for
-cosmetics or chase endless review cycles. Carry noncritical remaining findings
-explicitly. Sixty-two backlog cards do not imply sixty-two full review cycles.
+**Independent package Deep Review is pending; reviewed SHA is none.**
+REVIEW_POLICY selects non-Codex Go; the fresh daily assignment reserves paid
+calls for separate explicit authorization. The implementer has requested the
+scoped Go reviewer authorization or an explicit local independent alternative.
+Do not silently substitute a reviewer or reuse a historical review receipt.
+No secrets/provider calls were made in this package. Resolve the reviewer choice,
+review the committed `2a1236c..08fb32e` range once, fix findings, independently
+recheck P0/P1 narrowly, then take **D56**. Pending access/review scope does not
+block independent preparation/work on D05/D06/D10/D22.
 
-Source inspected: `23312b8` (master at research start). Current strategy branch:
-`codex/pa-daily-strategy-20261011`. Do not edit source on master, reset others'
-work or assume the old master-merge assignment authorizes a new deployment.
-Previous handoff is preserved in Git at `23312b8:docs/CODEX_PROMPT.md`.
+Cycle: coherent package → appropriate scoped checks → one fresh independent
+read-only Deep Review of the whole accumulated diff → fixes → next package.
+Reviewers do not fix/commit/push or grant acceptance. No full review after each
+routine edit; only narrow critical-finding rechecks. Outside package boundaries
+review is triggered only by substantial security risk. This current sequencing
+supersedes old ADR-015's implementation-before-verification ordering (ADR-020).
 
-Evidence baseline: runtime/test `0fbcfd1`, dated 398 active PAI checks /69 IDs/
-10 scenario groups; actual Go synthetic capture and public GitHub/Python reads;
-scoped engineering review117 ADVISORY, extreme HTML-depth P2 remains. CI guard
-correction `4c2656c` has separate review118; merge/remote CI receipt is
-[PAI-master-integration-20261010](verification/PAI-master-integration-20261010.md).
-No current personal/operator acceptance. SyntheticTarget is test-only; private
-storage and real startup require implementation and scoped selection.
+## Scope and references
 
-The strategy identifies additional code-level gaps: optional durable startup,
-command/prefix routing, early 48-item Brief truncation, transport API differences,
-and incomplete daily personalization wiring. These are static findings, not a
-claim that historical passing tests failed. Current public Go documentation
-describes coding-agent traffic; runtime suitability, account availability and
-privacy must be assessed separately from the public catalog. No new winner over
-GPT-4o is claimed; a matched experiment and calibrated judge are specified.
+Read [strategy index](strategy/2026-10-11/README.md), then the selected cards in
+[BACKLOG](strategy/2026-10-11/BACKLOG.md)/[JSON](strategy/2026-10-11/backlog.json)
+and [IMPLEMENTER_START](strategy/2026-10-11/IMPLEMENTER_START.md). One backlog
+covers 62 cards/all 69 full-spec IDs; do not reduce Chat/Search/beautiful weekly
+Brief/Watch/confirmed Act to an MVP. Mini App is explicitly excluded. Nebula
+D51–D54 plus conditional D55 are independent of deferred Canvas; lack of its
+key does not stop local tasks. Telegram D56 follows this first package;
+dependency-ready D57/D58 join the shared pilot, with conditional topics/Secretary
+kept behind their own selection/read/draft/send gates.
 
-Continue the full Chat/Search/Brief/Watch/confirmed Act programme. Canvas
-remains owner-deferred. The owner additionally requested Nebula research/tasks
-and will request an API key: read [UTD_NEBULA](strategy/2026-10-11/UTD_NEBULA.md),
-D51–D54 plus conditional D55. There is currently no Nebula client in src.
-Nebula-only must work without Canvas; api-tools is an upstream ETL CLI, not a
-required client dependency. No key/connection/implementation occurred here.
-Owner clarification: deliver a fully working daily Nebula integration, not a
-minimal adapter or smoke-only MVP. D51–D54 cover useful datasets, durable
-sync/recovery, conversation/memory, Brief/Watch and a 14-day real pilot. D55
-closes measured gaps with suitable ready-made components; choose reuse by
-quality and maintainability, not line-count minimization. D54 completes after
-D52/D53/D27; its initial key/canary preparation may happen earlier.
-These external gates do not block independent work. Do not rerun completed
-historical tasks/reviews, immutable115/116/117 calls or full historical pytest.
-Do not forge the 51 missing formal approvals. Use current REVIEW_POLICY and the
-pinned tools/playbook.py entrypoint; keep engineering evidence separate from
-provider, visual, operator and formal acceptance.
+Follow ASSISTANT_BOUNDARIES, IMPLEMENTATION_CONTRACT, REVIEW_POLICY,
+PLAYBOOK_ADOPTION and pinned `tools/playbook.py`. No private corpus, messages,
+account IDs or credentials in Git/logs/reviewer packets. Do not read .env or
+personal DBs for local work. Personal connections, production/migrations,
+services/timers, paid calls and external actions require separate explicit
+scope. Configured keys never imply source, model egress, write or background
+consent. Preserve unknown effects and exact owner/version/expiry/one-use
+confirmations. Publication/merge/human acceptance are separate decisions.
 
-Telegram changes are integrated into this same backlog, not a separate roadmap.
-Read [TELEGRAM](strategy/2026-10-11/TELEGRAM.md) only as the design/evidence
-reference for assigned cards. After D01–D03, take D56; then dependency-ready
-D57/D58 feed the shared D27/D40 pilot. D59 topics are experimental; selected
-Secretary D60→D61→D62 separates read, local draft and confirmed send. Mini App is explicitly excluded by the owner; do not implement or reintroduce it
-as a conditional task. D25 remains an ordinary private reader. The optional
-topics/Secretary branches do not block the core assistant. Official API availability is not observed bot/client support.
-The only implementer handoff remains IMPLEMENTER_START; no separate TG phases.
+After each package update backlog and this handoff with changed files, commands
+and outcomes, reviewed SHA/provenance, noncritical findings, remaining gates and
+next block. Distinguish local fixtures/checks, actual provider/account/client
+connections, rendered visual evidence, CI and confirmed operator usefulness.
+Historical 398 PAI/69 IDs/10 groups and provider/review117 evidence remain dated
+on `0fbcfd1`; this package did not rerun or replace those results. Formal PA/PAI
+draft/planned/review_required states and 51 missing approvals remain unchanged.
 
-Next safe command:
-`PYTHONPATH=src .venv-pai/bin/python -m prm.cli --help`.
-
-Research commands/results, changed files and unresolved gates:
-[RESEARCH_RECEIPT](strategy/2026-10-11/RESEARCH_RECEIPT.md).
+Next safe command: `git show --stat 08fb32e`.
+Acceptance registration: `tools/run_daily_acceptance.py` runs only the three
+new daily files; the canonical project verifier includes that scoped check.
+Do not run the full historical pytest suite or repeat immutable115–118 calls.

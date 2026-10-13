@@ -2,7 +2,8 @@
 
 Date: 2026-10-13. Branch: `codex/pa-daily-implementation-20261013`.
 Implementation base: `2a1236c` (preserved research packet, original source
-`23312b8`). Scope: D01–D03. Independent review: **pending**; reviewed SHA:
+`23312b8`). Frozen code commit: `08fb32e1a9c97f8041088e8427f9b9b80059c468`.
+Scope: D01–D03. Independent review: **pending**; reviewed SHA:
 **none**. No model/provider request was made for this package.
 
 ## Implemented result
@@ -44,10 +45,20 @@ no skips or live/provider/account evidence are inferred.
 - `.venv-pai/bin/python tools/check_pai_plan.py`: exit 0, 32 registered packets/69 IDs/10 scenarios, two planned conditional test files absent; draft states preserved.
 - `.venv-pai/bin/python tools/playbook.py --check-pin`: exit 0; pin unchanged.
 - `git diff --check`: exit 0.
+- `.venv-pai/bin/python tools/playbook.py playbook_validate --root . --check tasks --check references`: first exit 1 with 52 errors (51 preserved missing formal approvals plus one branch name mistaken for a file reference). Removed inline-code formatting from the branch name in tasks.md; the missing formal approvals are not filled or weakened.
+- After that fix, `.venv-pai/bin/python tools/playbook.py playbook_validate --root . --check references`: exit 0, zero errors/warnings.
 - `PYTHONPATH=src .venv-pai/bin/python -m prm.cli runtime-check --mode compatibility`: exit 0, configured compatibility profile; observed process/schema/grants unknown.
 - `.venv-pai/bin/python -m compileall -q src/prm/runtime/config.py src/prm/runtime/dispatch.py src/prm/runtime/job_controls.py src/prm/storage/telegram.py src/prm/telegram_contracts.py`: exit 0.
 
 ## Review boundary and remaining evidence
+
+[Actual local synthetic transcript](../evidence/daily-package-01-20261013-transcript.json)
+records eight events through `runtime_from_config`, `TelegramJobIngress`, the
+real worker and result store. A and B are queued, ambiguity changes neither,
+reply cancels A, B completes, return-result retains its delivery scope gate.
+Capture argv: `PYTHONPATH=src .venv-pai/bin/python -` with the inline synthetic
+PostgresSandbox harness; exit 0. No Telegram/account/provider connection or
+screenshot is claimed. No secret/configuration file was read by the harness.
 
 No independent review or human acceptance is claimed. Current REVIEW_POLICY
 selects a non-Codex Go reviewer. The fresh assignment restricts paid requests

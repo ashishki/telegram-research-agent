@@ -1,0 +1,216 @@
+{
+  "schema_version": "daily.synthetic_transcript.v1",
+  "source_sha": "08fb32e1a9c97f8041088e8427f9b9b80059c468",
+  "data_scope": "public_synthetic_only",
+  "real_provider_calls": 0,
+  "telegram_account_connected": false,
+  "operator_acceptance": false,
+  "turns": [
+    {
+      "input": {
+        "update_id": 1,
+        "message": {
+          "from": {
+            "id": 42
+          },
+          "chat": {
+            "id": 42,
+            "type": "private"
+          },
+          "text": "Что с задачей?"
+        }
+      },
+      "reply": {
+        "text": "Нет подходящей задачи. Можно отправить новый запрос.",
+        "request_ref": null,
+        "job_id": null,
+        "navigation": null
+      }
+    },
+    {
+      "input": {
+        "update_id": 2,
+        "message": {
+          "from": {
+            "id": 42
+          },
+          "chat": {
+            "id": 42,
+            "type": "private"
+          },
+          "text": "/chat Synthetic task A",
+          "message_id": 20
+        }
+      },
+      "reply": {
+        "text": "Запрос сохранён. Задача job_2e52566347ef464eb1503cc18c266080. /status job_2e52566347ef464eb1503cc18c266080",
+        "request_ref": "request_eea623345dd1ae9c836855888e48e925",
+        "job_id": "job_2e52566347ef464eb1503cc18c266080",
+        "navigation": null
+      }
+    },
+    {
+      "input": {
+        "update_id": 3,
+        "message": {
+          "from": {
+            "id": 42
+          },
+          "chat": {
+            "id": 42,
+            "type": "private"
+          },
+          "text": "/chat Synthetic task B",
+          "message_id": 21
+        }
+      },
+      "reply": {
+        "text": "Запрос сохранён. Задача job_cbfdf25b36954a4f9b9648ce0a039f07. /status job_cbfdf25b36954a4f9b9648ce0a039f07",
+        "request_ref": "request_42be4c863dfa0f7c3a52a126dc96e2a1",
+        "job_id": "job_cbfdf25b36954a4f9b9648ce0a039f07",
+        "navigation": null
+      }
+    },
+    {
+      "input": {
+        "update_id": 4,
+        "message": {
+          "from": {
+            "id": 42
+          },
+          "chat": {
+            "id": 42,
+            "type": "private"
+          },
+          "text": "Стоп"
+        }
+      },
+      "reply": {
+        "text": "Выбери задачу:\n1. Synthetic task B\n2. Synthetic task A",
+        "request_ref": null,
+        "job_id": null,
+        "navigation": {
+          "kind": "inline_keyboard",
+          "inline_keyboard": [
+            [
+              {
+                "text": "Synthetic task B",
+                "callback_data": "paic:8964c35219c74948bf577992e80fa2f5"
+              }
+            ],
+            [
+              {
+                "text": "Synthetic task A",
+                "callback_data": "paic:d6fc44c08faf4d0ba2cc32b7788286b8"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "input": {
+        "update_id": 5,
+        "message": {
+          "from": {
+            "id": 42
+          },
+          "chat": {
+            "id": 42,
+            "type": "private"
+          },
+          "text": "Стоп",
+          "reply_to_message": {
+            "message_id": 20
+          }
+        }
+      },
+      "reply": {
+        "text": "Задача отменена.",
+        "request_ref": null,
+        "job_id": "job_2e52566347ef464eb1503cc18c266080",
+        "navigation": null
+      }
+    },
+    {
+      "input": {
+        "update_id": 6,
+        "message": {
+          "from": {
+            "id": 42
+          },
+          "chat": {
+            "id": 42,
+            "type": "private"
+          },
+          "text": "Что с задачей?"
+        }
+      },
+      "reply": {
+        "text": "job_cbfdf25b36954a4f9b9648ce0a039f07: queued; попытка 0.",
+        "request_ref": null,
+        "job_id": "job_cbfdf25b36954a4f9b9648ce0a039f07",
+        "navigation": null
+      }
+    },
+    {
+      "worker_result": {
+        "text": "Свободный AI-ответ требует отдельного активного разрешения на передачу только этого сообщения модели. История, архив и прошлые ответы не отправлялись.",
+        "status": "provider_egress_required",
+        "payload": {
+          "reason": "no_current_model_egress_authorization",
+          "conversation": {
+            "retention": "ephemeral_clear_on_restart",
+            "response_refs": [
+              "response_107838b8ba74caf74de7d875"
+            ],
+            "conversation_id": "conversation_e15fac365faea36a230d81ad",
+            "summary_version": 2,
+            "has_current_confirmation": false
+          },
+          "safe_context": {
+            "omitted_state": [
+              "prior_messages",
+              "response_objects",
+              "topic_summary",
+              "confirmations"
+            ]
+          },
+          "source_data_class": "user_provided",
+          "source_data_classes": [
+            "user_provided"
+          ],
+          "model_call_attempted": false
+        },
+        "data_class": "user_provided",
+        "request_ref": "request_42be4c863dfa0f7c3a52a126dc96e2a1",
+        "data_classes": [
+          "user_provided"
+        ],
+        "interaction_id": "bf8201f8-85fd-43c2-8286-54ebfd440d14"
+      },
+      "result_ref": "result_job_cbfdf25b36954a4f9b9648ce0a039f07"
+    },
+    {
+      "input": {
+        "update_id": 7,
+        "message": {
+          "from": {
+            "id": 42
+          },
+          "chat": {
+            "id": 42,
+            "type": "private"
+          },
+          "text": "Верни результат"
+        }
+      },
+      "reply": {
+        "text": "Результат готов. Для отправки нужен отдельный действующий scope доставки; приватный reader и CLI доступны оператору.",
+        "request_ref": null,
+        "job_id": "job_cbfdf25b36954a4f9b9648ce0a039f07",
+        "navigation": null
+      }
+    }
+  ]
+}

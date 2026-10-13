@@ -2,8 +2,8 @@
   "schema_version": "pa.daily_strategy.backlog.v1",
   "date": "2026-10-11",
   "base_commit": "23312b8",
-  "status": "proposed_not_implemented",
-  "authority": "Research and implementation planning only in this session; future execution requires the assigned block. No live connections, private egress, production changes or external effects are authorized by this file.",
+  "status": "local_implementation_in_progress",
+  "authority": "2026-10-13 owner assignment authorizes sequential local synthetic implementation in coherent packages. Personal connections, production, paid calls and external effects require separate explicit authorization. Formal feature/design/human acceptance remains separate.",
   "legend": {
     "K": "Код и synthetic проверки",
     "C": "Конфигурация без личных секретов",
@@ -19,7 +19,7 @@
     "engineering_done": "Следующий кодирующий агент работает законченными пакетами: реализация → адресные проверки → один независимый Deep Review накопленного diff → исправления → следующий пакет. У каждого пакета один native ingress→use case→result результат. P0/P1 исправлены и независимо перепроверены узко до зависимой работы; повторное полное ревью/все тесты без нового существенного риска не запускаются. Некритические остатки фиксируются; 62 карточки не означают 62 полных ревью. Изменения egress/secrets/retention/confirmation/recovery получают требуемое риск-ревью до реального использования.",
     "evidence": "Record exact SHA/diff, commands, pass/fail/skip, requested/observed model, public fixture hashes and unresolved live/operator gates. A test filename is not a pass. No private payloads in Git.",
     "rollback": "Отключить новую способность или вернуть предыдущий совместимый код; не откатывать consumed/unknown receipts, revoke/tombstones и canonical source IDs. Для schema changes нужен отдельный forward-compatible recovery.",
-    "verification": "Существующие test paths перечислены как regression floor; предложенные tests/test_daily_* ещё не существуют и должны быть написаны/зарегистрированы. Только затронутый tier; полный исторический pytest запрещён.",
+    "verification": "Existing test paths are regression floors. D01-D03 daily entrypoint/controls/dispatch acceptance files now exist and are registered in project_verification; other proposed daily tests must be created in their assigned package. Only the affected tier; full historical pytest is prohibited.",
     "formal_mapping": "PAI references mean reuse/coverage, never automatic completion or human approval. Do not modify formal statuses based solely on this plan."
   },
   "tasks": [
@@ -49,7 +49,10 @@
         "PAI-07",
         "PAI-24",
         "PAI-28"
-      ]
+      ],
+      "engineering_status": "implemented_locally_review_pending",
+      "implementation_receipt": "../../verification/DAILY-package-01-20261013.md",
+      "source_sha": "08fb32e1a9c97f8041088e8427f9b9b80059c468"
     },
     {
       "id": "D02",
@@ -77,7 +80,10 @@
         "PAI-06",
         "PAI-07",
         "PAI-09"
-      ]
+      ],
+      "engineering_status": "implemented_locally_review_pending",
+      "implementation_receipt": "../../verification/DAILY-package-01-20261013.md",
+      "source_sha": "08fb32e1a9c97f8041088e8427f9b9b80059c468"
     },
     {
       "id": "D03",
@@ -107,7 +113,10 @@
         "PAI-07",
         "PAI-10",
         "PAI-14"
-      ]
+      ],
+      "engineering_status": "implemented_locally_review_pending",
+      "implementation_receipt": "../../verification/DAILY-package-01-20261013.md",
+      "source_sha": "08fb32e1a9c97f8041088e8427f9b9b80059c468"
     },
     {
       "id": "D04",
@@ -2478,5 +2487,30 @@
       "decision": "excluded_by_owner",
       "effect": "Removed D63 from executable backlog, requirement coverage and rollout; ordinary private reader D25 and native rich reports D58 remain."
     }
-  ]
+  ],
+  "implementation": {
+    "assignment_date": "2026-10-13",
+    "branch": "codex/pa-daily-implementation-20261013",
+    "packages": [
+      {
+        "id": "daily-01",
+        "tasks": [
+          "D01",
+          "D02",
+          "D03"
+        ],
+        "status": "implemented_locally_review_pending",
+        "source_sha": "08fb32e1a9c97f8041088e8427f9b9b80059c468",
+        "diff_base": "2a1236c",
+        "diff_sha256": "c246840e13aa5742167e329f3eadcfbbdfc67ec22d9d876085d1bc2b64bba84a",
+        "reviewed_sha": null,
+        "receipt": "../../verification/DAILY-package-01-20261013.md",
+        "next_block_after_gate": [
+          "D56"
+        ]
+      }
+    ],
+    "live_evidence": "none",
+    "operator_acceptance": "none"
+  }
 }

@@ -1,6 +1,14 @@
 # Приоритизированный пул исполнения
 
-62 карточки поверх существующей реализации, включая Nebula и новые возможности Telegram. Это единый backlog: отдельных очередей Telegram/Nebula нет. Источник карточек — [backlog.json](backlog.json); этот документ сгенерирован из него. Статус всех карточек: **proposed**, работы не выполнены этим исследованием. P0 — ближайшие препятствия полезному ежедневному контуру; P1 — развитие и качество выбранных способностей; P2 — последующие/условные улучшения, включая отложенный Canvas. Приоритет не равен обязательности: темы/Secretary имеют явные условия выбора; Mini App исключён владельцем; P2 не вычёркивает обязательные требования полного замысла.
+62 карточки поверх существующей реализации, включая Nebula и новые возможности Telegram. Это единый backlog: отдельных очередей Telegram/Nebula нет. Источник карточек — [backlog.json](backlog.json). Исследование 11 октября не реализовывало эти задачи; назначение 13 октября разрешает последовательную локальную реализацию. D01–D03 реализованы локально на `08fb32e`, независимый review pending. Остальные карточки proposed; формальная приёмка отдельно. P0 — ближайшие препятствия полезному ежедневному контуру; P1 — развитие и качество выбранных способностей; P2 — последующие/условные улучшения, включая отложенный Canvas. Приоритет не равен обязательности: темы/Secretary имеют явные условия выбора; Mini App исключён владельцем; P2 не вычёркивает обязательные требования полного замысла.
+
+## Исполнение 13 октября 2026
+
+| Пакет | Код и локальные проверки | Deep Review | Следующий блок |
+| --- | --- | --- | --- |
+| D01–D03 | `08fb32e`; 32 новых acceptance + 6 safety holdouts = 38 passed; отдельный regression floor 52 passed | pending; reviewed SHA отсутствует; нужен scoped Go-review либо явно выбранная локальная замена | D56 после review gate |
+
+[Квитанция пакета](../../verification/DAILY-package-01-20261013.md) сохраняет точные argv, результаты и первоначальные ошибки. Реальные подключения и пользовательская польза этим не доказаны. Working branch: `codex/pa-daily-implementation-20261013`.
 
 Типы: **K** код, **C** настройка, **L** реальное подключение, **H** решение/оценка владельца, **R** исследование/измерение. Размер S — один небольшой срез; M — 2–3 среза; L — разбить до начала. Это относительная сложность, не обещанные сроки.
 
@@ -16,7 +24,7 @@ Record exact SHA/diff, commands, pass/fail/skip, requested/observed model, publi
 
 Отключить новую способность или вернуть предыдущий совместимый код; не откатывать consumed/unknown receipts, revoke/tombstones и canonical source IDs. Для schema changes нужен отдельный forward-compatible recovery.
 
-Существующие test paths перечислены как regression floor; предложенные tests/test_daily_* ещё не существуют и должны быть написаны/зарегистрированы. Только затронутый tier; полный исторический pytest запрещён.
+Существующие test paths перечислены как regression floor. Для D01–D03 tests/test_daily_entrypoint.py, test_daily_controls.py и test_daily_dispatch.py созданы и зарегистрированы; прочие предложенные daily-тесты создаются в своих пакетах. Только затронутый tier; полный исторический pytest запрещён.
 
 PAI references mean reuse/coverage, never automatic completion or human approval. Do not modify formal statuses based solely on this plan.
 
@@ -92,6 +100,8 @@ PAI references mean reuse/coverage, never automatic completion or human approval
 <a id="d01"></a>
 ### D01 Однозначный runtime и безопасная проверка готовности
 
+**Engineering:** implemented_locally_review_pending, source `08fb32e`, [evidence](../../verification/DAILY-package-01-20261013.md). Formal/live/operator acceptance не заявлена.
+
 P0 · G0 · K/C · размер M. Зависимости: нет.
 
 **Цель.** Исполнитель и владелец понимают, какой путь реально будет запущен и чего ему не хватает.
@@ -109,6 +119,8 @@ P0 · G0 · K/C · размер M. Зависимости: нет.
 <a id="d02"></a>
 ### D02 Статус отмена и возврат к задаче без ID
 
+**Engineering:** implemented_locally_review_pending, source `08fb32e`, [evidence](../../verification/DAILY-package-01-20261013.md). D56 завершит outbound receipts, callback ack и route envelopes.
+
 P0 · G0 · K · размер M. Зависимости: D01.
 
 **Цель.** Длительная работа не заставляет владельца администрировать очередь.
@@ -125,6 +137,8 @@ P0 · G0 · K · размер M. Зависимости: D01.
 
 <a id="d03"></a>
 ### D03 Один типизированный диспетчер существующих способностей
+
+**Engineering:** implemented_locally_review_pending, source `08fb32e`, [evidence](../../verification/DAILY-package-01-20261013.md). Это ограниченный deterministic mapping; универсальный planner и устойчивый фокус остаются D04.
 
 P0 · G0 · K · размер M. Зависимости: D01, D02.
 

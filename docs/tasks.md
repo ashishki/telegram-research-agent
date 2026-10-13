@@ -13,7 +13,7 @@ Historical PRM-SN/RFX/UTD task records are preserved byte-for-byte at `docs/task
 ## Local daily implementation — 2026-10-13
 
 The owner's active assignment lifts the research-only stop for local synthetic
-implementation. Working branch: `codex/pa-daily-implementation-20261013`.
+implementation. Working branch: codex/pa-daily-implementation-20261013.
 Package 1 is D01–D03, followed by D56 after the independent package gate.
 Acceptance registered before implementation:
 `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python -m pytest -q tests/test_daily_entrypoint.py tests/test_daily_controls.py tests/test_daily_dispatch.py`.

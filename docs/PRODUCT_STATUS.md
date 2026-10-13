@@ -1,5 +1,15 @@
 # Подробный статус Personal AI Assistant
 
+**Локальная реализация, 13 октября:** в ветке `codex/pa-daily-implementation-20261013`
+выполнен первый пакет daily backlog D01–D03 (`08fb32e`): explicit durable/compatibility
+entrypoint, offline config-check, typed dispatch и естественные job controls с
+durable reply bindings. [Квитанция](verification/DAILY-package-01-20261013.md):
+38 адресных проверок прошли, отдельно 52 regression floor. Независимый review
+нового пакета pending; reviewed SHA пока нет. Эти результаты не добавляют real
+provider/account evidence, remote CI или подтверждённую пользовательскую пользу.
+Следующий зависимый пакет — D56 после review gate. Датированный baseline ниже
+сохранён и не объявляется новой проверкой всего продукта.
+
 Дата среза: **10 октября 2026**. Runtime/test/independent source SHA: `0fbcfd1dde780724ad934aa66825afe17a6efc98`. Документация и Git integration изменены позднее; фактические refs — в [merge receipt](verification/PAI-master-integration-20261010.md).
 
 **Уточнение по Nebula, 11 октября:** [аудит двух upstream-репозиториев и пакет подключения](strategy/2026-10-11/UTD_NEBULA.md). Клиент Nebula в текущем коде отсутствует; существующие UTD watch и Canvas — другие интеграции. Владелец запросит ключ. Подготовлены D51–D54 для полноценной рабочей интеграции (включая recovery и 14-дневную приёмку) и условная D55 для закрытия пробелов через api-tools/официальный источник; Canvas остаётся отдельно отложенным. Исторические строки об отсрочке UTD/API ниже описывают состояние до этого уточнения; ни одной live-проверки Nebula пока нет.
