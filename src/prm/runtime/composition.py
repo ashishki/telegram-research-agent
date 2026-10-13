@@ -62,7 +62,7 @@ class AssistantRuntime:
             from .cost_cache import CostCacheRuntime
             with self.queue.store.transaction() as tx:
                 if tx.conn.execute("SELECT to_regclass('pa_cache.usage') AS meta").fetchone()['meta'] is None:return
-            cost=CostCacheRuntime(self).record(task_ref=task_ref,attempt_ref=attempt_ref,provider=endpoint.provider_ref,model=endpoint.model,
+            cost=CostCacheRuntime(self).record(task_ref=task_ref,attempt_ref=attempt_ref,provider=endpoint.provider_ref,model=receipt.model,
                 usage=usage,latency_ms=receipt.duration_ms,outcome=receipt.delivery_outcome,tariff_version=self.tariff_version)
             if cost is not None:
                 for index,group in enumerate(observed_groups):self.registry.settle(self.owner_ref,group[0].operation_ref,outcome='accepted',actual=cost if index==0 else 0)

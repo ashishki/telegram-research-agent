@@ -11,7 +11,8 @@ from llm.client import LLMCompletionReceipt, LLMOutcomeUnknown
 from prm.capabilities import CapabilityDenied, AuthorizationDecision
 from prm.storage.policy import DurableCapabilityRegistry,ScopePreparationUnknown
 from prm.storage.postgres import StorageError
-from .model_errors import ModelResponseInvalid,ModelAccountingReceipt,ModelPreparationUnknown,ModelAccountingUnconfirmed
+from .model_errors import ModelResponseInvalid,ModelAccountingReceipt,ModelPreparationUnknown,ModelAccountingUnconfirmed,ModelCompletionReceipt,ModelProviderRejected,ModelStreamInterrupted
+from .model_protocol import ChatCapabilities,ChatCompletionsTransport
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -28,12 +29,19 @@ class ModelEndpoint:
     token: str = field(repr=False, compare=False)
     timeout_seconds: int = 8
     synthetic_http: bool = False
+    capabilities: ChatCapabilities | dict | None = None
 
     def __post_init__(self):
-        url=urlsplit(self.endpoint)
+        try:
+            url=urlsplit(self.endpoint);url.port
+        except (ValueError,AttributeError):raise StorageError('invalid explicit model endpoint') from None
+        if self.capabilities is not None:
+            object.__setattr__(self,'capabilities',ChatCapabilities.from_mapping(self.capabilities))
+            self.capabilities.validate_route(self.endpoint,synthetic_http=self.synthetic_http)
         if (not self.provider_ref.startswith('provider_') or not self.connection_ref.startswith('connection_')
             or not self.model or len(self.model)>128 or not isinstance(self.token,str)
-            or '\n' in self.token or '\r' in self.token or url.username or url.password or url.fragment
+            or '\n' in self.token or '\r' in self.token or url.username or url.password or url.fragment or url.query
+            or type(self.synthetic_http)is not bool
             or type(self.timeout_seconds) is not int or not 1<=self.timeout_seconds<=120):
             raise StorageError('explicit bounded model endpoint required')
         if self.synthetic_http:
@@ -70,7 +78,13 @@ class ScopedModelClient:
         self.history=tuple(history);self.guard=guard
         self.usage_observer=usage_observer;self.task_ref=task_ref;self.attempt_ref=None;self._called=False;self.input_digest=None
 
-    def complete_with_receipt(self,*,prompt,system,max_tokens,category,authorization,data_class,owner_ref,connection_ref,resource_ref):
+    def stream_with_receipt(self,*,on_event,cancelled=None,**kwargs):
+        return self._complete(stream=True,on_event=on_event,cancelled=cancelled,**kwargs)
+
+    def complete_with_receipt(self,**kwargs):
+        return self._complete(**kwargs)
+
+    def _complete(self,*,prompt,system,max_tokens,category,authorization,data_class,owner_ref,connection_ref,resource_ref,stream=False,on_event=None,cancelled=None):
         endpoint=self.endpoint
         if (authorization is not self.groups[0][0] or authorization.provider_ref!=endpoint.provider_ref
             or connection_ref!=endpoint.connection_ref or owner_ref!=authorization.owner_ref
@@ -86,9 +100,8 @@ class ScopedModelClient:
                 raise StorageError('invalid bounded history')
             messages.append(dict(item))
         messages.append({'role':'user','content':prompt})
-        body=json.dumps({'model':endpoint.model,'messages':messages,'max_completion_tokens':max_tokens,
-                         'store':False,'stream':False},ensure_ascii=False).encode()
-        if len(body)>48000:raise StorageError('model request exceeds bounded scope')
+        adapter=ChatCompletionsTransport(endpoint)
+        body=adapter.encode(messages,max_tokens,stream=stream)
         from .model_attempts import prepare_model_attempt,ModelAttemptAlreadyRecorded
         operations=tuple(group[0].operation_ref for group in self.groups)
         digest=hashlib.sha256(body).hexdigest()
@@ -100,48 +113,22 @@ class ScopedModelClient:
             purpose=self.groups[0][0].purpose,operation_refs=operations,input_digest=digest)
         started=time.monotonic();http_attempted=False;known_reply_error=None;accepted_reply=None;accounting_unconfirmed=False
         def transport():
-            nonlocal http_attempted
-            if self.guard:self.guard()
-            headers={'Content-Type':'application/json'}
-            if endpoint.token:headers['Authorization']='Bearer '+endpoint.token
-            request=Request(endpoint.endpoint,data=body,headers=headers,method='POST')
-            http_attempted=True
-            with build_opener(ProxyHandler({}),NoRedirect()).open(request,timeout=endpoint.timeout_seconds) as response:
-                if response.headers.get_content_type()!='application/json':raise ModelResponseInvalid()
-                raw=response.read(1048577)
-                if len(raw)>1048576:raise ModelResponseInvalid()
-                try:value=json.loads(raw)
-                except (ValueError,UnicodeError):raise ModelResponseInvalid() from None
-            if not isinstance(value,dict):raise ModelResponseInvalid()
-            choices=value.get('choices')
-            if value.get('model')!=endpoint.model or not isinstance(choices,list) or len(choices)!=1:
-                raise ModelResponseInvalid()
-            choice=choices[0]
-            if not isinstance(choice,dict) or not isinstance(choice.get('message'),dict):raise ModelResponseInvalid()
-            if choice.get('finish_reason')!='stop' or choice['message'].get('tool_calls'):
-                raise ModelResponseInvalid()
-            text=choice.get('message',{}).get('content')
-            if not isinstance(text,str) or not text.strip() or len(text.encode())>24000:raise ModelResponseInvalid()
-            usage=value.get('usage',{})
-            if not isinstance(usage,dict):raise ModelResponseInvalid()
-            for key in ('prompt_tokens','completion_tokens'):
-                if type(usage.get(key))is not int or not 0<=usage[key]<=1000000:raise ModelResponseInvalid()
-            for detail,key,total in (('prompt_tokens_details','cached_tokens','prompt_tokens'),('completion_tokens_details','reasoning_tokens','completion_tokens')):
-                entry=usage.get(detail,{})
-                if not isinstance(entry,dict) or type(entry.get(key,0))is not int or not 0<=entry.get(key,0)<=usage[total]:raise ModelResponseInvalid()
-            return text,usage
+            def attempted():
+                nonlocal http_attempted
+                http_attempted=True
+            return adapter.send(body,before_request=attempted,on_event=on_event,cancelled=cancelled,guard=self.guard)
         def checked_transport():
             nonlocal known_reply_error,accepted_reply
             try:
                 accepted_reply=transport();return accepted_reply
-            except ModelResponseInvalid as error:
+            except (ModelResponseInvalid,ModelProviderRejected,ModelStreamInterrupted) as error:
                 known_reply_error=error;raise
         try:
             reservations=tuple(tuple(decision.reservation for decision in group) for group in self.groups)
             if endpoint.timeout_seconds<=8:
-                text,usage=self.registry.execute_reserved_groups(reservations,checked_transport)
+                reply=self.registry.execute_reserved_groups(reservations,checked_transport)
             else:
-                text,usage=self.registry.execute_reserved_groups(reservations,checked_transport,model_timeout_seconds=endpoint.timeout_seconds)
+                reply=self.registry.execute_reserved_groups(reservations,checked_transport,model_timeout_seconds=endpoint.timeout_seconds)
         except CapabilityDenied:raise
         except ScopePreparationUnknown as error:
             raise ScopePreparationUnknown(error.operation_refs,attempt_ref=self.attempt_ref) from None
@@ -149,33 +136,35 @@ class ScopedModelClient:
             if accepted_reply is not None:
                 # The reply was positively observed even if final settlement
                 # lost its acknowledgement. Preserve it without another call.
-                text,usage=accepted_reply;accounting_unconfirmed=True
+                reply=accepted_reply;accounting_unconfirmed=True
             elif not http_attempted:
                 raise ModelPreparationUnknown(self.attempt_ref,operations) from None
             else:
-                unknown=LLMCompletionReceipt(text='',model=endpoint.model,input_tokens=0,output_tokens=0,
+                unknown=ModelCompletionReceipt(text='',model=endpoint.model,requested_model=endpoint.model,input_tokens=0,output_tokens=0,
                     estimated_cost_usd=None,duration_ms=int((time.monotonic()-started)*1000),attempts=1,usage_recorded=False,
-                    external_call_attempted=http_attempted,delivery_outcome='unknown')
+                    external_call_attempted=http_attempted,delivery_outcome='rejected' if isinstance(known_reply_error,ModelProviderRejected) else 'unknown')
                 # Compound execution may wrap the original validation error.
                 error=known_reply_error or LLMOutcomeUnknown(unknown)
                 error.operation_refs=operations;error.attempt_ref=self.attempt_ref;error.retry_allowed=False
                 if self.usage_observer:
                     try:self.usage_observer(unknown,{'input':None,'cached_input':None,'cache_write':None,'output':None,'reasoning':None,
-                        'semantics':'invalid_provider_response' if known_reply_error else 'unknown_outcome'},self.groups)
+                        'semantics':known_reply_error.reason_kind if known_reply_error else 'unknown_outcome'},self.groups)
                     except Exception:error.accounting_status='unconfirmed'
                 raise error from None
-        receipt=LLMCompletionReceipt(text=text,model=endpoint.model,input_tokens=usage['prompt_tokens'],
-            output_tokens=usage['completion_tokens'],estimated_cost_usd=None,duration_ms=int((time.monotonic()-started)*1000),
+        receipt=ModelCompletionReceipt(text=reply.text,model=reply.observed_model,requested_model=reply.requested_model,
+            observed_model=reply.observed_model,finish_reason=reply.finish_reason,input_tokens=reply.usage['input'],
+            output_tokens=reply.usage['output'],estimated_cost_usd=None,duration_ms=int((time.monotonic()-started)*1000),
             attempts=1,usage_recorded=False,external_call_attempted=True,delivery_outcome='accepted')
+        from .model_attempts import record_model_observation
+        try:record_model_observation(self.registry.store,owner=owner_ref,attempt_ref=self.attempt_ref,operation_refs=operations,receipt=receipt,usage=reply.usage)
+        except Exception:accounting_unconfirmed=True
         if self.usage_observer:
-            normalized={'input':usage['prompt_tokens'],'cached_input':usage.get('prompt_tokens_details',{}).get('cached_tokens',0),
-                        'cache_write':0,'output':usage['completion_tokens'],'reasoning':usage.get('completion_tokens_details',{}).get('reasoning_tokens',0),
-                        'semantics':'openai_chat_output_includes_reasoning' if endpoint.provider_ref=='provider_openai' else 'unknown_compatible_provider'}
+            normalized=reply.usage
             try:self.usage_observer(receipt,normalized,self.groups)
             except Exception:accounting_unconfirmed=True
         if accounting_unconfirmed:
             from .model_attempts import record_accounting_unconfirmed
-            unconfirmed=ModelAccountingReceipt(**{item.name:getattr(receipt,item.name) for item in fields(LLMCompletionReceipt)},
+            unconfirmed=ModelAccountingReceipt(**{item.name:getattr(receipt,item.name) for item in fields(ModelCompletionReceipt)},
                 attempt_ref=self.attempt_ref,operation_refs=operations)
             try:record_accounting_unconfirmed(self.registry.store,owner=owner_ref,receipt=unconfirmed)
             except Exception:raise ModelAccountingUnconfirmed(unconfirmed) from None

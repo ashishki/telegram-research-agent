@@ -49,6 +49,7 @@ def verify_report(path: Path, *, matrix: dict | None = None) -> tuple[bool, str]
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--require-spec-matrix', action='store_true')
+    parser.add_argument('--daily-traces',type=Path,help='also verify an existing frozen local trace packet offline')
     args, pytest_args = parser.parse_known_args(argv)
     if not pytest_args or any(arg.startswith('--junit') for arg in pytest_args):
         parser.error('explicit test paths required; the runner owns its report path')
@@ -64,6 +65,11 @@ def main(argv=None) -> int:
             parser.error('only explicit Python test paths/nodes and bounded reporting options are allowed')
     if not any(arg.split('::', 1)[0].endswith('.py') for arg in expanded):
         parser.error('at least one explicit test file required; no implicit full-suite run')
+    if args.daily_traces:
+        import importlib.util
+        spec=importlib.util.spec_from_file_location('daily_native_evaluator',ROOT/'tools/run_daily_eval.py')
+        evaluator=importlib.util.module_from_spec(spec);spec.loader.exec_module(evaluator)
+        if evaluator.main(['--verify',str(args.daily_traces)])!=0:return 1
     with tempfile.TemporaryDirectory(prefix='pai-acceptance-') as directory:
         report = Path(directory) / 'pytest.xml'
         result = subprocess.run([sys.executable, '-m', 'pytest', '--strict-markers',

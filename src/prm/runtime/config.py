@@ -17,7 +17,7 @@ RUNTIME_FIELDS = frozenset({'owner_ref', 'owner_chat_id', 'budget_refs', 'job_bu
     'graph', 'github', 'canvas', 'artifact_root', 'media_root', 'local_services', 'speech', 'vision',
     'delivery', 'media_download', 'model_profiles', 'quality_profile', 'bot_ref'})
 REQUIRED = frozenset({'owner_ref', 'owner_chat_id', 'budget_refs', 'job_budget'})
-MODEL_FIELDS = frozenset({'provider_ref', 'connection_ref', 'endpoint', 'model', 'token_env', 'timeout_seconds', 'synthetic_http'})
+MODEL_FIELDS = frozenset({'provider_ref', 'connection_ref', 'endpoint', 'model', 'token_env', 'timeout_seconds', 'synthetic_http', 'capabilities'})
 SECRET_FIELDS = frozenset({'token', 'password', 'api_key', 'access_token', 'refresh_token', 'encryption_key', 'client_secret'})
 
 
@@ -94,6 +94,9 @@ def _model(value):
     elif url.scheme != 'https' or not url.hostname:
         raise StorageError('invalid HTTPS model endpoint')
     if not synthetic or 'token_env' in value: _credential_ref(value.get('token_env'))
+    if 'capabilities' in value:
+        from .model_protocol import ChatCapabilities
+        ChatCapabilities.from_mapping(value['capabilities']).validate_route(value['endpoint'],synthetic_http=synthetic)
     seconds = value.get('timeout_seconds', 8)
     if type(seconds) is not int or not 1 <= seconds <= 120: raise StorageError('invalid model deadline')
 
@@ -161,6 +164,8 @@ def validate_runtime_config(config: dict) -> None:
         if key in config:
             if not config.get('media_root'): raise StorageError('media root required for adapter')
             _model(config[key]['endpoint'])
+            if config[key]['endpoint'].get('capabilities') is not None:
+                raise StorageError('text capabilities cannot grant a media modality')
     if 'graph' in config:
         _mapping(config['graph']['oauth'], {'client_id', 'tenant', 'redirect_uri', 'authority', 'graph_origin', 'synthetic'}, {'client_id', 'tenant', 'redirect_uri'})
     # Existing scope constructors are pure validators, with no network/token

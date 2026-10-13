@@ -13,6 +13,7 @@ from .media_attempts import read_bounded_media,execute_fenced_media
 
 class SpeechTranscriber:
     def __init__(self,root,*,endpoint:ModelEndpoint,upper_bound,resource_ref=None):
+        if endpoint.capabilities is not None:raise StorageError('speech requires its separate modality contract; text capabilities cannot be reused')
         self.root,self.endpoint,self.upper_bound,self.resource_ref=root,endpoint,upper_bound,resource_ref
         self.provider_ref=endpoint.provider_ref
     def __call__(self,asset,path,*,task_ref=None):

@@ -16,6 +16,7 @@ MAX_VISION_BODY_BYTES=6800000
 
 class VisionAdapter:
     def __init__(self,root,*,endpoint,upper_bound,resource_ref=None):
+        if endpoint.capabilities is not None:raise StorageError('vision requires its separate modality contract; text capabilities cannot be reused')
         self.root,self.endpoint,self.upper_bound,self.resource_ref=root,endpoint,upper_bound,resource_ref
     def __call__(self,asset,question,path,*,task_ref=None):
         if asset.owner_ref!=self.root.owner_ref or asset.kind!='image' or asset.size_bytes>MAX_IMAGE_BYTES:raise CapabilityDenied('bounded owned image required')

@@ -54,7 +54,7 @@ class CostCacheRuntime:
             if tariff_version is not None and usage.get('semantics')=='openai_chat_output_includes_reasoning':
                 row=tx.conn.execute('SELECT payload FROM pa_cache.tariffs WHERE provider=%s AND model=%s AND version=%s',(provider,model,tariff_version)).fetchone()
                 if row and datetime.fromisoformat(row['payload']['valid_until'])>datetime.now(timezone.utc) and all(usage.get(name)is not None for name in ('input','cached_input','output')):
-                    if usage['cached_input']>usage['input'] or usage.get('reasoning',0)>usage['output']:raise StorageError('provider token subsets inconsistent')
+                    if usage['cached_input']>usage['input'] or usage.get('reasoning') is not None and usage['reasoning']>usage['output']:raise StorageError('provider token subsets inconsistent')
                     price=row['payload'];cost=int(((usage['input']-usage['cached_input'])*Decimal(price['input'])+
                         usage['cached_input']*Decimal(price['cache_read'])+usage['output']*Decimal(price['output'])).to_integral_value(rounding=ROUND_CEILING))
             old=tx.conn.execute('SELECT task_ref,provider,model,tariff_version,usage,cost_microdollars,latency_ms,outcome FROM pa_cache.usage WHERE owner=%s AND attempt_ref=%s',

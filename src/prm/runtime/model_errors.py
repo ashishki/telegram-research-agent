@@ -11,6 +11,10 @@ class ModelAccountingReceipt(LLMCompletionReceipt):
     attempt_ref: str = ''
     operation_refs: tuple = ()
     retry_allowed: bool = False
+    requested_model: str = ''
+    observed_model: str | None = None
+    finish_reason: str | None = None
+    protocol: str = 'chat_completions'
 
 
 class ModelPreparationUnknown(StorageError):
@@ -55,15 +59,32 @@ class MediaOutcomeUnknown(LLMOutcomeUnknown):
 
 
 class ModelProviderRejected(StorageError):
-    def __init__(self,status_code):
+    def __init__(self,status_code,*,retry_after=None):
         super().__init__('selected model provider rejected the request')
         self.status_code=status_code;self.reason_kind='provider_rejected';self.retry_allowed=False
+        self.retry_after=retry_after;self.external_call_attempted=True
 
 
 class ModelResponseInvalid(StorageError):
-    def __init__(self):
+    def __init__(self,*,finish_reason=None):
         super().__init__('selected model provider returned an invalid response')
         self.reason_kind='invalid_provider_response';self.retry_allowed=False
+        self.finish_reason=finish_reason
+
+
+class ModelStreamInterrupted(StorageError):
+    def __init__(self,reason,*,partial_characters=0):
+        super().__init__('selected model stream is incomplete; do not retry automatically')
+        self.reason_kind='stream_'+reason;self.partial_characters=partial_characters
+        self.retry_allowed=False
+
+
+@dataclass(frozen=True)
+class ModelCompletionReceipt(LLMCompletionReceipt):
+    requested_model: str = ''
+    observed_model: str | None = None
+    finish_reason: str | None = None
+    protocol: str = 'chat_completions'
 
 
 DEFINITIVE_REJECTIONS=frozenset({400,401,403,404,405,422,429})

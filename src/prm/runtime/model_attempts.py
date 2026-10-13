@@ -41,3 +41,18 @@ def record_accounting_unconfirmed(store,*,owner,receipt):
             'model':receipt.model,'input_tokens':receipt.input_tokens,'output_tokens':receipt.output_tokens,
             'usage_recorded':False,'estimated_cost_usd':None}
         if payload!=item.payload:tx.put(owner,'conversation',receipt.attempt_ref,payload,expected_version=item.version)
+
+
+def record_model_observation(store,*,owner,attempt_ref,operation_refs,receipt,usage):
+    """Persist returned identity/usage without prompt, output, URL or headers."""
+    with store.transaction() as tx:
+        lineage_lock(tx.conn,owner)
+        item=tx.get(owner,'conversation',attempt_ref)
+        if item is None or tuple(item.payload['operation_refs'])!=tuple(operation_refs):
+            raise StorageError('model observation fence unavailable')
+        observed={'requested_model':receipt.requested_model,'observed_model':receipt.observed_model,
+            'finish_reason':receipt.finish_reason,'protocol':receipt.protocol,'usage':usage,
+            'duration_ms':receipt.duration_ms,'provider_outcome':receipt.delivery_outcome}
+        prior=item.payload.get('observation')
+        if prior is not None and prior!=observed:raise StorageError('model observation is immutable')
+        if prior is None:tx.put(owner,'conversation',attempt_ref,{**item.payload,'observation':observed},expected_version=item.version)

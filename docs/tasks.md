@@ -12,6 +12,14 @@ Historical PRM-SN/RFX/UTD task records are preserved byte-for-byte at `docs/task
 
 ## Local daily implementation — 2026-10-13
 
+Package 3: D05 + D06, base `980087f`, local synthetic-only. One accumulated
+review covers model descriptor/transport, scoped accounting/no-repeat integration,
+frozen 20-case manifest, trace/verifier and affected native fixture tests.
+Acceptance registered before implementation:
+`PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python -m pytest -q tests/test_daily_model_protocols.py tests/test_daily_eval_manifest.py`.
+Regression floors: model/cost/session/acceptance tests, scoped to affected behavior.
+No provider/account/paid calls; non-Codex Go/governed review remains separate.
+
 Package 2: D56, after local independent closure of DAILY01-R01/R02/R04 on
 988da0e. The owner's next-package instruction continues local work; non-Codex
 Go/governed/human evidence remains pending, no paid authorization inferred.

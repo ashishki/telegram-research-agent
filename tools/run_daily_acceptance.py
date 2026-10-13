@@ -7,12 +7,13 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 TESTS = ('tests/test_daily_entrypoint.py', 'tests/test_daily_controls.py', 'tests/test_daily_dispatch.py',
-         'tests/test_daily_telegram_routes.py', 'tests/test_daily_telegram_transport.py')
+         'tests/test_daily_telegram_routes.py', 'tests/test_daily_telegram_transport.py',
+         'tests/test_daily_model_protocols.py', 'tests/test_daily_eval_manifest.py')
 
 
 def main():
     env = dict(os.environ, PYTHONPATH=str(ROOT / 'src'), PYTEST_DISABLE_PLUGIN_AUTOLOAD='1')
-    return subprocess.run([sys.executable, '-m', 'pytest', '-q', *TESTS], cwd=ROOT, env=env, check=False).returncode
+    return subprocess.run([sys.executable, str(ROOT / 'tools/run_pai_acceptance.py'), '-q', *TESTS], cwd=ROOT, env=env, check=False).returncode
 
 
 if __name__ == '__main__':
