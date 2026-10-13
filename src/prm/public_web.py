@@ -138,7 +138,7 @@ class HttpPublicWebProvider:
             # Only a source's explicit modification/publication metadata may
             # establish freshness. The HTTP response Date is transport timing,
             # not evidence that the document itself is current.
-            "published_at": response["headers"].get("last-modified"),
+            "modified_at": response["headers"].get("last-modified"),
         }
 
 

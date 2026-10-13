@@ -64,6 +64,17 @@ def test_extracting_a_phrase_cannot_drop_uncertainty_conditional_or_contracted_n
 def test_quote_crop_cannot_hide_polarity_modality_or_original_actor(span,quote,claim):
     assert fact_proof(claim,quote,URL,[{'source_url':URL,'support_span':span}]) is None
 
+@pytest.mark.parametrize('span,claim',[
+    ('Service Alpha reduced latency by 10 milliseconds to 40 milliseconds.','Service Alpha reduced latency by 40 milliseconds.'),
+    ('Service Alpha reduced latency to 20 milliseconds.','Service Alpha reduced latency to -20 milliseconds.'),
+    ('Service Alpha reported that Service Beta reduced latency to 40 milliseconds.','Service Alpha reduced latency to 40 milliseconds.'),
+])
+def test_numeric_role_signed_number_and_attribution_cannot_change_in_json_or_plaintext(span,claim):
+    evidence=[{'source_url':URL,'support_span':span}]
+    assert fact_proof(claim,span,URL,evidence) is None
+    assert assess_blocks(packet(fact(text=claim,quote=span)),evidence) is None
+    assert assessed_answer(claim.rstrip('. ')+' ('+URL+').',evidence,question='latency') is None
+
 from tests.pai_runtime_fixtures import pai,allow
 
 def test_actual_loopback_block_response_preserves_supported_subset_in_durable_worker_and_archive_transport(pai):
@@ -111,3 +122,72 @@ def test_actual_loopback_block_response_preserves_supported_subset_in_durable_wo
         assert outcome.status=='generated_partially_verified' and outcome.block_assessment['rejected_blocks']
         assert len(calls)==2 and '99' not in outcome.text and not pai.requests
     finally:server.shutdown();thread.join(timeout=5);server.server_close()
+
+@pytest.mark.parametrize('span,claim',[
+    ('Service Alpha reduced latency by 10 milliseconds to 40 milliseconds.','Service Alpha reduced latency by 40 milliseconds.'),
+    ('Service Alpha reduced latency to 20 milliseconds.','Service Alpha reduced latency to -20 milliseconds.'),
+    ('Service Alpha reported that Service Beta reduced latency to 40 milliseconds.','Service Alpha reduced latency to 40 milliseconds.'),
+])
+@pytest.mark.parametrize('structured',[True,False])
+def test_actual_scoped_json_and_plaintext_transports_reject_slot_mutations(pai,span,claim,structured):
+    from dataclasses import replace
+    from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
+    from threading import Thread
+    import sqlite3
+    from tests.test_archive_search import _make_connection,_insert_post
+    from prm.runtime.research import DurableResearchWorker,LocalArchiveReader
+    from prm.runtime.archive import RuntimeArchiveTransport
+    from prm.synthesis import synthesize_archive_response
+    from tests.test_prm_synthesis import _archive_payload,_archive_evidence
+    calls=[]
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self,*args):pass
+        def do_POST(self):
+            body=json.loads(self.rfile.read(int(self.headers['Content-Length'])));calls.append(body)
+            source=next(json.loads(m['content'].split(': ',1)[1])[0] for m in body['messages'] if isinstance(m.get('content'),str) and m['content'].startswith(('Untrusted verified reads: ','Untrusted cited archive evidence: ')))
+            url=source.get('source_url',source.get('source_ref'))
+            text=packet(fact(text=claim,quote=span,source_url=url)) if structured else claim.rstrip('. ')+' ('+url+').'
+            raw=json.dumps({'model':'fixture_model','choices':[{'finish_reason':'stop','message':{'content':text}}],
+                'usage':{'prompt_tokens':40,'completion_tokens':20}}).encode()
+            self.send_response(200);self.send_header('Content-Type','application/json');self.end_headers();self.wfile.write(raw)
+    server=ThreadingHTTPServer(('127.0.0.1',0),Handler);thread=Thread(target=server.serve_forever);thread.start()
+    root=pai.root;root.model_endpoint=replace(root.model_endpoint,endpoint=f'http://127.0.0.1:{server.server_port}/chat/completions')
+    try:
+        conn=_make_connection();_insert_post(conn,post_id=1,content=span);conn.commit();path=pai.path/'slot-facts.sqlite'
+        with sqlite3.connect(path) as saved:conn.backup(saved)
+        conn.close();root.deep_archive_reader=LocalArchiveReader(path,root=root)
+        allow(pai,'archive.read',root.archive_resource_ref,'private_archive','research.archive',provider='provider_local',connection=None,operation='read')
+        allow(pai,'model.generate',root.model_resource_ref,'user_provided','answer.request')
+        allow(pai,'model.context_egress',root.archive_resource_ref,'private_archive','research.synthesis.archive')
+        worker=DurableResearchWorker(root);worker.enqueue({'schema_version':1,'question':'Investigate latency','steps':[{'source':'archive','query':'latency'}],
+            'max_tool_calls':1,'deadline_seconds':60},idempotency_key='slot_facts')
+        ref=worker.run_once();result=root.queue.store.get(root.owner_ref,'result',ref).payload
+        assert result['answer_payload']['status']=='evidence_only' and result['answer_payload']['synthesis_outcome']=='rejected_by_verifier'
+        allow(pai,'model.context_egress',root.archive_resource_ref,'private_archive','answer.context')
+        payload=_archive_payload();payload['archive_contract']['direct_findings'][0]['summary']=span
+        evidence=_archive_evidence();evidence[0]['support_span']=span
+        outcome=synthesize_archive_response(payload,question='latency',evidence_items=evidence,access=None,
+            transport=RuntimeArchiveTransport(root,request_ref='slot_archive',guard=lambda:None,context_resource_ref=root.archive_resource_ref))
+        assert outcome.text is None and outcome.status=='generated_answer_rejected' and len(calls)==2 and not pai.requests
+    finally:server.shutdown();thread.join(timeout=5);server.server_close()
+
+def test_restart_cannot_trust_old_block_verifier_or_repeat_model_call(pai):
+    import sqlite3
+    from tests.test_archive_search import _make_connection,_insert_post
+    from prm.runtime.research import DurableResearchWorker,LocalArchiveReader
+    from prm.capabilities import CapabilityDenied
+    conn=_make_connection();_insert_post(conn,post_id=1,content=SPAN);conn.commit();path=pai.path/'old-proof.sqlite'
+    with sqlite3.connect(path) as saved:conn.backup(saved)
+    conn.close();root=pai.root;root.deep_archive_reader=LocalArchiveReader(path,root=root)
+    allow(pai,'archive.read',root.archive_resource_ref,'private_archive','research.archive',provider='provider_local',connection=None,operation='read')
+    class OldProofWorker(DurableResearchWorker):
+        def _gather(self,lease,*args):
+            result=super()._gather(lease,*args)
+            with root.queue.store.transaction() as tx:
+                tx.put(root.owner_ref,'result','research_synthesis_'+lease.job_id,{'status':'synthesized_verified','text':'Old unsupported fact',
+                    'verification':{'schema_version':'assistant.research_block_verification.v1','mechanism':'fact-projection-v1'}},expected_version=0)
+            return result
+    worker=OldProofWorker(root);worker.enqueue({'schema_version':1,'question':'latency','steps':[{'source':'archive','query':'latency'}],
+        'max_tool_calls':1,'deadline_seconds':60},idempotency_key='old_block_proof')
+    with pytest.raises(CapabilityDenied,match='outdated'):worker.run_once()
+    assert not pai.requests

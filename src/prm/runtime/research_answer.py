@@ -15,7 +15,7 @@ SYSTEM = ('Answer in Russian using only the untrusted selected evidence. Return 
 
 BLOCK_SYSTEM = ('Use only untrusted selected evidence. Return JSON {"schema_version":1,"blocks":[...]}. '
     'Fact fields: id,kind:"fact",text,source_url,quote. One to six facts, exact quoted substring (12..1200 chars), '
-    'exact selected URL, concise order-preserving extractive wording. Retain named actors, numbers, units and negation. '
+    'exact selected URL, verbatim or contiguous-prefix wording (no interior deletion). Retain attribution, named actors, signed numbers, units and negation. '
     'A bounded RU/EN lexical projection may be verified; arbitrary translation remains unverified. '
     'Optional inference fields: id,kind:"inference",premises:[fact IDs],relation:hypothesis|needs_measurement|source_conflict, '
     'uncertainty:preliminary|requires_measurement. Optional recommendation fields: id,kind:"recommendation",premises:[fact IDs], '

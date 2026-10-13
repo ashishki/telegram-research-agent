@@ -77,8 +77,10 @@ def retrieve_archive(connection,query,*,filters=None,limit=10,vector_index_path=
     def add(item,rank,weight,mode):
         # Post-level dedup also prevents long chunks occupying every top slot.
         key=item.post_archive_document_id
-        entry=entries.setdefault(key,{'item':item,'score':0.0,'modes':set()})
+        entry=entries.setdefault(key,{'item':item,'score':0.0,'modes':set(),'fts_rank':None,'vector_rank':None})
         entry['score']+=weight/(60+rank);entry['modes'].add(mode)
+        field='fts_rank' if mode=='fts' else 'vector_rank'
+        entry[field]=min(entry[field],rank) if entry[field] is not None else rank
     for index,variant in enumerate(variants):
         rows=search_telegram_archive_fts(connection,variant,filters=normalized,limit=min(80,max(20,limit*3)),
             snippet_tokens=snippet_tokens,chunk_max_chars=chunk_max_chars)
@@ -86,7 +88,10 @@ def retrieve_archive(connection,query,*,filters=None,limit=10,vector_index_path=
         terms=set(TOKEN.findall(variant.casefold()))
         for rank,item in enumerate(rows,1):
             row=canonical.get(item.post_id)
-            if row and terms & set(TOKEN.findall(row['content'].casefold())):add(item,rank,3 if index==0 else 1,'fts')
+            if row and terms & set(TOKEN.findall(row['content'].casefold())):
+                documents,excluded=archive_documents_for_row(row,chunk_max_chars=chunk_max_chars)
+                match=next((doc for doc in documents if doc.archive_document_id==item.archive_document_id and doc.content_hash==item.content_hash),None)
+                if match:add(_result_from_row({**dict(row),'rank':item.rank,'snippet':item.snippet},document=match),rank,3 if index==0 else 1,'fts')
     if vector_index_path is not None:
         from db.archive_vector import search_archive_vector_index,ArchiveVectorIndexError
         try:
@@ -108,6 +113,8 @@ def retrieve_archive(connection,query,*,filters=None,limit=10,vector_index_path=
         if prior is None:families[key]=dict(entry,modes=set(entry['modes']))
         else:
             prior['score']=max(prior['score'],entry['score']);prior['modes'].update(entry['modes'])
+            for field in ('fts_rank','vector_rank'):
+                values=[n for n in (prior[field],entry[field]) if n is not None];prior[field]=min(values) if values else None
             if entry['item'].post_archive_document_id<prior['item'].post_archive_document_id:prior['item']=entry['item']
     ranked=sorted(families.values(),key=lambda e:(-e['score'],e['item'].post_archive_document_id))
     selected=[];seen_hashes=set();counts={};deferred=[]
@@ -118,7 +125,8 @@ def retrieve_archive(connection,query,*,filters=None,limit=10,vector_index_path=
         if counts.get(item.channel_id,0)>=max(1,(limit+1)//2):deferred.append(entry);continue
         selected.append(entry);counts[item.channel_id]=counts.get(item.channel_id,0)+1
     selected=(selected+deferred)[:limit]
-    items=tuple(replace(e['item'],retrieval_mode='canonical_expanded_fts' if 'hashed_vector' not in e['modes'] else 'canonical_fts_hashed_fusion',fusion_score=round(e['score'],8)) for e in selected)
+    items=tuple(replace(e['item'],retrieval_mode='canonical_expanded_fts' if 'hashed_vector' not in e['modes'] else 'canonical_fts_hashed_fusion',
+        fusion_score=round(e['score'],8),fts_rank=e['fts_rank'],vector_rank=e['vector_rank']) for e in selected)
     return RetrievalResult(items,len(variants),len(entries),rejected,vector_status)
 
 

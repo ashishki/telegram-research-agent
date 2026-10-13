@@ -60,6 +60,35 @@ def test_exact_canonical_id_and_source_url_still_obey_selection_filters():
         assert not retrieve_archive(conn,'tg:1001:1001',filters={'channel_identities':((1002,'@beta'),)},limit=20).items
     finally:conn.close()
 
+def test_compatibility_hybrid_revalidates_canonical_before_returning_sidecar(tmp_path):
+    from db.archive_vector import search_telegram_archive_hybrid
+    conn,_=corpus();path=tmp_path/'old-hybrid.sqlite'
+    try:
+        build_archive_vector_index(conn,index_path=path)
+        conn.execute("UPDATE posts SET content='Changed canonical source' WHERE id=3")
+        conn.execute('DELETE FROM posts WHERE id=4');conn.commit()
+        result=search_telegram_archive_hybrid(conn,'retrieval vector',vector_index_path=path,limit=20,
+            filters={'channel_identities':((1001,'@alpha'),)})
+        assert all(i.post_id not in (3,4) and i.channel_id==1001 for i in result)
+    finally:conn.close()
+
+def test_pi_facade_hybrid_keeps_exact_identity_and_current_project_membership(tmp_path):
+    from assistant.pi_facade import PersonalIntelligenceFacade
+    from config.settings import Settings
+    conn,_=corpus();index=tmp_path/'derived.sqlite';path=tmp_path/'canonical.sqlite'
+    conn.execute("INSERT INTO projects(id,name,description,keywords) VALUES(1,'Synthetic','','')")
+    conn.execute("INSERT INTO post_project_links VALUES(3,1,1.0,'Synthetic')");conn.commit()
+    build_archive_vector_index(conn,index_path=index)
+    conn.execute('DELETE FROM post_project_links');conn.commit()
+    with sqlite3.connect(path) as saved:conn.backup(saved)
+    conn.close()
+    facade=PersonalIntelligenceFacade(settings=Settings(db_path=str(path),llm_api_key='',model_provider='synthetic',telegram_session_path=str(tmp_path/'unused.session')))
+    result=facade.search_telegram_archive('retrieval vector',filters={'retrieval_mode':'hybrid','vector_index_path':str(index),'vector_policy':'always',
+        'channel_identities':((1001,'@alpha'),),'project_names':['Synthetic']})
+    assert not result['items']
+    result=facade.search_telegram_archive('retrieval vector',filters={'retrieval_mode':'hybrid','vector_index_path':str(index),'vector_policy':'always','channel_identities':((1001,'@alpha'),)})
+    assert result['items'] and all(i['channel_id']==1001 for i in result['items'])
+
 from tests.pai_runtime_fixtures import pai,allow
 
 def test_native_retrieval_cache_binds_every_filter_not_only_query(pai):

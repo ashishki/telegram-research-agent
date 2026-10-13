@@ -23,7 +23,7 @@ def evaluate():
                         # Preserve the current hashed algorithm with its original
                         # FTS baseline, only in this isolated synthetic process.
                         original=legacy_vector.search_telegram_archive;legacy_vector.search_telegram_archive=search_telegram_archive_fts
-                        try:items=legacy_vector.search_telegram_archive_hybrid(conn,case['query'],vector_index_path=index,filters=case['filters'],limit=20,vector_policy='always')
+                        try:items=legacy_vector._search_telegram_archive_hybrid_baseline(conn,case['query'],vector_index_path=index,filters=case['filters'],limit=20,vector_policy='always')
                         finally:legacy_vector.search_telegram_archive=original
                     else:items=retrieve_archive(conn,case['query'],filters=case['filters'],limit=20,vector_index_path=index if mode.endswith('fusion') else None).items
                     ids=[str(i.post_id) for i in items];gold=case['relevance'];relevant=set(gold)

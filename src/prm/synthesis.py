@@ -193,22 +193,25 @@ def synthesize_archive_response(
         )
 
     if str(result.text or '').lstrip().startswith('{'):
-        from prm.research_blocks import assess_blocks
+        from prm.research_blocks import assess_blocks,VOCABULARY_VERSION
         sent=[{'source_url':item.source_ref,'support_span':item.text} for item in context.items]
         assessment=assess_blocks(result.text,sent,question=context.question)
         if assessment is not None:
             return ArchiveSynthesisOutcome(text=assessment['text'],
                 status='generated_partially_verified' if assessment['status']=='partial_supported' else 'generated_verified',
                 measurement={**base_measurement,**result.receipt.public_measurement(),
-                    'block_verifier':'fact-projection-v1','accepted_block_count':len(assessment['blocks']),
+                    'block_verifier':VOCABULARY_VERSION,'accepted_block_count':len(assessment['blocks']),
                     'rejected_block_count':len(assessment['rejected_blocks'])},block_assessment=assessment)
     answer = " ".join(str(result.text or "").split())
+    from prm.runtime.research_answer import assessed_answer
+    sent=[{'source_url':item.source_ref,'support_span':item.text} for item in context.items]
+    strict=assessed_answer(answer,sent,question=context.question)
     if not _verified_archive_answer(
         answer,
         contract=contract,
         evidence_items=evidence_items,
         selected_context=context,
-    ):
+    ) or strict is None:
         return ArchiveSynthesisOutcome(
             text=None,
             status="generated_answer_rejected",

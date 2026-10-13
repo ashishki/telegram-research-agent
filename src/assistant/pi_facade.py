@@ -796,6 +796,7 @@ class PersonalIntelligenceFacade:
                     reactions=tuple(_string_values(clean_filters.get("reactions") or clean_filters.get("reaction"))),
                     tags=tuple(_string_values(clean_filters.get("tags") or clean_filters.get("tag"))),
                     project_names=tuple(_string_values(clean_filters.get("project_names") or clean_filters.get("project_name"))),
+                    channel_identities=tuple(tuple(pair) for pair in clean_filters.get('channel_identities',())),
                 )
                 if hybrid_requested:
                     results = search_telegram_archive_hybrid(

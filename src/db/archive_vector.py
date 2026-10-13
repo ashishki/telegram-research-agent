@@ -251,7 +251,7 @@ def search_archive_vector_index(
     ]
 
 
-def search_telegram_archive_hybrid(
+def _search_telegram_archive_hybrid_baseline(
     connection: sqlite3.Connection,
     query: str,
     *,
@@ -288,6 +288,17 @@ def search_telegram_archive_hybrid(
     except ArchiveVectorIndexError:
         vector_results = []
     return _merge_fts_and_vector(fts_results, vector_results, limit=clean_limit)
+
+
+def search_telegram_archive_hybrid(connection,query,*,vector_index_path,filters=None,limit=10,vector_policy='fallback_on_fts_miss'):
+    """Reachable compatibility path shares canonical validation and scope filters."""
+    from db.archive_retrieval import retrieve_archive
+    if vector_policy not in {'fallback_on_fts_miss','always'}:raise ArchiveVectorIndexError('bounded explicit vector policy required')
+    result=retrieve_archive(connection,query,filters=filters,limit=min(80,max(1,int(limit or 10))))
+    if vector_policy=='always' or not result.items:
+        result=retrieve_archive(connection,query,filters=filters,limit=min(80,max(1,int(limit or 10))),vector_index_path=vector_index_path)
+    return [replace(item,retrieval_mode='hybrid_fts_vector' if item.fts_rank is not None and item.vector_rank is not None
+        else 'hybrid_vector_only' if item.vector_rank is not None else 'hybrid_fts_only') for item in result.items]
 
 
 def _ensure_index_schema(connection: sqlite3.Connection) -> None:

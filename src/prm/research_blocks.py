@@ -5,7 +5,7 @@ import hashlib,json,re
 from assistant.claim_ledger import verify_answer_against_evidence
 from prm.storage.postgres import StorageError
 
-VOCABULARY_VERSION='fact-projection-v1'
+VOCABULARY_VERSION='fact-projection-v2'
 WORDS={
     'service':'service','сервис':'service','reduced':'reduce','reduce':'reduce','сократил':'reduce','сократила':'reduce',
     'latency':'latency','задержку':'latency','задержка':'latency','to':'to','до':'to',
@@ -13,10 +13,10 @@ WORDS={
     'did':'','not':'not','не':'not','no':'not','нет':'not','never':'not','никогда':'not','without':'not','без':'not',
     'the':'','a':'','an':'','is':'','was':'','and':'and','и':'and',
 }
-TOKEN=re.compile(r'\d+(?:[.,]\d+)?|[a-zа-яё][a-zа-яё0-9_+-]*',re.I)
+TOKEN=re.compile(r'[+-]?\d+(?:[.,]\d+)?|[a-zа-яё][a-zа-яё0-9_+-]*(?:\.[0-9]+)*',re.I)
 IDENTIFIER=re.compile(r'[a-z][a-z0-9_]{0,39}')
-QUALIFIERS=frozenset({'may','might','could','would','will','can','if','unknown','unmeasured','unverified','estimated','planned','expected','assumed','claims','claimed','reportedly','allegedly',
-    'может','могут','возможно','если','неизвестно','неизвестен','неизмерен','предполагается','планируется','ожидается','оценочно','заявляет','утверждает','якобы'})
+QUALIFIERS=frozenset({'may','might','could','would','will','can','if','unknown','unmeasured','unverified','estimated','planned','expected','assumed','claims','claimed','reported','reports','says','said','reportedly','allegedly',
+    'может','могут','возможно','если','неизвестно','неизвестен','неизмерен','предполагается','планируется','ожидается','оценочно','заявляет','утверждает','сообщил','сообщает','якобы'})
 
 
 @dataclass(frozen=True)
@@ -70,11 +70,9 @@ def fact_proof(statement,quote,url,evidence):
     candidate=tokens(statement);support=tokens(quote)
     if len(candidate)<3 or ('not' in candidate)!=('not' in support):return None
     if (set(support)&QUALIFIERS)!=(set(candidate)&QUALIFIERS):return None
-    position=0
-    for token in candidate:
-        while position<len(support) and support[position]!=token:position+=1
-        if position==len(support):return None
-        position+=1
+    # Only a contiguous prefix may be shortened. Interior deletion can move a
+    # number into another role or turn reported speech into a measured fact.
+    if candidate!=support[:len(candidate)]:return None
     # Critical actors/numbers and word order are preserved by the token proof.
     # The legacy ledger checks the same mechanical projection, not an invented
     # semantic equivalence. Raw final text and exact quote stay in the block.

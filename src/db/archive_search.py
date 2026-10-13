@@ -149,7 +149,7 @@ def search_telegram_archive(connection,query,*,filters=None,limit=10,snippet_tok
     from db.archive_retrieval import retrieve_archive
     # Preserve the legacy result shape. Native callers consume the service's
     # explicit version/variant/fusion metadata instead of this compatibility view.
-    return [replace(item,retrieval_mode='canonical_exact_lookup' if item.retrieval_mode=='canonical_exact_lookup' else 'sqlite_fts_archive',fusion_score=None) for item in
+    return [replace(item,retrieval_mode='canonical_exact_lookup' if item.retrieval_mode=='canonical_exact_lookup' else 'sqlite_fts_archive',fusion_score=None,fts_rank=None,vector_rank=None) for item in
         retrieve_archive(connection,query,filters=filters,limit=limit,
         snippet_tokens=snippet_tokens,chunk_max_chars=chunk_max_chars).items]
 

@@ -15,7 +15,15 @@ def project_public_query(owner_text,proposed):
     """A model may project this question, never add remembered/private words."""
     from prm.public_web import _validate_public_query,_PRIVATE_QUERY_MARKERS
     if not isinstance(owner_text,str) or not isinstance(proposed,str):return None
-    original=' '.join(owner_text.split());query=' '.join(proposed.split())
+    import unicodedata
+    def normalize(value):return ' '.join(''.join(c for c in unicodedata.normalize('NFKC',value) if unicodedata.category(c)!='Cf').split())
+    original=normalize(owner_text);query=normalize(proposed)
+    # A standalone public formulation must carry no ownership/private-source
+    # references. Reject whole questions conservatively, never try to redact
+    # a secret substring that a model labelled public.
+    possessive=r'\b(?:my|mine|our|ours|private|personal|мой|моя|моё|мое|мои|моего|моей|мою|моему|моем|моём|моим|моими|моих|наш|наша|наши|нашего|нашей|наших)\b'
+    source_reference=r'\b(?:from|in|inside|из|в|по)\s+(?:(?:the|an|a|этой|этом|этих)\s+)?(?:email|e-mail|inbox|mailbox|mail|calendar|notes?|messages?|archive|profile|почт\w*|письм\w*|календар\w*|заметк\w*|сообщени\w*|архив\w*|профил\w*)\b'
+    if re.search(possessive,original,re.I) or re.search(source_reference,original,re.I):return None
     private=(*_PRIVATE_QUERY_MARKERS,'мой проект','моего проекта','для моего','my project','my mail','моя почта','мои письма','my calendar','мой календарь')
     if any(marker in original.casefold() for marker in private) or re.search(r'(?i)\b(?:token|password|секрет|пароль)\b|[\w.+-]+@[\w.-]+\.[a-z]{2,}',original):return None
     if not query or query not in original or _validate_public_query(query,original_query=original)!='accepted':return None

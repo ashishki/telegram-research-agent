@@ -341,7 +341,18 @@ class DurableResearchWorker:
                 if isinstance(source,str) and source.startswith('https://') and isinstance(span,str) and span.strip():eligible_refs.add(record.evidence_ref)
             batches.append(batch)
         read_scopes=list({json.dumps(s,sort_keys=True):s for s in read_scopes}.values())
-        if previous is not None:return previous.payload
+        if previous is not None:
+            cached=previous.payload
+            if cached.get('status') in {'synthesized_verified','partial_supported'}:
+                from prm.research_blocks import VOCABULARY_VERSION
+                check=cached.get('verification') or {}
+                if check.get('schema_version')=='assistant.research_block_verification.v1':
+                    if check.get('mechanism')!=VOCABULARY_VERSION:raise CapabilityDenied('cached block verifier is outdated')
+                else:
+                    known=[{'source_url':r.payload.get('source_url') or r.payload.get('message_url'),
+                        'support_span':(r.payload.get('support_span') or r.payload.get('snippet') or r.payload.get('text') or '')[:1200]} for b in batches for r in b.items if r.evidence_ref in eligible_refs]
+                    if assessed_answer(cached.get('text'),known,question=plan['question']) is None:raise CapabilityDenied('cached plaintext facts no longer verified')
+            return cached
         bundle=EvidenceBundle.select(tuple(batches),maximum_items=8,eligible_refs=frozenset(eligible_refs)) if batches else None
         evidence=[]
         for record in bundle.selected if bundle else ():

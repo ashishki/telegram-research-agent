@@ -70,3 +70,25 @@ def test_public_projection_cannot_add_context_or_copy_private_owner_markers():
     assert project_public_query('Сколько стоит Service Alpha?','Service Alpha')=='Service Alpha'
     for text,query in [('Сколько стоит Service Alpha?','Service Alpha SECRET'),('мой проект PRIVATE CANARY','PRIVATE CANARY'),('my mail owner@example.test','owner@example.test')]:
         assert project_public_query(text,query) is None
+
+@pytest.mark.parametrize('text,query',[
+    ('What does my email say about Service Alpha renewal for PRIVATE_CANARY?','PRIVATE_CANARY'),
+    ('Проверь новости о ProjectSecret из моей почты','ProjectSecret'),
+])
+def test_natural_private_source_forms_do_not_queue_public_discovery(pai,monkeypatch,text,query):
+    provider=configure(pai,monkeypatch);grants(pai)
+    pai.root.intent_planner=FakePlanner(plan(intent='web_search',steps=[{'tool':'web.search','argument':query}],source_filters=['public'],max_tool_calls=3))
+    _,answer=request(pai,123100,text)
+    assert answer['status']=='clarify' and not provider.calls
+    assert DurableResearchWorker(pai.root).run_once() is None and not pai.requests
+
+def test_http_last_modified_remains_modification_not_publication(monkeypatch):
+    import prm.public_web as public
+    from datetime import datetime,timezone
+    now=datetime.now(timezone.utc).isoformat();url='https://official.example.test/alpha'
+    monkeypatch.setattr(public,'_https_get',lambda *args,**kwargs:{'status':200,'final_url':url,'headers':{'content-type':'text/plain','last-modified':now},'body':b'Service Alpha price is 20 dollars.'})
+    monkeypatch.setattr(public,'_reject_private_resolution',lambda host:None)
+    provider=public.HttpPublicWebProvider(search_endpoint='https://search.example.test/query')
+    result=public._fetch_candidate(provider,{'source_url':url},bounds=PublicWebBounds(('official.example.test',)))
+    assert result['publication_time'] is None and result['published_at'] is None
+    assert result['modified_time'] and result['freshness_basis']=='modification'
