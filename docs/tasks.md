@@ -25,6 +25,16 @@ receipts and unverified translations. Affected archive/vector/documents, web/DNS
 claim-ledger and Brief/source guards are scoped floors. One full independent
 read-only local review; critical fixes get narrow rechecks, no second full review.
 No full historical suite or formal/Go/human acceptance substitution.
+Source/full review b442682; first repairsde1e511; final source/narrow PASS650b8dd.
+One full STOP3P1/1P2; narrower remaining-sign/private-form variants are preserved
+in [review receipt](verification/DAILY-package-06-local-review-20261013.md).
+All package P0/P1 closed locally: R01 on650b8dd,R02 on9ae0220,R03/R04 on de1e511.
+[Ledger](verification/DAILY-package-06-D11-D12-D14-D16-20261013.md) records exact
+checks and failures; final verifier49 passed96.06s, web/verifier59 passed125.07s,
+zero skips, overlap not summed. Synthetic lexical metrics/actual loopback do not
+prove provider understanding/quality, independent holdout or operator usefulness.
+Next coherent D13+D15+D17+D18; D15 L must be split before source implementation.
+Go/governed/human, live and formal statuses below unchanged.
 
 Package5: D07 + D08 + D09, base3bb16f3, same assigned branch, local/synthetic.
 One accumulated Deep Review covers versioned role/privacy/billing policies and

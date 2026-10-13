@@ -90,14 +90,35 @@ cooperating new writers, not raw admin/legacy SQL. Physical retention, real
 provider/client integration and useful everyday quality remain separate gates.
 [Local runbook](runbooks/profiles_projects_selected_archive.md).
 
-Next dependency-ready coherent package: **D11 + D12 + D14 + D16** — RU/EN
-retrieval measurement/merge, natural web search/freshness, grounded synthesis and
-whole-week enumeration before model limits. Read these cards and relevant
-source/editorial context, register scoped tests and one accumulated review
-boundary before source edits. No real source scan or paid search/model scope.
-D57 still needs D24; D58 needs D19. Continue independent local tasks without live
-access; do not rerun completed tiers without changed contracts, reproduced
-failures or substantial security risk.
+**D11 + D12 + D14 + D16:** shared canonical retrieval/filters/lexical RU/EN
+expansion and exact lookup; typed public discovery/fetch/freshness proposals;
+independently admitted fact/inference/recommendation blocks; paginated whole-week
+selection and source/channel fairness, explicit rolling/calendar windows and
+immutable material inventories. Source/full review `b442682`; first repairs
+`de1e511`; final source/narrow PASS `650b8dd`. [Ledger](verification/DAILY-package-06-D11-D12-D14-D16-20261013.md)
+and [frozen review/rechecks](verification/DAILY-package-06-local-review-20261013.md).
+One full STOP3P1/1P2. Narrow de1/bebd/9ae STOP stages preserved; final R01-only
+PASS650b8dd closes R01, R02 closed9ae, hybrid/time R03/R04 closedde1. No open
+package P0/P1; no dependent work before closure. Scopes remain local/synthetic; final59 web/verifier passes,49
+verifier/native/replay passes and targeted native4 passes. Earlier tiers/failures
+are retained in the ledger. Counts overlap; exact SHA/change boundaries in ledger, no historical rerun.
+Synthetic dev21 retrieval/10 matched fact labels are not human gold or holdout.
+Expanded FTS recall .8958/nDCG .9267 vs baseline .6146/.6775; hashed FP .8,
+no automatic native hashed use. Compatibility opt-in is now canonical-checked;
+original algorithm offline baseline only. Tiny lexical fact projection is
+conservative, not general semantic inference/translation. Ambiguous personal
+mail/calendar/archive/project questions require a standalone public formulation.
+No actual Brave/client/account/CI/operator validation. Inventory keeps links and
+metadata, not a duplicate post corpus; reader/data retention/live recovery remain
+separate. [Runbook](runbooks/retrieval_public_blocks_weekly.md).
+
+Next coherent local package **after completed local critical closure**: **D13 + D15 + D17 + D18** —
+selected project repository context, bounded multi-stage research, event novelty/
+conflicts and project-aware useful Brief. Dependencies are locally implemented;
+D15 is L, break it into explicit bounded slices before source edits. Read the
+four cards and relevant design/source/editorial context; register tests and one
+accumulated review boundary. No private repository/token activation, live scan,
+paid provider or external effects inferred. D57 still needs D24; D58 needs D19.
 
 Cycle: coherent package → appropriate scoped checks → one fresh independent
 read-only Deep Review of its accumulated committed diff → fixes → next package.
@@ -135,7 +156,7 @@ remain dated on `0fbcfd1`. Formal draft/planned/review_required and 51 missing
 approvals remain unchanged. Legacy inputs without v2 revision pointers and
 actual simultaneous DB scheduling remain unverified; retain HTML-depth P2.
 
-Next safe command: `git show --stat 8f193bb`; read D11/D12/D14/D16/context refs.
-`tools/run_daily_acceptance.py` registers the twelve implemented daily files in
+Next safe command: `git show --stat 650b8dd`; read D13/D15/D17/D18/context refs.
+`tools/run_daily_acceptance.py` registers the sixteen authored daily files in
 the existing project verifier. Run only appropriate scoped checks; no full
 historical pytest, private target or repeated immutable115–118 calls.

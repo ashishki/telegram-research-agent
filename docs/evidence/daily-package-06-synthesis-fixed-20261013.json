@@ -1,0 +1,82 @@
+{
+  "schema_version": "assistant.daily_synthesis_eval.v1",
+  "fixture_sha256": "ffc1171781c9cfa3515f39d9e8c30c0efa25f45db7c80fb20873e05813979041",
+  "authority": "synthetic matched dev cases, labels fixed before implementation; no human/provider judgment",
+  "rows": [
+    {
+      "id": "exact",
+      "expected_supported": true,
+      "legacy_all_or_none_admitted": true,
+      "block_admitted": true
+    },
+    {
+      "id": "extractive",
+      "expected_supported": true,
+      "legacy_all_or_none_admitted": true,
+      "block_admitted": true
+    },
+    {
+      "id": "translated",
+      "expected_supported": true,
+      "legacy_all_or_none_admitted": false,
+      "block_admitted": true
+    },
+    {
+      "id": "swapped_actor",
+      "expected_supported": false,
+      "legacy_all_or_none_admitted": false,
+      "block_admitted": false
+    },
+    {
+      "id": "false_number",
+      "expected_supported": false,
+      "legacy_all_or_none_admitted": false,
+      "block_admitted": false
+    },
+    {
+      "id": "dropped_negation",
+      "expected_supported": false,
+      "legacy_all_or_none_admitted": false,
+      "block_admitted": false
+    },
+    {
+      "id": "inverted_relation",
+      "expected_supported": false,
+      "legacy_all_or_none_admitted": false,
+      "block_admitted": false
+    },
+    {
+      "id": "wrong_url",
+      "expected_supported": false,
+      "legacy_all_or_none_admitted": false,
+      "block_admitted": false
+    },
+    {
+      "id": "unbounded_translation",
+      "expected_supported": false,
+      "legacy_all_or_none_admitted": false,
+      "block_admitted": false
+    },
+    {
+      "id": "invented_causal",
+      "expected_supported": false,
+      "legacy_all_or_none_admitted": false,
+      "block_admitted": false
+    }
+  ],
+  "metrics": {
+    "legacy_all_or_none_admitted": {
+      "groundedness_precision": 1.0,
+      "required_fact_recall": 0.6666666666666666,
+      "false_reject_count": 1,
+      "false_accept_count": 0
+    },
+    "block_admitted": {
+      "groundedness_precision": 1.0,
+      "required_fact_recall": 1.0,
+      "false_reject_count": 0,
+      "false_accept_count": 0
+    }
+  },
+  "semantic_translation": "only fixed bounded vocabulary; other paraphrases remain unverified"
+}

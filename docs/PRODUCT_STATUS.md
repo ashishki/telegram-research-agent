@@ -48,7 +48,7 @@ Actual20-turn synthetic transcript на71704c4 содержит fake planner/loo
 вызовы/сервисы/production, ни provider/operator/human acceptance не выполнены.
 Полный Chat/Search/Brief/Watch/Act programme и исключение Mini App сохранены.
 
-**Текущий пакет D07 + D08 + D09, 13 октября:** versioned profiles по ролям/
+**Пакет D07 + D08 + D09, 13 октября:** versioned profiles по ролям/
 privacy/expiry/fallback, promotion по фактическим paired attempts и observed
 policy binding, честный бюджет; подтверждённые версии проектов с транзитивным
 provenance/deletion; выбранный canonical архив с global tombstones, exact ID/name
@@ -67,8 +67,29 @@ loopback responses — одинаковый synthetic model, разные connec
 инвалидирует старые копии; historical UX остаётся D19, legacy/admin writers вне
 lock contract. Structured project onboarding — engineering interface, не human
 acceptance. Go/governed, provider/CI/operator/live/production gates остаются
-открыты. Следующий готовый локальный пакет: **D11 + D12 + D14 + D16**. Полный
+открыты. Следующим локально выполнен D11+D12+D14+D16; текущий срез ниже. Полный
 Chat/Search/beautiful Brief/Watch/confirmed Act сохраняется; Mini App исключён.
+
+**Текущий пакет D11+D12+D14+D16, 13 октября:** общий canonical retrieval с
+bounded RU/EN expansions/filters/cache/exact lookup и revalidated opt-in hybrid;
+нативный public plan для обычных вопросов, discovery отдельно от fetch и дат;
+частично подтверждённые факты/выводы/предложения с source/premise proof; полная
+bounded paginated выборка недели, ранжирование source/channel до model packet,
+rolling168h/calendar-week и immutable /briefmaterials inventory без копии corpus.
+Source/full review b442682, repairsde1e511, final source/narrow PASS650b8dd.
+[Проверки](verification/DAILY-package-06-D11-D12-D14-D16-20261013.md),
+[review](verification/DAILY-package-06-local-review-20261013.md). One full
+STOP3P1/1P2 и промежуточные narrow STOP сохранены; R01 закрыт650b8dd,R02 на9ae,
+R03/R04 наde1. Открытых package P0/P1 нет. Final verifier49 passed96.06s,
+web/verifier59 passed125.07s, targeted native4 passed23.65s, zero skips; counts
+перекрываются.21/10 synthetic dev labels, не human gold/holdout: expanded FTS
+recall .8958/nDCG .9267 против .6146/.6775; hashed FP .8, auto native off.
+Блоки используют консервативный lexical proof, не общий NLI. Личные source/topic
+вопросы требуют отдельной public formulation; source date publication unknown
+сохраняется, HTTP modification не выдаётся за publication. Синтетический actual
+loopback/PG не доказывает live Brave/client/account/CI/operator usefulness или
+Go/governed/human acceptance. Следующий локальный пакет: **D13+D15+D17+D18**;
+D15 L сначала разбить на bounded slices. Полный замысел сохранён, Mini App исключён.
 
 Дата среза: **10 октября 2026**. Runtime/test/independent source SHA: `0fbcfd1dde780724ad934aa66825afe17a6efc98`. Документация и Git integration изменены позднее; фактические refs — в [merge receipt](verification/PAI-master-integration-20261010.md).
 

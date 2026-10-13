@@ -6,7 +6,9 @@ D04 + D10 source/review71704c4, initial repairs2a20da4, final fix/narrow PASS028
 D07 + D08 + D09 source/full review caefb45, initial repairs9f5feec, final
 fix/narrow PASS8f193bb; all package P1 including reader R12 closed locally.
 [Latest receipt](../../verification/DAILY-package-05-D07-D08-D09-20261013.md).
-Next ready package: D11 + D12 + D14 + D16;
+D11/D12/D14/D16 source/full review b442682, final source/narrow PASS650b8dd;
+all local P1 closed, earlier STOP stages preserved in [receipt](../../verification/DAILY-package-06-D11-D12-D14-D16-20261013.md).
+Next ready package: D13 + D15 + D17 + D18 (split D15 L before implementation);
 read [current handoff](../../CODEX_PROMPT.md) and [backlog receipts](BACKLOG.md).
 The non-Codex Go/governed/human gates remain open; local review is separate.
 The original first-block instructions below are design context, not a request
