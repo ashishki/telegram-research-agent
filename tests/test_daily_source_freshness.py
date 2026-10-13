@@ -262,3 +262,37 @@ def test_selected_window_and_reactions_filter_exact_identity_and_watch_carries_s
     note=root.watch_collector.collector(root.archive_resource_ref,SimpleNamespace(timezone_name='UTC',subscription_id='watch_'+('a'*32)))
     assert len(note)==1 and note[0].archive_snapshots==tuple(archive.status()['archive_snapshots'])
     conn.close()
+
+
+def test_private_reader_rechecks_source_snapshot_after_render_before_read(pai,monkeypatch):
+    from dataclasses import asdict
+    from prm.briefs import BriefBuildRequest,CoverageSource,build_brief_document
+    from prm.capabilities import AuthorizationRequest
+    from prm.runtime.reader import PrivateReportRuntime
+    from tests.test_assistant_briefs import _window,_evidence
+    import prm.runtime.reader as reader_module
+    root,conn,archive=setup(pai,mode='session');archive.apply_page(**page(pai,[event(pai)]))
+    allow(pai,'archive.read',root.archive_resource_ref,'private_archive','brief.archive',provider='provider_local',connection=None,operation='read')
+    scope=asdict(AuthorizationRequest(owner_ref=root.owner_ref,connection_ref=None,capability='archive.read',resource_ref=root.archive_resource_ref,
+        operation='read',data_class='private_archive',provider_ref='provider_local',purpose='brief.archive'))
+    document=build_brief_document(BriefBuildRequest('Synthetic private report',_window(),
+        (_evidence('event_1','https://example.test/event',title='Private source',summary='OLD PRIVATE SOURCE'),),
+        owner_ref=root.owner_ref,coverage=(CoverageSource('source_synthetic','checked'),)))
+    root.briefs.pending_classes[document.content_digest]=('private_archive',)
+    root.briefs.pending_scopes[document.content_digest]=[scope]
+    root.briefs.pending_snapshots={document.content_digest:archive.status()['archive_snapshots']}
+    state=root.conversations.record_response('42',text='Synthetic report',topic='')
+    root.briefs.bind_visible(conversation_id=state.conversation_id,response_ref=state.object_refs[0].response_ref,document=document,
+        authenticated_chat_id='42',authenticated_actor_id='42',authenticated_owner_chat_id='42')
+    reader=PrivateReportRuntime(root,artifact_root=pai.path/'reader')
+    token=reader.issue_session(chat_id='42',actor_id='42',owner_chat_id='42')
+    original=reader_module.subprocess.run;rendered=[]
+    def outage_after_render(*args,**kwargs):
+        result=original(*args,**kwargs)
+        archive.outage();rendered.append(True)
+        return result
+    with monkeypatch.context() as patch:
+        patch.setattr(reader_module.subprocess,'run',outage_after_render)
+        result=reader.artifact(token,brief_id=document.brief_id,version=document.version,format='markdown')
+    assert rendered==[True] and result is None
+    conn.close()

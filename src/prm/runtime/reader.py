@@ -95,6 +95,10 @@ class PrivateReportRuntime:
                 (self.root.owner_ref,path.name)).fetchone()
             if tx.get(self.root.owner_ref,'result',parent_ref,version=document.version) is None or not indexed or indexed['deleted'] or indexed['root_digest']!=self.root_digest:
                 return None
+            try:
+                source_current(tx,self.root.registry,self.root.owner_ref,self.root.briefs.source_scopes(brief_id,version),
+                    archive_snapshots=self.root.briefs.archive_snapshots(brief_id,version),require_snapshot=True)
+            except (StorageError,CapabilityDenied):return None
             if path.is_symlink() or path.stat().st_size>16000000:raise StorageError('invalid stored artifact')
             body=path.read_bytes()
         return body,{'html':'text/html; charset=utf-8','markdown':'text/markdown; charset=utf-8','pdf':'application/pdf'}[format]
