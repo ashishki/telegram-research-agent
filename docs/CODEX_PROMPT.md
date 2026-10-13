@@ -69,13 +69,35 @@ ephemeral context; second-item/shorten views bind exact source text; model
 explanation quality, real projects, wider search and useful Brief remain later
 cards/gates, not a reduced programme.
 
-Next dependency-ready coherent package after local P1 closure: **D07 + D08 + D09** —
-quality/budget/provider profiles, current project context and selected archive
-freshness. Read these cards/context before declaring test/review boundaries;
-continue independent local work if owner choices are missing. No real archive/
-session/account scan. D11/D14/D16 also depend on D10;
-D57 still needs D24; D58 needs D19. Do not rerun completed daily tiers
-without changed contracts, reproduced failures or substantial security risk.
+**D07 + D08 + D09:** versioned role/privacy/fallback policies and immutable paired
+promotion receipts with observed profile binding; tariff/unknown billing and
+native budget; owner-confirmed versioned project context with exact source
+relationships, transitive provenance and deletion; selected canonical archive
+import/session hooks, exact channel identity, global tombstones/cursor/quota and
+snapshot freshness through retrieval/model/focus/Brief/Watch/delivery/reader.
+Source/full review `caefb45`; initial repairs `9f5feec`; final source/narrow PASS
+`8f193bb`. [Package ledger](verification/DAILY-package-05-D07-D08-D09-20261013.md)
+and [frozen findings/rechecks](verification/DAILY-package-05-local-review-20261013.md).
+One full review STOP seven P1/four P2; narrow9f5feec closed R01–R11 but found
+reader R12. Tiny repair/narrow PASS8f193bb closes R12, no open package P0/P1.
+Final focused native/wiring tier24 passed/52.27s; R12+Brief tier5 passed/18.21s;
+reader/deletion floor5 passed/29.76s, zero skips. Counts overlap; earlier failures
+and repairs retained.40 paired loopback requests use the same canned model,
+different connections/synthetic tariffs: mechanics, not savings or quality.
+Fake Telegram client only; no session/account activation or full-history claim.
+Snapshot invalidation is conservative; historical UX remains D19. Guards cover
+cooperating new writers, not raw admin/legacy SQL. Physical retention, real
+provider/client integration and useful everyday quality remain separate gates.
+[Local runbook](runbooks/profiles_projects_selected_archive.md).
+
+Next dependency-ready coherent package: **D11 + D12 + D14 + D16** — RU/EN
+retrieval measurement/merge, natural web search/freshness, grounded synthesis and
+whole-week enumeration before model limits. Read these cards and relevant
+source/editorial context, register scoped tests and one accumulated review
+boundary before source edits. No real source scan or paid search/model scope.
+D57 still needs D24; D58 needs D19. Continue independent local tasks without live
+access; do not rerun completed tiers without changed contracts, reproduced
+failures or substantial security risk.
 
 Cycle: coherent package → appropriate scoped checks → one fresh independent
 read-only Deep Review of its accumulated committed diff → fixes → next package.
@@ -113,7 +135,7 @@ remain dated on `0fbcfd1`. Formal draft/planned/review_required and 51 missing
 approvals remain unchanged. Legacy inputs without v2 revision pointers and
 actual simultaneous DB scheduling remain unverified; retain HTML-depth P2.
 
-Next safe command: `git show --stat 0287f87`; read D07/D08/D09/context refs.
-`tools/run_daily_acceptance.py` registers the nine implemented daily files in
+Next safe command: `git show --stat 8f193bb`; read D11/D12/D14/D16/context refs.
+`tools/run_daily_acceptance.py` registers the twelve implemented daily files in
 the existing project verifier. Run only appropriate scoped checks; no full
 historical pytest, private target or repeated immutable115–118 calls.

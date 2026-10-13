@@ -25,6 +25,17 @@ Existing cost/policy, project descriptor and reaction/archive tests are affected
 regression floors. One independent local read-only full review after checks;
 critical findings get narrow independent rechecks before dependent work.
 No policy/approval-tool changes, no PG DDL/checksum reset, no full historical suite.
+Source/full review caefb45; initial repairs9f5feec; final fix/narrow PASS8f193bb.
+One full STOP7P1/4P2; initial narrow closed R01–R11 and found reader P1 R12.
+Final narrow PASS closes R12, no open local package P0/P1. [Checks](verification/DAILY-package-05-D07-D08-D09-20261013.md)
+and [frozen review/closure](verification/DAILY-package-05-local-review-20261013.md).
+Final scoped native24 passed/52.27s; R12+Brief5 passed/18.21s, reader/deletion5
+passed/29.76s, zero skips, counts overlap. Local fixtures only; paired40 loopback
+requests/fake session do not prove provider quality/usefulness/live integration.
+Transitive private scope/deletion and canonical snapshot invalidate stale copies;
+legacy/admin writers and historical UX remain distinct. Next local coherent
+package D11+D12+D14+D16, acceptance/review boundary must be registered before
+changes. Go/governed/human and formal statuses below unchanged.
 
 Package 4: D04 + D10, base `62a2909`, local synthetic-only. One accumulated
 review covers focus admission/completion/lineage, request isolation and planner
@@ -40,8 +51,8 @@ and [frozen review](verification/DAILY-package-04-local-review-20261013.md).
 Final affected tier78 passed/2 missing-provenance fixture failures; repaired two
 fixtures+five pure nodes7 passed/6.28s, model-client floor10 passed/41.30s,
 final R09/delivery tier5 passed/20.18s. One full review, narrow repairs only.
-Formal statuses below stay unchanged; next ready local package is
-D07/D08/D09.20-turn transcript is synthetic71704c4 dialogue mechanics only.
+Formal statuses below stay unchanged; D07/D08/D09 followed as package5.
+20-turn transcript is synthetic71704c4 dialogue mechanics only.
 
 Package 3: D05 + D06, base `980087f`, local synthetic-only. One accumulated
 review covers model descriptor/transport, scoped accounting/no-repeat integration,

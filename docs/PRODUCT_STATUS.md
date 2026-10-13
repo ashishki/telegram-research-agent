@@ -27,7 +27,7 @@ acceptance отсутствуют. R05 P2: blocking read может задерж
 чтения принятие просроченного результата запрещено. D04 + D10 реализован
 следующим локальным пакетом; non-Codex Go/governed gates остаются открыты.
 
-**Текущий пакет D04 + D10, 13 октября:** versioned focus admission и bounded
+**Пакет D04 + D10, 13 октября:** versioned focus admission и bounded
 intent plans, exact old-result binding, ephemeral project context, SourceBatch/
 EvidenceBundle с отдельными received/eligible/selected/cited/omitted counters.
 300 synthetic archive items перечисляются до выбора canonical20 Brief items;
@@ -44,9 +44,31 @@ Affected tier78 passed/2 fixture failures, затем исправленные f
 passed/41.30s, counts не суммируются. Второй full review не запускался.
 Actual20-turn synthetic transcript на71704c4 содержит fake planner/loopback;
 это dialogue mechanics до source repairs, не реальная модель/качество/польза.
-Следующий готовый пакет: D07 + D08 + D09. Ни аккаунты/платные
+Следующим локально выполнен D07 + D08 + D09; текущая квитанция ниже. Ни аккаунты/платные
 вызовы/сервисы/production, ни provider/operator/human acceptance не выполнены.
 Полный Chat/Search/Brief/Watch/Act programme и исключение Mini App сохранены.
+
+**Текущий пакет D07 + D08 + D09, 13 октября:** versioned profiles по ролям/
+privacy/expiry/fallback, promotion по фактическим paired attempts и observed
+policy binding, честный бюджет; подтверждённые версии проектов с транзитивным
+provenance/deletion; выбранный canonical архив с global tombstones, exact ID/name
+filters, atomic cursor/quota и source snapshots. Обычный research, Brief/Watch,
+модель, focus/delivery и reader повторно проверяют текущий источник. Source/full
+review `caefb45`, initial repairs `9f5feec`, final fix/narrow PASS `8f193bb`.
+[Проверки](verification/DAILY-package-05-D07-D08-D09-20261013.md),
+[review/rechecks](verification/DAILY-package-05-local-review-20261013.md).
+Один full STOP семь P1/четыре P2; narrow9f5feec закрыл R01–R11, нашёл R12 в
+reader. Узкая PASS8f193bb закрывает R12; открытых package P0/P1 нет. Final native
+24 passed/52.27s; R12+Brief5 passed/18.21s, reader/deletion5 passed/29.76s,
+zero skips, counts перекрываются. Все исходные failures сохранены. Pair40
+loopback responses — одинаковый synthetic model, разные connections/объявленные
+цены, не quality/savings claim. Telegram session проверен fake client, не реальный
+аккаунт; bounded scan не доказывает full history. Текущий snapshot консервативно
+инвалидирует старые копии; historical UX остаётся D19, legacy/admin writers вне
+lock contract. Structured project onboarding — engineering interface, не human
+acceptance. Go/governed, provider/CI/operator/live/production gates остаются
+открыты. Следующий готовый локальный пакет: **D11 + D12 + D14 + D16**. Полный
+Chat/Search/beautiful Brief/Watch/confirmed Act сохраняется; Mini App исключён.
 
 Дата среза: **10 октября 2026**. Runtime/test/independent source SHA: `0fbcfd1dde780724ad934aa66825afe17a6efc98`. Документация и Git integration изменены позднее; фактические refs — в [merge receipt](verification/PAI-master-integration-20261010.md).
 

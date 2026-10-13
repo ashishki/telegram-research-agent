@@ -19,7 +19,7 @@
     "engineering_done": "Следующий кодирующий агент работает законченными пакетами: реализация → адресные проверки → один независимый Deep Review накопленного diff → исправления → следующий пакет. У каждого пакета один native ingress→use case→result результат. P0/P1 исправлены и независимо перепроверены узко до зависимой работы; повторное полное ревью/все тесты без нового существенного риска не запускаются. Некритические остатки фиксируются; 62 карточки не означают 62 полных ревью. Изменения egress/secrets/retention/confirmation/recovery получают требуемое риск-ревью до реального использования.",
     "evidence": "Record exact SHA/diff, commands, pass/fail/skip, requested/observed model, public fixture hashes and unresolved live/operator gates. A test filename is not a pass. No private payloads in Git.",
     "rollback": "Отключить новую способность или вернуть предыдущий совместимый код; не откатывать consumed/unknown receipts, revoke/tombstones и canonical source IDs. Для schema changes нужен отдельный forward-compatible recovery.",
-    "verification": "Nine implemented daily acceptance files are registered in the project verifier via the strict zero-skip runner. Use package-specific tiers during implementation; no full historical pytest.",
+    "verification": "Twelve implemented daily acceptance files are registered in the strict project verifier. Use package-specific tiers; no full historical suite or invented provider/human acceptance.",
     "formal_mapping": "PAI references mean reuse/coverage, never automatic completion or human approval. Do not modify formal statuses based solely on this plan."
   },
   "tasks": [
@@ -256,7 +256,12 @@
       "legacy": [
         "PAI-03",
         "PAI-23"
-      ]
+      ],
+      "engineering_status": "local_review_p1_closed_go_route_pending",
+      "implementation_receipt": "../../verification/DAILY-package-05-D07-D08-D09-20261013.md",
+      "local_code_sha": "8f193bb8feba12f973e0b80730e72e8ad485a817",
+      "engineering_source_sha": "8f193bb8feba12f973e0b80730e72e8ad485a817",
+      "independent_review_receipt": "../../verification/DAILY-package-05-local-review-20261013.md"
     },
     {
       "id": "D08",
@@ -286,7 +291,12 @@
         "PAI-05",
         "PAI-13",
         "PAI-21"
-      ]
+      ],
+      "engineering_status": "local_review_p1_closed_go_route_pending",
+      "implementation_receipt": "../../verification/DAILY-package-05-D07-D08-D09-20261013.md",
+      "local_code_sha": "8f193bb8feba12f973e0b80730e72e8ad485a817",
+      "engineering_source_sha": "8f193bb8feba12f973e0b80730e72e8ad485a817",
+      "independent_review_receipt": "../../verification/DAILY-package-05-local-review-20261013.md"
     },
     {
       "id": "D09",
@@ -316,7 +326,12 @@
       "legacy": [
         "PAI-11",
         "PAI-27"
-      ]
+      ],
+      "engineering_status": "local_review_p1_closed_go_route_pending",
+      "implementation_receipt": "../../verification/DAILY-package-05-D07-D08-D09-20261013.md",
+      "local_code_sha": "8f193bb8feba12f973e0b80730e72e8ad485a817",
+      "engineering_source_sha": "8f193bb8feba12f973e0b80730e72e8ad485a817",
+      "independent_review_receipt": "../../verification/DAILY-package-05-local-review-20261013.md"
     },
     {
       "id": "D10",
@@ -2686,14 +2701,65 @@
           "duration_seconds": 20.18,
           "scope": "R09 scheduled receipt replay and affected delivery authority/no-repeat guards"
         }
+      },
+      {
+        "id": "daily-05",
+        "tasks": [
+          "D07",
+          "D08",
+          "D09"
+        ],
+        "status": "local_review_p1_closed_go_route_pending",
+        "source_sha": "caefb455c009492f3bf5edf1f924b4d75df8666d",
+        "reviewed_sha": "caefb455c009492f3bf5edf1f924b4d75df8666d",
+        "diff_base": "3bb16f35876b3bf1cf49516caa7775fb2dea5aa1",
+        "diff_sha256": "225f1dcca7d0693eadc8cb354f3b9b2f3b34b9f2960b53a87efed1aa56d78fc9",
+        "final_code_sha": "8f193bb8feba12f973e0b80730e72e8ad485a817",
+        "recheck_diff_sha256": "3fe81128007679ae7889f2180f8eb583ca139ff4675aa3597a85268391317c0e",
+        "receipt": "../../verification/DAILY-package-05-D07-D08-D09-20261013.md",
+        "review_receipt": "../../verification/DAILY-package-05-local-review-20261013.md",
+        "review_route": "independent_local_readonly",
+        "policy_go_route_satisfied": false,
+        "remaining_findings": [],
+        "next_block_after_gate": [
+          "D11",
+          "D12",
+          "D14",
+          "D16"
+        ],
+        "limitations": [
+          "Only isolated PG/SQLite and loopback/fake sessions, no real provider/account/client/production.",
+          "Paired synthetic mechanics are not provider quality, independent holdout or human usefulness.",
+          "Policy windows are configured units, not verified invoices; non-USD/subscription/overage unknown.",
+          "Selected snapshot invalidation is conservative; explicit historical rendering remains D19.",
+          "Canonical file guards cover cooperating new writers; legacy/admin bypasses are outside scope."
+        ],
+        "final_rechecked_sha": "8f193bb8feba12f973e0b80730e72e8ad485a817",
+        "initial_fix_sha": "9f5feec9c109c76cc73839259ba626547d52b7eb",
+        "initial_recheck_verdict": "STOP: R01-R11 closed, new P1 DAILY05-R12",
+        "tiny_fix_diff_sha256": "25db22208d787f0103677b59aa9886f8f37cb558b0a7c0cf4a5a1fe5cce0e5a7",
+        "final_recheck_verdict": "PASS R12; no new P0/P1 in fix; frozen R01-R11 closures preserved",
+        "reviewer_provenance": {
+          "full": "/root/daily05_readonly_review",
+          "narrow": "/root/daily05_p1_recheck",
+          "requested_model_effort": "inherited active defaults, no override",
+          "observed_model_effort": "unknown",
+          "route": "local collaboration read-only; Git-loaded code/memory stubs; no reviewer DB/HTTP/tests/mutations"
+        },
+        "final_scoped_checks": [
+          "Native/source/wiring24 passed52.27s zero skips",
+          "R12+Brief5 passed18.21s zero skips",
+          "Reader/deletion5 passed29.76s zero skips; counts overlap; all failures retained in ledger"
+        ]
       }
     ],
     "live_evidence": "none",
     "operator_acceptance": "none",
     "next_dependency_ready_package": [
-      "D07",
-      "D08",
-      "D09"
+      "D11",
+      "D12",
+      "D14",
+      "D16"
     ]
   }
 }
