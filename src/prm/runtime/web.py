@@ -125,7 +125,7 @@ class GitHubReadProvider:
     def scope_digest(self,sha):
         return hashlib.sha256(json.dumps([sha,self.selection]).encode()).hexdigest()
 
-    def read_repository_context(self,repository_ref,*,guard=None):
+    def read_repository_context(self,repository_ref,*,guard=None,operation_refs=None):
         if repository_ref!=self.repository_ref:raise CapabilityDenied('repository selection differs')
         import uuid
         def current():
@@ -138,16 +138,17 @@ class GitHubReadProvider:
             current()
             decision=self.registry.authorize_and_reserve(replace(self.source_request(),operation_ref='github_'+uuid.uuid4().hex),upper_bound=self.upper_bound)
             if not decision.allowed:raise CapabilityDenied(decision.reason)
+            if operation_refs is not None:operation_refs.append(decision.operation_ref)
             def transport():
                 current()
-                if self.credential:
-                    row=self.credential.current(owner=self.owner_ref,connection_ref=self.connection_ref,repository_ref=repository_ref,revision=self.connection_revision)
-                    permission='issues' if path.startswith('issues/') else 'pull_requests' if path.startswith('pulls/') else 'contents'
-                    if row['scopes']['permissions'].get(permission)!='read':raise CapabilityDenied('GitHub object permission outside selected read scope')
+                from contextlib import nullcontext
+                permission='issues' if path.startswith('issues/') else 'pull_requests' if path.startswith('pulls/') else 'contents'
                 headers={'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2026-03-10'}
-                if self.credential:headers['Authorization']='Bearer '+self.credential.credential(owner=self.owner_ref,connection_ref=self.connection_ref,repository_ref=repository_ref,revision=self.connection_revision)
-                value=_https_get('https://api.github.com/repos/'+repository_ref+'/'+path,timeout_seconds=8,max_bytes=128000,
-                    headers=headers)
+                scope=self.credential.leased_credential(owner=self.owner_ref,connection_ref=self.connection_ref,repository_ref=repository_ref,revision=self.connection_revision,permission=permission) if self.credential else nullcontext(None)
+                with scope as token:
+                    if token:headers['Authorization']='Bearer '+token
+                    if guard:guard()
+                    value=_https_get('https://api.github.com/repos/'+repository_ref+'/'+path,timeout_seconds=8,max_bytes=128000,headers=headers)
                 if value['content_type']!='application/json':raise StorageError('GitHub JSON required')
                 return json.loads(value['body'])
             return self.registry.execute_reserved((decision.reservation,),transport)

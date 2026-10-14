@@ -30,7 +30,7 @@ class DurableBriefStore(BriefDocumentStore):
     def __init__(self,target,*,owner_ref,registry=None):
         super().__init__();self.store=PostgresStore(target);self.owner_ref=owner_ref;self.registry=registry
         self.pending_dependencies={};self.pending_classes={};self.pending_scopes={}
-        self.pending_inventory={};self.pending_coverage={};self.pending_events={}
+        self.pending_inventory={};self.pending_coverage={};self.pending_events={};self.pending_project_bindings={}
 
     def _document_ref(self,brief_id):return 'brief_'+hashlib.sha256(brief_id.encode()).hexdigest()[:32]
     def _binding_ref(self,conversation_id):return 'brief_binding_'+hashlib.sha256(conversation_id.encode()).hexdigest()[:32]
@@ -50,6 +50,8 @@ class DurableBriefStore(BriefDocumentStore):
                 digest=hashlib.sha256(raw).hexdigest()
                 old=tx.get(owner,'result',ref,version=item.version)
                 if old is not None:
+                    from prm.runtime.source_access import project_bindings_current
+                    project_bindings_current(tx,owner,old.payload.get('project_bindings',[]))
                     if old.payload.get('storage_digest')!=digest:raise StateConflict('immutable Brief version differs')
                     if self.registry is not None:
                         from prm.runtime.source_access import source_current
@@ -77,7 +79,8 @@ class DurableBriefStore(BriefDocumentStore):
                         'content_digest':item.content_digest,'storage_digest':digest,'source_data_classes':classes,'source_scopes':scopes,
                         'archive_snapshots':snapshots,'material_pages':pages,'source_coverage':self.pending_coverage.get(item.content_digest),
                         'topic':item.topic,'included_at':item.window.generated_at.isoformat(),
-                        'event_selection':self.pending_events.get(item.content_digest)},expected_version=item.version-1)
+                        'event_selection':self.pending_events.get(item.content_digest),
+                        'project_bindings':self.pending_project_bindings.get(item.content_digest,[])},expected_version=item.version-1)
                     tx.conn.execute('INSERT INTO pa_briefs.documents VALUES(%s,%s,%s,%s,%s)',(owner,item.brief_id,item.version,digest,Jsonb(encoded)))
                 if tx.conn.execute("SELECT to_regclass('pa_memory.dependencies') AS meta").fetchone()['meta'] is not None:
                     for dependency in self.pending_dependencies.get(item.content_digest,()):
@@ -156,12 +159,14 @@ class DurableBriefStore(BriefDocumentStore):
                     if self.registry:source_current(tx,self.registry,self.owner_ref,p.get('source_scopes',[]))
                 except (CapabilityDenied,StorageError):continue
                 history.extend({**e,'brief_ref':p['brief_id']+':'+str(p['version']),
-                    'last_included_at':p.get('included_at')} for e in selection['events'])
+                    'last_included_at':p.get('included_at')} for e in selection['events'] if e.get('editorial_included') is True)
         return tuple(history[-480:])
 
     def _decode_document(self,item):
         if item.payload.get('kind')!='brief_manifest':return _stored_document(item.payload)
         with self.store.transaction() as tx:
+            from prm.runtime.source_access import project_bindings_current
+            project_bindings_current(tx,self.owner_ref,item.payload.get('project_bindings',[]))
             row=tx.conn.execute('SELECT payload,digest FROM pa_briefs.documents WHERE owner=%s AND id=%s AND version=%s',
                 (self.owner_ref,item.payload['brief_id'],item.payload['version'])).fetchone()
         if row is None or row['digest']!=item.payload['storage_digest'] or hashlib.sha256(json.dumps(row['payload'],ensure_ascii=False,sort_keys=True).encode()).hexdigest()!=row['digest']:

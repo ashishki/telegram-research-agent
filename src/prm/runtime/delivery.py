@@ -116,6 +116,8 @@ class DeliveryExecutor:
                 raise StorageError('result unavailable')
             from prm.storage.jobs import JobQueue
             request_input = JobQueue(self.store.target)._input(tx, owner, job['payload'])
+            from .source_access import result_provenance,result_project_bindings
+            classes,scopes=result_provenance(tx,owner,result)
             if prior:payload=dict(prior['payload'])
             else:
                 from .source_access import result_provenance,result_archive_snapshots
@@ -124,6 +126,8 @@ class DeliveryExecutor:
                            'data_class':result.payload.get('data_class',classes[0]),
                            'data_classes':list(classes),
                            'request_ref': result.payload.get('request_ref'),'source_scopes':list(scopes)}
+                bindings=result_project_bindings(tx,owner,result)
+                if bindings:payload['project_bindings']=bindings
                 snapshots=result_archive_snapshots(tx,owner,result)
                 if snapshots:payload['archive_snapshots']=list(snapshots)
             options=result.payload.get('payload',{})
@@ -249,8 +253,13 @@ class DeliveryExecutor:
                 raise CapabilityDenied('delivery day changed after preparation')
 
     def _source_current(self,tx,owner,payload):
-        from .source_access import source_current
+        from .source_access import source_current,project_bindings_current,result_project_bindings
         source_current(tx,self.registry,owner,payload.get('source_scopes',()),archive_snapshots=payload.get('archive_snapshots',()),require_snapshot=True)
+        project_bindings_current(tx,owner,payload.get('project_bindings',[]))
+        if payload.get('result_ref'):
+            item=tx.get(owner,'result',payload['result_ref'])
+            if item is None or item.digest!=payload.get('result_digest'):raise CapabilityDenied('delivered result changed or deleted')
+            project_bindings_current(tx,owner,result_project_bindings(tx,owner,item))
 
     def _deliver(self, *, owner, delivery_id, kind, source_ref, destination_ref, payload, upper_bound, effect_lease=None):
         if not isinstance(destination_ref, str) or not 0 < len(destination_ref) <= 128:

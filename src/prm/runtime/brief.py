@@ -87,12 +87,25 @@ class BriefRuntime:
                 except ValueError:continue
                 eligible.add(record.evidence_ref)
         from prm.event_clusters import cluster_events
-        from prm.brief_selection import select_events,build_attention_editorial,admit_editorial_wording
+        from prm.brief_selection import select_events,build_attention_editorial,admit_editorial_wording,brief_ref
         selection_digest=self.root.archive_selection.digest if self.root.archive_selection else None
         history=self.root.briefs.event_history(topic=topic,selection_digest=selection_digest) if hasattr(self.root.briefs,'event_history') else ()
         projects=[]
         if hasattr(self.root,'projects'):
-            with self.root.queue.store.transaction() as tx:projects=self.root.projects.list_in(tx)[:3]
+            with self.root.queue.store.transaction() as tx:
+                projects=self.root.projects.list_in(tx)[:3]
+                bridge=self.root.projects.bridge_brief_in(tx,[r for b in batches for r in b.items if r.evidence_ref in eligible],projects)
+            if bridge:
+                from prm.source_contracts import SourceRecord
+                new=[];new_eligible=set()
+                for batch in batches:
+                    converted=[]
+                    for old in batch.items:
+                        record=SourceRecord.from_item(bridge[old.evidence_ref],old.resource) if old.evidence_ref in bridge else old
+                        converted.append(record)
+                        if old.evidence_ref in eligible:new_eligible.add(record.evidence_ref)
+                    new.append(replace(batch,items=tuple(converted)))
+                batches=new;eligible=new_eligible
         records=list({r.evidence_ref:r for b in batches for r in b.items if r.evidence_ref in eligible}.values())
         events=cluster_events(records,history=history)
         decisions=select_events(events,projects=projects,maximum=20)
@@ -119,6 +132,12 @@ class BriefRuntime:
             editorial=self.editorial(document,data_classes=classes,source_scopes=used_scopes,archive_snapshots=snapshots) if type(self.editorial)is RuntimeBriefEditorial else self.editorial(document)
             if editorial is not None:offered=editorial
         document=build_brief_document(replace(request,editorial=admit_editorial_wording(local_editorial,offered,document.evidence)))
+        included={a.evidence_ref for s in document.editorial.stories for a in s.anchors}
+        required={brief_ref(r) for e,r,s in decisions if e.conflict or s['importance'] in {'critical','high'}}
+        if required-included:
+            request=replace(request,limitations=tuple(dict.fromkeys((*request.limitations,'editorial_required_event_unrepresented'))),
+                coverage=tuple(replace(c,state='partial',reason='editorial_required_event_unrepresented') if c.state=='checked' else c for c in request.coverage))
+            document=build_brief_document(replace(request,editorial=document.editorial))
         dependencies=[r.payload['dependency_ref'] for b in batches for r in b.items if r.payload.get('dependency_ref')]
         used_projects={row[2]['project']['project_ref'] for row in decisions[:5] if row[2]['project']}
         if used_projects:
@@ -138,16 +157,21 @@ class BriefRuntime:
         self.root.briefs.pending_coverage[document.content_digest]['event_count']=len(events)
         self.root.briefs.pending_coverage[document.content_digest]['event_duplicate_count']=len(records)-len(events)
         if not hasattr(self.root.briefs,'pending_events'):self.root.briefs.pending_events={}
+        project_bindings=[{'project_ref':p.object_id,'version':p.version,'digest':p.digest} for p in projects if p.object_id in used_projects]
+        if not hasattr(self.root.briefs,'pending_project_bindings'):self.root.briefs.pending_project_bindings={}
+        self.root.briefs.pending_project_bindings[document.content_digest]=project_bindings
         self.root.briefs.pending_events[document.content_digest]={'selection_digest':selection_digest,
-            'events':[e.metadata() for e,_,_ in decisions],
+            'events':[{**e.metadata(),'editorial_included':brief_ref(r) in included} for e,r,_ in decisions],
             'signals':[{k:v for k,v in s.items() if k!='project'}|{'event_ref':e.event_ref,'revision':e.revision,
                 'project_binding':None if not s['project'] else {k:s['project'][k] for k in ('project_ref','version','digest')}} for e,_,s in decisions]}
         cluster_refs={r.evidence_ref:(e.event_ref,e.revision) for e in events for r in e.records}
         selected={r.evidence_ref for r in bundle.selected} if bundle else set()
+        editorial_selected={r.evidence_ref for _,r,_ in decisions if brief_ref(r) in included}
         if not hasattr(self.root.briefs,'pending_inventory'):self.root.briefs.pending_inventory={}
         self.root.briefs.pending_inventory[document.content_digest]=[{**r.metadata(),'source_url':r.payload.get('source_url'),
             'event_ref':cluster_refs.get(r.evidence_ref,(None,None))[0],'event_revision':cluster_refs.get(r.evidence_ref,(None,None))[1],
-            'selected':r.evidence_ref in selected,'reason':'selected' if r.evidence_ref in selected else 'ineligible' if r.evidence_ref not in eligible else 'event_duplicate' if any(r in e.records and len(e.records)>1 and any(p.evidence_ref in selected for p in e.records) for e in events) else 'model_packet_limit'} for b in batches for r in b.items]
+            'packet_selected':r.evidence_ref in selected,'editorial_included':r.evidence_ref in editorial_selected,
+            'selected':r.evidence_ref in editorial_selected,'reason':'selected' if r.evidence_ref in editorial_selected else 'editorial_omitted' if r.evidence_ref in selected else 'ineligible' if r.evidence_ref not in eligible else 'event_duplicate' if any(r in e.records and len(e.records)>1 and any(p.evidence_ref in selected for p in e.records) for e in events) else 'model_packet_limit'} for b in batches for r in b.items]
         self.root.briefs.pending_dependencies[document.content_digest]=dependencies
         self.root.briefs.pending_classes[document.content_digest]=tuple(sorted(classes)) or ('user_provided',)
         self.root.briefs.pending_scopes[document.content_digest]=used_scopes
@@ -180,6 +204,8 @@ class BriefRuntime:
             parent=self.root.briefs._document_ref(brief_id);manifest=tx.get(owner,'result',parent,version=version)
             if manifest is None or manifest.payload.get('brief_id')!=brief_id:raise StorageError('Brief version unavailable')
             scopes=manifest.payload.get('source_scopes',[]);snapshots=manifest.payload.get('archive_snapshots',[])
+            from .source_access import project_bindings_current
+            project_bindings_current(tx,owner,manifest.payload.get('project_bindings',[]))
             source_current(tx,self.root.registry,owner,scopes,archive_snapshots=snapshots,require_snapshot=True)
             pages=manifest.payload.get('material_pages',[]);rows=[];seen=0;dependencies=[parent]
             for page in pages:

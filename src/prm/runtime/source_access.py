@@ -10,6 +10,7 @@ PROTECTED=frozenset({'private_archive','private_connector_metadata','private_con
 
 def result_provenance(tx,owner,item):
     """Canonical response origins and both existing durable result layouts."""
+    project_bindings_current(tx,owner,result_project_bindings(tx,owner,item))
     if item.object_id.startswith('response_'):
         ref='response_origin_'+hashlib.sha256(item.object_id.encode()).hexdigest()[:32]
         origin=tx.get(owner,'conversation',ref)
@@ -25,6 +26,44 @@ def result_provenance(tx,owner,item):
     if not set(classes)<= {'model_generated','private_archive','private_connector_metadata','private_connector_content','user_provided','public'}:raise StorageError('unknown result data class')
     if not set(classes)&PROTECTED<={s.get('data_class') for s in scopes}:raise CapabilityDenied('protected result source authority unavailable')
     return tuple(classes),tuple(scopes)
+
+
+def result_project_bindings(tx,owner,item):
+    pending=[item.object_id];seen=set();bindings={}
+    while pending:
+        ref=pending.pop()
+        if ref in seen:continue
+        seen.add(ref)
+        if len(seen)>64:raise StorageError('bounded project provenance graph required')
+        current=tx.get(owner,'result',ref)
+        if current is None:raise StorageError('result project provenance deleted')
+        for binding in current.payload.get('project_bindings',[]):
+            key=(binding['project_ref'],binding['version'],binding['digest']);bindings[key]=binding
+        if tx.conn.execute("SELECT to_regclass('pa_memory.dependencies') AS meta").fetchone()['meta'] is not None:
+            rows=tx.conn.execute("SELECT parent_ref FROM pa_memory.dependencies WHERE owner=%s AND parent_namespace='result' AND child_namespace='result' AND child_ref=%s",(owner,ref)).fetchall()
+            pending.extend(row['parent_ref'] for row in rows)
+    return list(bindings.values())
+
+
+def project_bindings_current(tx,owner,bindings,_depth=0):
+    if _depth>4:raise StorageError('bounded transitive project bindings required')
+    if not isinstance(bindings,list) or len(bindings)>16:raise StorageError('bounded saved project bindings required')
+    for b in bindings:
+        tx.conn.execute("SELECT version FROM pa_runtime.object_heads WHERE owner=%s AND namespace='memory' AND object_id=%s FOR SHARE",(owner,b['project_ref'])).fetchone()
+        item=tx.get(owner,'memory',b['project_ref'])
+        now=tx.conn.execute('SELECT clock_timestamp() AS now').fetchone()['now']
+        if item is None or item.version!=b['version'] or item.digest!=b['digest'] or item.payload.get('kind')!='project':raise CapabilityDenied('saved project context changed or deleted')
+        from .profiles import aware
+        context=item.payload['project_context']
+        if not aware(context['reviewed_at'])<=now<aware(context['expires_at']):raise CapabilityDenied('saved project context expired')
+        for parent in context['source_bindings']:
+            source=tx.get(owner,parent['namespace'],parent['ref'])
+            if source is None or source.version!=parent['version'] or source.digest!=parent['digest']:raise CapabilityDenied('saved project source changed or deleted')
+            if parent['namespace']=='memory' and source.payload.get('kind')=='project':
+                project_bindings_current(tx,owner,[{'project_ref':source.object_id,'version':source.version,'digest':source.digest}],_depth+1)
+        for relation in context['relationships']:
+            source=tx.get(owner,'result',relation['evidence_ref'])
+            if source is None or source.version!=relation['evidence_version'] or source.digest!=relation['evidence_digest']:raise CapabilityDenied('saved project relationship changed or deleted')
 
 
 def result_archive_snapshots(tx,owner,item):

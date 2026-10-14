@@ -5,6 +5,25 @@ from prm.brief_editorial import BriefEditorial, BriefStory, StoryAnchor
 VERSION = 'brief-attention-v1'
 
 
+def brief_ref(record):
+    from prm.briefs import _slug,_EVIDENCE_REF
+    identity=record.payload.get('evidence_id') or record.external_ref
+    return identity if _EVIDENCE_REF.fullmatch(identity) else 'evidence_'+_slug(identity,fallback=record.payload.get('source_url',''))
+
+
+def safe_anchor(text):
+    parts=re.split(r'https?://\S+|<[^>]*>',text)
+    for part in sorted(parts,key=len,reverse=True):
+        part=part.strip()
+        if len(part)>=16:return part[:1200]
+    # An anchor is a literal pointer, not a factual shortening. Neutral UI
+    # wording below is used when no supported factual excerpt is available.
+    for start in range(max(0,len(text)-15)):
+        part=text[start:start+16]
+        if not re.search(r'https?://|<[^>]+>',part):return part
+    return None
+
+
 def project_match(record, projects):
     value = record.payload
     dependency = value.get('dependency_ref')
@@ -78,9 +97,7 @@ def build_attention_editorial(document, decisions):
     for event, record, signal in decisions:
         if len(stories) >= 5:
             break
-        identity = record.payload.get('evidence_id') or record.external_ref
-        from prm.briefs import _slug, _EVIDENCE_REF
-        ref = identity if _EVIDENCE_REF.fullmatch(identity) else 'evidence_' + _slug(identity, fallback=record.payload.get('source_url', ''))
+        ref=brief_ref(record)
         source = sources.get(ref)
         if source is None or len(source.summary) < 16:
             continue
@@ -110,11 +127,20 @@ def build_attention_editorial(document, decisions):
             caveat = 'Впервые обнаружено в этом периоде; время события не подтверждено. ' + caveat
         # Keep validator text limits/URL rules; source text with URLs remains in
         # document evidence, and that uncertain story falls back to its source.
-        quote = source.summary
-        fact = quote[:280]
+        quote=safe_anchor(source.summary)
+        if quote is None:continue
+        from prm.research_blocks import fact_proof
+        known=[{'source_url':source.source_ref,'support_span':source.summary}]
+        fact=source.summary[:280]
+        neutral='Краткая формулировка не подтверждена. Откройте исходный материал.'
+        if not fact_proof(fact,source.summary,source.source_ref,known) or re.search(r'https?://|<[^>]+>',fact):
+            fact=neutral
+            caveat='Для проверки утверждений нужен полный исходный фрагмент. '+caveat
         title = source.title[:140]
+        if not fact_proof(title,source.summary,source.source_ref,known) or re.search(r'https?://|<[^>]+>',title):title='Материал источника'
         if title.startswith('@') or any(s.title.casefold()==title.casefold() for s in stories):
-            title = fact[:100]
+            # A unique neutral label introduces no numeric/source claim.
+            title='Материал источника '+'•'*len(stories)
         stories.append(BriefStory(title, fact, fact, fact, why[:300], next_step[:300], caveat[:300], (StoryAnchor(ref, quote),)))
         used.add(ref)
     candidate = BriefEditorial(tuple(stories), tuple(sources.keys() - used))

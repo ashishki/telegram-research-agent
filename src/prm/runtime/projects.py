@@ -117,6 +117,44 @@ class ProjectRuntime:
                 'status':'candidate_experiment' if allowed else 'weak_watch','action_recommendation':allowed,
                 'relationship':relation if allowed else None,'next_proof':descriptor['next_proof'] if allowed else None,
                 'cost':'unknown','execution_authority':False,'human_usefulness':None,'source_data_classes':list(classes),'source_scopes':list(scopes),'archive_snapshots':list(snapshots)}
+
+    def bridge_brief_in(self,tx,records,projects):
+        """Exact native canonical identity+version to a confirmed result relation.
+
+        Matching text alone is insufficient. Only cited native archive reads
+        with their immutable source identity can supply the durable pointer.
+        """
+        bindings=[]
+        for project in projects:
+            for relation in project.payload['project_context']['relationships']:
+                item=self._live(tx,{'namespace':'result','ref':relation['evidence_ref'],'version':relation['evidence_version'],'digest':relation['evidence_digest']})
+                allowed=set(item.payload.get('answer_payload',{}).get('source_refs',[]))
+                if not allowed:continue
+                pending=list(item.payload.get('evidence_refs',[]));seen=set()
+                while pending and len(seen)<32:
+                    ref=pending.pop()
+                    if ref in seen:continue
+                    seen.add(ref);source=tx.get(self.root.owner_ref,'result',ref)
+                    if source is None:continue
+                    value=source.payload
+                    if value.get('source')=='archive' and value.get('status')=='gathered':
+                        from .source_access import source_current
+                        source_current(tx,self.root.registry,self.root.owner_ref,value.get('source_scopes',[]),archive_snapshots=value.get('evidence',{}).get('archive_snapshots',()),require_snapshot=True)
+                        for material in value.get('evidence',{}).get('items',[]):
+                            if material.get('source_url') in allowed and material.get('post_archive_document_id') and material.get('content_hash'):
+                                bindings.append((material,relation,item))
+                    pending.extend(value.get('evidence_refs',[]))
+        result={}
+        for record in records:
+            p=record.payload
+            if not p.get('post_archive_document_id') or not p.get('archive_content_hash'):continue
+            for material,relation,item in bindings:
+                if (p['post_archive_document_id']==material['post_archive_document_id']
+                    and p['archive_content_hash']==material['content_hash'] and p.get('source_url')==material.get('source_url')
+                    and relation['quote'] in p.get('support_span','')):
+                    result[record.evidence_ref]={**p,'dependency_ref':{'namespace':'result','object_ref':item.object_id,'version':item.version,'digest':item.digest},'project_bridge':'canonical_identity_version_and_cited_result'}
+                    break
+        return result
     def service(self,request,request_ref,guard):
         actor={'chat_id':request.chat_id,'actor_id':request.actor_id,'owner_chat_id':request.owner_chat_id};self.memory._owner(**actor);guard()
         command,_,arg=request.query.partition(' ')

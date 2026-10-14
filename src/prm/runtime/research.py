@@ -91,6 +91,9 @@ class LocalArchiveReader:
                 'posted_at':publication.isoformat() if publication else None,'first_discovered_at':row['ingested_at'],'local_archive_provenance':True,
                 'source_group_id':'tg_channel:'+str(row['channel_id']),'source_version':hashlib.sha256(text.encode()).hexdigest(),
                 'importance':'high' if high else 'medium','content_truncated':len(text)>1200})
+            from db.archive_documents import archive_post_document_id,content_hash
+            items[-1]['post_archive_document_id']=archive_post_document_id(channel_id=row['channel_id'],message_id=row['message_id'])
+            items[-1]['archive_content_hash']=content_hash(text)
         omitted=max(0,total-offset-len(rows))
         resource=SourceResource(self.root.owner_ref if self.root else 'owner_local_archive',self.root.archive_resource_ref if self.root else 'resource_archive','archive','private_archive',
             scope_digest=self.selection.digest if self.selection else hashlib.sha256((parameters[0]+'\x1f'+parameters[1]).encode()).hexdigest())
@@ -185,7 +188,7 @@ class DurableResearchWorker:
         if observed!=expected:raise CapabilityDenied('research source scopes incomplete')
         return requests
 
-    def enqueue(self,plan,*,idempotency_key,continuation_binding=None):
+    def enqueue(self,plan,*,idempotency_key,continuation_binding=None,origin_binding=None):
         from .research_plan import validate_research_plan,selected_catalogue
         plan=validate_research_plan(plan,self.root)
         if plan['schema_version']==2:plan={**plan,'selected_catalogue':selected_catalogue(self.root,plan)}
@@ -193,6 +196,7 @@ class DurableResearchWorker:
         parent= self.root.queue.store.get(self.root.owner_ref,'conversation',parent_ref,version=1) if parent_ref else None
         stored_plan={**plan,'source_parent':{'input_namespace':'conversation','input_ref':parent_ref,'input_version':parent.version,'input_digest':parent.digest}} if parent is not None else plan
         if continuation_binding is not None:stored_plan={**stored_plan,'continuation_of':continuation_binding}
+        if origin_binding is not None:stored_plan={**stored_plan,'research_origin':origin_binding}
         ref='research_'+hashlib.sha256(idempotency_key.encode()).hexdigest()[:32]
         queue=self.root.queue
         with queue.store.transaction() as tx:
@@ -207,6 +211,9 @@ class DurableResearchWorker:
                 if prior is None or prior.version!=continuation_binding['version'] or prior.digest!=continuation_binding['digest']:raise StateConflict('exact research result changed or deleted')
                 tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',
                     (self.root.owner_ref,'result',prior.object_id,'conversation',ref))
+            if origin_binding is not None:
+                tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',
+                    (self.root.owner_ref,'conversation',origin_binding['input_ref'],'conversation',ref))
             payload={'schema_version':1,'input_namespace':'conversation','input_ref':ref,'input_version':1,'input_digest':item.digest,
                      'connection_ref':None,'resource_ref':'resource_research','purpose':'local.research','consent_revision':1}
             now=tx.conn.execute('SELECT clock_timestamp() AS now').fetchone()['now']
@@ -224,15 +231,25 @@ class DurableResearchWorker:
             source_current(tx,self.root.registry,self.root.owner_ref,scopes)
             prior=tx.get(self.root.owner_ref,'conversation',item.payload['request_ref'],version=1)
             if prior is None or prior.payload.get('schema_version')!=2:raise StorageError('versioned research plan required for continuation')
-            plan={k:v for k,v in prior.payload.items() if k not in {'selected_catalogue','source_parent','continuation_of'}}
+            origin=prior.payload.get('research_origin') or {'input_namespace':'conversation','input_ref':prior.object_id,'input_version':prior.version,'input_digest':prior.digest}
+            self.root.queue._input(tx,self.root.owner_ref,origin)
+            if item.payload.get('unknown_tool_calls'):raise StateConflict('unresolved research attempt requires reconciliation')
+            synthesis_ops=item.payload.get('answer_payload',{}).get('operation_refs',[])
+            if synthesis_ops and tx.conn.execute("SELECT ref FROM pa_policy.operations WHERE owner=%s AND ref=ANY(%s) AND state IN ('prepared','unknown') LIMIT 1",(self.root.owner_ref,synthesis_ops)).fetchone():raise StateConflict('unresolved synthesis outcome requires reconciliation')
+            for ref in item.payload.get('intermediate_refs',item.payload.get('evidence_refs',[])):
+                step=tx.get(self.root.owner_ref,'result',ref)
+                if step is None or step.payload['status'] in {'read_prepared','source_outcome_unknown'}:raise StateConflict('unresolved research read requires reconciliation')
+                operations=step.payload.get('operation_refs',[])
+                if operations and tx.conn.execute("SELECT ref FROM pa_policy.operations WHERE owner=%s AND ref=ANY(%s) AND state IN ('prepared','unknown') LIMIT 1",(self.root.owner_ref,operations)).fetchone():raise StateConflict('unresolved provider outcome requires reconciliation')
+            plan={k:v for k,v in prior.payload.items() if k not in {'selected_catalogue','source_parent','continuation_of','research_origin'}}
             from .research_plan import selected_catalogue
             if selected_catalogue(self.root,plan)!=prior.payload['selected_catalogue']:raise CapabilityDenied('continuation cannot expand source selection')
-        return self.enqueue(plan,idempotency_key=idempotency_key,continuation_binding={'ref':result_ref,'version':version,'digest':digest})
+        return self.enqueue(plan,idempotency_key=idempotency_key,continuation_binding={'ref':result_ref,'version':version,'digest':digest},origin_binding=origin)
 
     def _coverage(self,plan,completed,lease):
         from .research_plan import assess_coverage,selected_catalogue
         from .source_access import source_current
-        rows=[]
+        rows=[];batches=[];eligible=set()
         if selected_catalogue(self.root,plan)!=plan['selected_catalogue']:raise CapabilityDenied('research selected sources changed')
         for entry in completed:
             if entry['status']!='gathered':continue
@@ -242,13 +259,26 @@ class DurableResearchWorker:
                     self.root.queue._fenced(tx,lease)
                     source_current(tx,self.root.registry,self.root.owner_ref,scopes,archive_snapshots=entry['evidence'].get('archive_snapshots',()),require_snapshot=True)
                 batch=self._source_batch(entry['source'],entry['evidence'],entry.get('source_batch'))
+                batches.append(batch)
                 for record in batch.items:
                     p=record.payload
                     if entry['source']=='public' and p.get('freshness')!='fresh':continue
                     if not str(p.get('source_url') or p.get('message_url') or '').startswith('https://'):continue
-                    rows.append(p)
+                    rows.append(p);eligible.add(record.evidence_ref)
             except (CapabilityDenied,StorageError,KeyError,TypeError,ValueError):entry['status']='source_unavailable'
-        return assess_coverage(plan,completed,rows)
+        from prm.source_contracts import EvidenceBundle
+        bundle=EvidenceBundle.select(tuple(batches),maximum_items=8,eligible_refs=frozenset(eligible)) if batches else None
+        packet=[]
+        for record in bundle.selected if bundle else ():
+            p=record.payload
+            packet.append({'support_span':str(p.get('support_span') or p.get('text') or p.get('content') or p.get('snippet') or '')[:1200],
+                'conflict_group':p.get('conflict_group'),'conflict_value':p.get('conflict_value')})
+        observed=assess_coverage(plan,completed,rows)
+        answer=assess_coverage(plan,completed,packet)
+        answer['gathered_covered_terms']=observed['covered_terms'];answer['answer_packet_item_count']=len(packet)
+        answer['conflicts']=answer['conflicts'] or observed['conflicts']
+        if answer['conflicts']:answer['sufficient']=False
+        return answer
 
     def _run_multiwave(self,plan,lease):
         queue=self.root.queue;completed=[];calls=0;stop='coverage_insufficient';coverage=None
@@ -306,8 +336,12 @@ class DurableResearchWorker:
         classes=sorted({r['data_class'] for e in available for r in e['source_batch']['selected_resources']}) or ['user_provided']
         scopes=list({json.dumps(s,sort_keys=True):s for e in available for s in e.get('source_scopes',[])}.values())
         queue.checkpoint(lease,{'phase':'verify','coverage':coverage,'stop_reason':stop,'completed_refs':[e['ref'] for e in completed]})
+        operations=list({op for e in completed for op in e.get('operation_refs',[])}|set(synthesized.get('operation_refs',[])))
+        with queue.store.transaction() as tx:
+            unresolved=bool(coverage['unknown_outcome'] or operations and tx.conn.execute("SELECT ref FROM pa_policy.operations WHERE owner=%s AND ref=ANY(%s) AND state IN ('prepared','unknown') LIMIT 1",(lease.owner,operations)).fetchone())
+        hint='\nНеизвестный исход запроса требует сверки перед продолжением.' if unresolved else '\nПродолжить: /deepcontinue result_'+lease.job_id+' 1'
         return queue.complete(lease,{'request_ref':lease.payload['input_ref'],'status':'partial' if gaps else synthesized['status'],
-            'text':synthesized['text']+'\n\n'+coverage_text(completed,len(plan['steps'])+(len(plan['gap_steps']) if any(e.get('wave')==1 for e in completed) or not coverage['sufficient'] else 0),synthesized['source_refs'],gaps,found_count=synthesized.get('found_count'))+'\nПродолжить: /deepcontinue result_'+lease.job_id+' 1',
+            'text':synthesized['text']+'\n\n'+coverage_text(completed,len(plan['steps'])+(len(plan['gap_steps']) if any(e.get('wave')==1 for e in completed) or not coverage['sufficient'] else 0),synthesized['source_refs'],gaps,found_count=synthesized.get('found_count'))+hint,
             'evidence_refs':[e['ref'] for e in available],'intermediate_refs':[e['ref'] for e in completed],'tool_calls':calls,
             'tool_call_accounting':'conservative_upper_bound','unknown_tool_calls':sum(e['tool_calls'] for e in completed if e['status']=='source_outcome_unknown'),
             'gaps':gaps,'coverage':coverage,'stop_reason':stop,'continuation_of':plan.get('continuation_of'),'research_plan_version':2,
@@ -377,10 +411,10 @@ class DurableResearchWorker:
             'text':text,'evidence_refs':[entry['ref'] for entry in available],'tool_calls':calls,
             'tool_call_accounting':'conservative_upper_bound',
             'unknown_tool_calls':sum(entry['tool_calls'] for entry in completed if entry['status']=='source_outcome_unknown'),
-            'gaps':gaps,'archive_snapshots':sorted({s for e in available for s in e['evidence'].get('archive_snapshots',[])}),'source_freshness':[entry['evidence']['source_freshness'] for entry in available if entry['evidence'].get('source_freshness')],'source_scopes':[scope for entry in available for scope in entry.get('source_scopes',[])],'answer_payload':synthesized,'data_classes':sorted({'private_archive' if entry['source']=='archive' else 'public' for entry in available}) or ['user_provided'],'data_class':'private_archive' if any(entry['source']=='archive' for entry in available) else 'public'})
+            'gaps':gaps,'archive_snapshots':sorted({s for e in available for s in e['evidence'].get('archive_snapshots',[])}),'source_freshness':[entry['evidence']['source_freshness'] for entry in available if entry['evidence'].get('source_freshness')],'source_scopes':[scope for entry in available for scope in entry.get('source_scopes',[])],'answer_payload':synthesized,'data_classes':sorted({r['data_class'] for e in available for r in e['source_batch']['selected_resources']}) or ['user_provided'],'data_class':next(iter(sorted({r['data_class'] for e in available for r in e['source_batch']['selected_resources']})), 'user_provided')})
 
     def _gather(self,lease,index,step,prepared):
-        root=self.root;queue=root.queue;result={**prepared,'status':'partial'}
+        root=self.root;queue=root.queue;result={**prepared,'status':'partial','operation_refs':[]}
         def guard():
             with queue.store.transaction() as tx:queue._fenced(tx,lease)
         try:
@@ -390,6 +424,7 @@ class DurableResearchWorker:
                     capability='archive.read',resource_ref=root.archive_resource_ref,operation='read',data_class='private_archive',
                     provider_ref='provider_local',purpose='research.archive',operation_ref='researchread_'+lease.job_id+'_'+str(index)),upper_bound=0)
                 if not decision.allowed:raise CapabilityDenied(decision.reason)
+                result['operation_refs'].append(decision.operation_ref)
                 reader=root.deep_archive_reader or LocalArchiveReader(root.settings.db_path,root=root)
                 result['evidence']=root.registry.execute_reserved((decision.reservation,),lambda:reader.search_archive(step['query'],limit=8))
                 result['source_scopes']=[asdict(__import__('dataclasses').replace(decision.reservation._request,operation_ref=None))]
@@ -401,6 +436,7 @@ class DurableResearchWorker:
                 access=reserve_public_access(root,step['query'],request_ref=lease.job_id+'_'+str(index),search_ref=root.public_search_ref,
                     fetch_ref=root.public_fetch_ref,bounds=bounds,upper_bound=root.public_upper_bound)
                 if access is None:raise CapabilityDenied('public source scope denied')
+                result['operation_refs']=[d.operation_ref for d in (access.search_authorization,*access.fetch_authorizations)]
                 try:
                     provider=AuthorizedPublicWeb(root.public_web_provider,root.registry,access,guard=guard)
                     result['evidence']=execute_public_web_research(public_query=step['query'],original_query=plan_question(lease,queue),access=access,provider=provider,bounds=bounds)
@@ -409,7 +445,7 @@ class DurableResearchWorker:
                     for decision in (access.search_authorization,*access.fetch_authorizations):decision.reservation.abandon_before_transport()
             else:
                 if root.github_context_provider is None:raise StorageError('GitHub source unavailable')
-                result['evidence']=root.github_context_provider.read_repository_context(step['query'],guard=guard)
+                result['evidence']=root.github_context_provider.read_repository_context(step['query'],guard=guard,operation_refs=result['operation_refs'])
                 result['source_scopes']=[asdict(root.github_context_provider.source_request())]
             value=result['evidence']
             batch=self._source_batch(step['source'],value,value.get('source_batch'))
@@ -499,6 +535,7 @@ class DurableResearchWorker:
                     else:result['synthesis_outcome']='rejected_by_verifier'
                 except Exception:
                     result.update(status='partial_provider_unavailable_or_unknown',synthesis_outcome='provider_unavailable_or_unknown')
+            result['operation_refs']=[group[0].operation_ref for group in groups]
             for group in groups:group[0].reservation.abandon_before_transport()
         if bundle:
             selected_refs=[]

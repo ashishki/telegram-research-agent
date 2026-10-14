@@ -95,6 +95,14 @@ class JobQueue:
         if parent is not None:
             if not isinstance(parent,dict) or set(parent)!={'input_namespace','input_ref','input_version','input_digest'} or parent['input_namespace']!='conversation':raise StorageError('typed source parent reference required')
             self._input(tx,owner,parent,_depth+1)
+        origin=item.payload.get('research_origin')
+        if origin is not None:
+            if not isinstance(origin,dict) or set(origin)!={'input_namespace','input_ref','input_version','input_digest'} or origin['input_namespace']!='conversation':raise StorageError('typed research origin required')
+            self._input(tx,owner,origin,_depth+1)
+        continuation=item.payload.get('continuation_of')
+        if continuation is not None:
+            old=tx.get(owner,'result',continuation['ref'])
+            if old is None or old.version!=continuation['version'] or old.digest!=continuation['digest']:raise StorageError('continued result changed or deleted')
         return item
     def enqueue_in(self,tx,*,owner,idempotency_key,payload,deadline,kind='compute.digest',mode='compute',priority=0,max_attempts=3):
         _check(tx.conn);_ref(owner);_ref(idempotency_key);payload=_payload(payload)

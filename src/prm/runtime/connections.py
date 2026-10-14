@@ -125,6 +125,19 @@ class GitHubCredentialRuntime:
         if not isinstance(token,str) or not token or any(c.isspace() for c in token):raise CapabilityDenied('invalid GitHub credential')
         return token
 
+    def leased_credential(self,*,owner,connection_ref,repository_ref,revision,permission):
+        """Hold the selected connection through bounded provider I/O."""
+        from contextlib import contextmanager
+        @contextmanager
+        def lease():
+            with self.store.transaction() as tx:
+                tx.conn.execute('SELECT id FROM pa_connections.accounts WHERE owner=%s AND id=%s FOR SHARE',(owner,connection_ref)).fetchone()
+                row=self.current(owner=owner,connection_ref=connection_ref,repository_ref=repository_ref,revision=revision)
+                if row['scopes']['permissions'].get(permission)!='read':raise CapabilityDenied('GitHub object permission outside selected scope')
+                token=self.credential(owner=owner,connection_ref=connection_ref,repository_ref=repository_ref,revision=revision)
+                yield token
+        return lease()
+
     def revoke(self,*,connection_ref,chat_id,actor_id,owner_chat_id):
         owner=brief_owner_ref_from_authenticated_private_tuple(chat_id,actor_id,owner_chat_id)
         if not owner:raise CapabilityDenied('exact owner required')

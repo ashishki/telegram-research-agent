@@ -2364,6 +2364,10 @@ def _render_editorial(
     editorial = document.editorial
     assert editorial is not None
     if not editorial.stories:
+        if 'editorial_required_event_unrepresented' in document.coverage_manifest.limitations:
+            return '\n'.join((f'🗞 <b>{_telegram_html(document.topic,160)}</b>',
+                'Отмеченные важными материалы не удалось кратко изложить. Откройте материалы выборки и исходные фрагменты.',
+                _telegram_card_coverage_line(document)))
         message = (
             "В проверенной области важных изменений по теме не найдено."
             if document.coverage_manifest.complete else
