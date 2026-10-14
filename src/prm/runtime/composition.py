@@ -200,13 +200,25 @@ class AssistantRuntime:
         if isinstance(planned,AssistantResult):return planned
         if planned is not None:
             request,intent=planned
+        if request.query.startswith('/deepcontinue '):
+            from .research import DurableResearchWorker
+            fields=request.query.split()
+            if len(fields)!=3 or not fields[2].isdigit():raise StorageError('exact research result and version required')
+            item=self.queue.store.get(self.owner_ref,'result',fields[1],version=int(fields[2]))
+            if item is None:raise StorageError('research result unavailable')
+            job=DurableResearchWorker(self).continue_result(result_ref=item.object_id,version=item.version,digest=item.digest,idempotency_key='deepcontinue_'+request_ref)
+            return AssistantResult(request_ref,'queued','research','Продолжение сохранено: заново проверю те же выбранные источники.\nСтатус: /status '+job,
+                payload={'job_ref':job,'source_data_class':'user_provided','source_data_classes':['user_provided']})
         if request.query.startswith('/deep '):
             import json
             from .research import DurableResearchWorker
             from prm.contracts import AssistantResult
             argument=request.query.partition(' ')[2].strip()
-            plan=json.loads(argument) if argument.startswith('{') else {'schema_version':1,'question':argument,
-                'steps':[{'source':'archive','query':argument}],'max_tool_calls':3,'deadline_seconds':180}
+            from .research_plan import coverage_terms
+            from prm.research_planner import next_archive_queries
+            plan=json.loads(argument) if argument.startswith('{') else {'schema_version':2,'question':argument,
+                'steps':[{'source':'archive','query':argument}],'gap_steps':[{'source':'archive','query':next_archive_queries(argument)[0]}],
+                'coverage_terms':coverage_terms(argument),'max_tool_calls':3,'deadline_seconds':180}
             job=DurableResearchWorker(self).enqueue(plan,idempotency_key='deep_'+request_ref)
             return AssistantResult(request_ref,'queued','research','Исследование сохранено. Проверю выбранные источники и подготовлю ответ с цитатами и границами покрытия.\nСтатус: /status '+job+'\nОтмена: /cancel '+job,
                 payload={'job_ref':job,'source_data_class':'user_provided','source_data_classes':['user_provided']})
@@ -588,7 +600,8 @@ def runtime_from_config(config,*,target,settings):
         root.model_profile_registry=ModelProfiles(configured,policies=config.get('profile_policies'),comparison_receipts=config.get('profile_comparisons'),root=root);root.quality_profile=config.get('quality_profile','balanced')
     if config.get('github'):
         from .web import GitHubReadProvider
-        root.github_context_provider=GitHubReadProvider(registry=registry,owner_ref=root.owner_ref,**config['github'])
+        from .cost_cache import CostCacheRuntime
+        root.github_context_provider=GitHubReadProvider(registry=registry,owner_ref=root.owner_ref,cache=CostCacheRuntime(root),**config['github'])
     if config.get('graph'):
         from .connections import GraphOAuth,TokenVault
         from .graph import GraphTransport

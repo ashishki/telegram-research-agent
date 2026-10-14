@@ -107,6 +107,11 @@ def assess_research_gaps(candidates: Sequence[Mapping[str, Any]], *, question: s
     }
 
 
+def next_archive_queries(question: str) -> tuple[str, ...]:
+    """Reuse the deterministic gap planner, without its optional model selector."""
+    return tuple(assess_research_gaps((), question=question)['query_variants'])
+
+
 def _ranked(candidates: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
     unique: dict[str, dict[str, Any]] = {}
     for candidate in candidates:

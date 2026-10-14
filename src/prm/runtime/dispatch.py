@@ -66,6 +66,8 @@ def parse_request_intent(text: str, *, requested_mode: str = 'auto') -> RequestI
         clean, origin = phrase, 'phrase'
     elif requested_mode != 'chat' and clean.casefold().startswith('собери обзор недели '):
         clean, origin = '/weekly ' + clean[len('собери обзор недели '):].strip(), 'phrase'
+    elif requested_mode != 'chat' and clean.casefold().startswith('глубоко исследуй '):
+        clean, origin = '/deep ' + clean[len('глубоко исследуй '):].strip(), 'phrase'
     command, _, argument = clean.partition(' ')
     if command in JOB_COMMANDS:
         return RequestIntent(JOB_COMMANDS[command], '', target_ref=argument.strip() or None, origin=origin)
@@ -76,7 +78,7 @@ def parse_request_intent(text: str, *, requested_mode: str = 'auto') -> RequestI
             return RequestIntent(kind, clean, requested_mode, service=service, origin=origin)
     if command == '/new':
         return RequestIntent(IntentKind.CHAT, '/new', 'chat', origin=origin)
-    if command == '/deep' and argument.strip():
+    if command in {'/deep','/deepcontinue'} and argument.strip():
         return RequestIntent(IntentKind.SEARCH, clean, requested_mode, service='deep', origin=origin)
     if command == '/web' and argument.strip():
         return RequestIntent(IntentKind.SEARCH, 'Проверь свежий факт: ' + argument.strip(), 'research',

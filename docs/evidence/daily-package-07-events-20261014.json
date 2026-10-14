@@ -1,0 +1,145 @@
+{
+  "schema_version": "assistant.daily_event_eval.v1",
+  "fixture_sha256": "a4cd00b0b5e5d48d356c457bb576e902d9a2dd12f41c4c2bcd347dc12f3e7586",
+  "dataset_role": "authored_synthetic_dev_labels_not_owner_gold_or_holdout",
+  "mechanism": "deterministic-events-v1",
+  "cases": [
+    {
+      "case_id": "syndicated",
+      "input_records": 11,
+      "gold_events": 1,
+      "observed_events": 1,
+      "preserved_events": 1,
+      "exact_gold_groups": [
+        [
+          "syndicated_0",
+          "syndicated_1",
+          "syndicated_10",
+          "syndicated_2",
+          "syndicated_3",
+          "syndicated_4",
+          "syndicated_5",
+          "syndicated_6",
+          "syndicated_7",
+          "syndicated_8",
+          "syndicated_9"
+        ]
+      ],
+      "observed_groups": [
+        [
+          "syndicated_0",
+          "syndicated_1",
+          "syndicated_10",
+          "syndicated_2",
+          "syndicated_3",
+          "syndicated_4",
+          "syndicated_5",
+          "syndicated_6",
+          "syndicated_7",
+          "syndicated_8",
+          "syndicated_9"
+        ]
+      ],
+      "duplicate_outputs": 0,
+      "independent_confirmation_count": null,
+      "event_revisions": [
+        "2520699aa191e5ddff31512cddf44066a310e22323b6d9b25c5a162a1dd9167f"
+      ]
+    },
+    {
+      "case_id": "similar_distinct",
+      "input_records": 2,
+      "gold_events": 2,
+      "observed_events": 2,
+      "preserved_events": 2,
+      "exact_gold_groups": [
+        [
+          "similar_distinct_0"
+        ],
+        [
+          "similar_distinct_1"
+        ]
+      ],
+      "observed_groups": [
+        [
+          "similar_distinct_1"
+        ],
+        [
+          "similar_distinct_0"
+        ]
+      ],
+      "duplicate_outputs": 0,
+      "independent_confirmation_count": null,
+      "event_revisions": [
+        "5978361c5d5237c4e6bfbd1c254eec0fa63444305ed516d1fd38f4e14421c136",
+        "a38d55dc3ceea60d74e47cdd64c208b0ca8e99bf58ea5f01349f859b311c5fd5"
+      ]
+    },
+    {
+      "case_id": "changed_deadline",
+      "input_records": 2,
+      "gold_events": 2,
+      "observed_events": 2,
+      "preserved_events": 2,
+      "exact_gold_groups": [
+        [
+          "changed_deadline_0"
+        ],
+        [
+          "changed_deadline_1"
+        ]
+      ],
+      "observed_groups": [
+        [
+          "changed_deadline_0"
+        ],
+        [
+          "changed_deadline_1"
+        ]
+      ],
+      "duplicate_outputs": 0,
+      "independent_confirmation_count": null,
+      "event_revisions": [
+        "2cf0e97ed7ab927a541fdd72313581f2bc0573cbb7f12a4cd3f9c6d84fdbf451",
+        "c9840188ad9aae032086778470064af13e3b5dbc96f34f4b383ab84444afc851"
+      ]
+    },
+    {
+      "case_id": "unknown_similarity",
+      "input_records": 2,
+      "gold_events": 2,
+      "observed_events": 2,
+      "preserved_events": 2,
+      "exact_gold_groups": [
+        [
+          "unknown_similarity_0"
+        ],
+        [
+          "unknown_similarity_1"
+        ]
+      ],
+      "observed_groups": [
+        [
+          "unknown_similarity_1"
+        ],
+        [
+          "unknown_similarity_0"
+        ]
+      ],
+      "duplicate_outputs": 0,
+      "independent_confirmation_count": null,
+      "event_revisions": [
+        "a01f9e113646dc6e7a9becf40a5b8309ea783a4f3296b3ed396e6c66039f1c1e",
+        "5eb3f1fc10be0b3bf0d41434e70606092f338b77a9bc08cd8a2ff61357a50d1c"
+      ]
+    }
+  ],
+  "gold_event_recall": 1.0,
+  "duplicate_output_rate": 0.0,
+  "gold_events": 7,
+  "output_events": 7,
+  "semantic_clustering": false,
+  "human_usefulness": null,
+  "provider_integration": false,
+  "holdout_acceptance": false
+}

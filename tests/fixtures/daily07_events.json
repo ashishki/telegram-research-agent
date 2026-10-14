@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "dataset_role": "authored_synthetic_dev_labels_not_owner_gold_or_holdout",
+  "cases": [
+    {"id": "syndicated", "texts": ["Protocol version 2 is available.", "Protocol version 2 is available.", "Protocol version 2 is available.", "Protocol version 2 is available.", "Protocol version 2 is available.", "Protocol version 2 is available.", "Protocol version 2 is available.", "Protocol version 2 is available.", "Protocol version 2 is available.", "Protocol version 2 is available.", "Protocol version 2 is available."], "urls": ["https://primary.example.test/release"], "expected_events": 1},
+    {"id": "similar_distinct", "texts": ["Alpha protocol version 2 is available.", "Beta protocol version 2 is available."], "urls": ["https://primary.example.test/alpha", "https://primary.example.test/beta"], "expected_events": 2},
+    {"id": "changed_deadline", "texts": ["Submission closes on 2026-10-20.", "Correction: submission closes on 2026-10-22."], "urls": ["https://primary.example.test/deadline"], "expected_events": 2},
+    {"id": "unknown_similarity", "texts": ["Alpha protocol improves search.", "Alpha protocol improves retrieval."], "urls": ["https://primary.example.test/one", "https://primary.example.test/two"], "expected_events": 2}
+  ],
+  "editorial_priorities": ["critical_change", "confirmed_project_relationship", "new_event", "repeated_event"],
+  "required_event": "critical_change"
+}

@@ -90,7 +90,7 @@ def test_brief_document_is_versioned_inspectable_and_dst_half_open() -> None:
             CoverageSource("telegram:channel-missing", "unavailable", "not supplied"),
         ),
         evidence=(
-            _evidence("dup-low", "https://t.me/example/repost-a", title="Duplicate older", summary="Older duplicate.", importance="low", repost_family_id="origin:eval-release"),
+            _evidence("dup-low", "https://t.me/example/repost-a", title="Duplicate older", summary="Selected duplicate.", importance="low", repost_family_id="origin:eval-release"),
             _evidence("dup-high", "https://t.me/example/repost-b", title="Duplicate selected", summary="Selected duplicate.", importance="high", repost_family_id="origin:eval-release"),
             _evidence("conflict-a", "https://t.me/example/a", title="Deadline source A", summary="Deadline says Monday.", urgent=True, conflict_group="deadline", conflict_value="Monday"),
             _evidence("conflict-b", "https://t.me/example/b", title="Deadline source B", summary="Deadline says Tuesday.", urgent=True, conflict_group="deadline", conflict_value="Tuesday"),

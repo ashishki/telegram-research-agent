@@ -1955,14 +1955,17 @@ def _urgency(raw: Mapping[str, Any]) -> Literal["urgent", "soon", "not_marked", 
 def _deduplicate(evidence: Sequence[BriefEvidence]) -> tuple[tuple[BriefEvidence, ...], tuple[DeduplicationRecord, ...]]:
     families: dict[str, list[BriefEvidence]] = {}
     for item in evidence:
-        families.setdefault(item.source_family_ref, []).append(item)
+        # A URL/family alone cannot erase corrected facts, deadlines or source
+        # revisions. Exact duplicate snapshots remain collapsible.
+        key=json.dumps([item.source_family_ref,item.summary,item.source_version,item.conflict_group,item.conflict_value],ensure_ascii=False)
+        families.setdefault(key, []).append(item)
     kept: list[BriefEvidence] = []
     records: list[DeduplicationRecord] = []
     for key, family in families.items():
         ordered = sorted(family, key=_evidence_rank, reverse=True)
         kept.append(ordered[0])
         if len(ordered) > 1:
-            records.append(DeduplicationRecord(ordered[0].evidence_ref, tuple(item.evidence_ref for item in ordered[1:]), key))
+            records.append(DeduplicationRecord(ordered[0].evidence_ref, tuple(item.evidence_ref for item in ordered[1:]), ordered[0].source_family_ref))
     return tuple(sorted(kept, key=_evidence_rank, reverse=True)), tuple(records)
 
 

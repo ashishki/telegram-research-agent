@@ -16,7 +16,7 @@ def test_real_research_job_has_progress_results_and_partial_source_outcome(pai):
 
 def test_cancel_before_claim_stops_every_research_source(pai):
     worker=DurableResearchWorker(pai.root)
-    plan={'schema_version':1,'question':'question','steps':[{'source':'public','query':'explicit minimized query'}],'max_tool_calls':4,'deadline_seconds':120}
+    plan={'schema_version':1,'question':'explicit minimized query','steps':[{'source':'public','query':'explicit minimized query'}],'max_tool_calls':4,'deadline_seconds':120}
     job=worker.enqueue(plan,idempotency_key='cancel_research')
     assert pai.root.queue.cancel(owner=pai.root.owner_ref,job_id=job)
     assert worker.run_once() is None and not pai.requests

@@ -90,7 +90,7 @@ class LocalArchiveReader:
                 'title':text.splitlines()[0][:180],'support_span':text[:1200],
                 'posted_at':publication.isoformat() if publication else None,'first_discovered_at':row['ingested_at'],'local_archive_provenance':True,
                 'source_group_id':'tg_channel:'+str(row['channel_id']),'source_version':hashlib.sha256(text.encode()).hexdigest(),
-                'importance':'high' if high else 'medium'})
+                'importance':'high' if high else 'medium','content_truncated':len(text)>1200})
         omitted=max(0,total-offset-len(rows))
         resource=SourceResource(self.root.owner_ref if self.root else 'owner_local_archive',self.root.archive_resource_ref if self.root else 'resource_archive','archive','private_archive',
             scope_digest=self.selection.digest if self.selection else hashlib.sha256((parameters[0]+'\x1f'+parameters[1]).encode()).hexdigest())
@@ -151,8 +151,8 @@ class DurableResearchWorker:
             if metadata:
                 sha=value.get('observed_ref')
                 if not isinstance(sha,str) or not re.fullmatch(r'[a-f0-9]{40}',sha):raise StorageError('GitHub snapshot unavailable')
-                scope=hashlib.sha256(json.dumps([sha,provider.paths]).encode()).hexdigest()
-            resource=SourceResource(root.owner_ref,provider.repository_ref,'github','public',scope_digest=scope)
+                scope=provider.scope_digest(sha)
+            resource=SourceResource(root.owner_ref,provider.repository_ref,'github',provider.data_class,connection_ref=provider.connection_ref,scope_digest=scope)
         else:raise StorageError('unsupported research source')
         rows=value.get('fetched_sources',[]) if source=='public' else value.get('items',[])
         if source=='public':rows=[r for r in rows if r.get('status')=='fetched']
@@ -171,33 +171,28 @@ class DurableResearchWorker:
         expected={
             'archive':{('archive.read',root.archive_resource_ref,'private_archive','provider_local','research.archive')},
             'public':{('web.search',root.public_search_ref,'public','provider_public_web','public.search'),('web.fetch',root.public_fetch_ref,'public','provider_public_web','public.fetch')},
-            'github':{('github.repository_context',root.github_context_provider.repository_ref if root.github_context_provider else None,'public','provider_github','project.context')},
+            'github':{('github.repository_context',root.github_context_provider.repository_ref if root.github_context_provider else None,root.github_context_provider.data_class if root.github_context_provider else 'public','provider_github','project.context')},
         }[source]
         seen=set();requests=[];observed=set()
         for scope in scopes:
             request=AuthorizationRequest(**scope)
             identity=(request.capability,request.resource_ref,request.data_class,request.provider_ref,request.purpose)
-            if request.owner_ref!=root.owner_ref or request.connection_ref is not None or request.operation!='read' or identity not in expected:raise CapabilityDenied('research stored source scope differs')
+            connection=root.github_context_provider.connection_ref if source=='github' and root.github_context_provider else None
+            if request.owner_ref!=root.owner_ref or request.connection_ref!=connection or request.operation!='read' or identity not in expected:raise CapabilityDenied('research stored source scope differs')
             observed.add(identity)
             key=json.dumps(scope,sort_keys=True)
             if key not in seen:seen.add(key);requests.append(scope)
         if observed!=expected:raise CapabilityDenied('research source scopes incomplete')
         return requests
 
-    def enqueue(self,plan,*,idempotency_key):
-        required={'schema_version','question','steps','max_tool_calls','deadline_seconds'}
-        if (not isinstance(plan,dict) or set(plan)!=required or plan['schema_version']!=1
-            or not isinstance(plan['question'],str) or not 0<len(plan['question'])<=2000
-            or not isinstance(plan['steps'],list) or not 1<=len(plan['steps'])<=8
-            or type(plan['max_tool_calls'])is not int or not 1<=plan['max_tool_calls']<=10
-            or type(plan['deadline_seconds'])is not int or not 1<=plan['deadline_seconds']<=300):
-            raise StorageError('bounded durable research plan required')
-        for step in plan['steps']:
-            if not isinstance(step,dict) or set(step)!={'source','query'} or step['source'] not in {'archive','public','github'} or not isinstance(step['query'],str) or len(step['query'])>2000:
-                raise StorageError('unsupported source read; effects excluded from research')
+    def enqueue(self,plan,*,idempotency_key,continuation_binding=None):
+        from .research_plan import validate_research_plan,selected_catalogue
+        plan=validate_research_plan(plan,self.root)
+        if plan['schema_version']==2:plan={**plan,'selected_catalogue':selected_catalogue(self.root,plan)}
         parent_ref=self.root.task_context.get()
         parent= self.root.queue.store.get(self.root.owner_ref,'conversation',parent_ref,version=1) if parent_ref else None
         stored_plan={**plan,'source_parent':{'input_namespace':'conversation','input_ref':parent_ref,'input_version':parent.version,'input_digest':parent.digest}} if parent is not None else plan
+        if continuation_binding is not None:stored_plan={**stored_plan,'continuation_of':continuation_binding}
         ref='research_'+hashlib.sha256(idempotency_key.encode()).hexdigest()[:32]
         queue=self.root.queue
         with queue.store.transaction() as tx:
@@ -207,17 +202,130 @@ class DurableResearchWorker:
             if item and item.payload!=stored_plan:raise StateConflict('research identity belongs to another plan')
             item=item or tx.put(self.root.owner_ref,'conversation',ref,stored_plan,expected_version=0)
             if parent is not None:self.root.focus.inherit_in(tx,parent_ref,ref)
+            if continuation_binding is not None:
+                prior=tx.get(self.root.owner_ref,'result',continuation_binding['ref'])
+                if prior is None or prior.version!=continuation_binding['version'] or prior.digest!=continuation_binding['digest']:raise StateConflict('exact research result changed or deleted')
+                tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',
+                    (self.root.owner_ref,'result',prior.object_id,'conversation',ref))
             payload={'schema_version':1,'input_namespace':'conversation','input_ref':ref,'input_version':1,'input_digest':item.digest,
                      'connection_ref':None,'resource_ref':'resource_research','purpose':'local.research','consent_revision':1}
             now=tx.conn.execute('SELECT clock_timestamp() AS now').fetchone()['now']
             return queue.enqueue_in(tx,owner=self.root.owner_ref,idempotency_key=idempotency_key,payload=payload,
                 deadline=now+timedelta(seconds=plan['deadline_seconds']),kind='compute.research')
 
+    def continue_result(self,*,result_ref,version,digest,idempotency_key):
+        from .source_access import source_current,result_provenance
+        with self.root.queue.store.transaction() as tx:
+            item=tx.get(self.root.owner_ref,'result',result_ref)
+            if item is None or item.version!=version or item.digest!=digest or not item.payload.get('request_ref'):raise StateConflict('exact research result unavailable')
+            _,scopes=result_provenance(tx,self.root.owner_ref,item)
+            # Refresh old source snapshots by new reads, under current same
+            # source grants. An expired/revoked source never resumes from cache.
+            source_current(tx,self.root.registry,self.root.owner_ref,scopes)
+            prior=tx.get(self.root.owner_ref,'conversation',item.payload['request_ref'],version=1)
+            if prior is None or prior.payload.get('schema_version')!=2:raise StorageError('versioned research plan required for continuation')
+            plan={k:v for k,v in prior.payload.items() if k not in {'selected_catalogue','source_parent','continuation_of'}}
+            from .research_plan import selected_catalogue
+            if selected_catalogue(self.root,plan)!=prior.payload['selected_catalogue']:raise CapabilityDenied('continuation cannot expand source selection')
+        return self.enqueue(plan,idempotency_key=idempotency_key,continuation_binding={'ref':result_ref,'version':version,'digest':digest})
+
+    def _coverage(self,plan,completed,lease):
+        from .research_plan import assess_coverage,selected_catalogue
+        from .source_access import source_current
+        rows=[]
+        if selected_catalogue(self.root,plan)!=plan['selected_catalogue']:raise CapabilityDenied('research selected sources changed')
+        for entry in completed:
+            if entry['status']!='gathered':continue
+            try:
+                scopes=self._read_scopes(entry)
+                with self.root.queue.store.transaction() as tx:
+                    self.root.queue._fenced(tx,lease)
+                    source_current(tx,self.root.registry,self.root.owner_ref,scopes,archive_snapshots=entry['evidence'].get('archive_snapshots',()),require_snapshot=True)
+                batch=self._source_batch(entry['source'],entry['evidence'],entry.get('source_batch'))
+                for record in batch.items:
+                    p=record.payload
+                    if entry['source']=='public' and p.get('freshness')!='fresh':continue
+                    if not str(p.get('source_url') or p.get('message_url') or '').startswith('https://'):continue
+                    rows.append(p)
+            except (CapabilityDenied,StorageError,KeyError,TypeError,ValueError):entry['status']='source_unavailable'
+        return assess_coverage(plan,completed,rows)
+
+    def _run_multiwave(self,plan,lease):
+        queue=self.root.queue;completed=[];calls=0;stop='coverage_insufficient';coverage=None
+        from concurrent.futures import ThreadPoolExecutor
+        for wave,steps in enumerate((plan['steps'],plan['gap_steps'])):
+            if wave:
+                coverage=self._coverage(plan,completed,lease)
+                queue.checkpoint(lease,{'phase':'gap_check','wave':wave,'coverage':coverage,'completed_refs':[e['ref'] for e in completed]})
+                if coverage['sufficient']:stop='coverage_sufficient';break
+                if coverage['stop_extra_wave']:stop='source_unavailable_or_unknown';break
+            pending=[]
+            for position,step in enumerate(steps):
+                index=position+(len(plan['steps']) if wave else 0)
+                ref='research_step_'+lease.job_id+'_'+str(index)
+                cached=queue.store.get(lease.owner,'result',ref)
+                if cached:
+                    value=dict(cached.payload)
+                    if value['status']=='read_prepared':
+                        value['status']='source_outcome_unknown'
+                        with queue.store.transaction() as tx:
+                            from .deletion import lineage_lock
+                            lineage_lock(tx.conn,lease.owner);queue._fenced(tx,lease)
+                            tx.put(lease.owner,'result',ref,value,expected_version=cached.version)
+                    completed.append(value);calls+=value['tool_calls'];continue
+                maximum=1
+                if step['source']=='public':
+                    maximum=min(1+self.root.public_web_bounds.max_fetches if self.root.public_web_bounds else 1,plan['max_tool_calls']-calls)
+                    if maximum<2:stop='tool_call_limit';continue
+                elif step['source']=='github':maximum=self.root.github_context_provider.maximum_calls if self.root.github_context_provider else 1
+                if calls+maximum>plan['max_tool_calls']:stop='tool_call_limit';continue
+                prepared={'ref':ref,'source':step['source'],'tool_calls':maximum,'status':'read_prepared','evidence':{},'wave':wave}
+                with queue.store.transaction() as tx:
+                    from .deletion import lineage_lock
+                    lineage_lock(tx.conn,lease.owner);queue._fenced(tx,lease)
+                    tx.put(lease.owner,'result',ref,prepared,expected_version=0)
+                    tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',
+                        (lease.owner,'conversation',lease.payload['input_ref'],'result',ref))
+                pending.append((index,step,prepared));calls+=maximum
+            queue.checkpoint(lease,{'phase':'gather','wave':wave,'completed_refs':[e['ref'] for e in completed],'pending_refs':[p[2]['ref'] for p in pending]})
+            with ThreadPoolExecutor(max_workers=2,thread_name_prefix='pa-research-wave') as reads:
+                futures=[reads.submit(self._gather,lease,*p) for p in pending]
+                for future in futures:
+                    completed.append(future.result())
+                    queue.checkpoint(lease,{'phase':'gather','wave':wave,'completed_refs':[e['ref'] for e in completed]})
+        coverage=self._coverage(plan,completed,lease)
+        if coverage['sufficient']:stop='coverage_sufficient'
+        elif coverage['conflicts']:stop='source_conflict'
+        elif coverage['stop_extra_wave']:stop='source_unavailable_or_unknown'
+        queue.checkpoint(lease,{'phase':'synthesis','coverage':coverage,'stop_reason':stop,'completed_refs':[e['ref'] for e in completed]})
+        synthesized=self._synthesize(plan,completed,lease)
+        available=[e for e in completed if e['status']=='gathered']
+        gaps=[e['source']+': '+e['status'] for e in completed if e['status']!='gathered']
+        if not coverage['sufficient']:gaps.append(stop)
+        from .research_answer import coverage_text
+        classes=sorted({r['data_class'] for e in available for r in e['source_batch']['selected_resources']}) or ['user_provided']
+        scopes=list({json.dumps(s,sort_keys=True):s for e in available for s in e.get('source_scopes',[])}.values())
+        queue.checkpoint(lease,{'phase':'verify','coverage':coverage,'stop_reason':stop,'completed_refs':[e['ref'] for e in completed]})
+        return queue.complete(lease,{'request_ref':lease.payload['input_ref'],'status':'partial' if gaps else synthesized['status'],
+            'text':synthesized['text']+'\n\n'+coverage_text(completed,len(plan['steps'])+(len(plan['gap_steps']) if any(e.get('wave')==1 for e in completed) or not coverage['sufficient'] else 0),synthesized['source_refs'],gaps,found_count=synthesized.get('found_count'))+'\nПродолжить: /deepcontinue result_'+lease.job_id+' 1',
+            'evidence_refs':[e['ref'] for e in available],'intermediate_refs':[e['ref'] for e in completed],'tool_calls':calls,
+            'tool_call_accounting':'conservative_upper_bound','unknown_tool_calls':sum(e['tool_calls'] for e in completed if e['status']=='source_outcome_unknown'),
+            'gaps':gaps,'coverage':coverage,'stop_reason':stop,'continuation_of':plan.get('continuation_of'),'research_plan_version':2,
+            'archive_snapshots':sorted({s for e in available for s in e['evidence'].get('archive_snapshots',[])}),
+            'source_scopes':scopes,'answer_payload':synthesized,'data_classes':classes,'data_class':classes[0]})
+
     def run_once(self):
         root=self.root;queue=root.queue
+        queue.recover_expired(owner=root.owner_ref,kinds=('compute.research',))
         lease=queue.claim(owner=root.owner_ref,kinds=('compute.research',),lease_seconds=300)
         if lease is None:return None
-        plan=queue.store.get(lease.owner,'conversation',lease.payload['input_ref'],version=lease.payload['input_version']).payload
+        item=queue.store.get(lease.owner,'conversation',lease.payload['input_ref'],version=lease.payload['input_version'])
+        if item is None:raise StorageError('research plan deleted')
+        plan=item.payload
+        if plan.get('schema_version')==2:
+            from .research_plan import selected_catalogue
+            if selected_catalogue(root,plan)!=plan['selected_catalogue']:raise CapabilityDenied('research source selection changed')
+            return self._run_multiwave(plan,lease)
         completed=[];calls=0;pending=[]
         for index,step in enumerate(plan['steps']):
             ref='research_step_'+lease.job_id+'_'+str(index)
@@ -237,7 +345,7 @@ class DurableResearchWorker:
             if step['source']=='public':
                 maximum=min(1+root.public_web_bounds.max_fetches if root.public_web_bounds else 1,plan['max_tool_calls']-calls)
                 if maximum<2:break
-            elif step['source']=='github':maximum=1+len(root.github_context_provider.paths) if root.github_context_provider else 1
+            elif step['source']=='github':maximum=root.github_context_provider.maximum_calls if root.github_context_provider else 1
             if calls+maximum>plan['max_tool_calls']:break
             prepared={'ref':ref,'source':step['source'],'tool_calls':maximum,'status':'read_prepared','evidence':{}}
             with queue.store.transaction() as tx:
@@ -301,8 +409,8 @@ class DurableResearchWorker:
                     for decision in (access.search_authorization,*access.fetch_authorizations):decision.reservation.abandon_before_transport()
             else:
                 if root.github_context_provider is None:raise StorageError('GitHub source unavailable')
-                result['evidence']=root.github_context_provider.read_repository_context(step['query'])
-                result['source_scopes']=[asdict(AuthorizationRequest(owner_ref=root.owner_ref,connection_ref=None,capability='github.repository_context',resource_ref=root.github_context_provider.repository_ref,operation='read',data_class='public',provider_ref='provider_github',purpose='project.context'))]
+                result['evidence']=root.github_context_provider.read_repository_context(step['query'],guard=guard)
+                result['source_scopes']=[asdict(root.github_context_provider.source_request())]
             value=result['evidence']
             batch=self._source_batch(step['source'],value,value.get('source_batch'))
             result['source_batch']=batch.metadata()
@@ -366,8 +474,8 @@ class DurableResearchWorker:
         endpoint=root.endpoint_for('research');groups=[]
         if endpoint is not None and evidence:
             scopes=[('model.generate',root.model_resource_ref,'user_provided','answer.request')]
-            scopes.extend(('model.context_egress',root.archive_resource_ref if kind=='private_archive' else root.public_fetch_ref,kind,
-                           'research.synthesis.archive' if kind=='private_archive' else 'research.synthesis.public') for kind in sorted(classes))
+            scopes.extend(('model.context_egress',root.archive_resource_ref if kind=='private_archive' else root.github_context_provider.repository_ref if kind=='private_connector_content' else root.public_fetch_ref,kind,
+                           'research.synthesis.archive' if kind=='private_archive' else 'research.synthesis.github' if kind=='private_connector_content' else 'research.synthesis.public') for kind in sorted(classes))
             for index,(capability,resource,data_class,purpose) in enumerate(scopes):
                 decision=root.registry.authorize_and_reserve(AuthorizationRequest(owner_ref=root.owner_ref,connection_ref=endpoint.connection_ref,
                     capability=capability,resource_ref=resource,operation='model_egress',data_class=data_class,provider_ref=endpoint.provider_ref,

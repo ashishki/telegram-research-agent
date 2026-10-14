@@ -30,7 +30,7 @@ class DurableBriefStore(BriefDocumentStore):
     def __init__(self,target,*,owner_ref,registry=None):
         super().__init__();self.store=PostgresStore(target);self.owner_ref=owner_ref;self.registry=registry
         self.pending_dependencies={};self.pending_classes={};self.pending_scopes={}
-        self.pending_inventory={};self.pending_coverage={}
+        self.pending_inventory={};self.pending_coverage={};self.pending_events={}
 
     def _document_ref(self,brief_id):return 'brief_'+hashlib.sha256(brief_id.encode()).hexdigest()[:32]
     def _binding_ref(self,conversation_id):return 'brief_binding_'+hashlib.sha256(conversation_id.encode()).hexdigest()[:32]
@@ -75,13 +75,19 @@ class DurableBriefStore(BriefDocumentStore):
                             (owner,'result',ref,'result',page_ref))
                     tx.put(owner,'result',ref,{'kind':'brief_manifest','brief_id':item.brief_id,'version':item.version,
                         'content_digest':item.content_digest,'storage_digest':digest,'source_data_classes':classes,'source_scopes':scopes,
-                        'archive_snapshots':snapshots,'material_pages':pages,'source_coverage':self.pending_coverage.get(item.content_digest)},expected_version=item.version-1)
+                        'archive_snapshots':snapshots,'material_pages':pages,'source_coverage':self.pending_coverage.get(item.content_digest),
+                        'topic':item.topic,'included_at':item.window.generated_at.isoformat(),
+                        'event_selection':self.pending_events.get(item.content_digest)},expected_version=item.version-1)
                     tx.conn.execute('INSERT INTO pa_briefs.documents VALUES(%s,%s,%s,%s,%s)',(owner,item.brief_id,item.version,digest,Jsonb(encoded)))
                 if tx.conn.execute("SELECT to_regclass('pa_memory.dependencies') AS meta").fetchone()['meta'] is not None:
                     for dependency in self.pending_dependencies.get(item.content_digest,()):
                         parent=tx.get(owner,dependency['namespace'],dependency['object_ref'])
                         if parent is None or parent.version!=dependency['version'] or parent.digest!=dependency['digest']:
                             raise StateConflict('Brief source changed or was deleted while building')
+                        if parent.payload.get('kind')=='project':
+                            now=tx.conn.execute('SELECT clock_timestamp() AS now').fetchone()['now']
+                            from prm.runtime.profiles import aware
+                            if aware(parent.payload['project_context']['expires_at'])<=now:raise StateConflict('Brief project expired while building')
                         tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',
                             (owner,dependency['namespace'],dependency['object_ref'],'result',ref))
             ref=self._binding_ref(kwargs['conversation_id']);old=tx.get(owner,'conversation',ref)
@@ -135,6 +141,23 @@ class DurableBriefStore(BriefDocumentStore):
     def archive_snapshots(self,brief_id,version):
         item=self.store.get(self.owner_ref,'result',self._document_ref(brief_id),version=version)
         return tuple(item.payload.get('archive_snapshots',())) if item else ()
+
+    def event_history(self,*,topic,selection_digest=None):
+        """Prior included events are observations, never inferred read/delivery."""
+        from prm.runtime.source_access import source_current
+        from prm.capabilities import CapabilityDenied
+        history=[]
+        with self.store.transaction() as tx:
+            rows=tx.conn.execute("SELECT v.payload FROM pa_runtime.object_heads h JOIN pa_runtime.object_versions v ON v.owner=h.owner AND v.namespace=h.namespace AND v.object_id=h.object_id AND v.version=h.version WHERE h.owner=%s AND h.namespace='result' AND v.payload->>'kind'='brief_manifest' AND v.payload->>'topic'=%s ORDER BY v.payload->>'included_at' DESC LIMIT 24",(self.owner_ref,topic)).fetchall()
+            for row in reversed(rows):
+                p=row['payload'];selection=p.get('event_selection')
+                if not selection or selection.get('selection_digest')!=selection_digest:continue
+                try:
+                    if self.registry:source_current(tx,self.registry,self.owner_ref,p.get('source_scopes',[]))
+                except (CapabilityDenied,StorageError):continue
+                history.extend({**e,'brief_ref':p['brief_id']+':'+str(p['version']),
+                    'last_included_at':p.get('included_at')} for e in selection['events'])
+        return tuple(history[-480:])
 
     def _decode_document(self,item):
         if item.payload.get('kind')!='brief_manifest':return _stored_document(item.payload)

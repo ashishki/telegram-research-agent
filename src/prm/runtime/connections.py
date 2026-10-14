@@ -84,6 +84,59 @@ class TokenVault:
         self._sync_directory()
 
 
+class GitHubCredentialRuntime:
+    """Local selected read-only token contract; no OAuth/token minting or writes.
+
+    A GitHub App installation token may be provisioned separately. This class
+    does not verify provider permissions from a caller's assertion, rotate an
+    expired token or activate an account merely because a key exists.
+    """
+    def __init__(self,*,target,vault):self.store=PostgresStore(target);self.vault=vault
+
+    def bind(self,*,connection_ref,repository_ref,token,expires_at,credential_kind,permissions,chat_id,actor_id,owner_chat_id):
+        owner=brief_owner_ref_from_authenticated_private_tuple(chat_id,actor_id,owner_chat_id)
+        if not owner or not re.fullmatch(r'[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}',repository_ref):raise CapabilityDenied('exact owner and repository required')
+        if credential_kind not in {'fine_grained','app_installation'} or not isinstance(permissions,dict) or permissions.get('contents')!='read' or not set(permissions)<={'contents','issues','pull_requests','metadata'} or any(v!='read' for v in permissions.values()):raise StorageError('selected read-only GitHub permissions required')
+        if not isinstance(token,str) or not token or len(token)>10000 or any(c.isspace() for c in token) or expires_at.tzinfo is None:raise StorageError('bounded expiring supplied credential required')
+        with self.store.transaction() as tx:
+            now=tx.conn.execute('SELECT clock_timestamp() AS now').fetchone()['now']
+            if expires_at<=now:raise StorageError('current credential required')
+            if tx.conn.execute('SELECT id FROM pa_connections.accounts WHERE owner=%s AND id=%s',(owner,connection_ref)).fetchone():raise StateConflict('new connection identity required for reconnect')
+            secret=self.vault.put({'access_token':token})
+            try:
+                tx.conn.execute('INSERT INTO pa_connections.accounts VALUES(%s,%s,%s,%s,1,%s,%s,%s)',
+                    (owner,connection_ref,repository_ref,Jsonb({'provider':'github','repositories':[repository_ref],'permissions':permissions,'credential_kind':credential_kind,'provider_permissions_verified':False}),'connected',secret,expires_at))
+            except Exception:self.vault.delete(secret);raise
+        return 1
+
+    def current(self,*,owner,connection_ref,repository_ref,revision):
+        with self.store.transaction() as tx:
+            row=tx.conn.execute('SELECT * FROM pa_connections.accounts WHERE owner=%s AND id=%s',(owner,connection_ref)).fetchone()
+            now=tx.conn.execute('SELECT clock_timestamp() AS now').fetchone()['now']
+            if (not row or row['status']!='connected' or row['account_ref']!=repository_ref or row['revision']!=revision
+                or row['expires'] is None or row['expires']<=now or not isinstance(row['scopes'],dict)
+                or row['scopes'].get('provider')!='github' or row['scopes'].get('repositories')!=[repository_ref]):raise CapabilityDenied('selected GitHub connection unavailable')
+            return row
+
+    def credential(self,**scope):
+        row=self.current(**scope)
+        try:token=self.vault.get(row['secret_ref'])['access_token']
+        except (StorageError,KeyError):raise CapabilityDenied('selected GitHub credential unavailable') from None
+        if not isinstance(token,str) or not token or any(c.isspace() for c in token):raise CapabilityDenied('invalid GitHub credential')
+        return token
+
+    def revoke(self,*,connection_ref,chat_id,actor_id,owner_chat_id):
+        owner=brief_owner_ref_from_authenticated_private_tuple(chat_id,actor_id,owner_chat_id)
+        if not owner:raise CapabilityDenied('exact owner required')
+        with self.store.transaction() as tx:
+            row=tx.conn.execute("SELECT secret_ref FROM pa_connections.accounts WHERE owner=%s AND id=%s AND scopes->>'provider'='github' FOR UPDATE",(owner,connection_ref)).fetchone()
+            tx.conn.execute("UPDATE pa_connections.accounts SET status='disconnected',revision=revision+1,secret_ref=NULL WHERE owner=%s AND id=%s AND scopes->>'provider'='github'",(owner,connection_ref))
+        if row and row['secret_ref']:self.vault.delete(row['secret_ref'])
+        # Tombstone metadata invalidates reads/caches/derived serving immediately.
+        # No provider revocation endpoint or credential scan is performed.
+        return {'status':'disconnected','provider_token_revocation':'operator_or_provider_required'}
+
+
 class GraphOAuth:
     SCOPES=frozenset({'User.Read','offline_access','Mail.ReadBasic','Mail.Read','Mail.Send','Mail.ReadWrite','Calendars.Read','Calendars.ReadWrite','Contacts.Read'})
     def __init__(self,*,target,vault,client_id,tenant,redirect_uri,authority='https://login.microsoftonline.com',graph_origin='https://graph.microsoft.com',synthetic=False):

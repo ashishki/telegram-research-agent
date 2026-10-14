@@ -135,8 +135,11 @@ class DurableCapabilityRegistry(CapabilityRegistry):
                 if tx.conn.closed:raise StorageError('execution epoch guard connection lost')
                 return result
         finally:_ACTIVE_TRANSPORT.reset(marker)
-    def _grants(self,conn,owner,now,*,lock=False):
-        rows=conn.execute('SELECT owner,grant_id,revision,document FROM pa_policy.grants WHERE owner=%s ORDER BY grant_id'+(' FOR UPDATE' if lock else ''),(owner,)).fetchall()
+    def _grants(self,conn,owner,now,*,lock=False,capability=None,grant_refs=None):
+        where='owner=%s';parameters=[owner]
+        if capability is not None:where+=" AND document->'capability'->>'name'=%s";parameters.append(capability)
+        if grant_refs is not None:where+=' AND grant_id=ANY(%s)';parameters.append(list(grant_refs))
+        rows=conn.execute('SELECT owner,grant_id,revision,document FROM pa_policy.grants WHERE '+where+' ORDER BY grant_id'+(' FOR UPDATE' if lock else ''),parameters).fetchall()
         now=self._now(conn)
         return [_decode(row,now) for row in rows]
     def _decision(self,conn,request,*,lock=False):
@@ -144,7 +147,10 @@ class DurableCapabilityRegistry(CapabilityRegistry):
         if request.provider_ref!='provider_local' and conn.execute("SELECT to_regclass('pa_control.state') AS table_ref").fetchone()['table_ref'] is not None:
             row=conn.execute('SELECT egress_enabled,draining FROM pa_control.state WHERE id=1').fetchone()
             if not row or not row['egress_enabled'] or row['draining']:return self._deny(request,'execution_epoch_disabled'),[],now
-        grants=self._grants(conn,request.owner_ref,now,lock=lock)
+        # Independent read capabilities must not block on an unrelated grant
+        # held by another in-flight read. Same-capability call counts and the
+        # shared budget rows retain their existing atomic locks.
+        grants=self._grants(conn,request.owner_ref,now,lock=lock,capability=request.capability if lock and request.operation=='read' else None)
         now=self._now(conn)
         return CapabilityRegistry(grants).authorize(request,now=now),grants,now
     def register_grant(self,grant:CapabilityGrant):
@@ -252,7 +258,9 @@ class DurableCapabilityRegistry(CapabilityRegistry):
         owner=next(iter(owners));ref=next(iter(refs))
         try:
             with self.store.transaction() as tx:
-                conn=tx.conn;_check_schema(conn);now=self._now(conn);grants=self._grants(conn,owner,now,lock=True)
+                conn=tx.conn;_check_schema(conn);now=self._now(conn)
+                selected=sorted({r.grant_ref for r in reservations}) if all(r._request.operation=='read' for r in reservations) else None
+                grants=self._grants(conn,owner,now,lock=True,grant_refs=selected)
                 op=conn.execute('SELECT * FROM pa_policy.operations WHERE owner=%s AND ref=%s FOR UPDATE',(owner,ref)).fetchone()
                 members=conn.execute('SELECT * FROM pa_policy.members WHERE owner=%s AND operation_ref=%s',(owner,ref)).fetchall()
                 if not op or op['state']!='reserved' or {m['member_id'] for m in members}!={r.member_id for r in reservations}:return False

@@ -47,6 +47,13 @@ def apply_conversation_plan(root,request,intent,*,request_ref,lease,guard):
     ticket=root.focus.ticket(request_ref) if lease is not None else None
     if intent.origin not in {'text'} or request.mode!='auto' or request.query.strip().casefold() in {'да','yes','подтверждаю'}:return None
     if ticket and ticket.get('ambiguous'):return clarification(request_ref,'ambiguous_target')
+    if request.query.strip().casefold() in {'продолжи исследование','обнови источники исследования'}:
+        target=ticket.get('target') if ticket else None
+        if not target:return clarification(request_ref,'missing_target')
+        item=root.queue.store.get(root.owner_ref,'result',target['result_ref'],version=target['result_version'])
+        if item is None or not item.payload.get('research_plan_version'):return clarification(request_ref,'missing_target')
+        query='/deepcontinue '+item.object_id+' '+str(item.version)
+        return replace(request,query=query),parse_request_intent(query)
     if lease is not None:
         with root.queue.store.transaction() as tx:body=root.queue._input(tx,root.owner_ref,lease.payload).payload
         if body.get('telegram_envelope',{}).get('source_trust')=='untrusted_source':return None
@@ -57,6 +64,8 @@ def apply_conversation_plan(root,request,intent,*,request_ref,lease,guard):
     sources=('archive',)
     if root.public_web_provider is not None and root.public_web_bounds is not None:
         tools.append('web.search');sources=(*sources,'public')
+    if root.github_context_provider is not None:
+        tools.append('github.read');sources=(*sources,'github')
     plan=None
     if root.intent_planner is not None:
         try:
@@ -78,6 +87,24 @@ def apply_conversation_plan(root,request,intent,*,request_ref,lease,guard):
     if plan.needs_clarification:return clarification(request_ref,plan.reason)
     if plan.intent=='followup':return _read_view(root,request_ref,ticket,plan,guard)
     if plan.intent=='chat':return replace(request,mode='chat'),RequestIntent(IntentKind.CHAT,request.query,'chat')
+    if plan.intent=='research':
+        from .web import project_public_query
+        from .research_plan import coverage_terms
+        mapping={'archive.search':'archive','web.search':'public','github.read':'github'}
+        steps=[]
+        for step in plan.steps:
+            source=mapping[step.tool];query=(step.argument or root.github_context_provider.repository_ref) if source=='github' else step.argument or request.query
+            if source=='public':
+                query=project_public_query(request.query,query)
+                if query is None:return clarification(request_ref,'source_unavailable')
+            if source=='github' and query!=root.github_context_provider.repository_ref:return clarification(request_ref,'source_unavailable')
+            steps.append({'source':source,'query':query})
+        from prm.research_planner import next_archive_queries
+        gaps=[{'source':'archive','query':q} for q in next_archive_queries(request.query)[:1]] if 'archive' in plan.source_filters else []
+        gaps=[g for g in gaps if g not in steps]
+        command='/deep '+json.dumps({'schema_version':2,'question':request.query[:2000],'steps':steps,'gap_steps':gaps,
+            'coverage_terms':coverage_terms(request.query),'max_tool_calls':plan.max_tool_calls,'deadline_seconds':180},ensure_ascii=False)
+        return replace(request,query=command),parse_request_intent(command)
     if plan.intent=='web_search':
         from .web import project_public_query
         query=project_public_query(request.query,plan.steps[0].argument)

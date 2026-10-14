@@ -56,3 +56,10 @@ def source_current(tx,registry,owner,scopes,*,archive_snapshots=(),require_snaps
     for connection in sorted({request.connection_ref for request in chosen if request.provider_ref=='provider_microsoft_graph' and request.connection_ref}):
         row=tx.conn.execute('SELECT status FROM pa_connections.accounts WHERE owner=%s AND id=%s FOR SHARE',(owner,connection)).fetchone()
         if not row or row['status']!='connected':raise CapabilityDenied('delivery source disconnected')
+    for request in chosen:
+        if request.provider_ref!='provider_github' or not request.connection_ref:continue
+        row=tx.conn.execute('SELECT status,expires,scopes FROM pa_connections.accounts WHERE owner=%s AND id=%s FOR SHARE',(owner,request.connection_ref)).fetchone()
+        now=tx.conn.execute('SELECT clock_timestamp() AS now').fetchone()['now']
+        if (not row or row['status']!='connected' or row['expires'] is None or row['expires']<=now
+            or not isinstance(row['scopes'],dict) or row['scopes'].get('provider')!='github'
+            or row['scopes'].get('repositories')!=[request.resource_ref]):raise CapabilityDenied('GitHub source disconnected or expired')

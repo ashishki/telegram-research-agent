@@ -212,10 +212,11 @@ class JobQueue:
             tx.conn.execute('''UPDATE pa_jobs.jobs SET status=%s,token=NULL,lease_until=NULL,error_code=%s,
                 available_at=clock_timestamp()+(%s*interval '1 second') WHERE owner=%s AND id=%s''',
                 (state,error_code,delay_seconds,lease.owner,lease.job_id))
-    def recover_expired(self,*,owner):
+    def recover_expired(self,*,owner,kinds=None):
+        if kinds is not None and (not isinstance(kinds,tuple) or not 1<=len(kinds)<=16 or any(not isinstance(k,str) or not k.startswith('compute.') for k in kinds)):raise StorageError('bounded compute recovery kinds required')
         with self.store.transaction() as tx:
             conn=tx.conn;_check(conn)
-            rows=conn.execute("SELECT * FROM pa_jobs.jobs WHERE owner=%s AND status IN ('leased','running') AND lease_until<=clock_timestamp() ORDER BY id FOR UPDATE SKIP LOCKED",(owner,)).fetchall()
+            rows=conn.execute("SELECT * FROM pa_jobs.jobs WHERE owner=%s AND status IN ('leased','running') AND lease_until<=clock_timestamp() AND (%s::text[] IS NULL OR kind=ANY(%s)) ORDER BY id FOR UPDATE SKIP LOCKED",(owner,list(kinds) if kinds else None,list(kinds) if kinds else None)).fetchall()
             for row in rows:
                 if row['mode']=='effect':status='awaiting_reconciliation'
                 elif row['attempts']>=row['max_attempts'] or row['deadline']<=conn.execute('SELECT clock_timestamp() AS now').fetchone()['now']:status='failed'

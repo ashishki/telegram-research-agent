@@ -153,7 +153,7 @@ def validate_runtime_config(config: dict) -> None:
         if (selection.owner_ref,selection.resource_ref)!=(config['owner_ref'],config.get('archive_resource_ref','resource_archive')):raise StorageError('archive selection binding differs')
     sections = {
         'public_web': ({'token_env', 'bounds'}, {'token_env', 'bounds'}),
-        'github': ({'repository_ref', 'ref', 'upper_bound', 'paths'}, {'repository_ref', 'ref', 'upper_bound'}),
+        'github': ({'repository_ref', 'ref', 'upper_bound', 'paths','issues','pulls','releases'}, {'repository_ref', 'ref', 'upper_bound'}),
         'delivery': ({'token_env', 'upper_bound', 'destination_ref', 'origin', 'synthetic'}, {'token_env', 'upper_bound', 'destination_ref'}),
         'media_download': ({'token_env', 'resource_ref', 'upper_bound', 'origin'}, {'token_env', 'resource_ref', 'upper_bound'}),
         'speech': ({'endpoint', 'upper_bound', 'resource_ref'}, {'endpoint', 'upper_bound'}),

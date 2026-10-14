@@ -7,15 +7,18 @@ from prm.storage.postgres import StorageError,StateConflict
 from prm.capabilities import AuthorizationRequest
 from .dispatch import RequestIntent,IntentKind
 
-TOOLS=frozenset({'chat.compose','archive.search','web.search','brief.compose','result.view','actions.preview','memory.preview'})
-INTENTS=frozenset({'chat','search','web_search','weekly','followup','action_preview','memory_preview','clarify'})
+TOOLS=frozenset({'chat.compose','archive.search','web.search','github.read','brief.compose','result.view','actions.preview','memory.preview'})
+INTENTS=frozenset({'chat','search','web_search','research','weekly','followup','action_preview','memory_preview','clarify'})
 REASONS=frozenset({'missing_target','ambiguous_target','source_unavailable','missing_action_fields','uncertain_intent'})
 STOPS=('scope_denied','cancelled','deadline','invalid_response')
 SYSTEM=('TaskPlan v1. Return only JSON with schema_version:1, intent, steps:[{tool,argument}], '
         'binding:"none"|"bound", item_index:null|1..8, project_ref:null, source_filters:[], '
         'needs_clarification:boolean, reason:null|missing_target|ambiguous_target|source_unavailable|missing_action_fields|uncertain_intent, '
-        'max_tool_calls:1..3, stop_conditions:["scope_denied","cancelled","deadline","invalid_response"]. '
-        'Intent chat/search/web_search/weekly/followup/action_preview/memory_preview/clarify. '
+        'max_tool_calls:1..3 (research:1..10), stop_conditions:["scope_denied","cancelled","deadline","invalid_response"]. '
+        'Intent chat/search/web_search/research/weekly/followup/action_preview/memory_preview/clarify. '
+        'For a multi-stage question choose research with archive.search/web.search/github.read steps (at most3); '
+        'github.read argument is empty to use the already selected repository, or its exact name from the question; '
+        'source_filters match the actual read sources. '
         'Changing public facts (prices, releases, schedules) use web_search even without a search keyword. '
         'A web.search argument must be an exact substring of the current owner question. '
         'Use only public wording from that question, never private projects, mail, archive or remembered context. '
@@ -59,7 +62,7 @@ def validate_task_plan(value,*,available_tools,available_sources,available_proje
     if value['project_ref'] is not None and value['project_ref'] not in available_projects:raise StorageError('planner cannot invent a project')
     filters=value['source_filters']
     if not isinstance(filters,list) or len(filters)>8 or any(not isinstance(f,str) or f not in available_sources for f in filters) or len(set(filters))!=len(filters):raise StorageError('planner source outside selected catalogue')
-    if type(value['max_tool_calls'])is not int or not 1<=value['max_tool_calls']<=3 or value['stop_conditions']!=list(STOPS):raise StorageError('bounded planner budget/stops required')
+    if type(value['max_tool_calls'])is not int or not 1<=value['max_tool_calls']<=(10 if value['intent']=='research' else 3) or value['stop_conditions']!=list(STOPS):raise StorageError('bounded planner budget/stops required')
     steps=value['steps']
     if not isinstance(steps,list) or not 1<=len(steps)<=3 or len(steps)>value['max_tool_calls']:raise StorageError('bounded nonempty plan steps required')
     parsed=[]
@@ -67,7 +70,10 @@ def validate_task_plan(value,*,available_tools,available_sources,available_proje
         if not isinstance(step,dict) or set(step)!={'tool','argument'} or not isinstance(step['tool'],str) or step['tool'] not in TOOLS or step['tool'] not in available_tools or not isinstance(step['argument'],str) or len(step['argument'].encode())>2000:raise StorageError('plan step outside registered read/compose/preview capabilities')
         parsed.append(PlanStep(step['tool'],step['argument']))
     allowed={'chat':'chat.compose','search':'archive.search','web_search':'web.search','weekly':'brief.compose','followup':'result.view','action_preview':'actions.preview','memory_preview':'memory.preview'}
-    if value['intent']!='clarify' and any(s.tool!=allowed[value['intent']] for s in parsed):raise StorageError('plan intent and tools disagree')
+    if value['intent']=='research':
+        mapping={'archive.search':'archive','web.search':'public','github.read':'github'}
+        if value['binding']!='none' or any(s.tool not in mapping for s in parsed) or {mapping[s.tool] for s in parsed}!=set(filters):raise StorageError('research plan and selected read sources disagree')
+    elif value['intent']!='clarify' and any(s.tool!=allowed[value['intent']] for s in parsed):raise StorageError('plan intent and tools disagree')
     if value['intent']=='followup' and value['binding']!='bound':raise StorageError('follow-up requires exact object binding')
     if value['intent']=='web_search' and (len(parsed)!=1 or value['max_tool_calls']<2 or value['binding']!='none' or value['project_ref'] is not None or set(filters)!={'public'}):raise StorageError('public discovery requires a standalone bounded public plan')
     return TaskPlan(value['intent'],tuple(parsed),value['binding'],index,value['project_ref'],tuple(filters),value['needs_clarification'],value['reason'],value['max_tool_calls'],tuple(value['stop_conditions']))

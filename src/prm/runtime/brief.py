@@ -86,7 +86,18 @@ class BriefRuntime:
                 try:_evidence_from_mapping(record.payload,window=window)
                 except ValueError:continue
                 eligible.add(record.evidence_ref)
-        bundle=EvidenceBundle.select_ranked(tuple(batches),maximum_items=20,topic=topic,eligible_refs=frozenset(eligible)) if batches else None
+        from prm.event_clusters import cluster_events
+        from prm.brief_selection import select_events,build_attention_editorial,admit_editorial_wording
+        selection_digest=self.root.archive_selection.digest if self.root.archive_selection else None
+        history=self.root.briefs.event_history(topic=topic,selection_digest=selection_digest) if hasattr(self.root.briefs,'event_history') else ()
+        projects=[]
+        if hasattr(self.root,'projects'):
+            with self.root.queue.store.transaction() as tx:projects=self.root.projects.list_in(tx)[:3]
+        records=list({r.evidence_ref:r for b in batches for r in b.items if r.evidence_ref in eligible}.values())
+        events=cluster_events(records,history=history)
+        decisions=select_events(events,projects=projects,maximum=20)
+        baseline=EvidenceBundle.select(tuple(batches),maximum_items=0,eligible_refs=frozenset(eligible)) if batches else None
+        bundle=replace(baseline,selected=tuple(row[1] for row in decisions)) if baseline else None
         if bundle:
             evidence=[r.payload for r in bundle.selected]
             if bundle.model_omitted_count:
@@ -100,19 +111,43 @@ class BriefRuntime:
         document=build_brief_document(request)
         classes={resource.data_class for batch in batches for resource in batch.selected_resources}
         snapshots=tuple({b.watermark for b in batches if b.watermark and any(r.kind=='archive' for r in b.selected_resources)}) if self.root.archive_selection else ()
+        # Editorial prose may improve explanation, but cannot decide source
+        # scope, project identity, novelty or optional continuation authority.
+        local_editorial=build_attention_editorial(document,decisions)
+        offered=None
         if self.editorial is not None:
             editorial=self.editorial(document,data_classes=classes,source_scopes=used_scopes,archive_snapshots=snapshots) if type(self.editorial)is RuntimeBriefEditorial else self.editorial(document)
-            if editorial is not None:document=build_brief_document(replace(request,editorial=editorial))
+            if editorial is not None:offered=editorial
+        document=build_brief_document(replace(request,editorial=admit_editorial_wording(local_editorial,offered,document.evidence)))
         dependencies=[r.payload['dependency_ref'] for b in batches for r in b.items if r.payload.get('dependency_ref')]
+        used_projects={row[2]['project']['project_ref'] for row in decisions[:5] if row[2]['project']}
+        if used_projects:
+            with self.root.queue.store.transaction() as tx:
+                for project in projects:
+                    if project.object_id not in used_projects:continue
+                    current=self.root.projects._get_in(tx,project.object_id,project.version)
+                    c,s,a=self.root.projects.provenance_in(tx,current);classes.update(c)
+                    used_scopes.extend(s);snapshots=tuple(set(snapshots)|set(a))
+                    dependencies.append({'namespace':'memory','object_ref':project.object_id,'version':project.version,'digest':project.digest})
+        used_scopes=list({__import__('json').dumps(s,sort_keys=True):s for s in used_scopes}.values())
         if not hasattr(self.root.briefs,'pending_coverage'):self.root.briefs.pending_coverage={}
         self.root.briefs.pending_coverage[document.content_digest]=bundle.metadata() if bundle else {'schema_version':'assistant.evidence_bundle.v1','received_count':0,'candidate_count':0,'selected_count':0,'cited_count':None,'batches':[]}
         self.root.briefs.pending_coverage[document.content_digest]['enumeration_received_count']=received
         self.root.briefs.pending_coverage[document.content_digest]['candidate_global_cap']=2048
         self.root.briefs.pending_coverage[document.content_digest]['document_evidence_count']=len(document.evidence)
+        self.root.briefs.pending_coverage[document.content_digest]['event_count']=len(events)
+        self.root.briefs.pending_coverage[document.content_digest]['event_duplicate_count']=len(records)-len(events)
+        if not hasattr(self.root.briefs,'pending_events'):self.root.briefs.pending_events={}
+        self.root.briefs.pending_events[document.content_digest]={'selection_digest':selection_digest,
+            'events':[e.metadata() for e,_,_ in decisions],
+            'signals':[{k:v for k,v in s.items() if k!='project'}|{'event_ref':e.event_ref,'revision':e.revision,
+                'project_binding':None if not s['project'] else {k:s['project'][k] for k in ('project_ref','version','digest')}} for e,_,s in decisions]}
+        cluster_refs={r.evidence_ref:(e.event_ref,e.revision) for e in events for r in e.records}
         selected={r.evidence_ref for r in bundle.selected} if bundle else set()
         if not hasattr(self.root.briefs,'pending_inventory'):self.root.briefs.pending_inventory={}
         self.root.briefs.pending_inventory[document.content_digest]=[{**r.metadata(),'source_url':r.payload.get('source_url'),
-            'selected':r.evidence_ref in selected,'reason':'selected' if r.evidence_ref in selected else 'ineligible' if r.evidence_ref not in eligible else 'model_packet_limit'} for b in batches for r in b.items]
+            'event_ref':cluster_refs.get(r.evidence_ref,(None,None))[0],'event_revision':cluster_refs.get(r.evidence_ref,(None,None))[1],
+            'selected':r.evidence_ref in selected,'reason':'selected' if r.evidence_ref in selected else 'ineligible' if r.evidence_ref not in eligible else 'event_duplicate' if any(r in e.records and len(e.records)>1 and any(p.evidence_ref in selected for p in e.records) for e in events) else 'model_packet_limit'} for b in batches for r in b.items]
         self.root.briefs.pending_dependencies[document.content_digest]=dependencies
         self.root.briefs.pending_classes[document.content_digest]=tuple(sorted(classes)) or ('user_provided',)
         self.root.briefs.pending_scopes[document.content_digest]=used_scopes
