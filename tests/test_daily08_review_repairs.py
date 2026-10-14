@@ -265,3 +265,71 @@ def test_r08_story_reaction_replay_and_r09_documented_labels_are_native(pai):
         _,event=request(pai,i,label)
         assert event['payload']['feedback_event']['kind']==kind and event['payload']['feedback_event']['story_number']==2
     assert not pai.requests
+
+
+@pytest.mark.parametrize('path',['weekly','refresh'])
+@pytest.mark.parametrize('change',['forget','edit'])
+def test_r02_native_brief_publication_links_text_before_visible_binding(pai,monkeypatch,path,change):
+    root,value,items,rule=rule_brief(pai)
+    if path=='refresh':
+        _,_,doc,_=create(pai,180090)
+        query='/document '+json.dumps({'brief_id':doc.brief_id,'version':1,'action':'refresh'})
+        items[0].update(support_span='Publication sentinel current protocol changed.',source_version='new')
+    else:
+        query='Собери обзор недели Protocol'
+        items[0]['support_span']='Publication sentinel current protocol changed.'
+    original=root.briefs.bind_visible;mutated=[]
+    def gated(**kwargs):
+        if not kwargs.get('_persist_only') and not mutated:
+            mutated.append(True)
+            if change=='forget':root.memory.forget(rule.object_id,**ACTOR)
+            else:root.ingress.receive({'update_id':180092,'edited_message':{'message_id':880,'from':{'id':42},'chat':{'id':42,'type':'private'},'text':'Edited publication original'}})
+        return original(**kwargs)
+    monkeypatch.setattr(root.briefs,'bind_visible',gated)
+    ack=root.ingress.receive({'update_id':180091,'message':{'message_id':880,'from':{'id':42},'chat':{'id':42,'type':'private'},'text':query}})
+    from prm.storage.postgres import StateConflict
+    try:ref=root.worker().run_once()
+    except StateConflict:ref=None
+    assert mutated
+    state=root.queue.status(owner=root.owner_ref,job_id=ack.job_id)
+    assert state['status'] in {'completed','cancelled','failed'}
+    if ref:assert root.queue.store.get(root.owner_ref,'result',ref).payload['status']=='source_unavailable'
+    with root.queue.store.transaction() as tx:
+        assert not tx.conn.execute("SELECT 1 FROM pa_runtime.object_versions WHERE owner=%s AND namespace='result' AND object_id LIKE 'response_%%' AND payload::text LIKE %s",(root.owner_ref,'%Publication sentinel%')).fetchall()
+        assert not tx.conn.execute("SELECT payload FROM pa_conversation.history WHERE owner=%s AND payload->>'text' LIKE %s",(root.owner_ref,'%Publication sentinel%')).fetchall()
+    monkeypatch.setattr(root.briefs,'bind_visible',original)
+    _,next_value=request(pai,180093,'покажи память');assert next_value['status'] in {'found','not_found'}
+    assert not pai.requests
+
+
+@pytest.mark.parametrize('append_sources',[False,True])
+def test_r03_large_compacted_refresh_keeps_diff_on_actual_html_multipart_wire(pai,telegram_http,monkeypatch,append_sources):
+    root,_,items,calls,_=setup(pai,count=20)
+    for i,row in enumerate(items):
+        row['support_span']='Событие '+str(i)+': '+('синтетический фрагмент протокола '*32)
+        row['source_url']+='?publication='+('x'*400)
+    _,_,doc,_=create(pai,180100)
+    for row in items:row.update(support_span=row['support_span']+' Обновлённый фрагмент.',source_version='changed')
+    if append_sources:
+        original=root.brief_runtime.answer
+        def expanded(**kwargs):
+            # Explicit synthetic appendix of8 sources from the same document.
+            # The production concise card intentionally stays below3500 chars.
+            result=original(**kwargs);pointer=result.payload['document_binding']
+            current,_=root.documents.load(pointer['brief_id'],pointer['version'])
+            from html import escape
+            appendix='\n'.join(escape(e.summary)+' <a href="'+escape(e.source_ref,quote=True)+'">Источник</a>' for e in current.evidence[:8])
+            return replace(result,text=result.text+'\n'+appendix)
+        monkeypatch.setattr(root.brief_runtime,'answer',expanded)
+    ack,answer=request(pai,180101,'обнови бриф')
+    assert 'payload_storage' in answer['payload'] and answer['payload']['brief_view']=='refresh'
+    assert 'brief_refresh' not in answer['payload'] and 'События: новых' in answer['text']
+    executor=delivery(pai,telegram_http)
+    sent=executor.deliver_result(owner=root.owner_ref,job_id=ack.job_id,destination_ref='destination_private',upper_bound=0)
+    assert sent['status']=='sent' and (len(telegram_http.requests)>1 if append_sources else len(telegram_http.requests)==1)
+    assert all(path.endswith('/sendMessage') and body['parse_mode']==['HTML'] for path,body in telegram_http.requests)
+    from prm.runtime.presentation import split_html_messages
+    expected=split_html_messages(answer['text'],limit=3500)
+    assert [body['text'][0] for _,body in telegram_http.requests]==(['['+str(i+1)+'/'+str(len(expected))+']\n'+part for i,part in enumerate(expected)] if append_sources else [answer['text']])
+    assert 'Обновление: источники проверены заново' in telegram_http.requests[0][1]['text'][0]
+    assert len(calls)==2 and doc.evidence[0].source_ref in '\n'.join(b['text'][0] for _,b in telegram_http.requests)

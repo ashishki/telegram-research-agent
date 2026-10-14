@@ -35,6 +35,11 @@ class DurableBriefStore(BriefDocumentStore):
     def _document_ref(self,brief_id):return 'brief_'+hashlib.sha256(brief_id.encode()).hexdigest()[:32]
     def _binding_ref(self,conversation_id):return 'brief_binding_'+hashlib.sha256(conversation_id.encode()).hexdigest()[:32]
 
+    def persist_document(self,document,*,chat_id,actor_id,owner_chat_id):
+        """Commit source-bound immutable facts before any visible response text."""
+        return self.bind_visible(document=document,authenticated_chat_id=chat_id,authenticated_actor_id=actor_id,
+            authenticated_owner_chat_id=owner_chat_id,_persist_only=True)
+
     def bind_visible(self,**kwargs):
         owner=brief_owner_ref_from_authenticated_private_tuple(kwargs.get('authenticated_chat_id'),kwargs.get('authenticated_actor_id'),kwargs.get('authenticated_owner_chat_id'))
         if owner!=self.owner_ref or kwargs['document'].owner_ref!=owner:raise StorageError('exact private Brief owner required')
@@ -106,6 +111,7 @@ class DurableBriefStore(BriefDocumentStore):
                             if aware(parent.payload['project_context']['expires_at'])<=now:raise StateConflict('Brief project expired while building')
                         tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',
                             (owner,dependency['namespace'],dependency['object_ref'],'result',ref))
+            if kwargs.pop('_persist_only',False):return document
             ref=self._binding_ref(kwargs['conversation_id']);old=tx.get(owner,'conversation',ref)
             binding={'response_ref':kwargs['response_ref'],'brief_id':document.brief_id,'version':document.version,
                 'comparison':None if comparison is None else {'brief_id':comparison.brief_id,'version':comparison.version},

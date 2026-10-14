@@ -198,26 +198,27 @@ class BriefRuntime:
         return document
 
     def answer(self,*,topic,timezone_name,end_at=None,period_mode='rolling',prepared_document=None):
-        from prm.application import PersonalResearchAssistant
+        from prm.contracts import AssistantResult
+        from prm.capabilities import CapabilityDenied
         document=prepared_document or self.build(topic=topic,timezone_name=timezone_name,end_at=end_at,period_mode=period_mode)
         ref=self.root.task_context.get();original=self.root.queue.store.get(self.root.owner_ref,'conversation',ref) if ref else None
         if original is not None:
             if not hasattr(self.root.briefs,'pending_original_inputs'):self.root.briefs.pending_original_inputs={}
             self.root.briefs.pending_original_inputs[document.content_digest]=[{'namespace':'conversation','ref':original.object_id,'version':original.version,'digest':original.digest}]
-        assistant=PersonalResearchAssistant(settings=self.root.settings,conversations=self.root.conversations,briefs=self.root.briefs)
-        request=OperatorRequest(query=topic,mode='brief',chat_id=self.root.owner_chat_id,
-            actor_id=self.root.owner_chat_id,owner_chat_id=self.root.owner_chat_id)
-        from prm.briefs import rebuild_brief_request
-        result=assistant.render_brief_document(request,rebuild_brief_request(document),prepared_document=document)
+        # Publish the immutable source-bound manifest first; atomic view writing
+        # then links text/origin to it before releasing the lineage transaction.
+        # Both initial weekly and explicit refresh use this native path.
+        request_ref=ref or document.brief_id+':'+str(document.version)
+        try:
+            self.root.briefs.persist_document(document,chat_id=self.root.owner_chat_id,actor_id=self.root.owner_chat_id,owner_chat_id=self.root.owner_chat_id)
+            document,manifest=self.root.documents.load(document.brief_id,document.version)
+            result=self.root.documents.remember_view(request_ref,document,manifest,render_brief_document(document,view='telegram'),view='telegram',
+                extra={'brief_document_created':True,'automatic_job_created':False,'notification_sent':False})
+        except (StorageError,CapabilityDenied):
+            return AssistantResult(request_ref,'source_unavailable','brief','Обзор не опубликован: сохранённый контекст или исходный запрос изменён. Можно собрать актуальный обзор заново.',
+                payload={'source_data_class':'user_provided','source_data_classes':['user_provided']})
         classes=self.root.briefs.pending_classes.get(document.content_digest,('private_archive','private_connector_content'))
-        refs=result.payload.get('conversation',{}).get('response_refs',())
         snapshots=self.root.briefs.pending_snapshots.get(document.content_digest,[])
-        if refs:
-            manifest=self.root.briefs.store.get(self.root.owner_ref,'result',self.root.briefs._document_ref(document.brief_id),version=document.version)
-            self.root.conversations.record_origin(refs[0],classes,source_scopes=self.root.briefs.pending_scopes.get(document.content_digest,()),archive_snapshots=snapshots,
-                memory_bindings=manifest.payload.get('memory_bindings',[]),project_bindings=manifest.payload.get('project_bindings',[]),
-                original_input_bindings=manifest.payload.get('original_input_bindings',[]),
-                source_result_bindings=[{'namespace':'result','ref':manifest.object_id,'version':manifest.version,'digest':manifest.digest}])
         inventory_hint='\nМатериалы выборки: /briefmaterials '+document.brief_id+' '+str(document.version)+' 0'
         prompt=self.root.feedback.optional_prompt() if hasattr(self.root,'feedback') else ''
         return replace(result,text=result.text+inventory_hint+('\n'+prompt if prompt else ''),payload={**result.payload,

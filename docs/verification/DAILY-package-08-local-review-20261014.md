@@ -29,3 +29,28 @@ Repairs and scoped checks follow on a separate SHA. Critical R01–R07 require
 an independent narrow recheck before D22/D23/D24/D57. The full STOP stays frozen;
 do not repeat the accumulated review after each fix. Any remaining variants,
 limitations and exact narrow SHA/diff will be appended here after the verdict.
+
+## First narrow recheck — frozen STOP R02/R03
+
+Same independent read-only agent, inherited defaults/no override, observed
+unknown. Independently verified clean Git and dbf4958→
+b2092d6ad4218066567500aee8d33ae4b3e82784:18 files/+558/-57,
+binary78154 bytes/SHA256 a49896ae916871a9707bfb18070caab227a6cfd6c41f851203630ff501ea7511.
+Only R01–R07 and direct repair risks; adjacent R08/R09 viewed. No second full
+review, reviewer tests/DB/network/mutations or acceptance.
+
+Closed R01/R04/R05/R06/R07 and both R08/R09. No new separate P0/P1 in checked
+delta. **STOP: two remaining P1 variants, original R02/R03 IDs retained.**
+
+- R02: refresh still used BriefRuntime.answer→legacy application
+  record_response→bind_visible→record_origin. Forget current rule/project after
+  raw response and before binding rejects publication but leaves unlinked
+  response/history. Initial weekly shares this sibling. Require source-bound
+  manifest first, atomic response/origin/edges, and no orphan on refused binding.
+- R03: large refresh compaction drops brief_refresh.performed, retains
+  brief_view=telegram, and delivery re-renders full native rich instead of its
+  actual status/diff. Preserve a bounded view discriminator; do not add a large
+  dynamic diff to the compact header. Add real compacted refresh wire checks.
+
+No dependent block started. Next recheck scope is only these two variants and
+the direct delta. Earlier five critical/P2 closures remain bound to b2092d6.

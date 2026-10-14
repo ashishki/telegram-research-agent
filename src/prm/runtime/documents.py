@@ -74,16 +74,24 @@ class DocumentDialogueRuntime:
             source_scopes=scopes,archive_snapshots=snapshots,memory_bindings=manifest.payload.get('memory_bindings',[]),
             project_bindings=manifest.payload.get('project_bindings',[]),original_input_bindings=manifest.payload.get('original_input_bindings',[]),
             source_result_bindings=exact,provenance_guard=current)
-        root.briefs.bind_visible(conversation_id=state.conversation_id,response_ref=state.object_refs[0].response_ref,
-            document=document,active_item_number=active_item,authenticated_chat_id=root.owner_chat_id,
-            authenticated_actor_id=root.owner_chat_id,authenticated_owner_chat_id=root.owner_chat_id)
+        try:
+            root.briefs.bind_visible(conversation_id=state.conversation_id,response_ref=state.object_refs[0].response_ref,
+                document=document,active_item_number=active_item,authenticated_chat_id=root.owner_chat_id,
+                authenticated_actor_id=root.owner_chat_id,authenticated_owner_chat_id=root.owner_chat_id)
+        except (StorageError,CapabilityDenied):
+            # A revision/forget may win after the already linked atomic view.
+            # A refused publication leaves neither its text nor its history.
+            from .deletion import delete_derived_in
+            with root.queue.store.transaction() as tx:
+                delete_derived_in(tx,owner=root.owner_ref,namespace='result',object_ref=state.object_refs[0].response_ref)
+            raise
         payload={'brief_document':document.to_dict(),'brief_inspection':document.inspect(),'brief_view':view,'telegram_parse_mode':'HTML',
             'document_binding':{'brief_id':document.brief_id,'version':document.version,'content_digest':document.content_digest,'story_number':active_item},
             'conversation':{'response_refs':[state.object_refs[0].response_ref]},'source_data_classes':classes,'source_data_class':classes[0],
             'source_result_bindings':exact,'memory_bindings':manifest.payload.get('memory_bindings',[]),'project_bindings':manifest.payload.get('project_bindings',[]),
             'original_input_bindings':manifest.payload.get('original_input_bindings',[]),
             'source_scopes':scopes,'archive_snapshots':snapshots,'retrieval_performed':False,'write_performed':False,**(extra or {})}
-        return AssistantResult(request_ref,'partial_brief' if document.status=='partial' else 'ok','brief',text,payload=payload)
+        return AssistantResult(request_ref,'partial_brief' if document.status=='partial' else 'empty_brief' if document.status=='empty' else 'ok','brief',text,payload=payload)
 
     def view_current(self,request,*,request_ref,lease,guard,why_signals=False):
         resolved=self.resolve_current(request,request_ref=request_ref,lease=lease,guard=guard)
@@ -138,8 +146,9 @@ class DocumentDialogueRuntime:
         diff={'added':sorted(new.keys()-old.keys()),'removed':sorted(old.keys()-new.keys()),'changed':sorted(k for k in old.keys()&new.keys() if old[k]!=new[k]),
             'compared_version':pointer['version'],'previous_version':head.version,'new_source_search':True}
         answer=root.brief_runtime.answer(topic=fresh.topic,timezone_name=fresh.window.timezone,prepared_document=fresh)
+        if not answer.payload.get('document_binding'):return answer
         text='Обновление: источники проверены заново; создана версия '+str(fresh.version)+'.\nСобытия: новых '+str(len(diff['added']))+', изменённых '+str(len(diff['changed']))+', отсутствующих в новой выборке '+str(len(diff['removed']))+'.\n\n'+answer.text
-        return replace(answer,text=text,payload={**answer.payload,'brief_refresh':{'performed':True,**diff},'retrieval_performed':True})
+        return replace(answer,text=text,payload={**answer.payload,'brief_view':'refresh','brief_refresh':{'performed':True,**diff},'retrieval_performed':True})
 
     def try_answer(self,request,*,request_ref,lease,guard):
         query=request.query.strip();explicit=None

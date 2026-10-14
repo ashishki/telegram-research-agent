@@ -59,6 +59,10 @@ Source/memory authority stays locked through bounded HTTP. Final response and
 origin are atomic. A concurrent forget/correction/revoke can hide the finished
 answer and complete with `source_unavailable`, without a retry or stale facts.
 Natural memory/document views use the same atomic response/origin/edge boundary.
+Native weekly and refresh first commit a source-bound immutable manifest and
+then use that atomic view API. A rejected visible binding removes the refused
+response and its history. Compacted refresh retains a bounded refresh view tag;
+the complete dynamic diff remains in diagnostic storage rather than its header.
 If a required parent is lost after response but before small/diagnostic completion,
 compute settles `failed/derived_source_unavailable`, releases its lease and
 retains durable unknown model attempts; the next owner request can proceed.
