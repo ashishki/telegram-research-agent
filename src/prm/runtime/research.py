@@ -234,7 +234,10 @@ class DurableResearchWorker:
             origin=prior.payload.get('research_origin') or {'input_namespace':'conversation','input_ref':prior.object_id,'input_version':prior.version,'input_digest':prior.digest}
             self.root.queue._input(tx,self.root.owner_ref,origin)
             if item.payload.get('unknown_tool_calls'):raise StateConflict('unresolved research attempt requires reconciliation')
-            synthesis_ops=item.payload.get('answer_payload',{}).get('operation_refs',[])
+            synthesis_ops=set(item.payload.get('answer_payload',{}).get('operation_refs',[]))
+            job=tx.conn.execute("SELECT id FROM pa_jobs.jobs WHERE owner=%s AND result_ref=%s AND kind='compute.research' LIMIT 1",(self.root.owner_ref,result_ref)).fetchone()
+            if job:synthesis_ops.update(self._synthesis_operations(tx,self.root.owner_ref,job['id']))
+            synthesis_ops=sorted(synthesis_ops)
             if synthesis_ops and tx.conn.execute("SELECT ref FROM pa_policy.operations WHERE owner=%s AND ref=ANY(%s) AND state IN ('prepared','unknown') LIMIT 1",(self.root.owner_ref,synthesis_ops)).fetchone():raise StateConflict('unresolved synthesis outcome requires reconciliation')
             for ref in item.payload.get('intermediate_refs',item.payload.get('evidence_refs',[])):
                 step=tx.get(self.root.owner_ref,'result',ref)
@@ -245,6 +248,23 @@ class DurableResearchWorker:
             from .research_plan import selected_catalogue
             if selected_catalogue(self.root,plan)!=prior.payload['selected_catalogue']:raise CapabilityDenied('continuation cannot expand source selection')
         return self.enqueue(plan,idempotency_key=idempotency_key,continuation_binding={'ref':result_ref,'version':version,'digest':digest},origin_binding=origin)
+
+    @staticmethod
+    def _synthesis_operations(tx,owner,job_id):
+        # Discover attempts even if a worker died before writing the packet.
+        # Literal prefix comparison keeps underscores from acting as wildcards.
+        prefix='research_synthesis_'+job_id+'_'
+        return [row['ref'] for row in tx.conn.execute(
+            'SELECT ref FROM pa_policy.operations WHERE owner=%s AND left(ref,length(%s))=%s ORDER BY ref',
+            (owner,prefix,prefix)).fetchall()]
+
+    @staticmethod
+    def _answer_evidence(record):
+        item=record.payload
+        source=item.get('source_url') or item.get('message_url')
+        span=item.get('support_span') or item.get('snippet') or item.get('text') or item.get('content')
+        if not isinstance(source,str) or not source.startswith('https://') or not isinstance(span,str) or not span.strip():return None
+        return {'evidence_id':record.evidence_ref,'source_url':source,'support_span':span[:1200]}
 
     def _coverage(self,plan,completed,lease):
         from .research_plan import assess_coverage,selected_catalogue
@@ -262,8 +282,8 @@ class DurableResearchWorker:
                 batches.append(batch)
                 for record in batch.items:
                     p=record.payload
-                    if entry['source']=='public' and p.get('freshness')!='fresh':continue
-                    if not str(p.get('source_url') or p.get('message_url') or '').startswith('https://'):continue
+                    if entry['source']=='public' and (p.get('freshness')!='fresh' or entry['evidence'].get('conflicts')):continue
+                    if self._answer_evidence(record) is None:continue
                     rows.append(p);eligible.add(record.evidence_ref)
             except (CapabilityDenied,StorageError,KeyError,TypeError,ValueError):entry['status']='source_unavailable'
         from prm.source_contracts import EvidenceBundle
@@ -271,8 +291,7 @@ class DurableResearchWorker:
         packet=[]
         for record in bundle.selected if bundle else ():
             p=record.payload
-            packet.append({'support_span':str(p.get('support_span') or p.get('text') or p.get('content') or p.get('snippet') or '')[:1200],
-                'conflict_group':p.get('conflict_group'),'conflict_value':p.get('conflict_value')})
+            packet.append({**self._answer_evidence(record),'conflict_group':p.get('conflict_group'),'conflict_value':p.get('conflict_value')})
         observed=assess_coverage(plan,completed,rows)
         answer=assess_coverage(plan,completed,packet)
         answer['gathered_covered_terms']=observed['covered_terms'];answer['answer_packet_item_count']=len(packet)
@@ -480,33 +499,34 @@ class DurableResearchWorker:
             read_scopes.extend(scopes)
             snapshots.update(step['evidence'].get('archive_snapshots',()))
             for record in batch.items:
-                item=record.payload;source=item.get('source_url') or item.get('message_url');span=item.get('support_span') or item.get('snippet') or item.get('text') or item.get('content')
+                item=record.payload
                 if step['source']=='public' and (item.get('freshness')!='fresh' or step['evidence'].get('conflicts')):continue
-                if isinstance(source,str) and source.startswith('https://') and isinstance(span,str) and span.strip():eligible_refs.add(record.evidence_ref)
+                if self._answer_evidence(record) is not None:eligible_refs.add(record.evidence_ref)
             batches.append(batch)
         read_scopes=list({json.dumps(s,sort_keys=True):s for s in read_scopes}.values())
         if previous is not None:
-            cached=previous.payload
+            with queue.store.transaction() as tx:
+                queue._fenced(tx,lease)
+                operations=self._synthesis_operations(tx,lease.owner,lease.job_id)
+            cached={**previous.payload,'operation_refs':sorted(set(previous.payload.get('operation_refs',[]))|set(operations))}
             if cached.get('status') in {'synthesized_verified','partial_supported'}:
                 from prm.research_blocks import VOCABULARY_VERSION
                 check=cached.get('verification') or {}
                 if check.get('schema_version')=='assistant.research_block_verification.v1':
                     if check.get('mechanism')!=VOCABULARY_VERSION:raise CapabilityDenied('cached block verifier is outdated')
                 else:
-                    known=[{'source_url':r.payload.get('source_url') or r.payload.get('message_url'),
-                        'support_span':(r.payload.get('support_span') or r.payload.get('snippet') or r.payload.get('text') or '')[:1200]} for b in batches for r in b.items if r.evidence_ref in eligible_refs]
+                    known=[self._answer_evidence(r) for b in batches for r in b.items if r.evidence_ref in eligible_refs]
                     if assessed_answer(cached.get('text'),known,question=plan['question']) is None:raise CapabilityDenied('cached plaintext facts no longer verified')
             return cached
         bundle=EvidenceBundle.select(tuple(batches),maximum_items=8,eligible_refs=frozenset(eligible_refs)) if batches else None
         evidence=[]
         for record in bundle.selected if bundle else ():
-            item=record.payload;source=item.get('source_url') or item.get('message_url');span=item.get('support_span') or item.get('snippet') or item.get('text') or item.get('content')
-            evidence.append({'evidence_id':record.evidence_ref,'source_url':source,'support_span':span[:1200]})
+            evidence.append(self._answer_evidence(record))
             classes.add(record.resource.data_class)
         candidate_count=bundle.candidate_count if bundle else 0
         result={'status':'evidence_only' if evidence else 'insufficient_evidence','text':evidence_answer(evidence),
                 'verification':None,'source_refs':[item['source_url'] for item in evidence],
-                'model_reply_observed':False,'synthesis_outcome':'not_attempted','found_count':candidate_count,'source_coverage':bundle.metadata() if bundle else {'schema_version':'assistant.evidence_bundle.v1','received_count':0,'candidate_count':0,'selected_count':0,'cited_count':None,'model_omitted_count':0,'batches':[]}}
+                'model_reply_observed':False,'synthesis_outcome':'not_attempted','operation_refs':[],'found_count':candidate_count,'source_coverage':bundle.metadata() if bundle else {'schema_version':'assistant.evidence_bundle.v1','received_count':0,'candidate_count':0,'selected_count':0,'cited_count':None,'model_omitted_count':0,'batches':[]}}
         endpoint=root.endpoint_for('research');groups=[]
         if endpoint is not None and evidence:
             scopes=[('model.generate',root.model_resource_ref,'user_provided','answer.request')]
@@ -548,6 +568,9 @@ class DurableResearchWorker:
             from .deletion import lineage_lock
             lineage_lock(tx.conn,lease.owner);queue._fenced(tx,lease)
             source_current(tx,root.registry,lease.owner,read_scopes,archive_snapshots=snapshots,require_snapshot=True)
+            result['operation_refs']=sorted(set(result['operation_refs'])|set(self._synthesis_operations(tx,lease.owner,lease.job_id)))
+            if result['operation_refs'] and tx.conn.execute("SELECT ref FROM pa_policy.operations WHERE owner=%s AND ref=ANY(%s) AND state IN ('prepared','unknown') LIMIT 1",(lease.owner,result['operation_refs'])).fetchone():
+                result.update(status='partial_provider_unavailable_or_unknown',synthesis_outcome='provider_unavailable_or_unknown')
             main_ref='result_'+lease.job_id
             if tx._deleted(lease.owner,'result',main_ref):raise StorageError('research result deleted before synthesis storage')
             parents=[entry['ref'] for entry in completed if entry['status']=='gathered']

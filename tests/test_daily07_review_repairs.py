@@ -80,6 +80,43 @@ def test_r04_unknown_prepared_read_cannot_get_new_operation_ids(pai):
     assert not pai.root.deep_archive_reader.calls
 
 
+@pytest.mark.parametrize('outcome',['prepared','unknown'])
+def test_r04_interrupted_synthesis_retains_attempt_fence_after_recovery(pai,monkeypatch,outcome):
+    from prm.runtime.model import ChatCompletionsTransport
+    class WorkerStopped(BaseException):pass
+    attempts=[]
+    def stopped(self,body,**kwargs):
+        kwargs['before_request']();attempts.append(body);raise WorkerStopped()
+    monkeypatch.setattr(ChatCompletionsTransport,'send',stopped)
+    worker,plan,_=setup(pai,Reader(first='Retrieval cache is documented here.'))
+    allow(pai,'model.generate',pai.root.model_resource_ref,'user_provided','answer.request')
+    allow(pai,'model.context_egress',pai.root.archive_resource_ref,'private_archive','research.synthesis.archive')
+    job=worker.enqueue(plan,idempotency_key='r04_interrupted_synthesis_'+outcome)
+    with pytest.raises(WorkerStopped):worker.run_once()
+    ref='research_synthesis_'+job
+    assert pai.root.queue.store.get(pai.root.owner_ref,'result',ref) is None
+    operations=[ref+'_0',ref+'_1']
+    if outcome=='unknown':
+        for op in operations:pai.root.registry.settle(pai.root.owner_ref,op,outcome='unknown')
+    with pai.root.queue.store.transaction() as tx:
+        tx.conn.execute("UPDATE pa_jobs.jobs SET lease_until=clock_timestamp()-interval '1 second' WHERE owner=%s AND id=%s",(pai.root.owner_ref,job))
+    worker=DurableResearchWorker(pai.root)
+    assert worker.run_once() is None
+    with pai.root.queue.store.transaction() as tx:
+        tx.conn.execute("UPDATE pa_jobs.jobs SET available_at=clock_timestamp()-interval '1 second' WHERE owner=%s AND id=%s",(pai.root.owner_ref,job))
+    item=pai.root.queue.store.get(pai.root.owner_ref,'result',worker.run_once())
+    assert item.payload['answer_payload']['operation_refs']==operations
+    assert item.payload['answer_payload']['synthesis_outcome']=='provider_unavailable_or_unknown'
+    assert '/deepcontinue' not in item.payload['text'] and len(attempts)==1
+    assert pai.root.deep_archive_reader.calls==['retrieval'] and not pai.requests
+    with pytest.raises(StateConflict):worker.continue_result(result_ref=item.object_id,version=item.version,digest=item.digest,idempotency_key='r04_synthesis_retry')
+    # Also protect older packets whose interrupted-operation metadata was lost.
+    lost={**item.payload,'answer_payload':{**item.payload['answer_payload'],'operation_refs':[]}}
+    changed=pai.root.queue.store.put(pai.root.owner_ref,'result',item.object_id,lost,expected_version=item.version)
+    with pytest.raises(StateConflict):worker.continue_result(result_ref=changed.object_id,version=changed.version,digest=changed.digest,idempotency_key='r04_lost_metadata_retry')
+    assert len(attempts)==1 and pai.root.deep_archive_reader.calls==['retrieval']
+
+
 def test_r05_local_headline_and_truncation_preserve_qualifiers(pai):
     items=rows(pai,1)
     items[0].update(title='Guaranteed refund',support_span='The refund request '+('has been discussed in the current review process ' * 8)+'but no refund has been approved.',importance='critical')
@@ -169,6 +206,45 @@ def test_r07_matching_saved_version_also_rejects_expired_context(pai):
         with pytest.raises(CapabilityDenied):project_bindings_current(tx,root.owner_ref,[{'project_ref':item.object_id,'version':item.version,'digest':item.digest}])
 
 
+def test_r07_later_included_project_has_its_binding_and_omitted_projects_do_not(pai):
+    root,actor,source=project_setup(pai)
+    items=rows(pai,4)
+    for i,item in enumerate(items):item.update(source_group_id='g'+str(i+1),importance='medium')
+    def project(ref,name,selected):
+        text='\n'.join(row['support_span'] for row in selected)
+        evidence=root.queue.store.put(root.owner_ref,'result',ref+'_evidence',{'text':text,'data_classes':['user_provided']},expected_version=0)
+        c=context(pai,source);c['descriptor'].update(name=name,aliases=[name])
+        c['relationships']=[{'evidence_ref':evidence.object_id,'evidence_version':1,'evidence_digest':evidence.digest,'quote':row['support_span'],
+            'relation':'Supports the current goal','experiment':'One local fixture run','reject_if':'Measured behavior differs'} for row in selected]
+        preview=root.projects.preview(object_ref=ref,context=c,**actor);saved=root.memory.confirm(preview,**actor)
+        for row in selected:row['dependency_ref']={'namespace':'result','object_ref':evidence.object_id,'version':1,'digest':evidence.digest}
+        return saved,c
+    first,_=project('project_aurora','Aurora',items)
+    value=runtime(pai,items);value.answer(topic='Workflow',timezone_name='UTC',end_at=pai.now)
+    high=rows(pai,1)[0];high.update(evidence_id='new_high',source_url='https://primary.example.test/high',support_span='An important workflow change is documented here.',source_group_id='g0',importance='high')
+    later=rows(pai,1)[0];later.update(evidence_id='new_beta',source_url='https://primary.example.test/beta',support_span='A new bounded workflow is documented for Beta.',source_group_id='g0',importance='medium')
+    second,c=project('project_beta','Beta',[later])
+    items.extend([high,later]);answer=value.answer(topic='Workflow',timezone_name='UTC',end_at=pai.now)
+    from prm.conversation import conversation_id_for
+    binding=root.briefs.store.get(root.owner_ref,'conversation',root.briefs._binding_ref(conversation_id_for('42'))).payload
+    manifest=root.briefs.store.get(root.owner_ref,'result',root.briefs._document_ref(binding['brief_id']),version=1)
+    events=manifest.payload['event_selection']['events']
+    assert [e['editorial_included'] for e in events]==[True,False,False,False,False,True]
+    assert manifest.payload['project_bindings']==[{'project_ref':second.object_id,'version':second.version,'digest':second.digest}]
+    document=root.briefs._decode_document(manifest)
+    assert any('Beta' in story.why_selected for story in document.editorial.stories)
+    assert not any('Aurora' in story.why_selected for story in document.editorial.stories)
+    c['descriptor']['current_goal']='Changed Beta goal'
+    preview=root.projects.preview(object_ref=second.object_id,context=c,expected_version=second.version,**actor);root.memory.confirm(preview,**actor)
+    from prm.storage.briefs import DurableBriefStore
+    root.briefs=DurableBriefStore(pai.pg.app,owner_ref=root.owner_ref,registry=root.registry)
+    with pytest.raises(CapabilityDenied):root.briefs._decode_document(manifest)
+    from prm.runtime.source_access import result_provenance
+    with root.queue.store.transaction() as tx:
+        item=tx.get(root.owner_ref,'result',answer.payload['conversation']['response_refs'][0])
+        with pytest.raises(CapabilityDenied):result_provenance(tx,root.owner_ref,item)
+
+
 def test_r09_omitted_stories_are_new_on_next_week_and_inventory_labels_differ(pai):
     value=runtime(pai,rows(pai));value.answer(topic='Protocol',timezone_name='UTC',end_at=pai.now)
     document=value.build(topic='Protocol',timezone_name='UTC',end_at=pai.now)
@@ -178,12 +254,14 @@ def test_r09_omitted_stories_are_new_on_next_week_and_inventory_labels_differ(pa
     assert any(r['packet_selected'] and not r['selected'] for r in inventory)
 
 
-@pytest.mark.parametrize('location',['ninth_record','after_span_bound'])
+@pytest.mark.parametrize('location',['ninth_record','after_span_bound','span_precedence'])
 def test_r10_coverage_uses_actual_bounded_answer_packet(pai,location):
     class PacketReader(Reader):
         def search_archive(self,query,*,limit):
             self.calls.append(query)
             if query!='retrieval':return {'items':[{'evidence_id':'gap','source_url':'https://t.me/synthetic/gap','support_span':'Cache is documented here.','source_version':'v1'}]}
+            if location=='span_precedence':return {'items':[{'evidence_id':'first','source_url':'https://t.me/synthetic/first','text':'Retrieval cache is documented here.',
+                'snippet':'Retrieval is documented here.','source_version':'v1'}]}
             texts=['Retrieval is documented here.']*9 if location=='ninth_record' else ['Retrieval '+('padding '*170)+'cache']
             if location=='ninth_record':texts[-1]='Cache is documented here.'
             return {'items':[{'evidence_id':'first_'+str(i),'source_url':'https://t.me/synthetic/'+str(i),'support_span':t,'source_version':'v1'} for i,t in enumerate(texts)]}

@@ -139,7 +139,7 @@ class BriefRuntime:
                 coverage=tuple(replace(c,state='partial',reason='editorial_required_event_unrepresented') if c.state=='checked' else c for c in request.coverage))
             document=build_brief_document(replace(request,editorial=document.editorial))
         dependencies=[r.payload['dependency_ref'] for b in batches for r in b.items if r.payload.get('dependency_ref')]
-        used_projects={row[2]['project']['project_ref'] for row in decisions[:5] if row[2]['project']}
+        used_projects={s['project']['project_ref'] for _,r,s in decisions if s['project'] and brief_ref(r) in included}
         if used_projects:
             with self.root.queue.store.transaction() as tx:
                 for project in projects:
