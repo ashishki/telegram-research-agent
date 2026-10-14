@@ -70,7 +70,7 @@ acceptance. Go/governed, provider/CI/operator/live/production gates остают
 открыты. Следующим локально выполнен D11+D12+D14+D16; текущий срез ниже. Полный
 Chat/Search/beautiful Brief/Watch/confirmed Act сохраняется; Mini App исключён.
 
-**Текущий пакет D11+D12+D14+D16, 13 октября:** общий canonical retrieval с
+**Пакет D11+D12+D14+D16, 13 октября:** общий canonical retrieval с
 bounded RU/EN expansions/filters/cache/exact lookup и revalidated opt-in hybrid;
 нативный public plan для обычных вопросов, discovery отдельно от fetch и дат;
 частично подтверждённые факты/выводы/предложения с source/premise proof; полная
@@ -88,8 +88,34 @@ recall .8958/nDCG .9267 против .6146/.6775; hashed FP .8, auto native off.
 вопросы требуют отдельной public formulation; source date publication unknown
 сохраняется, HTTP modification не выдаётся за publication. Синтетический actual
 loopback/PG не доказывает live Brave/client/account/CI/operator usefulness или
-Go/governed/human acceptance. Следующий локальный пакет: **D13+D15+D17+D18**;
-D15 L сначала разбить на bounded slices. Полный замысел сохранён, Mini App исключён.
+Go/governed/human acceptance. Следующим локально выполнен D13+D15+D17+D18;
+текущая квитанция ниже. Полный замысел сохранён, Mini App исключён.
+
+**Текущий пакет D13+D15+D17+D18, 14 октября:** выбранные GitHub files и
+точные issue/PR/release IDs с SHA/versions/cache; отдельный synthetic private
+read-only credential contract и model-egress scope; двухволновое исследование
+с persisted coverage/checkpoints, bounded parallel reads и exact continuation;
+детерминированные event revisions/новизна и проектный отбор Brief. D15a plan/
+coverage, D15b reads/gap и D15c recovery/continuation разбиты до source changes.
+Source/full review134172e, first repairs/narrow STOPa638afc, final source/narrow
+PASS1717567. [Ledger](verification/DAILY-package-07-D13-D15-D17-D18-20261014.md),
+[review](verification/DAILY-package-07-local-review-20261014.md),
+[runbook](runbooks/project_research_event_brief.md). Один full STOP8P1/2P2;
+first narrow оставил два P1 варианта/R10 P2; final R04/R07-only recheck закрывает
+их, новых P0/P1 в исправлениях нет. Исходные STOP/failures сохранены. Final
+affected43 passed191.86s и targeted6 passed32.51s, zero skips, counts перекрываются.
+Prepared/unknown synthesis переживает recovery и блокирует fresh continuation;
+исходная Telegram lineage остаётся связана. Native canonical ID/hash/URL/cited
+result связывают архив с подтверждённым проектом; bindings реально включённых
+историй проверяются после restart/expiry/replacement при serving/delivery/reader.
+Facts/titles local/model проходят D14, иначе neutral wording/visible gap. История
+редакционного включения отдельно от packet selection и неизвестного surfaced/read.
+Exact groups7/7 на tiny authored dev fixture — не semantic quality/gold/holdout;
+lexical coverage8/1200 не доказывает полноту ответа или полезность. Реальные GitHub
+permissions/token rotation/App minting/provider/client/CI/visual/operator acceptance
+не выполнялись. Non-Codex Go/governed и formal/human gates открыты. Следующий
+локальный пакет **D19+D20+D21+D58**; D57 всё ещё требует D24. Full Chat/Search/
+beautiful weekly Brief/Watch/confirmed Act сохраняется, Mini App исключён.
 
 Дата среза: **10 октября 2026**. Runtime/test/independent source SHA: `0fbcfd1dde780724ad934aa66825afe17a6efc98`. Документация и Git integration изменены позднее; фактические refs — в [merge receipt](verification/PAI-master-integration-20261010.md).
 

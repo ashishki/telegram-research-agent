@@ -27,7 +27,7 @@ executed reviewer reproductions. Initial tests39/44/5 overlap and missed these.
 | DAILY07-R09 | P2 | runtime/brief.py:142/store:158 twenty packet decisions enter included history although only five stories shown; omitted events suppressed next week and inventory mislabeled |
 | DAILY07-R10 | P2 | research.py:258/464 coverage sees all rows/full spans but synthesis only8/1200 chars; may stop while actual answer packet lacks required support |
 
-Root repairs (pending independent narrow verdict): actual resource privacy for
+Root repairs (first independent narrow verdict below): actual resource privacy for
 v1/v2; connection SHARE lock through HTTP; stable original input lineage before
 intake and execution; intermediate+policy unknown-operation gate; D14 admission
 for local facts/neutral source fallback/visible required editorial gaps; exact
@@ -44,3 +44,57 @@ repair run/review SHA/closure are recorded after completion in the ledger.
 
 No dependent package work before critical independent closure. One full review
 is retained; subsequent checks are narrow for findings and changed boundaries.
+
+## First narrow recheck — frozen STOP
+
+Same independent read-only agent, inherited defaults/no override, observed
+model/effort unknown. Reviewed134172e → a638afcd4aab67dc7772c3689cfd39da7b28be18;
+16 files/+519/-36, binary diff73727 bytes/SHA256
+26b16350d2294a514b6546d4ac1ceafaaf9e1f6d4a8c9f00adb9988f7e486065.
+HEAD matched; later untracked runbook excluded. No reviewer tests/DB/network,
+credentials or mutations. Root's38/35/23 passes overlap and missed the variants.
+
+Closed R01/R02/R03/R05/R06/R08/R09. Original R10 cap/truncation cases repaired.
+**STOP: two remaining P1 variants R04/R07; one residual R10 P2.**
+
+- R04: kill after synthesis policy/model preparation before result storage.
+  Recovery denies deterministic attempted authorization, leaves groups empty,
+  writes operation_refs=[] and permits fresh continuation. Discover durable
+  attempts even when reauthorization is denied; do not rely only on new groups.
+- R07: high nonproject G0, four repeated medium project-A events in other groups,
+  then new project-B G0 member. Editorial skips A and includes B beyond the first
+  five decisions; persisted used_projects from decisions[:5] omits B. Derive
+  bindings/classes/scopes/dependencies from actual included anchors.
+- R10 P2: coverage prefers text before snippet, synthesis snippet before text.
+  A valid row with both can still cover terms absent from the answer packet.
+  Share one projection; this does not add a critical review boundary.
+
+## Final narrow recheck — PASS R04/R07
+
+Same independent read-only reviewer verified HEAD171756780d1ba9453b2bd8075303432062c18b8a
+and rangea638afc →1717567:3 files/+116/-15, binary19616 bytes/SHA256
+e0ee698387f28b725b1b047532429ec07208739cedeb9e8cc2832f36cd3e03b7.
+Uncommitted receipt/runbook excluded. Scope: only remaining R04/R07 P1 variants
+and direct repair risks, including shared synthesis packet projection. No second
+full review; no reviewer tests/DB/credentials/provider calls or mutations.
+Requested model/effort inherited active defaults/no override; observed unknown.
+
+**PASS: R04/R07 closed; no new P0/P1 in checked repairs.** R10 residual P2
+also closed by shared `_answer_evidence`, same eligibility/filter/field priority
+and1200-character limit. Original full STOP and first narrow STOP are frozen.
+R01/R02/R03/R05/R06/R08/R09 closures from a638afc remain; R04/R07/R10 close on
+1717567. No open local package P0/P1, both P2 repaired. This does not grant any
+design/human/feature acceptance or satisfy the non-Codex Go/governed route.
+
+- R04: durable synthesis operations are discovered independently of fresh
+  authorization or stored metadata. Cached/fresh synthesis and exact native
+  continuation retain prepared/unknown attempt fences and reject new calls.
+- R07: actual included story anchors determine used project bindings, private
+  classes/scopes and dependencies. Late B is bound/revalidated after restart
+  or replacement; omitted A does not enter the saved recommendation binding.
+- R10: one shared packet projection removes text/snippet precedence drift.
+
+Implementer targeted6 passed32.51s and affected43 passed191.86s overlap; these
+are not reviewer test executions. No dependent package was started before this
+verdict. Next local block D19/D20/D21/D58 is recorded in the handoff; all external
+provider/client/CI/visual/operator/formal gates remain separate.

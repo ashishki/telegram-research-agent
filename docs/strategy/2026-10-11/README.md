@@ -14,12 +14,20 @@ source/narrow PASS8f193bb; [квитанция](../../verification/DAILY-package
 и [review](../../verification/DAILY-package-05-local-review-20261013.md). One full
 STOP7P1/4P2 и narrow STOP с reader R12 сохранены; final narrow закрывает все
 package P0/P1. Profiles/projects/selected archive проверены synthetic PG/SQLite/
-loopback и fake session; quality/live/human gates открыты. Следующий готовый пакет —
+loopback и fake session; quality/live/human gates открыты.
 D11/D12/D14/D16 уже реализован следующим локальным пакетом: source/full review
 b442682, final source/narrow PASS650b8dd; [квитанция](../../verification/DAILY-package-06-D11-D12-D14-D16-20261013.md)
 и [findings/closure](../../verification/DAILY-package-06-local-review-20261013.md).
 One full STOP3P1/1P2, final narrow закрывает все package P0/P1. Реальные сервисы/
-польза/формальные gates открыты. Следующий пакет D13+D15+D17+D18. Ветка:
+польза/формальные gates открыты. D13+D15a–c+D17+D18 также реализован локально,
+14 октября: source/full review134172e, first repairs/narrow STOPa638afc,
+final source/narrow PASS1717567. [Проверки](../../verification/DAILY-package-07-D13-D15-D17-D18-20261014.md)
+и [frozen review/rechecks](../../verification/DAILY-package-07-local-review-20261014.md):
+one full STOP8P1/2P2, final R04/R07-only recheck закрывает варианты/R10, новых
+P0/P1 в исправлениях нет. Final affected43/targeted6 passes перекрываются;
+GitHub private/public, lexical research, event/project Brief — synthetic only,
+без provider/CI/visual/operator или formal acceptance. Следующий пакет
+D19+D20+D21+D58; D57 требует D24. Ветка:
 `codex/pa-daily-implementation-20261013`. Датированный research packet ниже
 сохраняется как дизайн/context. Ни production, ни аккаунты этим не активированы.
 
@@ -47,7 +55,7 @@ One full STOP3P1/1P2, final narrow закрывает все package P0/P1. Ре
 
 Уточнение владельца от 11 октября: реализацию выполняет следующий кодирующий агент, законченными пакетами с Deep Review между ними. 13 октября это локальное назначение получено; research-only stop снят. Актуальные engineering receipts находятся в backlog, история исследования сохранена.
 
-Цикл: выбрать связанный dependency-ready пакет с одним понятным результатом → реализовать → выполнить адресные проверки → один независимый Deep Review накопленного diff → исправить найденное → перейти к следующему пакету. D01–D03, D56, D05/D06, D04/D10 и D07/D08/D09 реализованы локально с узким закрытием P1; D11/D12/D14/D16 также реализованы с закрытием P1; следующий готовый пакет — D13+D15+D17+D18. Уже завершённые по evidence работы не повторять. Пул из 62 карточек не означает 62 отдельных полных ревью; границы последующих пакетов задаются результатом и зависимостями.
+Цикл: выбрать связанный dependency-ready пакет с одним понятным результатом → реализовать → выполнить адресные проверки → один независимый Deep Review накопленного diff → исправить найденное → перейти к следующему пакету. D01–D03, D56, D05/D06, D04/D10, D07/D08/D09, D11/D12/D14/D16 и D13/D15a–c/D17/D18 реализованы локально с узким закрытием P1; следующий готовый пакет — D19+D20+D21+D58. Уже завершённые по evidence работы не повторять. Пул из 62 карточек не означает 62 отдельных полных ревью; границы последующих пакетов задаются результатом и зависимостями.
 
 После исправлений проверять только затронутое поведение и закрытие находок. P0/P1 требуют независимой узкой перепроверки перед зависимой работой; повторное полное ревью пакета без нового существенного риска не запускается. Некритические остатки фиксируются с приоритетом и не создают бесконечный цикл доводки. Если критическая проблема не закрывается, ограничить зависимую часть и продолжить независимую работу, честно записав блокер. Не повторять завершённые исторические проверки и не запускать новый круг ради косметики или более красивой оценки.
 

@@ -1,6 +1,6 @@
 # Current assignment — local daily assistant implementation
 
-Updated: 2026-10-13. Active owner assignment lifts the research/documentation-only
+Updated: 2026-10-14. Active owner assignment lifts the research/documentation-only
 stop and authorizes sequential local implementation of the agreed backlog.
 Branch: `codex/pa-daily-implementation-20261013`. Implementer uses the active
 session default model/reasoning, without override. Preserve others' changes;
@@ -112,13 +112,38 @@ No actual Brave/client/account/CI/operator validation. Inventory keeps links and
 metadata, not a duplicate post corpus; reader/data retention/live recovery remain
 separate. [Runbook](runbooks/retrieval_public_blocks_weekly.md).
 
-Next coherent local package **after completed local critical closure**: **D13 + D15 + D17 + D18** —
-selected project repository context, bounded multi-stage research, event novelty/
-conflicts and project-aware useful Brief. Dependencies are locally implemented;
-D15 is L, break it into explicit bounded slices before source edits. Read the
-four cards and relevant design/source/editorial context; register tests and one
-accumulated review boundary. No private repository/token activation, live scan,
-paid provider or external effects inferred. D57 still needs D24; D58 needs D19.
+**D13 + D15 + D17 + D18, owner assignment14 October:** selected safe GitHub
+files/exact issue/PR/release IDs with commit/version/cache and distinct private
+read/model scopes; strict two-wave research with current source catalogue,
+coverage/checkpoints/exact continuation; deterministic event revisions/recurrence
+and project-aware Brief attention selection. D15a plan/coverage, D15b bounded
+reads and D15c recovery/continuation were split before source edits in the
+[design](verification/DAILY-package-07-design-20261014.md). Source/full review
+`134172e`, first repairs `a638afc`, final repairs `1717567`.
+[Ledger](verification/DAILY-package-07-D13-D15-D17-D18-20261014.md),
+[frozen review/rechecks](verification/DAILY-package-07-local-review-20261014.md)
+and [runbook](runbooks/project_research_event_brief.md). One full STOP8P1/2P2;
+first narrow STOP leaves R04/R07 variants and R10 P2. Final R04/R07-only
+independent PASS on1717567 closes both variants and R10, no new P0/P1 in
+checked fixes. No open local package P0/P1; no dependent package started.
+Final affected tier43 passed191.86s, targeted6 passed32.51s, zero skips;
+earlier39/44/38/35/23 checks overlap and retain failures in the ledger.
+Seven exact synthetic event groups are authored dev fixtures, not human gold,
+semantic grouping quality or holdout. Native canonical project bridge and saved
+current bindings reject changed/expired source/project state. Both local/model
+facts pass D14 admission; neutral wording preserves unsupported/unsafe cases.
+Packet/editorial inclusion/surfaced state differ. Unknown durable read/synthesis
+attempts require reconciliation; original Telegram lineage stays fenced.
+Only selected synthetic token/App credential contracts were exercised; no actual
+GitHub account/permission-width/rotation/canary or provider/CI/visual/operator
+evidence. Local engineering closure cannot fill non-Codex Go/governed/human gates.
+
+Next coherent local package **after achieved critical independent closure**:
+**D19 + D20 + D21 + D58** — exact document/version followups, useful feedback,
+provenance-aware memory and native interactive reports from the same document.
+Read four cards and relevant context; register one outcome, scoped checks and
+accumulated review boundary before source edits. D58 follows D19 inside the
+package; D57 still needs D24. No personal/live/paid/production/external scope.
 
 Cycle: coherent package → appropriate scoped checks → one fresh independent
 read-only Deep Review of its accumulated committed diff → fixes → next package.
@@ -156,7 +181,8 @@ remain dated on `0fbcfd1`. Formal draft/planned/review_required and 51 missing
 approvals remain unchanged. Legacy inputs without v2 revision pointers and
 actual simultaneous DB scheduling remain unverified; retain HTML-depth P2.
 
-Next safe command: `git show --stat 650b8dd`; read D13/D15/D17/D18/context refs.
-`tools/run_daily_acceptance.py` registers the sixteen authored daily files in
+Next safe command: `git show --stat 1717567`; read D19/D20/D21/D58/context refs.
+Final local R04/R07 PASS is in the package7 receipt; external gates remain open.
+`tools/run_daily_acceptance.py` registers the twenty-one authored daily files in
 the existing project verifier. Run only appropriate scoped checks; no full
 historical pytest, private target or repeated immutable115–118 calls.

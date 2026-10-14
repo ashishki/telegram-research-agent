@@ -1,6 +1,6 @@
 # Первый блок реализации единого входа и управления задачами
 
-Execution overlay, 13 October: D01–D03 and D56 are implemented locally. Final
+Execution overlay, 14 October: D01–D03 and D56 are implemented locally. Final
 local P1 rechecks: `988da0e` and `d231d9a`. D05 + D06 source/review `2318bbe`, fixes `e10365e`.
 D04 + D10 source/review71704c4, initial repairs2a20da4, final fix/narrow PASS0287f87.
 D07 + D08 + D09 source/full review caefb45, initial repairs9f5feec, final
@@ -8,7 +8,12 @@ fix/narrow PASS8f193bb; all package P1 including reader R12 closed locally.
 [Latest receipt](../../verification/DAILY-package-05-D07-D08-D09-20261013.md).
 D11/D12/D14/D16 source/full review b442682, final source/narrow PASS650b8dd;
 all local P1 closed, earlier STOP stages preserved in [receipt](../../verification/DAILY-package-06-D11-D12-D14-D16-20261013.md).
-Next ready package: D13 + D15 + D17 + D18 (split D15 L before implementation);
+D13/D15a–c/D17/D18 implemented locally: source/full review134172e,
+first repairs/narrow STOPa638afc, final repairs/narrow PASS1717567. R04/R07-only
+independent recheck closes both variants/R10, no open local package P0/P1;
+[current receipt](../../verification/DAILY-package-07-D13-D15-D17-D18-20261014.md)
+preserves all failures, provenance and separate live/operator/formal gates.
+Next package after achieved critical closure: D19 + D20 + D21 + D58;
 read [current handoff](../../CODEX_PROMPT.md) and [backlog receipts](BACKLOG.md).
 The non-Codex Go/governed/human gates remain open; local review is separate.
 The original first-block instructions below are design context, not a request
