@@ -1,6 +1,6 @@
 # Приоритизированный пул исполнения
 
-62 карточки поверх существующей реализации, включая Nebula и новые возможности Telegram. Это единый backlog: отдельных очередей Telegram/Nebula нет. Источник карточек — [backlog.json](backlog.json). Исследование 11 октября не реализовывало эти задачи; назначения 13/14 октября разрешают последовательную локальную реализацию. D01–D03, D56, D05/D06, D04/D10, D07/D08/D09, D11/D12/D14/D16 и D13/D15a–c/D17/D18 реализованы локально; независимые local read-only reviews и узкие P1 rechecks записаны. Non-Codex Go/governed/human gates остаются открыты. Остальные карточки proposed; формальная приёмка отдельно. P0 — ближайшие препятствия полезному ежедневному контуру; P1 — развитие и качество выбранных способностей; P2 — последующие/условные улучшения, включая отложенный Canvas. Приоритет не равен обязательности: темы/Secretary имеют явные условия выбора; Mini App исключён владельцем; P2 не вычёркивает обязательные требования полного замысла.
+62 карточки поверх существующей реализации, включая Nebula и новые возможности Telegram. Это единый backlog: отдельных очередей Telegram/Nebula нет. Источник карточек — [backlog.json](backlog.json). Исследование 11 октября не реализовывало эти задачи; назначения 13/14 октября разрешают последовательную локальную реализацию. D01–D03, D56, D05/D06, D04/D10, D07/D08/D09, D11/D12/D14/D16, D13/D15a–c/D17/D18 и D19/D20/D21/D58 реализованы локально; независимые local read-only reviews и узкие P1 rechecks записаны. Non-Codex Go/governed/human gates остаются открыты. Остальные карточки proposed; формальная приёмка отдельно. P0 — ближайшие препятствия полезному ежедневному контуру; P1 — развитие и качество выбранных способностей; P2 — последующие/условные улучшения, включая отложенный Canvas. Приоритет не равен обязательности: темы/Secretary имеют явные условия выбора; Mini App исключён владельцем; P2 не вычёркивает обязательные требования полного замысла.
 
 ## Исполнение 13–14 октября 2026
 
@@ -12,11 +12,14 @@
 | D04 + D10 | Source `71704c4`; initial repairs `2a20da4`, final fix `0287f87`; focus/planner/source coverage; affected tier78 passed/2 fixture failures, repairs7 passed; model floor10; final delivery/R09 tier5 passed | Один full review STOP: шесть P1/два P2. Narrow recheck2a20da4 нашёл P1 R09; final narrow PASS0287f87 закрывает все package findings. Go/governed pending | D07 + D08 + D09 реализован следующим пакетом |
 | D07 + D08 + D09 | Source caefb45; initial repairs9f5feec; final fix8f193bb; profiles/project provenance/selected archive snapshots; final native24, R12+Brief5, reader/deletion5 passed, counts overlap | One full STOP7P1/4P2; narrow9f5feec closed R01–R11 but found P1 R12; final narrow PASS8f193bb closes R12, no open P0/P1. Go/governed pending | D11/D12/D14/D16 реализован следующим пакетом |
 | D11 + D12 + D14 + D16 | Source b442682; first repairsde1e511; final650b8dd; retrieval/public blocks/whole-week inventory; final typed49/web+typed59/native4 passed, overlapping counts | One full STOP3P1/1P2; narrow STOP variants retained; final R01-only PASS650b8dd, R02closed9ae,R03/R04closedde1. No open P0/P1; Go/governed pending | D13 + D15 + D17 + D18 реализован следующим пакетом |
-| D13 + D15a–c + D17 + D18 | Source134172e; first repairsa638afc; final1717567; selected GitHub/research waves/event/project Brief; final affected43/targeted6 passed, zero skips, counts overlap | One full STOP8P1/2P2; first narrow STOPR04/R07 variants/R10P2; final R04/R07-only PASS1717567 closes variants/R10, no new P0/P1. Go/governed pending | D19 + D20 + D21 + D58 |
+| D13 + D15a–c + D17 + D18 | Source134172e; first repairsa638afc; final1717567; selected GitHub/research waves/event/project Brief; final affected43/targeted6 passed, zero skips, counts overlap | One full STOP8P1/2P2; first narrow STOPR04/R07 variants/R10P2; final R04/R07-only PASS1717567 closes variants/R10, no new P0/P1. Go/governed pending | D19 + D20 + D21 + D58 реализован следующим пакетом |
+| D19 + D20 + D21 + D58 | Source `dbf4958`; first repairs `b2092d6`; final `b00a5cb`; document/version/refresh/export, feedback/rules, memory/egress and opt-in rich delivery; final publication30/targeted6 and first-repair affected25 passed, zero skips, counts overlap | One full STOP7P1/2P2; first narrow STOPR02/R03 variants; final R02/R03-only PASS closes both, all nine findings closed locally, no new P0/P1. Go/governed pending | D22 + D23 + D24 + D57; D22/D57 сначала разбить на срезы |
 
 [D01–D03 checks](../../verification/DAILY-package-01-20261013.md), [local review](../../verification/DAILY-package-01-local-review-20261013.md), [D56 checks](../../verification/DAILY-package-02-D56-20261013.md) и [local review/P1 closure](../../verification/DAILY-package-02-local-review-20261013.md) сохраняют точные argv, результаты, первоначальные ошибки и SHA/diff provenance. Local independent evidence не выдаётся за разрешённый non-Codex Go route или human acceptance. Перекрывающиеся test counts не суммируются. Реальные подключения и пользовательская польза этим не доказаны. Working branch: `codex/pa-daily-implementation-20261013`.
 
-[D07/D08/D09 checks](../../verification/DAILY-package-05-D07-D08-D09-20261013.md), [frozen findings/narrow closures](../../verification/DAILY-package-05-local-review-20261013.md) и [runbook](../../runbooks/profiles_projects_selected_archive.md) сохраняют scope, failures, actual profile bindings, conservative snapshots и ограничения. No real accounts/provider quality/retention/production acceptance. D11/D12/D14/D16 реализован; [checks](../../verification/DAILY-package-06-D11-D12-D14-D16-20261013.md), [frozen review](../../verification/DAILY-package-06-local-review-20261013.md), [runbook](../../runbooks/retrieval_public_blocks_weekly.md). D13/D15a–c/D17/D18 реализован; [design/slices](../../verification/DAILY-package-07-design-20261014.md), [checks](../../verification/DAILY-package-07-D13-D15-D17-D18-20261014.md), [review](../../verification/DAILY-package-07-local-review-20261014.md), [runbook](../../runbooks/project_research_event_brief.md). Следующий D19+D20+D21+D58: зарегистрировать один результат, scoped acceptance и accumulated review. D58 следует D19 внутри пакета; D57 требует D24.
+[D07/D08/D09 checks](../../verification/DAILY-package-05-D07-D08-D09-20261013.md), [frozen findings/narrow closures](../../verification/DAILY-package-05-local-review-20261013.md) и [runbook](../../runbooks/profiles_projects_selected_archive.md) сохраняют scope, failures, actual profile bindings, conservative snapshots и ограничения. No real accounts/provider quality/retention/production acceptance. D11/D12/D14/D16 реализован; [checks](../../verification/DAILY-package-06-D11-D12-D14-D16-20261013.md), [frozen review](../../verification/DAILY-package-06-local-review-20261013.md), [runbook](../../runbooks/retrieval_public_blocks_weekly.md). D13/D15a–c/D17/D18 реализован; [design/slices](../../verification/DAILY-package-07-design-20261014.md), [checks](../../verification/DAILY-package-07-D13-D15-D17-D18-20261014.md), [review](../../verification/DAILY-package-07-local-review-20261014.md), [runbook](../../runbooks/project_research_event_brief.md).
+
+D19/D20/D21/D58 реализован; [design/boundary](../../verification/DAILY-package-08-design-20261014.md), [checks](../../verification/DAILY-package-08-D19-D20-D21-D58-20261014.md), [review/rechecks](../../verification/DAILY-package-08-local-review-20261014.md), [runbook](../../runbooks/documents_feedback_memory_rich.md). Original-input/source/memory guards, atomic native publication/origin/history, version-aware ancestry и failed-compute settlement исправлены; rule-derived editorial local-only, nonfull rich views exact compatible, save+undo inactive. Три genuine base action-preview provenance failures сохранены; actual loopback — не provider/client/visual/CI/operator usefulness или formal acceptance. Следующий **D22+D23+D24+D57**: сначала bounded D22/D57 design, затем synthetic storage/retention/restore/profile/progress; реальные host/DSN/DDL/backup/service/cutover/canary отдельно разрешаются.
 
 Типы: **K** код, **C** настройка, **L** реальное подключение, **H** решение/оценка владельца, **R** исследование/измерение. Размер S — один небольшой срез; M — 2–3 среза; L — разбить до начала. Это относительная сложность, не обещанные сроки.
 
@@ -453,6 +456,8 @@ P0 · G1 · K/H · размер M. Зависимости: D08, D14, D16.
 <a id="d19"></a>
 ### D19 Обсуждение документов и версий в беседе
 
+**Engineering:** local_review_p1_closed_go_route_pending; source/full review `dbf4958`, first repairs `b2092d6`, final code/narrow R02/R03 PASS `b00a5cb`; [checks](../../verification/DAILY-package-08-D19-D20-D21-D58-20261014.md), [review](../../verification/DAILY-package-08-local-review-20261014.md). Native exact document/story/version, restyle/refresh/diff and actual HTML/PDF/MD export; atomic publication/history and original-input/dependency guards. Hosted reader, legacy application publication seam and human/Go gates remain separate.
+
 P0 · G1 · K · размер M. Зависимости: D04, D18.
 
 **Цель.** Обзор становится рабочим объектом, к которому легко вернуться.
@@ -470,6 +475,8 @@ P0 · G1 · K · размер M. Зависимости: D04, D18.
 <a id="d20"></a>
 ### D20 Полезная обратная связь без работы по разметке
 
+**Engineering:** local_review_p1_closed_go_route_pending; source/full review `dbf4958`, final code/recheck `b00a5cb`; [checks](../../verification/DAILY-package-08-D19-D20-D21-D58-20261014.md), [review](../../verification/DAILY-package-08-local-review-20261014.md). Exact version/story feedback, owner emoji interest, why-shown, explicit confirmed topic rule/undo; included and excluded rule dependencies current. Rule-derived editorial local-only, weekly prompt opt-in/off; no inferred read/applied or automatic profile change. Useful selection/human acceptance unproved.
+
 P1 · G1 · K/H · размер M. Зависимости: D08, D18.
 
 **Цель.** Отбор постепенно учитывает владельца и остаётся объяснимым.
@@ -486,6 +493,8 @@ P1 · G1 · K/H · размер M. Зависимости: D08, D18.
 
 <a id="d21"></a>
 ### D21 Память которая помогает следующему вопросу
+
+**Engineering:** local_review_p1_closed_go_route_pending; source/full review `dbf4958`, final code/recheck `b00a5cb`; [checks](../../verification/DAILY-package-08-D19-D20-D21-D58-20261014.md), [review](../../verification/DAILY-package-08-local-review-20261014.md). Lexical relevant confirmed memory and explicit save/correct/inspect/search/export/forget; current protected-source/model authority and transitive guards through HTTP/publication/delivery. Bounds128 current heads/4 memories/1200 chars each are mechanics, not semantic quality. Save+undo policy proposed/inactive; real retention/operator/Go/human gates open.
 
 P0 · G1 · K/H · размер M. Зависимости: D04, D08, D10.
 
@@ -1125,6 +1134,8 @@ P1 · G1 · K/C/R · размер L. Зависимости: D56, D02, D24, D05.
 
 <a id="d58"></a>
 ### D58 Telegram: полноценные интерактивные отчёты из общего документа
+
+**Engineering:** local_review_p1_closed_go_route_pending; source/full review `dbf4958`, first repairs `b2092d6`, final code/narrow R02/R03 PASS `b00a5cb`; [checks](../../verification/DAILY-package-08-D19-D20-D21-D58-20261014.md), [review](../../verification/DAILY-package-08-local-review-20261014.md). Opt-in/off native strict no-media rich renderer, exact controls/identity, durable send/edit/known-reject compatible fallback and unknown no-replay. Nonfull/refresh views select exact compatible HTML/text before HTTP; no whole-Brief substitution. Production concise wire and synthetic same-document multipart appendix are separate local evidence; actual Telegram/client/visual/usefulness and Go/human acceptance pending.
 
 P1 · G1 · K/C · размер M. Зависимости: D56, D19.
 

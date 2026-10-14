@@ -54,3 +54,33 @@ delta. **STOP: two remaining P1 variants, original R02/R03 IDs retained.**
 
 No dependent block started. Next recheck scope is only these two variants and
 the direct delta. Earlier five critical/P2 closures remain bound to b2092d6.
+
+## Final narrow R02/R03 recheck — PASS
+
+Same independent read-only reviewer verified clean Git/branch and
+b2092d6→b00a5cbcc20d5b530631fed8f2a10eade0fa0242:7 files/+184/-18,
+binary24033 bytes/SHA256 0d360a2db54652248fe29e6cdc623c4c372f73f0ccd96bb3182ddb9d434728e1.
+Scope only remaining R02/R03 variants and direct delta; no new full review,
+reviewer tests/runtime/DB/network/keys/mutations or acceptance. Requested model/
+effort inherited active defaults/no override; observed unknown.
+
+**PASS: R02/R03 closed, no new P0/P1 in scoped fixes.** Five earlier P1 and
+R08/R09 closures remain on b2092d6; all9 package findings closed locally.
+No open local package P0/P1, no dependent work before this verdict. Original
+full STOP and first narrow STOP stay frozen. Non-Codex Go/governed/design/human,
+live/client/visual/operator gates remain open.
+
+- R02: source-bound immutable manifest commits first, then both native weekly
+  and refresh use atomic response/origin/dependencies. Forget before response
+  refuses it; forget after response follows its graph. Failed visible binding
+  explicitly removes refused response/origin/history. Failed refresh returns
+  unavailable without announcing a published new version. Untouched legacy
+  application seam remains a separate limitation.
+- R03: bounded brief_view=refresh survives compact projection; exact compatible
+  HTML/text is selected before HTTP even when full diff stays in diagnostics.
+  Actual status/diff is preserved, unknown/fallback fences unchanged.
+
+Implementer6 targeted passes54.96s and30 publication passes146.47s correspond
+to these boundaries, overlap, and are not reviewer-executed reproductions.
+Production concise wire and explicitly synthetic same-document multipart
+appendix are separate evidence. No provider/client/usefulness acceptance.

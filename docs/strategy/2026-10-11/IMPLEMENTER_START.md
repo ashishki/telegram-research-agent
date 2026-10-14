@@ -13,7 +13,19 @@ first repairs/narrow STOPa638afc, final repairs/narrow PASS1717567. R04/R07-only
 independent recheck closes both variants/R10, no open local package P0/P1;
 [current receipt](../../verification/DAILY-package-07-D13-D15-D17-D18-20261014.md)
 preserves all failures, provenance and separate live/operator/formal gates.
-Next package after achieved critical closure: D19 + D20 + D21 + D58;
+D19 + D20 + D21 + D58 implemented locally: source/full review `dbf4958`,
+first repairs/narrow STOP `b2092d6`, final code/narrow R02/R03 PASS `b00a5cb`.
+[Current checks](../../verification/DAILY-package-08-D19-D20-D21-D58-20261014.md)
+and [frozen review/rechecks](../../verification/DAILY-package-08-local-review-20261014.md):
+one full STOP7P1/2P2, two narrow rechecks, all nine findings closed locally,
+no open package P0/P1. Native document/feedback/memory/rich mechanics only;
+save+undo inactive, rule-derived editorial local-only, nonfull rich views exact
+compatible. Three base action-preview failures and live/client/CI/visual/operator/
+formal gates remain explicit; never turn local evidence into account authority.
+Next package after achieved critical closure: D22 + D23 + D24 + D57;
+split D22 and D57 into bounded slices before source changes. Only synthetic
+storage/retention/restore/deployment/progress fixtures are authorized; real
+target/DSN/DDL/backup/service/cutover/canary require separate authorization.
 read [current handoff](../../CODEX_PROMPT.md) and [backlog receipts](BACKLOG.md).
 The non-Codex Go/governed/human gates remain open; local review is separate.
 The original first-block instructions below are design context, not a request

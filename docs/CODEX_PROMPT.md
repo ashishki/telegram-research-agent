@@ -138,12 +138,41 @@ Only selected synthetic token/App credential contracts were exercised; no actual
 GitHub account/permission-width/rotation/canary or provider/CI/visual/operator
 evidence. Local engineering closure cannot fill non-Codex Go/governed/human gates.
 
+Package8 **D19+D20+D21+D58** completed locally on14 October. Base/handoff1db5034;
+source/full review dbf4958, first repairs/narrow STOPb2092d6, final code/narrow
+R02/R03 PASSb00a5cb. [Registered design](verification/DAILY-package-08-design-20261014.md),
+[checks](verification/DAILY-package-08-D19-D20-D21-D58-20261014.md),
+[frozen review/rechecks](verification/DAILY-package-08-local-review-20261014.md),
+[runbook](runbooks/documents_feedback_memory_rich.md). One full STOP7P1/2P2;
+final narrow closes R02/R03 variants; other five P1/both P2 close on b2092d6.
+No open local package P0/P1; all9 repaired, no repeated full review or dependent
+work before closure. Final variants6 passed54.96s, publication30 passed146.47s;
+first-repair affected native25 passed161.51s, not a fresh final-SHA floor;
+counts overlap, exact revision boundaries are recorded in the ledger,
+pre-fix failures and3 genuine-base action-preview failures remain in the ledger.
+
+Exact Brief/story/version followups, fresh source refresh/diff and actual local
+exports; explicit feedback and confirmed scoped rules; relevant typed confirmed
+memory with separate egress; opt-in bounded no-media rich plus exact compatible
+views. The source-bound immutable manifest commits before the atomic native
+response/origin/history/dependencies; lost parent settles compute without retry.
+Historical ancestry and original Telegram input
+are checked, including direct/named/export/save. Final HTTP rechecks memory too.
+Excluded rules remain bound; rule-derived editorial is LOCAL ONLY. Save+undo
+policy remains proposed_inactive, legacy unknown provenance excluded from
+automatic context, lexical4/128/1200 not semantic/quality acceptance. Nonfull
+rich/refresh/status/diff use exact HTML/text before HTTP; full native rich retains
+inventory/prompt. Production concise wire differs from synthetic8-source multipart
+appendix. Untouched legacy application publication and base action-preview remain
+limitations. No real bot/client/account/provider/CI/visual/operator acceptance;
+non-Codex Go/governed/design/human gates remain open. Mini App excluded.
+
 Next coherent local package **after achieved critical independent closure**:
-**D19 + D20 + D21 + D58** — exact document/version followups, useful feedback,
-provenance-aware memory and native interactive reports from the same document.
-Read four cards and relevant context; register one outcome, scoped checks and
-accumulated review boundary before source edits. D58 follows D19 inside the
-package; D57 still needs D24. No personal/live/paid/production/external scope.
+**D22+D23+D24+D57**. Register bounded D22 storage/target/offline recovery slices
+and D57 truthful status/cancel, then draft/stream slices before source edits.
+D23 follows D22, D57 follows D24 inside the package. Real host/DSN/migrations,
+backup destination, service/cutover/client canary require separate authorization.
+Missing access does not stop isolated independent local work.
 
 Cycle: coherent package → appropriate scoped checks → one fresh independent
 read-only Deep Review of its accumulated committed diff → fixes → next package.
@@ -181,8 +210,9 @@ remain dated on `0fbcfd1`. Formal draft/planned/review_required and 51 missing
 approvals remain unchanged. Legacy inputs without v2 revision pointers and
 actual simultaneous DB scheduling remain unverified; retain HTML-depth P2.
 
-Next safe command: `git show --stat 1717567`; read D19/D20/D21/D58/context refs.
-Final local R04/R07 PASS is in the package7 receipt; external gates remain open.
-`tools/run_daily_acceptance.py` registers the twenty-one authored daily files in
+Next safe command: `git show --stat b00a5cb`; read D22/D23/D24/D57/context refs,
+register slices/outcome/scoped checks/one review boundary. Final local R02/R03
+PASS is in package8 receipt; external gates remain open.
+`tools/run_daily_acceptance.py` registers the twenty-six authored daily files in
 the existing project verifier. Run only appropriate scoped checks; no full
 historical pytest, private target or repeated immutable115–118 calls.

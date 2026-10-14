@@ -91,7 +91,7 @@ loopback/PG не доказывает live Brave/client/account/CI/operator usef
 Go/governed/human acceptance. Следующим локально выполнен D13+D15+D17+D18;
 текущая квитанция ниже. Полный замысел сохранён, Mini App исключён.
 
-**Текущий пакет D13+D15+D17+D18, 14 октября:** выбранные GitHub files и
+**Пакет D13+D15+D17+D18, 14 октября:** выбранные GitHub files и
 точные issue/PR/release IDs с SHA/versions/cache; отдельный synthetic private
 read-only credential contract и model-egress scope; двухволновое исследование
 с persisted coverage/checkpoints, bounded parallel reads и exact continuation;
@@ -113,9 +113,39 @@ Facts/titles local/model проходят D14, иначе neutral wording/visibl
 Exact groups7/7 на tiny authored dev fixture — не semantic quality/gold/holdout;
 lexical coverage8/1200 не доказывает полноту ответа или полезность. Реальные GitHub
 permissions/token rotation/App minting/provider/client/CI/visual/operator acceptance
-не выполнялись. Non-Codex Go/governed и formal/human gates открыты. Следующий
-локальный пакет **D19+D20+D21+D58**; D57 всё ещё требует D24. Full Chat/Search/
+не выполнялись. Non-Codex Go/governed и formal/human gates открыты. Следующим
+локально выполнен **D19+D20+D21+D58**; текущая квитанция ниже. Full Chat/Search/
 beautiful weekly Brief/Watch/confirmed Act сохраняется, Mini App исключён.
+
+**Текущий пакет D19+D20+D21+D58, 14 октября:** обсуждение точной версии/
+пункта документа, refresh с immutable новой версией/diff и HTML/PDF/MD export;
+явная обратная связь, owner reactions и подтверждённые topic rules с undo;
+bounded relevant confirmed memory в следующем вопросе с отдельными source/model
+grants; opt-in Telegram rich renderer/delivery/edit того же документа. Source/
+full review `dbf4958`, first repairs/narrow STOP `b2092d6`, final code/narrow
+R02/R03 PASS `b00a5cb`. [Ledger](verification/DAILY-package-08-D19-D20-D21-D58-20261014.md),
+[review/rechecks](verification/DAILY-package-08-local-review-20261014.md),
+[runbook](runbooks/documents_feedback_memory_rich.md). Один full STOP7P1/2P2 и
+две узкие независимые перепроверки; все девять находок закрыты локально, открытых
+package P0/P1 нет. Final publication30 passed146.47s, targeted6 passed54.96s,
+first-repair memory/conversation25 passed161.51s, zero skips; counts перекрываются,
+точные границы изменений и первоначальные failures сохранены в ledger.
+Source-bound immutable manifest сохраняется до атомарных native view/origin/
+history/dependencies с текущими original-input/source/memory guards; потеря
+parent освобождает compute lease
+без stale ответа/автоматического replay. Exact historical ancestry и memory
+проверяются до delivery HTTP. Исключающие правила сохраняют зависимости;
+rule-derived editorial local-only. Nonfull/refresh rich views передают точный
+совместимый HTML/text, full rich off по умолчанию. Save+undo — неактивное
+предложение; lexical4 memories/128 heads/1200 chars не доказывают semantic
+качество. Три action-preview provenance failures воспроизведены на base1db5034
+и сохранены; legacy application publication seam вне native closure. Isolated
+PG/SQLite и actual loopback подтверждают локальную механику, не реальные
+providers/accounts/client/CI/visual/operator usefulness. Non-Codex Go/governed/
+design/human gates остаются открыты. Следующий блок **D22+D23+D24+D57**;
+D22 и D57 сначала разбить на ограниченные срезы. Real storage/retention/backup/
+service/cutover/canary требуют отдельной авторизации. Полный замысел сохранён,
+Mini App исключён.
 
 Дата среза: **10 октября 2026**. Runtime/test/independent source SHA: `0fbcfd1dde780724ad934aa66825afe17a6efc98`. Документация и Git integration изменены позднее; фактические refs — в [merge receipt](verification/PAI-master-integration-20261010.md).
 

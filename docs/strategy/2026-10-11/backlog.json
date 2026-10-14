@@ -19,7 +19,7 @@
     "engineering_done": "Следующий кодирующий агент работает законченными пакетами: реализация → адресные проверки → один независимый Deep Review накопленного diff → исправления → следующий пакет. У каждого пакета один native ingress→use case→result результат. P0/P1 исправлены и независимо перепроверены узко до зависимой работы; повторное полное ревью/все тесты без нового существенного риска не запускаются. Некритические остатки фиксируются; 62 карточки не означают 62 полных ревью. Изменения egress/secrets/retention/confirmation/recovery получают требуемое риск-ревью до реального использования.",
     "evidence": "Record exact SHA/diff, commands, pass/fail/skip, requested/observed model, public fixture hashes and unresolved live/operator gates. A test filename is not a pass. No private payloads in Git.",
     "rollback": "Отключить новую способность или вернуть предыдущий совместимый код; не откатывать consumed/unknown receipts, revoke/tombstones и canonical source IDs. Для schema changes нужен отдельный forward-compatible recovery.",
-    "verification": "Sixteen authored daily acceptance files registered in strict project verifier; run scoped tiers only, no full historical suite or inferred provider/human acceptance.",
+    "verification": "Twenty-six authored daily acceptance files registered in strict project verifier; run scoped tiers only, no full historical suite or inferred provider/client/visual/operator/human acceptance. Registration is not an executed full-tier pass.",
     "formal_mapping": "PAI references mean reuse/coverage, never automatic completion or human approval. Do not modify formal statuses based solely on this plan."
   },
   "tasks": [
@@ -688,7 +688,12 @@
         "PAI-05",
         "PAI-14",
         "PAI-15"
-      ]
+      ],
+      "engineering_status": "local_review_p1_closed_go_route_pending",
+      "implementation_receipt": "../../verification/DAILY-package-08-D19-D20-D21-D58-20261014.md",
+      "local_code_sha": "b00a5cbcc20d5b530631fed8f2a10eade0fa0242",
+      "independent_review_receipt": "../../verification/DAILY-package-08-local-review-20261014.md",
+      "engineering_notes": "Native exact document/version/story views, restyle versus immutable refresh/diff, HTML/PDF/MD export, original-input and version-aware dependency guards, atomic publication/history. Hosted reader and untouched legacy application publication seam remain separate gates."
     },
     {
       "id": "D20",
@@ -718,7 +723,12 @@
       "legacy": [
         "PAI-14",
         "PAI-21"
-      ]
+      ],
+      "engineering_status": "local_review_p1_closed_go_route_pending",
+      "implementation_receipt": "../../verification/DAILY-package-08-D19-D20-D21-D58-20261014.md",
+      "local_code_sha": "b00a5cbcc20d5b530631fed8f2a10eade0fa0242",
+      "independent_review_receipt": "../../verification/DAILY-package-08-local-review-20261014.md",
+      "engineering_notes": "Exact feedback/reaction story binding, current included/excluded topic-rule dependencies, explicit confirmation/undo and why-shown. Rule-derived editorial is local-only; optional weekly prompt off. No inferred read/applied or automatic preference changes; human usefulness unproved."
     },
     {
       "id": "D21",
@@ -749,7 +759,12 @@
       "legacy": [
         "PAI-05",
         "PAI-21"
-      ]
+      ],
+      "engineering_status": "local_review_p1_closed_go_route_pending",
+      "implementation_receipt": "../../verification/DAILY-package-08-D19-D20-D21-D58-20261014.md",
+      "local_code_sha": "b00a5cbcc20d5b530631fed8f2a10eade0fa0242",
+      "independent_review_receipt": "../../verification/DAILY-package-08-local-review-20261014.md",
+      "engineering_notes": "Lexical current confirmed memory retrieval with explicit save/correct/inspect/search/export/forget and separate protected-source/model authority through actual HTTP/publication/delivery. Bounds128 heads/4 memories/1200 chars each are mechanical; save+undo remains proposed/inactive, retention/operator gates open."
     },
     {
       "id": "D22",
@@ -2024,7 +2039,12 @@
       "design_refs": [
         "TELEGRAM.md",
         "telegram_evidence.json"
-      ]
+      ],
+      "engineering_status": "local_review_p1_closed_go_route_pending",
+      "implementation_receipt": "../../verification/DAILY-package-08-D19-D20-D21-D58-20261014.md",
+      "local_code_sha": "b00a5cbcc20d5b530631fed8f2a10eade0fa0242",
+      "independent_review_receipt": "../../verification/DAILY-package-08-local-review-20261014.md",
+      "engineering_notes": "Strict opt-in/off no-media rich renderer of the exact document, durable send/edit/known-format compatible fallback and unknown no-replay. Nonfull/refresh views select exact compatible HTML/text before HTTP. Production concise wire and explicitly synthetic same-document multipart appendix are separate local evidence; actual client/visual/usefulness pending."
     },
     {
       "id": "D59",
@@ -2957,15 +2977,139 @@
           "Included Brief history does not establish delivery/read/understanding/usefulness; current project guards fail closed, explicit historical presentation remains D19.",
           "Neutral source wording preserves unsupported local/model facts; general semantic grounding and useful editorial quality remain unverified."
         ]
+      },
+      {
+        "id": "daily-08",
+        "assignment_date": "2026-10-14",
+        "tasks": [
+          "D19",
+          "D20",
+          "D21",
+          "D58"
+        ],
+        "status": "local_review_p1_closed_go_route_pending",
+        "diff_base": "1db5034c8b2374add70d16ef6a354ac26f0bc505",
+        "source_sha": "dbf49580c292cb433edefe2fddff3adb60c8bff0",
+        "reviewed_sha": "dbf49580c292cb433edefe2fddff3adb60c8bff0",
+        "diff_bytes": 253298,
+        "diff_sha256": "d654716c828daafdae18b27502ffd31b31e1e5a4ed53e766a99afea5edefc402",
+        "diff_stats": {
+          "files": 36,
+          "insertions": 2357,
+          "deletions": 106
+        },
+        "initial_review_verdict": "STOP: 0P0/7P1/2P2",
+        "initial_fix_sha": "b2092d6ad4218066567500aee8d33ae4b3e82784",
+        "initial_fix_diff_bytes": 78154,
+        "initial_fix_diff_sha256": "a49896ae916871a9707bfb18070caab227a6cfd6c41f851203630ff501ea7511",
+        "initial_fix_diff_stats": {
+          "files": 18,
+          "insertions": 558,
+          "deletions": 57
+        },
+        "initial_recheck_verdict": "STOP: R01/R04/R05/R06/R07 and R08/R09 closed; original R02/R03 P1 publication/compacted-refresh variants remain",
+        "final_code_sha": "b00a5cbcc20d5b530631fed8f2a10eade0fa0242",
+        "final_rechecked_sha": "b00a5cbcc20d5b530631fed8f2a10eade0fa0242",
+        "recheck_sha": "b00a5cbcc20d5b530631fed8f2a10eade0fa0242",
+        "recheck_diff_bytes": 24033,
+        "recheck_diff_sha256": "0d360a2db54652248fe29e6cdc623c4c372f73f0ccd96bb3182ddb9d434728e1",
+        "recheck_diff_stats": {
+          "files": 7,
+          "insertions": 184,
+          "deletions": 18
+        },
+        "final_recheck_verdict": "PASS R02/R03 and direct repair risks; no new P0/P1 in scoped delta; all nine findings closed locally, earlier closures preserved",
+        "full_review_count": 1,
+        "narrow_recheck_count": 2,
+        "receipt": "../../verification/DAILY-package-08-D19-D20-D21-D58-20261014.md",
+        "review_receipt": "../../verification/DAILY-package-08-local-review-20261014.md",
+        "design_receipt": "../../verification/DAILY-package-08-design-20261014.md",
+        "runbook": "../../runbooks/documents_feedback_memory_rich.md",
+        "review_route": "independent_local_readonly",
+        "policy_go_route_satisfied": false,
+        "remaining_findings": [],
+        "closed_findings": [
+          "DAILY08-R01",
+          "DAILY08-R02",
+          "DAILY08-R03",
+          "DAILY08-R04",
+          "DAILY08-R05",
+          "DAILY08-R06",
+          "DAILY08-R07",
+          "DAILY08-R08",
+          "DAILY08-R09"
+        ],
+        "reviewer_provenance": {
+          "full": "/root/daily08_readonly_review",
+          "narrow": "/root/daily08_readonly_review",
+          "requested_model_effort": "inherited active defaults, no override",
+          "observed_model_effort": "unknown",
+          "route": "local collaboration read-only; Git/scoped code/test/doc text reads; no reviewer tests/runtime/DB/network/keys/mutations or acceptance"
+        },
+        "final_scoped_checks": [
+          {
+            "passed": 6,
+            "failed": 0,
+            "skipped": 0,
+            "duration_seconds": 54.96,
+            "scope": "R02 weekly/refresh publication races and R03 compacted exact wire: production concise plus explicitly synthetic multipart appendix",
+            "verification_boundary": "final repair worktree before b00a5cb commit; exact command in ledger; no full-floor rerun"
+          },
+          {
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0,
+            "duration_seconds": 146.47,
+            "scope": "affected editorial/feedback/rich and actual six-view wire/prompt preservation",
+            "verification_boundary": "final repair worktree; overlaps with other nodes; exact command in ledger"
+          },
+          {
+            "passed": 25,
+            "failed": 0,
+            "skipped": 0,
+            "duration_seconds": 161.51,
+            "scope": "affected durable/conversation/memory and project-replacement floor",
+            "verification_boundary": "first repair worktree before b2092d6 commit; not a fresh b00a5cb run; overlaps with other nodes"
+          }
+        ],
+        "baseline_failures": {
+          "count": 3,
+          "base_sha": "1db5034c8b2374add70d16ef6a354ac26f0bc505",
+          "scope": "Existing action-preview fixtures lack protected-source provenance; genuine archived base cwd reproduces failures16.53s, tests retained.",
+          "tests": [
+            "test_preview_delivered_by_other_bot_does_not_authorize_plain_yes",
+            "test_edit_after_confirmation_precommit_fences_action_and_keeps_unknown_receipt",
+            "test_dispatch_winning_before_edit_preserves_unknown_receipt_and_no_replay"
+          ]
+        },
+        "independent_holdout": false,
+        "quality_score": null,
+        "live_evidence": "none",
+        "operator_acceptance": "none",
+        "next_block_after_gate": [
+          "D22",
+          "D23",
+          "D24",
+          "D57"
+        ],
+        "limitations": [
+          "Local independent engineering closure does not satisfy non-Codex Go/governed/design/human acceptance. Original full STOP and first narrow STOP remain frozen.",
+          "Only isolated synthetic PostgreSQL/SQLite, fake Telegram/providers and literal loopback HTTP; no real account/provider/client/CI/visual/production/operator usefulness acceptance.",
+          "Save+undo policy is a concrete inactive proposal; confirmed-memory lexical128/4/1200 bounds are not semantic quality, owner gold or independent holdout.",
+          "Confirmed topic-rule dependencies include excluded stories; rule-derived editorial remains local-only pending separate model-egress authority.",
+          "Rich defaults off and uses a no-media subset; nonfull/refresh views preserve exact compatible HTML/text. Concise native production and synthetic appendix multipart are separate fixture evidence.",
+          "Three genuine base action-preview provenance failures are retained. Native publication is repaired; untouched legacy application publication seam remains outside this package closure.",
+          "Actual storage/retention/backup/services/cutover/canary and personal/paid/external actions require separate authorization. D22 and D57 must be split before the next implementation."
+        ]
       }
     ],
     "live_evidence": "none",
     "operator_acceptance": "none",
     "next_dependency_ready_package": [
-      "D19",
-      "D20",
-      "D21",
-      "D58"
+      "D22",
+      "D23",
+      "D24",
+      "D57"
     ]
   }
 }

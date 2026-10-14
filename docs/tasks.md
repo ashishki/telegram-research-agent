@@ -1,7 +1,7 @@
 # Active Personal Assistant Task Graph
 
 Status: active PA / PAI programme; historical PA engineering evidence is preserved; exact PA and new PAI design approval remain required.
-Updated: 2026-10-10
+Updated: 2026-10-14 (local daily overlay; formal states unchanged)
 Feature: PA • Mode: standard • Planning depth: designed_slices
 
 The full target is `docs/PERSONAL_ASSISTANT_SPEC.md`. Exact slice scope, files, interfaces, dependencies, change budgets and rollback are in `docs/design/PA.design.json`. The design is review_required, not self-approved. Follow `docs/CODEX_PROMPT.md` and `docs/PLAYBOOK_ADOPTION.md`.
@@ -24,6 +24,21 @@ Acceptance registered before source edits:
 One accumulated independent local read-only Deep Review; critical fixes narrow
 rechecked before dependencies. No live/private/paid/external/production/DDL or
 full historical suite. Go/governed/human and formal statuses remain unchanged.
+Source/full review dbf4958; first repairs/narrow STOPb2092d6; final code/narrow
+R02/R03 PASSb00a5cb. [Ledger](verification/DAILY-package-08-D19-D20-D21-D58-20261014.md),
+[frozen review/rechecks](verification/DAILY-package-08-local-review-20261014.md),
+[runbook](runbooks/documents_feedback_memory_rich.md). One full STOP7P1/2P2;
+narrow final closes all9, no open local package P0/P1. Final variants6 passed
+54.96s and publication30 passed146.47s, zero skips; first-repair native25
+passed161.51s is not a fresh final-SHA floor, counts overlap, failures retained.
+Immutable manifest before atomic native view/origin/dependencies and guarded completion,
+exact historical/original input provenance, final delivery memory guards and
+excluded-rule dependencies repaired. Rule-derived editorial local-only; nonfull
+rich views exact compatible before HTTP, full native opt-in. Save+undo inactive,
+lexical4/128/1200 not semantic quality;3 baseline action-preview failures retained.
+No real providers/accounts/client/CI/visual/operator or formal acceptance.
+Next D22+D23+D24+D57; register bounded D22 and D57 slices first, real host/
+DSN/migrations/backup/service/cutover/canary require separate authorization.
 
 Package7 (2026-10-14): D13 + D15 + D17 + D18, base05a1198, assigned branch.
 Context/design: [bounded slices and review boundary](verification/DAILY-package-07-design-20261014.md),
