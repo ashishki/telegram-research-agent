@@ -74,7 +74,7 @@ class FeedbackRuntime:
         if low in {'почему это показано','почему показано','почему выбран этот материал'}:
             return self.root.documents.view_current(request,request_ref=request_ref,lease=lease,guard=guard,why_signals=True)
         kind=LABELS.get(low)
-        match=re.fullmatch(r'(?i)(полезно|не тема|уже знал|длинно|неверно|применил)\s+(?:пункт\s*)?(\d{1,2})',text)
+        match=re.fullmatch(r'(?i)('+ '|'.join(re.escape(label) for label in sorted(LABELS,key=len,reverse=True))+r')\s+(?:пункт\s*)?(\d{1,2})',text)
         story=int(match[2]) if match else None
         if match:kind=LABELS[match[1].casefold()]
         if kind is None:return None
@@ -107,7 +107,7 @@ class FeedbackRuntime:
             if old is None:tx.put(self.root.owner_ref,'conversation',ref,raw,expected_version=0)
         emojis=tuple(v.get('emoji') or ('custom:'+v['custom_emoji_id'] if v.get('custom_emoji_id') else 'paid') for v in update['message_reaction']['new_reaction'])
         return self.record(document,manifest,kind='reaction_interest' if emojis else 'unknown',request_ref=ref,idempotency_key=ref,
-            emoji=emojis,origin='personal_reaction')
+            story_number=pointer.get('story_number'),emoji=emojis,origin='personal_reaction')
 
     def import_legacy(self,row,*,brief_id,version,content_digest,legacy_ref,idempotency_key,chat_id,actor_id,owner_chat_id,personal_reaction=False,confirmed_owner=False):
         """Explicit authenticated adapter seam, with no private database discovery."""

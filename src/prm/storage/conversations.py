@@ -227,14 +227,15 @@ class DurableConversationStore(ConversationStore):
         item=self.store.get(self.owner_ref,'conversation','response_origin_'+hashlib.sha256(response_ref.encode()).hexdigest()[:32])
         return tuple(item.payload.get('archive_snapshots',())) if item else ()
 
-    def record_origin(self,response_ref,data_classes,*,source_scopes=(),parent_response_ref=None,archive_snapshots=(),memory_bindings=()):
+    def record_origin(self,response_ref,data_classes,*,source_scopes=(),parent_response_ref=None,archive_snapshots=(),memory_bindings=(),project_bindings=(),original_input_bindings=(),source_result_bindings=()):
         from prm.runtime.deletion import lineage_lock
         with self.store.transaction() as tx:
             lineage_lock(tx.conn,self.owner_ref)
             self._record_origin_in(tx,response_ref,data_classes,source_scopes=source_scopes,parent_response_ref=parent_response_ref,
-                archive_snapshots=archive_snapshots,memory_bindings=memory_bindings)
+                archive_snapshots=archive_snapshots,memory_bindings=memory_bindings,project_bindings=project_bindings,
+                original_input_bindings=original_input_bindings,source_result_bindings=source_result_bindings)
 
-    def _record_origin_in(self,tx,response_ref,data_classes,*,source_scopes=(),parent_response_ref=None,archive_snapshots=(),memory_bindings=()):
+    def _record_origin_in(self,tx,response_ref,data_classes,*,source_scopes=(),parent_response_ref=None,archive_snapshots=(),memory_bindings=(),project_bindings=(),original_input_bindings=(),source_result_bindings=()):
         classes=tuple(sorted(set(data_classes)))
         if not classes or not set(classes)<= {'model_generated','private_archive','private_connector_metadata','private_connector_content','user_provided','public'}:
             raise StorageError('explicit response origin classes required')
@@ -248,10 +249,29 @@ class DurableConversationStore(ConversationStore):
             from prm.runtime.source_access import memory_bindings_current
             memory_bindings_current(tx,self.owner_ref,memory_bindings)
             payload['memory_bindings']=list(memory_bindings)
+        if project_bindings:
+            from prm.runtime.source_access import project_bindings_current
+            project_bindings_current(tx,self.owner_ref,list(project_bindings));payload['project_bindings']=list(project_bindings)
+        if original_input_bindings:
+            from prm.runtime.source_access import original_inputs_current
+            original_inputs_current(tx,self.owner_ref,original_input_bindings);payload['original_input_bindings']=list(original_input_bindings)
+        if source_result_bindings:
+            from prm.runtime.memory_context import validate_bindings
+            from prm.runtime.source_access import result_provenance
+            for b in validate_bindings(source_result_bindings):
+                if b['namespace']!='result' or b['ref']==response_ref:raise StorageError('exact result parent required')
+                parent=tx.get(self.owner_ref,'result',b['ref'],version=b['version'])
+                if parent is None or parent.digest!=b['digest']:raise StorageError('exact result parent deleted or changed')
+                result_provenance(tx,self.owner_ref,parent)
+            payload['source_result_bindings']=list(source_result_bindings)
         if old and old.payload!=payload:raise StateConflict('response origin cannot be relabelled')
         if old is None:tx.put(self.owner_ref,'conversation',ref,payload,expected_version=0)
         for b in memory_bindings:
             tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',(self.owner_ref,'memory',b['memory_ref'],'result',response_ref))
+        for b in source_result_bindings:
+            tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',(self.owner_ref,'result',b['ref'],'result',response_ref))
+        for b in original_input_bindings:
+            tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',(self.owner_ref,'conversation',b['ref'],'result',response_ref))
         if tx.conn.execute("SELECT to_regclass('pa_memory.dependencies') AS meta").fetchone()['meta'] is not None:
             tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',
                 (self.owner_ref,'result',response_ref,'conversation',ref))
@@ -268,12 +288,14 @@ class DurableConversationStore(ConversationStore):
             lineage_lock(tx.conn,self.owner_ref)
             return self._record_model_response_in(tx,chat_id,**kwargs)
 
-    def _record_model_response_in(self,tx,chat_id,*,text,query,data_classes,source_scopes=(),archive_snapshots=(),memory_bindings=(),provenance_guard,_response_namespace=None):
-        from prm.runtime.source_access import memory_bindings_current
-        memory_bindings_current(tx,self.owner_ref,memory_bindings);provenance_guard(tx)
-        state=self._run_in(tx,'record_response',chat_id,text=text,topic='',_response_namespace=_response_namespace)
+    def _record_model_response_in(self,tx,chat_id,*,text,query,data_classes,source_scopes=(),archive_snapshots=(),memory_bindings=(),project_bindings=(),original_input_bindings=(),source_result_bindings=(),topic='',provenance_guard,_response_namespace=None):
+        from prm.runtime.source_access import memory_bindings_current,project_bindings_current,original_inputs_current
+        memory_bindings_current(tx,self.owner_ref,memory_bindings);project_bindings_current(tx,self.owner_ref,list(project_bindings))
+        original_inputs_current(tx,self.owner_ref,original_input_bindings);provenance_guard(tx)
+        state=self._run_in(tx,'record_response',chat_id,text=text,topic=topic,_response_namespace=_response_namespace)
         response_ref=state.object_refs[0].response_ref
-        self._record_origin_in(tx,response_ref,data_classes,source_scopes=source_scopes,archive_snapshots=archive_snapshots,memory_bindings=memory_bindings)
+        self._record_origin_in(tx,response_ref,data_classes,source_scopes=source_scopes,archive_snapshots=archive_snapshots,memory_bindings=memory_bindings,
+            project_bindings=project_bindings,original_input_bindings=original_input_bindings,source_result_bindings=source_result_bindings)
         tx.conn.execute("UPDATE pa_conversation.history SET payload=jsonb_set(payload,'{user_prompt}',%s) WHERE owner=%s AND payload->>'response_ref'=%s AND payload->>'source_data_class'='model_generated'",
             (Jsonb(query[:1200]),self.owner_ref,response_ref))
         return state

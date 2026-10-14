@@ -172,7 +172,7 @@ class RichReport:
     renderer_version:str='telegram-rich-v1'
 
 
-def render_rich_brief(document,*,controls=(),maximum_characters=MAX_CHARACTERS,view='full',story_number=None):
+def render_rich_brief(document,*,controls=(),maximum_characters=MAX_CHARACTERS,view='full',story_number=None,extra_text=()):
     if type(document)is not BriefDocument:raise RichMessageInvalid('immutable BriefDocument required')
     sources=tuple(dict.fromkeys(e.source_ref for e in document.evidence));tokens=tuple(b['callback_data'] for b in controls)
     blocks=[{'type':'heading','text':document.topic,'size':1},{'type':'paragraph','text':document.window.start_at.date().isoformat()+' — '+document.window.end_at.date().isoformat()+' · '+document.window.timezone}]
@@ -205,6 +205,8 @@ def render_rich_brief(document,*,controls=(),maximum_characters=MAX_CHARACTERS,v
     for limitation in document.coverage_manifest.limitations:blocks.append({'type':'paragraph','text':_limitation_name(limitation)})
     if document.status=='empty':blocks.append({'type':'paragraph','text':'В проверенной выборке важных изменений не найдено.'})
     blocks.append({'type':'footer','text':'Версия '+str(document.version)+'. Отображение сохранённого документа; применение и полезность не измерены.'})
+    for text in extra_text:
+        if text:blocks.append({'type':'paragraph','text':text})
     if controls:blocks.append({'type':'buttons','buttons':[dict(b) for b in controls]})
     messages=_split(blocks,source_urls=sources,callback_tokens=tokens,maximum_characters=maximum_characters)
     return RichReport(document.brief_id,document.version,document.content_digest,sources,messages)

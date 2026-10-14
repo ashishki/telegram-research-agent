@@ -4,7 +4,7 @@ import re
 
 KINDS=frozenset({'useful','not_topic','known','too_long','incorrect','applied','read','tried','reaction_interest','unknown'})
 FEATURES={'useful':'interest','not_topic':'topic_applicability','known':'novelty','too_long':'reading_cost','incorrect':'reliability','applied':'application','read':'learning_state','tried':'learning_state','reaction_interest':'interest','unknown':'unknown'}
-LABELS={'полезно':'useful','не тема':'not_topic','не моя тема':'not_topic','уже знал':'known','длинно':'too_long','слишком подробно':'too_long','неверно':'incorrect','применил':'applied'}
+LABELS={'полезно':'useful','не тема':'not_topic','не моя тема':'not_topic','уже знал':'known','это знаю':'known','длинно':'too_long','слишком длинно':'too_long','слишком подробно':'too_long','неверно':'incorrect','применил':'applied'}
 
 
 @dataclass(frozen=True)

@@ -88,7 +88,7 @@ class BriefRuntime:
                 except ValueError:continue
                 eligible.add(record.evidence_ref)
         from prm.event_clusters import cluster_events
-        from prm.brief_selection import select_events,build_attention_editorial,admit_editorial_wording,brief_ref
+        from prm.brief_selection import select_events,event_signals,build_attention_editorial,admit_editorial_wording,brief_ref
         selection_digest=self.root.archive_selection.digest if self.root.archive_selection else None
         history=self.root.briefs.event_history(topic=topic,selection_digest=selection_digest) if hasattr(self.root.briefs,'event_history') else ()
         projects=[]
@@ -110,6 +110,8 @@ class BriefRuntime:
         records=list({r.evidence_ref:r for b in batches for r in b.items if r.evidence_ref in eligible}.values())
         events=cluster_events(records,history=history)
         rules=self.root.feedback.rules() if hasattr(self.root,'feedback') else ()
+        affected=[event_signals(e,projects=projects,rules=rules)[1]['feedback'] for e in events]
+        memory_bindings=list({(b['memory_ref'],b['version'],b['digest']):b for signal in affected for b in signal['rule_bindings']}.values())
         decisions=select_events(events,projects=projects,rules=rules,maximum=20)
         baseline=EvidenceBundle.select(tuple(batches),maximum_items=0,eligible_refs=frozenset(eligible)) if batches else None
         bundle=replace(baseline,selected=tuple(row[1] for row in decisions)) if baseline else None
@@ -130,7 +132,10 @@ class BriefRuntime:
         # scope, project identity, novelty or optional continuation authority.
         local_editorial=build_attention_editorial(document,decisions)
         offered=None
-        if self.editorial is not None:
+        # Confirmed rules affect the packet including excluded candidates.
+        # Keep rule-derived editorial local: no derived private selection is
+        # sent to a model under only the original source-hook authority.
+        if self.editorial is not None and not memory_bindings:
             editorial=self.editorial(document,data_classes=classes,source_scopes=used_scopes,archive_snapshots=snapshots) if type(self.editorial)is RuntimeBriefEditorial else self.editorial(document)
             if editorial is not None:offered=editorial
         document=build_brief_document(replace(request,editorial=admit_editorial_wording(local_editorial,offered,document.evidence)))
@@ -160,7 +165,6 @@ class BriefRuntime:
         self.root.briefs.pending_coverage[document.content_digest]['event_duplicate_count']=len(records)-len(events)
         if not hasattr(self.root.briefs,'pending_events'):self.root.briefs.pending_events={}
         project_bindings=[{'project_ref':p.object_id,'version':p.version,'digest':p.digest} for p in projects if p.object_id in used_projects]
-        memory_bindings=list({(b['memory_ref'],b['version'],b['digest']):b for _,r,s in decisions if brief_ref(r) in included for b in s.get('feedback',{}).get('rule_bindings',[])}.values())
         if memory_bindings:
             from .memory_context import binding_provenance,memory_current
             with self.root.queue.store.transaction() as tx:
@@ -196,6 +200,10 @@ class BriefRuntime:
     def answer(self,*,topic,timezone_name,end_at=None,period_mode='rolling',prepared_document=None):
         from prm.application import PersonalResearchAssistant
         document=prepared_document or self.build(topic=topic,timezone_name=timezone_name,end_at=end_at,period_mode=period_mode)
+        ref=self.root.task_context.get();original=self.root.queue.store.get(self.root.owner_ref,'conversation',ref) if ref else None
+        if original is not None:
+            if not hasattr(self.root.briefs,'pending_original_inputs'):self.root.briefs.pending_original_inputs={}
+            self.root.briefs.pending_original_inputs[document.content_digest]=[{'namespace':'conversation','ref':original.object_id,'version':original.version,'digest':original.digest}]
         assistant=PersonalResearchAssistant(settings=self.root.settings,conversations=self.root.conversations,briefs=self.root.briefs)
         request=OperatorRequest(query=topic,mode='brief',chat_id=self.root.owner_chat_id,
             actor_id=self.root.owner_chat_id,owner_chat_id=self.root.owner_chat_id)
@@ -204,11 +212,17 @@ class BriefRuntime:
         classes=self.root.briefs.pending_classes.get(document.content_digest,('private_archive','private_connector_content'))
         refs=result.payload.get('conversation',{}).get('response_refs',())
         snapshots=self.root.briefs.pending_snapshots.get(document.content_digest,[])
-        if refs:self.root.conversations.record_origin(refs[0],classes,source_scopes=self.root.briefs.pending_scopes.get(document.content_digest,()),archive_snapshots=snapshots)
+        if refs:
+            manifest=self.root.briefs.store.get(self.root.owner_ref,'result',self.root.briefs._document_ref(document.brief_id),version=document.version)
+            self.root.conversations.record_origin(refs[0],classes,source_scopes=self.root.briefs.pending_scopes.get(document.content_digest,()),archive_snapshots=snapshots,
+                memory_bindings=manifest.payload.get('memory_bindings',[]),project_bindings=manifest.payload.get('project_bindings',[]),
+                original_input_bindings=manifest.payload.get('original_input_bindings',[]),
+                source_result_bindings=[{'namespace':'result','ref':manifest.object_id,'version':manifest.version,'digest':manifest.digest}])
         inventory_hint='\nМатериалы выборки: /briefmaterials '+document.brief_id+' '+str(document.version)+' 0'
         prompt=self.root.feedback.optional_prompt() if hasattr(self.root,'feedback') else ''
         return replace(result,text=result.text+inventory_hint+('\n'+prompt if prompt else ''),payload={**result.payload,
             'document_binding':{'brief_id':document.brief_id,'version':document.version,'content_digest':document.content_digest,'story_number':None},
+            'brief_inventory_hint':inventory_hint.strip(),'weekly_feedback_prompt':prompt,
             'archive_snapshots':snapshots,'source_data_classes':list(classes),'source_data_class':classes[0],'source_scopes':self.root.briefs.pending_scopes.get(document.content_digest,[]),'source_coverage':self.root.briefs.pending_coverage.get(document.content_digest)})
 
     def materials(self,*,brief_id,version,offset=0,limit=20,guard=lambda:None):

@@ -50,8 +50,13 @@ class MemoryDialogueRuntime:
                 for scope in s:scopes[json.dumps(scope,sort_keys=True)]=scope
         text=prefix+'\n'.join(item.object_id+' (v'+str(item.version)+'): '+item.payload['text'] for item in items)
         if not items:text=prefix+'Записи не найдены или их источники сейчас недоступны.'
-        state=root.conversations.record_response(root.owner_chat_id,text=text,topic='Память')
-        root.conversations.record_origin(state.object_refs[0].response_ref,classes,source_scopes=list(scopes.values()),archive_snapshots=snapshots,memory_bindings=bindings)
+        from .source_access import source_current
+        try:
+            state=root.conversations.record_model_response(root.owner_chat_id,text=text,query='',topic='Память',data_classes=classes,
+                source_scopes=list(scopes.values()),archive_snapshots=snapshots,memory_bindings=bindings,
+                provenance_guard=lambda tx:source_current(tx,root.registry,root.owner_ref,list(scopes.values()),archive_snapshots=snapshots,require_snapshot=True))
+        except (CapabilityDenied,StorageError):
+            return AssistantResult(request_ref,'source_unavailable','chat','Запись изменена или удалена. Покажите актуальную память заново.',payload={'source_data_class':'user_provided'})
         return AssistantResult(request_ref,status if items else 'not_found','chat',text,payload={'conversation':{'response_refs':[state.object_refs[0].response_ref]},
             'memory_bindings':bindings,'source_data_classes':sorted(classes),'source_data_class':sorted(classes)[0],'source_scopes':list(scopes.values()),'archive_snapshots':sorted(snapshots)})
 

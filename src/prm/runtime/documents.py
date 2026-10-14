@@ -63,14 +63,25 @@ class DocumentDialogueRuntime:
     def remember_view(self,request_ref,document,manifest,text,*,view,active_item=None,extra=None):
         root=self.root;scopes=manifest.payload.get('source_scopes',[]);snapshots=manifest.payload.get('archive_snapshots',[])
         classes=manifest.payload.get('source_data_classes',['user_provided'])
-        state=root.conversations.record_response(root.owner_chat_id,text=text,topic=document.topic)
-        root.conversations.record_origin(state.object_refs[0].response_ref,classes,source_scopes=scopes,archive_snapshots=snapshots)
+        exact=[{'namespace':'result','ref':manifest.object_id,'version':manifest.version,'digest':manifest.digest}]
+        from .source_access import result_provenance,source_current
+        def current(tx):
+            item=tx.get(root.owner_ref,'result',manifest.object_id,version=manifest.version)
+            if item is None or item.digest!=manifest.digest:raise CapabilityDenied('exact document view deleted or changed')
+            result_provenance(tx,root.owner_ref,item)
+            source_current(tx,root.registry,root.owner_ref,scopes,archive_snapshots=snapshots,require_snapshot=True)
+        state=root.conversations.record_model_response(root.owner_chat_id,text=text,query='',topic=document.topic,data_classes=classes,
+            source_scopes=scopes,archive_snapshots=snapshots,memory_bindings=manifest.payload.get('memory_bindings',[]),
+            project_bindings=manifest.payload.get('project_bindings',[]),original_input_bindings=manifest.payload.get('original_input_bindings',[]),
+            source_result_bindings=exact,provenance_guard=current)
         root.briefs.bind_visible(conversation_id=state.conversation_id,response_ref=state.object_refs[0].response_ref,
             document=document,active_item_number=active_item,authenticated_chat_id=root.owner_chat_id,
             authenticated_actor_id=root.owner_chat_id,authenticated_owner_chat_id=root.owner_chat_id)
         payload={'brief_document':document.to_dict(),'brief_inspection':document.inspect(),'brief_view':view,'telegram_parse_mode':'HTML',
             'document_binding':{'brief_id':document.brief_id,'version':document.version,'content_digest':document.content_digest,'story_number':active_item},
             'conversation':{'response_refs':[state.object_refs[0].response_ref]},'source_data_classes':classes,'source_data_class':classes[0],
+            'source_result_bindings':exact,'memory_bindings':manifest.payload.get('memory_bindings',[]),'project_bindings':manifest.payload.get('project_bindings',[]),
+            'original_input_bindings':manifest.payload.get('original_input_bindings',[]),
             'source_scopes':scopes,'archive_snapshots':snapshots,'retrieval_performed':False,'write_performed':False,**(extra or {})}
         return AssistantResult(request_ref,'partial_brief' if document.status=='partial' else 'ok','brief',text,payload=payload)
 
@@ -100,10 +111,11 @@ class DocumentDialogueRuntime:
         else:pointer=explicit
         store=root.briefs
         with store.store.transaction() as tx:
-            from .source_access import source_current
+            from .source_access import source_current,original_inputs_current
             guard();prior=tx.get(root.owner_ref,'result',store._document_ref(pointer['brief_id']),version=pointer['version'])
             head=tx.get(root.owner_ref,'result',store._document_ref(pointer['brief_id']))
             if prior is None or head is None:raise StorageError('refresh document unavailable')
+            original_inputs_current(tx,root.owner_ref,prior.payload.get('original_input_bindings',[]))
             source_current(tx,root.registry,root.owner_ref,prior.payload.get('source_scopes',[]))
             # Read retained period metadata only. No stale text/project advice is
             # projected into a fresh answer when old bindings are no longer current.
@@ -229,7 +241,10 @@ class DocumentDialogueRuntime:
             tx.put(owner,'result',ref,{'kind':'document_export','brief_id':document.brief_id,'version':document.version,'content_digest':document.content_digest,
                 'format':format,'bytes':len(body),'sha256':hashlib.sha256(body).hexdigest(),'parts':parts,
                 'data_classes':manifest.payload.get('source_data_classes',['user_provided']),'source_scopes':list(scopes),
-                'archive_snapshots':manifest.payload.get('archive_snapshots',[])},expected_version=0)
+                'archive_snapshots':manifest.payload.get('archive_snapshots',[]),
+                'memory_bindings':manifest.payload.get('memory_bindings',[]),'project_bindings':manifest.payload.get('project_bindings',[]),
+                'original_input_bindings':manifest.payload.get('original_input_bindings',[]),
+                'source_result_bindings':[{'namespace':'result','ref':manifest.object_id,'version':manifest.version,'digest':manifest.digest}]},expected_version=0)
             tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',(owner,'result',manifest.object_id,'result',ref))
             tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',(owner,'conversation',request_ref,'result',ref))
         return ref

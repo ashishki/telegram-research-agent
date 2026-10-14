@@ -12,6 +12,7 @@ def result_provenance(tx,owner,item):
     """Canonical response origins and both existing durable result layouts."""
     project_bindings_current(tx,owner,result_project_bindings(tx,owner,item))
     memory_bindings_current(tx,owner,result_memory_bindings(tx,owner,item))
+    original_inputs_current(tx,owner,result_input_bindings(tx,owner,item))
     if item.object_id.startswith('response_'):
         ref='response_origin_'+hashlib.sha256(item.object_id.encode()).hexdigest()[:32]
         origin=tx.get(owner,'conversation',ref)
@@ -29,24 +30,46 @@ def result_provenance(tx,owner,item):
     return tuple(classes),tuple(scopes)
 
 
-def result_memory_bindings(tx,owner,item):
+def _result_nodes(tx,owner,item):
+    """Keep immutable root and typed document/parent versions across ID edges."""
     dependencies=tx.conn.execute("SELECT to_regclass('pa_memory.dependencies') AS meta").fetchone()['meta'] is not None
-    pending=[item.object_id];seen=set();bindings={}
+    pending=[(item,{item.object_id:item.version})];seen=set()
     while pending:
-        ref=pending.pop()
-        if ref in seen:continue
-        seen.add(ref)
-        if len(seen)>64:raise StorageError('bounded memory provenance graph required')
-        current=tx.get(owner,'result',ref)
-        if current is None:raise StorageError('result memory provenance deleted')
-        for b in current.payload.get('memory_bindings',current.payload.get('payload',{}).get('memory_bindings',[])):
-            bindings[(b['memory_ref'],b['version'],b['digest'])]=b
+        current,inherited=pending.pop();ref=current.object_id;key=(ref,current.version)
+        if key in seen:continue
+        seen.add(key)
+        if len(seen)>64:raise StorageError('bounded result provenance graph required')
+        values=[current.payload,current.payload.get('payload',{})];versions=dict(inherited);explicit={}
         if ref.startswith('response_'):
             origin=tx.get(owner,'conversation','response_origin_'+hashlib.sha256(ref.encode()).hexdigest()[:32])
-            for b in origin.payload.get('memory_bindings',[]) if origin else ():
-                bindings[(b['memory_ref'],b['version'],b['digest'])]=b
+            if origin:values.append(origin.payload)
+        for value in values:
+            for b in value.get('source_result_bindings',[]):
+                parent=tx.get(owner,'result',b['ref'],version=b['version'])
+                if parent is None or parent.digest!=b['digest']:raise CapabilityDenied('exact result parent changed or deleted')
+                versions[b['ref']]=b['version'];explicit[(b['ref'],b['version'])]=parent
+            pointer=value.get('document_binding') or value.get('brief_document')
+            if pointer is None and value.get('kind') in {'brief_manifest','document_export'}:pointer=value
+            if pointer is None and value.get('kind')=='feedback_event':pointer={**value['event'],'version':value['event']['brief_version']}
+            if pointer:
+                doc_ref='brief_'+hashlib.sha256(pointer['brief_id'].encode()).hexdigest()[:32]
+                parent=tx.get(owner,'result',doc_ref,version=pointer['version'])
+                if parent is None or parent.payload.get('content_digest')!=pointer['content_digest']:raise CapabilityDenied('exact document provenance unavailable')
+                versions[doc_ref]=pointer['version'];explicit[(doc_ref,parent.version)]=parent
+        yield current,values
         rows=tx.conn.execute("SELECT parent_ref FROM pa_memory.dependencies WHERE owner=%s AND parent_namespace='result' AND child_namespace='result' AND child_ref=%s",(owner,ref)).fetchall() if dependencies else ()
-        pending.extend(row['parent_ref'] for row in rows)
+        for row in rows:
+            parent=tx.get(owner,'result',row['parent_ref'],version=versions.get(row['parent_ref']))
+            if parent is None:raise StorageError('result provenance parent deleted')
+            explicit[(parent.object_id,parent.version)]=parent
+        pending.extend((parent,versions) for parent in explicit.values() if (parent.object_id,parent.version) not in seen)
+
+
+def result_memory_bindings(tx,owner,item):
+    bindings={}
+    for _,values in _result_nodes(tx,owner,item):
+        for value in values:
+            for b in value.get('memory_bindings',[]):bindings[(b['memory_ref'],b['version'],b['digest'])]=b
     return list(bindings.values())
 
 
@@ -57,20 +80,33 @@ def memory_bindings_current(tx,owner,bindings):
 
 
 def result_project_bindings(tx,owner,item):
-    pending=[item.object_id];seen=set();bindings={}
-    while pending:
-        ref=pending.pop()
-        if ref in seen:continue
-        seen.add(ref)
-        if len(seen)>64:raise StorageError('bounded project provenance graph required')
-        current=tx.get(owner,'result',ref)
-        if current is None:raise StorageError('result project provenance deleted')
-        for binding in current.payload.get('project_bindings',[]):
-            key=(binding['project_ref'],binding['version'],binding['digest']);bindings[key]=binding
-        if tx.conn.execute("SELECT to_regclass('pa_memory.dependencies') AS meta").fetchone()['meta'] is not None:
-            rows=tx.conn.execute("SELECT parent_ref FROM pa_memory.dependencies WHERE owner=%s AND parent_namespace='result' AND child_namespace='result' AND child_ref=%s",(owner,ref)).fetchall()
-            pending.extend(row['parent_ref'] for row in rows)
+    bindings={}
+    for _,values in _result_nodes(tx,owner,item):
+        for value in values:
+            for b in value.get('project_bindings',[]):bindings[(b['project_ref'],b['version'],b['digest'])]=b
     return list(bindings.values())
+
+
+def result_input_bindings(tx,owner,item):
+    bindings={}
+    for _,values in _result_nodes(tx,owner,item):
+        for value in values:
+            for b in value.get('original_input_bindings',[]):bindings[(b['ref'],b['version'],b['digest'])]=b
+    return list(bindings.values())
+
+
+def original_inputs_current(tx,owner,bindings):
+    if not bindings:return
+    from .memory_context import validate_bindings
+    for b in validate_bindings(bindings):
+        if b['namespace']!='conversation':raise StorageError('native input namespace required')
+        item=tx.get(owner,'conversation',b['ref'])
+        if item is None or (item.version,item.digest)!=(b['version'],b['digest']):raise CapabilityDenied('original document input changed or deleted')
+        for metadata in (item.payload.get('telegram_envelope',{}),item.payload.get('reply_target',{})):
+            ref=metadata.get('source_revision_ref')
+            if ref:
+                source=tx.get(owner,'conversation',ref)
+                if source is None or source.version!=metadata.get('source_revision'):raise CapabilityDenied('original document Telegram source edited or deleted')
 
 
 def project_bindings_current(tx,owner,bindings,_depth=0):

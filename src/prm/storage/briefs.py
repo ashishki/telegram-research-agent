@@ -49,7 +49,9 @@ class DurableBriefStore(BriefDocumentStore):
                 if len(raw)>256000:raise StorageError('immutable Brief exceeds its bound')
                 digest=hashlib.sha256(raw).hexdigest()
                 old=tx.get(owner,'result',ref,version=item.version)
+                from prm.runtime.source_access import original_inputs_current
                 if old is not None:
+                    original_inputs_current(tx,owner,old.payload.get('original_input_bindings',[]))
                     from prm.runtime.source_access import project_bindings_current
                     project_bindings_current(tx,owner,old.payload.get('project_bindings',[]))
                     from prm.runtime.source_access import memory_bindings_current
@@ -59,6 +61,8 @@ class DurableBriefStore(BriefDocumentStore):
                         from prm.runtime.source_access import source_current
                         source_current(tx,self.registry,owner,old.payload.get('source_scopes',[]),archive_snapshots=old.payload.get('archive_snapshots',[]),require_snapshot=True)
                 else:
+                    inputs=getattr(self,'pending_original_inputs',{}).get(item.content_digest,[])
+                    original_inputs_current(tx,owner,inputs)
                     scopes=self.pending_scopes.get(item.content_digest,[]);snapshots=getattr(self,'pending_snapshots',{}).get(item.content_digest,[])
                     from prm.runtime.source_access import memory_bindings_current
                     memory_bindings_current(tx,owner,getattr(self,'pending_memory_bindings',{}).get(item.content_digest,[]))
@@ -86,7 +90,10 @@ class DurableBriefStore(BriefDocumentStore):
                         'window':item.window.to_dict(),'period_basis':item.period_basis,
                         'event_selection':self.pending_events.get(item.content_digest),
                         'project_bindings':self.pending_project_bindings.get(item.content_digest,[]),
-                        'memory_bindings':getattr(self,'pending_memory_bindings',{}).get(item.content_digest,[])},expected_version=item.version-1)
+                        'memory_bindings':getattr(self,'pending_memory_bindings',{}).get(item.content_digest,[]),
+                        'original_input_bindings':inputs},expected_version=item.version-1)
+                    for b in inputs:
+                        tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',(owner,'conversation',b['ref'],'result',ref))
                     tx.conn.execute('INSERT INTO pa_briefs.documents VALUES(%s,%s,%s,%s,%s)',(owner,item.brief_id,item.version,digest,Jsonb(encoded)))
                 if tx.conn.execute("SELECT to_regclass('pa_memory.dependencies') AS meta").fetchone()['meta'] is not None:
                     for dependency in self.pending_dependencies.get(item.content_digest,()):
@@ -171,6 +178,8 @@ class DurableBriefStore(BriefDocumentStore):
     def _decode_document(self,item):
         if item.payload.get('kind')!='brief_manifest':return _stored_document(item.payload)
         with self.store.transaction() as tx:
+            from prm.runtime.source_access import original_inputs_current
+            original_inputs_current(tx,self.owner_ref,item.payload.get('original_input_bindings',[]))
             from prm.runtime.source_access import project_bindings_current
             project_bindings_current(tx,self.owner_ref,item.payload.get('project_bindings',[]))
             from prm.runtime.source_access import memory_bindings_current

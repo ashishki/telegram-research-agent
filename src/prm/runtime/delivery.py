@@ -116,6 +116,11 @@ class DeliveryExecutor:
         from prm.storage.jobs import JobQueue
         from prm.storage.briefs import DurableBriefStore
         options=result.payload.get('payload',{});pointer=options.get('document_binding') or options.get('brief_document')
+        # Preserve exact statuses, refresh diffs and all continuation semantics.
+        # These views use the existing compatible projection before any send;
+        # this is not a retry/fallback after an unknown rich attempt.
+        if pointer and (options.get('brief_view','full') not in {'full','telegram'} or (options.get('brief_refresh') or {}).get('performed') or options.get('feedback_event') or options.get('export')):
+            return {**payload,'presentation_basis':'exact_compatible_document_view'}
         bindings=TelegramBindings(JobQueue(self.store.target),owner=owner,destination=self.sender.destination)
         controls=[];source_urls=[]
         if pointer:
@@ -126,7 +131,8 @@ class DeliveryExecutor:
             controls=[{'text':label,'callback_data':bindings.issue_document_control(job_id=job_id,response_ref=result.object_id,response_version=result.version,
                 brief_id=document.brief_id,brief_version=document.version,content_digest=document.content_digest,action=action,
                 story_number=pointer.get('story_number'))} for label,action in (('Источники','sources'),('Обсудить','full'),('Сохранить','save'))]
-            report=render_rich_brief(document,controls=controls,view=options.get('brief_view','full'),story_number=pointer.get('story_number'));messages=report.messages;source_urls=list(report.source_refs)
+            report=render_rich_brief(document,controls=controls,view=options.get('brief_view','full'),story_number=pointer.get('story_number'),
+                extra_text=(options.get('brief_inventory_hint',''),options.get('weekly_feedback_prompt','')));messages=report.messages;source_urls=list(report.source_refs)
             payload['telegram_document_binding']={'brief_id':document.brief_id,'version':document.version,'content_digest':document.content_digest}
             payload['telegram_navigation']={'kind':'inline_keyboard','inline_keyboard':[[b] for b in controls]}
         else:messages=render_rich_answer(result.payload['text'])
@@ -381,13 +387,13 @@ class DeliveryExecutor:
                 raise CapabilityDenied('delivery day changed after preparation')
 
     def _source_current(self,tx,owner,payload):
-        from .source_access import source_current,project_bindings_current,result_project_bindings
+        from .source_access import source_current,project_bindings_current,result_provenance
         source_current(tx,self.registry,owner,payload.get('source_scopes',()),archive_snapshots=payload.get('archive_snapshots',()),require_snapshot=True)
         project_bindings_current(tx,owner,payload.get('project_bindings',[]))
         if payload.get('result_ref'):
             item=tx.get(owner,'result',payload['result_ref'])
             if item is None or item.digest!=payload.get('result_digest'):raise CapabilityDenied('delivered result changed or deleted')
-            project_bindings_current(tx,owner,result_project_bindings(tx,owner,item))
+            result_provenance(tx,owner,item)
 
     def _deliver(self, *, owner, delivery_id, kind, source_ref, destination_ref, payload, upper_bound, effect_lease=None):
         if not isinstance(destination_ref, str) or not 0 < len(destination_ref) <= 128:

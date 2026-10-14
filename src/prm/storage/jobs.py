@@ -9,6 +9,10 @@ import uuid
 from psycopg.types.json import Jsonb
 from .postgres import PostgresStore,StorageError,StateConflict,_canonical
 
+
+class DerivedResultSourceUnavailable(StorageError):
+    """Compute output lost a required parent; no automatic re-execution."""
+
 DDL=(
     'CREATE SCHEMA pa_jobs',
     'CREATE TABLE pa_jobs.meta(version integer PRIMARY KEY,checksum text NOT NULL)',
@@ -195,12 +199,19 @@ class JobQueue:
                 parents=list(result.get('payload',result.get('answer_payload',{})).get('conversation',{}).get('response_refs',()))+list(result.get('evidence_refs',()))
                 if len(parents)>32:raise StorageError('bounded result dependencies required')
                 for parent_ref in set(parents):
-                    if tx.get(lease.owner,'result',parent_ref) is None:raise StorageError('derived result source was deleted')
+                    if tx.get(lease.owner,'result',parent_ref) is None:raise DerivedResultSourceUnavailable('derived result source was deleted')
                     tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',
                         (lease.owner,'result',parent_ref,'result',ref))
             tx.conn.execute("UPDATE pa_jobs.jobs SET status='completed',result_ref=%s,token=NULL,lease_until=NULL WHERE owner=%s AND id=%s",(ref,lease.owner,lease.job_id))
             if getattr(self,'focus_store',None) is not None:self.focus_store.complete_in(tx,lease,ref,result)
             return ref
+    def fail_source_result(self,lease):
+        if type(lease)is not JobLease or lease.mode!='compute':raise StorageError('typed compute lease required')
+        # This metadata-only CAS does not require the now deleted source. It
+        # cannot overwrite cancellation, completed output or a newer lease.
+        with self.store.transaction() as tx:
+            tx.conn.execute("UPDATE pa_jobs.jobs SET status='failed',error_code='derived_source_unavailable',token=NULL,lease_until=NULL WHERE owner=%s AND id=%s AND generation=%s AND token=%s AND mode='compute' AND status IN ('leased','running')",
+                (lease.owner,lease.job_id,lease.generation,lease.token))
     def cancel(self,*,owner,job_id):
         with self.store.transaction() as tx:
             _check(tx.conn)

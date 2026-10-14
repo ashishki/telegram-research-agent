@@ -15,6 +15,7 @@ PROJECTION_KEYS = frozenset({
     'accounting_status', 'write_performed', 'retrieval_performed',
     'telegram_parse_mode', 'telegram_navigation', 'delivery_completion',
     'document_binding','brief_view','memory_bindings','archive_snapshots',
+    'source_result_bindings','project_bindings','original_input_bindings','brief_inventory_hint','weekly_feedback_prompt',
 })
 
 
@@ -51,7 +52,8 @@ def bounded_result_record(queue, lease, record):
         if len(parents)>32:raise StorageError('bounded result dependencies required')
         for parent in set(parents):
             if tx.get(lease.owner,'result',parent) is None:
-                raise StorageError('diagnostic result source was deleted')
+                from prm.storage.jobs import DerivedResultSourceUnavailable
+                raise DerivedResultSourceUnavailable('diagnostic result source was deleted')
         for index, (ref, piece) in enumerate(zip(refs, pieces)):
             value = {'schema_version': 1, 'index': index, 'sha256': digest,
                      'input_ref': manifest['input_ref'],

@@ -18,6 +18,9 @@ and permitted sources, creates an immutable version, and reports event revision
 changes. Metadata-only refresh can replace a stale snapshot; it does not recover
 revoked content. Current source grants and original Telegram input still apply.
 Version comparison never bypasses a replaced project/rule or source snapshot.
+Native manifests and projections retain exact original input/version/digest and
+Telegram revision. Named/direct read, export, refresh and saved memory enforce
+that lineage too; edit invalidates it, input deletion follows dependency edges.
 
 `экспорт HTML`, `экспорт PDF`, `экспорт Markdown` produce actual local bytes
 from that same document, persisted in bounded existing result chunks. The export
@@ -35,6 +38,10 @@ confirmed owner and exact document binding; it never scans a personal SQLite DB.
 memory_<id>` deletes it. A rule changes only its matching topic feature and
 cannot hide critical/conflicting changes. Why-shown uses actually included
 anchors. The optional weekly prompt is disabled by default and starts no job.
+Rules affecting ranking retain bindings even when their candidate is excluded.
+Rule-derived editorial currently stays local: a configured model is not called
+under just the original news source authority. Separate future admission is
+needed to send that derived context. Undo/correction/expiry invalidates old copies.
 
 `запомни: …` previews a note; `подтверди сохранение` confirms the current preview.
 `исправь память memory_<id>: …` also previews a new version. `найди в памяти …`,
@@ -51,6 +58,10 @@ legacy provenance is excluded. No external embeddings or second memory store.
 Source/memory authority stays locked through bounded HTTP. Final response and
 origin are atomic. A concurrent forget/correction/revoke can hide the finished
 answer and complete with `source_unavailable`, without a retry or stale facts.
+Natural memory/document views use the same atomic response/origin/edge boundary.
+If a required parent is lost after response but before small/diagnostic completion,
+compute settles `failed/derived_source_unavailable`, releases its lease and
+retains durable unknown model attempts; the next owner request can proceed.
 
 The concrete save+undo proposal remains **proposed_inactive**: only an
 unambiguous new owner note would qualify; preferences/projects/learning and
@@ -64,6 +75,11 @@ the [official Bot API](https://core.telegram.org/bots/api#rich-messages):
 32768 Unicode characters,500 blocks including table rows, depth16,20 columns,
 zero media, and local24KiB JSON/part,32-part bounds. Source URLs and callback
 tokens are trusted allowlists. Split sections retain content and source identity.
+Full/telegram views use native rich with inventory/optional prompt retained.
+Other document views, feedback/export statuses, comparison/filter/refresh and
+why-shown use their exact compatible HTML/text projection, selected before any
+HTTP. They are not silently re-rendered as the whole Brief. This subset remains
+a presentation limitation pending actual client/visual acceptance.
 
 Known first-part format rejection allows a separately recorded compatible send
 of the same result. Status reports both attempts. Other rejection, acceptance of
