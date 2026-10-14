@@ -9,7 +9,7 @@ from prm.capabilities import CapabilityDenied
 from .intent_planner import validate_task_plan,TaskPlan
 from .dispatch import parse_request_intent,RequestIntent,IntentKind
 
-FOLLOWUP=re.compile(r'(?i)^(?:короче|сделай короче|коротко|поясни (?:второй|этот)|расскажи (?:про )?второй|объясни (?:этот|второй)|the second|explain (?:that|the second)|shorten)')
+FOLLOWUP=re.compile(r'(?i)^(?:короче|сделай короче|коротко|поясни (?:второй|этот)|расскажи (?:про )?второй|объясни (?:этот|второй)|the second|explain (?:that|the second)|shorten)(?: пункт| ответ)?[?.!]?$')
 CLARIFY={'missing_target':'Выбери результат: ответь на нужное сообщение или укажи сохранённый документ.',
     'ambiguous_target':'Нашлось несколько возможных результатов. Ответь на нужное сообщение.',
     'source_unavailable':'Нужный источник сейчас недоступен. Выбери доступный источник или уточни задачу.',

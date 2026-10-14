@@ -35,8 +35,9 @@ class BriefRuntime:
         self.root,self.source_hooks=root,tuple(source_hooks)
         self.editorial=editorial or (RuntimeBriefEditorial(root) if root.model_endpoint is not None else None)
 
-    def build(self,*,topic,timezone_name,end_at=None,previous_document=None,comparison_document=None,period_mode='rolling'):
-        window=brief_window(timezone_name,end_at=end_at,period_mode=period_mode)
+    def build(self,*,topic,timezone_name,end_at=None,previous_document=None,comparison_document=None,period_mode='rolling',window_override=None):
+        window=window_override or brief_window(timezone_name,end_at=end_at,period_mode=period_mode)
+        if window.timezone!=timezone_name or window.end_at-window.start_at>__import__('datetime').timedelta(days=8):raise StorageError('bounded exact Brief window required')
         from prm.source_contracts import SourceResource,SourceBatch,EvidenceBundle,normalize_source_batch
         evidence=[];coverage=[];limits=[];used_scopes=[];batches=[]
         for hook in self.source_hooks:
@@ -108,7 +109,8 @@ class BriefRuntime:
                 batches=new;eligible=new_eligible
         records=list({r.evidence_ref:r for b in batches for r in b.items if r.evidence_ref in eligible}.values())
         events=cluster_events(records,history=history)
-        decisions=select_events(events,projects=projects,maximum=20)
+        rules=self.root.feedback.rules() if hasattr(self.root,'feedback') else ()
+        decisions=select_events(events,projects=projects,rules=rules,maximum=20)
         baseline=EvidenceBundle.select(tuple(batches),maximum_items=0,eligible_refs=frozenset(eligible)) if batches else None
         bundle=replace(baseline,selected=tuple(row[1] for row in decisions)) if baseline else None
         if bundle:
@@ -158,12 +160,24 @@ class BriefRuntime:
         self.root.briefs.pending_coverage[document.content_digest]['event_duplicate_count']=len(records)-len(events)
         if not hasattr(self.root.briefs,'pending_events'):self.root.briefs.pending_events={}
         project_bindings=[{'project_ref':p.object_id,'version':p.version,'digest':p.digest} for p in projects if p.object_id in used_projects]
+        memory_bindings=list({(b['memory_ref'],b['version'],b['digest']):b for _,r,s in decisions if brief_ref(r) in included for b in s.get('feedback',{}).get('rule_bindings',[])}.values())
+        if memory_bindings:
+            from .memory_context import binding_provenance,memory_current
+            with self.root.queue.store.transaction() as tx:
+                for b in memory_bindings:
+                    item=memory_current(tx,self.root.owner_ref,b)
+                    c,s,a=binding_provenance(self.root,tx,item.payload.get('source_bindings',[]));classes.update(c);used_scopes.extend(s);snapshots=tuple(set(snapshots)|set(a))
+                    dependencies.append({'namespace':'memory','object_ref':b['memory_ref'],'version':b['version'],'digest':b['digest']})
+            used_scopes=list({__import__('json').dumps(s,sort_keys=True):s for s in used_scopes}.values())
+        if not hasattr(self.root.briefs,'pending_memory_bindings'):self.root.briefs.pending_memory_bindings={}
+        self.root.briefs.pending_memory_bindings[document.content_digest]=memory_bindings
         if not hasattr(self.root.briefs,'pending_project_bindings'):self.root.briefs.pending_project_bindings={}
         self.root.briefs.pending_project_bindings[document.content_digest]=project_bindings
         self.root.briefs.pending_events[document.content_digest]={'selection_digest':selection_digest,
             'events':[{**e.metadata(),'editorial_included':brief_ref(r) in included} for e,r,_ in decisions],
             'signals':[{k:v for k,v in s.items() if k!='project'}|{'event_ref':e.event_ref,'revision':e.revision,
-                'project_binding':None if not s['project'] else {k:s['project'][k] for k in ('project_ref','version','digest')}} for e,_,s in decisions]}
+                'brief_evidence_ref':brief_ref(r),'editorial_included':brief_ref(r) in included,
+                'project_binding':None if not s['project'] else {k:s['project'][k] for k in ('project_ref','version','digest')}} for e,r,s in decisions]}
         cluster_refs={r.evidence_ref:(e.event_ref,e.revision) for e in events for r in e.records}
         selected={r.evidence_ref for r in bundle.selected} if bundle else set()
         editorial_selected={r.evidence_ref for _,r,_ in decisions if brief_ref(r) in included}
@@ -179,9 +193,9 @@ class BriefRuntime:
         self.root.briefs.pending_snapshots[document.content_digest]=list(snapshots)
         return document
 
-    def answer(self,*,topic,timezone_name,end_at=None,period_mode='rolling'):
+    def answer(self,*,topic,timezone_name,end_at=None,period_mode='rolling',prepared_document=None):
         from prm.application import PersonalResearchAssistant
-        document=self.build(topic=topic,timezone_name=timezone_name,end_at=end_at,period_mode=period_mode)
+        document=prepared_document or self.build(topic=topic,timezone_name=timezone_name,end_at=end_at,period_mode=period_mode)
         assistant=PersonalResearchAssistant(settings=self.root.settings,conversations=self.root.conversations,briefs=self.root.briefs)
         request=OperatorRequest(query=topic,mode='brief',chat_id=self.root.owner_chat_id,
             actor_id=self.root.owner_chat_id,owner_chat_id=self.root.owner_chat_id)
@@ -192,7 +206,10 @@ class BriefRuntime:
         snapshots=self.root.briefs.pending_snapshots.get(document.content_digest,[])
         if refs:self.root.conversations.record_origin(refs[0],classes,source_scopes=self.root.briefs.pending_scopes.get(document.content_digest,()),archive_snapshots=snapshots)
         inventory_hint='\nМатериалы выборки: /briefmaterials '+document.brief_id+' '+str(document.version)+' 0'
-        return replace(result,text=result.text+inventory_hint,payload={**result.payload,'archive_snapshots':snapshots,'source_data_classes':list(classes),'source_data_class':classes[0],'source_scopes':self.root.briefs.pending_scopes.get(document.content_digest,[]),'source_coverage':self.root.briefs.pending_coverage.get(document.content_digest)})
+        prompt=self.root.feedback.optional_prompt() if hasattr(self.root,'feedback') else ''
+        return replace(result,text=result.text+inventory_hint+('\n'+prompt if prompt else ''),payload={**result.payload,
+            'document_binding':{'brief_id':document.brief_id,'version':document.version,'content_digest':document.content_digest,'story_number':None},
+            'archive_snapshots':snapshots,'source_data_classes':list(classes),'source_data_class':classes[0],'source_scopes':self.root.briefs.pending_scopes.get(document.content_digest,[]),'source_coverage':self.root.briefs.pending_coverage.get(document.content_digest)})
 
     def materials(self,*,brief_id,version,offset=0,limit=20,guard=lambda:None):
         if type(version)is not int or version<1 or type(offset)is not int or not 0<=offset<=2048 or type(limit)is not int or not 1<=limit<=20:raise StorageError('bounded exact Brief material request required')
@@ -206,6 +223,8 @@ class BriefRuntime:
             scopes=manifest.payload.get('source_scopes',[]);snapshots=manifest.payload.get('archive_snapshots',[])
             from .source_access import project_bindings_current
             project_bindings_current(tx,owner,manifest.payload.get('project_bindings',[]))
+            from .source_access import memory_bindings_current
+            memory_bindings_current(tx,owner,manifest.payload.get('memory_bindings',[]))
             source_current(tx,self.root.registry,owner,scopes,archive_snapshots=snapshots,require_snapshot=True)
             pages=manifest.payload.get('material_pages',[]);rows=[];seen=0;dependencies=[parent]
             for page in pages:

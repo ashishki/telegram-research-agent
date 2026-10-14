@@ -11,6 +11,7 @@ PROTECTED=frozenset({'private_archive','private_connector_metadata','private_con
 def result_provenance(tx,owner,item):
     """Canonical response origins and both existing durable result layouts."""
     project_bindings_current(tx,owner,result_project_bindings(tx,owner,item))
+    memory_bindings_current(tx,owner,result_memory_bindings(tx,owner,item))
     if item.object_id.startswith('response_'):
         ref='response_origin_'+hashlib.sha256(item.object_id.encode()).hexdigest()[:32]
         origin=tx.get(owner,'conversation',ref)
@@ -19,13 +20,40 @@ def result_provenance(tx,owner,item):
         classes=origin.payload['data_classes'];scopes=origin.payload.get('source_scopes',[])
     else:
         details=item.payload.get('payload',{})
-        classes=item.payload.get('data_classes',details.get('source_data_classes',[item.payload.get('data_class','private_archive')]))
+        classes=item.payload.get('data_classes',details.get('source_data_classes',item.payload.get('source_data_classes',[item.payload.get('data_class','private_archive')])))
         scopes=details.get('source_scopes',item.payload.get('source_scopes',[]))
     if not isinstance(classes,(list,tuple)) or not classes:raise StorageError('result data classes unavailable')
     if not isinstance(scopes,(list,tuple)) or len(scopes)>16:raise StorageError('bounded result source authority required')
     if not set(classes)<= {'model_generated','private_archive','private_connector_metadata','private_connector_content','user_provided','public'}:raise StorageError('unknown result data class')
     if not set(classes)&PROTECTED<={s.get('data_class') for s in scopes}:raise CapabilityDenied('protected result source authority unavailable')
     return tuple(classes),tuple(scopes)
+
+
+def result_memory_bindings(tx,owner,item):
+    dependencies=tx.conn.execute("SELECT to_regclass('pa_memory.dependencies') AS meta").fetchone()['meta'] is not None
+    pending=[item.object_id];seen=set();bindings={}
+    while pending:
+        ref=pending.pop()
+        if ref in seen:continue
+        seen.add(ref)
+        if len(seen)>64:raise StorageError('bounded memory provenance graph required')
+        current=tx.get(owner,'result',ref)
+        if current is None:raise StorageError('result memory provenance deleted')
+        for b in current.payload.get('memory_bindings',current.payload.get('payload',{}).get('memory_bindings',[])):
+            bindings[(b['memory_ref'],b['version'],b['digest'])]=b
+        if ref.startswith('response_'):
+            origin=tx.get(owner,'conversation','response_origin_'+hashlib.sha256(ref.encode()).hexdigest()[:32])
+            for b in origin.payload.get('memory_bindings',[]) if origin else ():
+                bindings[(b['memory_ref'],b['version'],b['digest'])]=b
+        rows=tx.conn.execute("SELECT parent_ref FROM pa_memory.dependencies WHERE owner=%s AND parent_namespace='result' AND child_namespace='result' AND child_ref=%s",(owner,ref)).fetchall() if dependencies else ()
+        pending.extend(row['parent_ref'] for row in rows)
+    return list(bindings.values())
+
+
+def memory_bindings_current(tx,owner,bindings):
+    if not isinstance(bindings,(list,tuple)) or len(bindings)>16:raise StorageError('bounded memory bindings required')
+    from .memory_context import memory_current
+    for binding in bindings:memory_current(tx,owner,binding)
 
 
 def result_project_bindings(tx,owner,item):

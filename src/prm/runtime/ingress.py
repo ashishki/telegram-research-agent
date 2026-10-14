@@ -40,7 +40,7 @@ class TelegramJobIngress:
         self.telegram_destination = TelegramDestination(chat_id=owner_chat_id, bot_ref=bot_ref)
         self.bindings = TelegramBindings(queue, owner=owner_ref, destination=self.telegram_destination)
         self.inbox = TelegramInbox(self.bindings)
-        self.allowed_updates = ('message', 'edited_message', 'callback_query')
+        self.allowed_updates = ('message', 'edited_message', 'callback_query','message_reaction')
 
     def polling_offset(self):
         return self.inbox.polling_offset()
@@ -54,7 +54,13 @@ class TelegramJobIngress:
             if local and local.payload.get('status') == 'sent': return local.payload.get('text')
             with self.queue.store.transaction() as tx:
                 row = tx.conn.execute('SELECT payload,digest,status FROM pa_delivery.attempts WHERE owner=%s AND id=%s', (self.owner_ref, binding.delivery_ref)).fetchone()
-                if row and row['status'] == 'sent' and _canonical(row['payload'])[1] == row['digest']: return row['payload']['text']
+                if row and row['status'] == 'sent' and _canonical(row['payload'])[1] == row['digest']:
+                    if row['payload'].get('telegram_rich_part_ref'):
+                        from prm.telegram_rich import plain_text
+                        part=tx.get(self.owner_ref,'result',row['payload']['telegram_rich_part_ref'],version=1)
+                        if part and part.digest==row['payload']['telegram_rich_part_digest']:return plain_text(part.payload['rich_message'])
+                        return None
+                    return row['payload']['text']
         state = self.queue.status(owner=self.owner_ref, job_id=binding.job_ref)
         if state:
             item = self.queue.store.get(self.owner_ref, 'conversation', state['input_ref'])
@@ -74,6 +80,10 @@ class TelegramJobIngress:
         elif envelope.kind == 'edited_message':
             self.bindings.revise_source(update, envelope)
             reply = IntakeReply('Исправление сохранено. Кнопки и подтверждения прежней версии недействительны. Новый запрос пока не запущен.', destination=envelope.destination)
+        elif envelope.kind=='message_reaction':
+            runtime=getattr(self,'feedback_runtime',None)
+            if runtime is not None:runtime.receive_reaction(update,envelope)
+            reply=None
         else:
             binding = self.bindings.for_message(envelope.destination, envelope.reply_to_message_id) if envelope.reply_to_message_id else None
             if envelope.quote and binding:
@@ -95,6 +105,7 @@ class TelegramJobIngress:
             return None
         text = str(callback.get('data', '')) if isinstance(callback, dict) else str(message.get('text', '')).strip()
         raw_text = text
+        document_control=None
         if envelope.source_trust == 'untrusted_source' and not isinstance(callback, dict):
             text = 'Поясни пересланный материал (недоверенные данные):\n' + text
         if message.get('message_thread_id') is not None:
@@ -102,12 +113,22 @@ class TelegramJobIngress:
         if isinstance(callback, dict):
             if text.startswith('paic:'):
                 selected = self.bindings.resolve_control(text, destination=self.telegram_destination)
-                if selected is None: return IntakeReply('Эта кнопка устарела или недоступна.')
-                return self.resolve_control(selected[0], explicit_ref=selected[1], update=update)
-            parts = text.split(':')
-            if len(parts) != 3 or parts[0] != 'pai' or parts[1] not in {'status', 'cancel', 'result'}:
-                return IntakeReply('Это действие недоступно; подтверждение не использовано.')
-            return self.resolve_control(parts[1], explicit_ref=parts[2], update=update)
+                if selected is not None:return self.resolve_control(selected[0], explicit_ref=selected[1], update=update)
+                document_control=self.bindings.resolve_document_control(text,destination=self.telegram_destination)
+                if document_control is None:return IntakeReply('Эта кнопка устарела или недоступна.')
+                import json
+                text='/document '+json.dumps({'brief_id':document_control['brief_id'],'version':document_control['brief_version'],
+                    'action':document_control['action'],'story_number':document_control['story_number']},ensure_ascii=False)
+                raw_text=text
+                # A callback is a new owner request, not a revision/rebinding of
+                # the bot message that happens to contain the clicked button.
+                message={'from':actor,'chat':chat}
+                callback=None
+            if document_control is None:
+                parts = text.split(':')
+                if len(parts) != 3 or parts[0] != 'pai' or parts[1] not in {'status', 'cancel', 'result'}:
+                    return IntakeReply('Это действие недоступно; подтверждение не использовано.')
+                return self.resolve_control(parts[1], explicit_ref=parts[2], update=update)
         parts = text.split(maxsplit=1)
         watch_words={'подтвердить наблюдение':'/watchconfirm','проверить наблюдение':'/watchstatus',
                      'приостановить наблюдение':'/watchpause','возобновить наблюдение':'/watchresume',
@@ -167,7 +188,9 @@ class TelegramJobIngress:
         body.update({'chat_id': self.owner_chat_id, 'actor_id': self.owner_chat_id,
                      'owner_chat_id': self.owner_chat_id, 'schema_version': 1})
         body['telegram_envelope'] = asdict(envelope)
-        if envelope.reply_to_message_id is not None:
+        if document_control is not None:
+            body['reply_target']={'job_ref':document_control['job_ref'],'result_ref':document_control['response_ref'],'result_version':document_control['response_version']}
+        elif envelope.reply_to_message_id is not None:
             if reply_binding is None:
                 return IntakeReply('Исходное сообщение или его версия недоступны. Выбери доступный результат.', disposition='rejected')
             state = self.queue.status(owner=self.owner_ref, job_id=reply_binding.job_ref)
@@ -345,7 +368,7 @@ class RequestConversations:
 
     def __getattr__(self, name):
         method = getattr(self.store, name)
-        if name not in {'load', 'start', 'active_or_start', 'begin_new_topic', 'record_response', 'offer_confirmation',
+        if name not in {'load', 'start', 'active_or_start', 'begin_new_topic', 'record_response', 'record_model_response', 'offer_confirmation',
                        'resolve_plain_yes', 'start_request', 'finish_request', 'cancel', 'is_cancelled', 'history',
                        'history_for_model', 'user_prompts_for_model'}:
             return method

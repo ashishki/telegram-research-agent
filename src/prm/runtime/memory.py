@@ -42,18 +42,34 @@ class MemoryRuntime:
         owner=brief_owner_ref_from_authenticated_private_tuple(chat_id,actor_id,owner_chat_id)
         if owner!=self.root.owner_ref:raise CapabilityDenied('explicit private memory owner required')
         return owner
-    def preview(self,*,object_ref,text,source_refs,kind='note',lifecycle='indexed',expected_version=0,project_context=None,chat_id,actor_id,owner_chat_id):
+    def preview(self,*,object_ref,text,source_refs,kind='note',lifecycle='indexed',expected_version=0,project_context=None,source_bindings=(),expires_at=None,preference_rule=None,chat_id,actor_id,owner_chat_id):
         owner=self._owner(chat_id,actor_id,owner_chat_id)
         if kind not in {'note','preference','learning','project'} or lifecycle not in self.LIFECYCLES or not isinstance(text,str) or not 0<len(text)<=12000:
             raise StorageError('bounded explicit memory content required')
         if not isinstance(source_refs,tuple) or not source_refs or len(source_refs)>16:raise StorageError('explicit provenance required')
         payload={'text':text,'source_refs':list(source_refs),'kind':kind,'lifecycle':lifecycle,'explicit_owner_request':True}
+        if source_bindings:
+            from .memory_context import validate_bindings
+            payload['source_bindings']=validate_bindings(source_bindings)
+            if any(b['namespace']=='memory' and b['ref']==object_ref for b in payload['source_bindings']):raise StorageError('memory cannot depend on its own replaced version')
+        if expires_at is not None:
+            from .profiles import aware
+            payload['expires_at']=aware(expires_at).isoformat()
+        if preference_rule is not None:
+            from prm.feedback import validate_preference_rule
+            if kind!='preference':raise StorageError('selection rule needs preference preview')
+            payload['preference_rule']=validate_preference_rule(preference_rule)
         if kind=='project':
             from .projects import validate_context
             payload['project_context']=validate_context(project_context)
         elif project_context is not None:raise StorageError('project context requires its explicit memory kind')
         _,digest=_canonical(payload);ref='memoryconfirm_'+uuid.uuid4().hex
         with self.store.transaction() as tx:
+            if kind!='project' and source_bindings:
+                from .memory_context import binding_provenance
+                classes,scopes,snapshots=binding_provenance(self.root,tx,payload['source_bindings'])
+                payload.update(source_data_classes=classes,source_scopes=scopes,archive_snapshots=snapshots)
+                _,digest=_canonical(payload)
             tx.conn.execute('INSERT INTO pa_memory.previews(owner,id,object_ref,payload,digest,expected_version,expires) VALUES(%s,%s,%s,%s,%s,%s,%s)',
                 (owner,ref,object_ref,Jsonb(payload),digest,expected_version,datetime.now(timezone.utc)+timedelta(minutes=10)))
         return ref
@@ -71,7 +87,18 @@ class MemoryRuntime:
                 context=self.root.projects.validate_in(tx,payload['project_context'],row['object_ref'])
                 context={**context,'descriptor':{**context['descriptor'],'owner_confirmation_status':'confirmed'}}
                 payload={**payload,'project_context':context,'project_confirmation':{'preview_ref':row['id'],'digest':row['digest']}}
+            else:
+                from .memory_context import binding_provenance
+                classes,scopes,snapshots=binding_provenance(self.root,tx,payload.get('source_bindings',[]))
+                if payload.get('expires_at'):
+                    from .profiles import aware
+                    if aware(payload['expires_at'])<=now:raise StateConflict('memory source expired before confirmation')
+                if payload.get('source_bindings') and (classes!=payload['source_data_classes'] or scopes!=payload['source_scopes'] or snapshots!=payload['archive_snapshots']):raise StateConflict('memory provenance changed before confirmation')
+                payload={**payload,'memory_confirmation':{'preview_ref':row['id'],'digest':row['digest']}}
             item=tx.put(owner,'memory',row['object_ref'],payload,expected_version=row['expected_version'])
+            if payload['kind']!='project':
+                for b in payload.get('source_bindings',[]):
+                    tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',(owner,b['namespace'],b['ref'],'memory',item.object_id))
             if payload['kind']=='project':
                 for b in context['source_bindings']:
                     tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',(owner,b['namespace'],b['ref'],'memory',item.object_id))
@@ -83,6 +110,10 @@ class MemoryRuntime:
         with self.store.transaction() as tx:
             item=tx.get(owner,'memory',object_ref)
             if item and item.payload.get('kind')=='project':return self.root.projects._get_in(tx,object_ref)
+            if item and item.payload.get('source_bindings'):
+                from .memory_context import memory_current,binding_provenance
+                memory_current(tx,owner,{'memory_ref':item.object_id,'version':item.version,'digest':item.digest})
+                binding_provenance(self.root,tx,item.payload['source_bindings'])
             return item
     def forget(self,object_ref,*,chat_id,actor_id,owner_chat_id):
         owner=self._owner(chat_id,actor_id,owner_chat_id)
@@ -108,16 +139,8 @@ class MemoryRuntime:
     def search(self,query,*,chat_id,actor_id,owner_chat_id,limit=20):
         owner=self._owner(chat_id,actor_id,owner_chat_id)
         if not isinstance(query,str) or len(query)>500 or not 1<=limit<=50:raise StorageError('bounded memory search required')
-        with self.store.transaction() as tx:
-            rows=tx.conn.execute('''SELECT h.object_id FROM pa_runtime.object_heads h JOIN pa_runtime.object_versions v USING(owner,namespace,object_id,version)
-                WHERE h.owner=%s AND h.namespace='memory' AND position(lower(%s) in lower(v.payload::text))>0
-                ORDER BY h.object_id LIMIT %s''',(owner,query,limit)).fetchall()
-            output=[]
-            for row in rows:
-                item=tx.get(owner,'memory',row['object_id'])
-                if item and item.payload.get('kind')=='project':item=self.root.projects._get_in(tx,item.object_id)
-                if item:output.append(item)
-            return output
+        from .memory_context import retrieve_memory
+        with self.store.transaction() as tx:return retrieve_memory(self.root,tx,query,limit=limit)
 
     def export_objects(self,*,chat_id,actor_id,owner_chat_id):
         owner=self._owner(chat_id,actor_id,owner_chat_id)
@@ -126,7 +149,13 @@ class MemoryRuntime:
             output=[]
             for row in rows:
                 item=tx.get(owner,'memory',row['object_id'])
-                if item and item.payload.get('kind')=='project':item=self.root.projects._get_in(tx,item.object_id)
+                try:
+                    if item and item.payload.get('kind')=='project':item=self.root.projects._get_in(tx,item.object_id)
+                    elif item and item.payload.get('source_bindings'):
+                        from .memory_context import memory_current,binding_provenance
+                        memory_current(tx,owner,{'memory_ref':item.object_id,'version':item.version,'digest':item.digest})
+                        binding_provenance(self.root,tx,item.payload['source_bindings'])
+                except (StorageError,CapabilityDenied):continue
                 if item:output.append(item)
             return output
     def export(self,**actor):return [i.payload for i in self.export_objects(**actor)]

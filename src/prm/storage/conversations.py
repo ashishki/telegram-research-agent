@@ -125,6 +125,7 @@ class DurableConversationStore(ConversationStore):
         with self.store.transaction() as tx:return self._run_in(tx,method,chat_id,*args,**kwargs)
 
     def _run_in(self,tx,method,chat_id,*args,**kwargs):
+        response_namespace=kwargs.pop('_response_namespace',None)
         conversation_id=conversation_id_for(chat_id)
         _check(tx.conn);self._lock(tx.conn,conversation_id)
         now=tx.conn.execute('SELECT clock_timestamp() AS now').fetchone()['now']
@@ -134,6 +135,15 @@ class DurableConversationStore(ConversationStore):
         kwargs['now']=now
         result=getattr(local,method)(chat_id,*args,**kwargs)
         state=local._states.get(conversation_id)
+        if method=='record_response' and response_namespace and state and state.object_refs:
+            # Equal answer text after deletion/reset cannot reuse a tombstoned
+            # ID. Bind native response identity to the immutable owner request.
+            from dataclasses import replace
+            original=state.object_refs[0]
+            def salted(ref):return 'response_'+hashlib.sha256((response_namespace+'\x1f'+ref).encode()).hexdigest()[:24]
+            rewritten=replace(original,response_ref=salted(original.response_ref),item_refs=tuple(salted(ref) for ref in original.item_refs))
+            state=replace(state,object_refs=(rewritten,*state.object_refs[1:]),message_refs=tuple(rewritten.response_ref if ref==original.response_ref else ref for ref in state.message_refs))
+            local._states[conversation_id]=state;result=state
         if state and method not in {'load','resolve_plain_yes','is_cancelled'}:
             self._save(tx,state,row['version'] if row else None)
             if method=='record_response' and self.history_retention_seconds:
@@ -217,28 +227,56 @@ class DurableConversationStore(ConversationStore):
         item=self.store.get(self.owner_ref,'conversation','response_origin_'+hashlib.sha256(response_ref.encode()).hexdigest()[:32])
         return tuple(item.payload.get('archive_snapshots',())) if item else ()
 
-    def record_origin(self,response_ref,data_classes,*,source_scopes=(),parent_response_ref=None,archive_snapshots=()):
+    def record_origin(self,response_ref,data_classes,*,source_scopes=(),parent_response_ref=None,archive_snapshots=(),memory_bindings=()):
+        from prm.runtime.deletion import lineage_lock
+        with self.store.transaction() as tx:
+            lineage_lock(tx.conn,self.owner_ref)
+            self._record_origin_in(tx,response_ref,data_classes,source_scopes=source_scopes,parent_response_ref=parent_response_ref,
+                archive_snapshots=archive_snapshots,memory_bindings=memory_bindings)
+
+    def _record_origin_in(self,tx,response_ref,data_classes,*,source_scopes=(),parent_response_ref=None,archive_snapshots=(),memory_bindings=()):
         classes=tuple(sorted(set(data_classes)))
         if not classes or not set(classes)<= {'model_generated','private_archive','private_connector_metadata','private_connector_content','user_provided','public'}:
             raise StorageError('explicit response origin classes required')
-        from prm.runtime.deletion import lineage_lock
         ref='response_origin_'+hashlib.sha256(response_ref.encode()).hexdigest()[:32]
+        if tx.get(self.owner_ref,'result',response_ref) is None:raise StorageError('response unavailable')
+        if parent_response_ref and tx.get(self.owner_ref,'result',parent_response_ref) is None:raise StorageError('source response deleted')
+        old=tx.get(self.owner_ref,'conversation',ref)
+        payload={'response_ref':response_ref,'data_classes':list(classes),'source_scopes':list(source_scopes)}
+        if archive_snapshots:payload['archive_snapshots']=list(archive_snapshots)
+        if memory_bindings:
+            from prm.runtime.source_access import memory_bindings_current
+            memory_bindings_current(tx,self.owner_ref,memory_bindings)
+            payload['memory_bindings']=list(memory_bindings)
+        if old and old.payload!=payload:raise StateConflict('response origin cannot be relabelled')
+        if old is None:tx.put(self.owner_ref,'conversation',ref,payload,expected_version=0)
+        for b in memory_bindings:
+            tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',(self.owner_ref,'memory',b['memory_ref'],'result',response_ref))
+        if tx.conn.execute("SELECT to_regclass('pa_memory.dependencies') AS meta").fetchone()['meta'] is not None:
+            tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',
+                (self.owner_ref,'result',response_ref,'conversation',ref))
+            if parent_response_ref and parent_response_ref!=response_ref:
+                tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',
+                    (self.owner_ref,'result',parent_response_ref,'result',response_ref))
+        if classes==('model_generated',):
+            tx.conn.execute("UPDATE pa_conversation.history SET payload=jsonb_set(payload,'{source_data_class}',%s) WHERE owner=%s AND payload->>'response_ref'=%s",
+                (Jsonb('model_generated'),self.owner_ref,response_ref))
+
+    def record_model_response(self,chat_id,**kwargs):
+        from prm.runtime.deletion import lineage_lock
         with self.store.transaction() as tx:
             lineage_lock(tx.conn,self.owner_ref)
-            if tx.get(self.owner_ref,'result',response_ref) is None:raise StorageError('response unavailable')
-            if parent_response_ref and tx.get(self.owner_ref,'result',parent_response_ref) is None:raise StorageError('source response deleted')
-            old=tx.get(self.owner_ref,'conversation',ref)
-            payload={'response_ref':response_ref,'data_classes':list(classes),'source_scopes':list(source_scopes)}
-            if archive_snapshots:payload['archive_snapshots']=list(archive_snapshots)
-            if old and old.payload!=payload:raise StateConflict('response origin cannot be relabelled')
-            if old is None:tx.put(self.owner_ref,'conversation',ref,payload,expected_version=0)
-            if tx.conn.execute("SELECT to_regclass('pa_memory.dependencies') AS meta").fetchone()['meta'] is not None:
-                tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',
-                    (self.owner_ref,'result',response_ref,'conversation',ref))
-                if parent_response_ref and parent_response_ref!=response_ref:
-                    tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',
-                        (self.owner_ref,'result',parent_response_ref,'result',response_ref))
-        if classes==('model_generated',):self.tag_response_source(response_ref,'model_generated')
+            return self._record_model_response_in(tx,chat_id,**kwargs)
+
+    def _record_model_response_in(self,tx,chat_id,*,text,query,data_classes,source_scopes=(),archive_snapshots=(),memory_bindings=(),provenance_guard,_response_namespace=None):
+        from prm.runtime.source_access import memory_bindings_current
+        memory_bindings_current(tx,self.owner_ref,memory_bindings);provenance_guard(tx)
+        state=self._run_in(tx,'record_response',chat_id,text=text,topic='',_response_namespace=_response_namespace)
+        response_ref=state.object_refs[0].response_ref
+        self._record_origin_in(tx,response_ref,data_classes,source_scopes=source_scopes,archive_snapshots=archive_snapshots,memory_bindings=memory_bindings)
+        tx.conn.execute("UPDATE pa_conversation.history SET payload=jsonb_set(payload,'{user_prompt}',%s) WHERE owner=%s AND payload->>'response_ref'=%s AND payload->>'source_data_class'='model_generated'",
+            (Jsonb(query[:1200]),self.owner_ref,response_ref))
+        return state
 
     def purge_history(self):
         with self.store.transaction() as tx:

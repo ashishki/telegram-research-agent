@@ -73,12 +73,13 @@ class RuntimeModelAccess:
 
 
 class ScopedModelClient:
-    def __init__(self, endpoint: ModelEndpoint, registry: DurableCapabilityRegistry, *, groups, history=(), guard=None,usage_observer=None,task_ref=None,source_scopes=(),archive_snapshots=(),profile_binding=None):
+    def __init__(self, endpoint: ModelEndpoint, registry: DurableCapabilityRegistry, *, groups, history=(), guard=None,usage_observer=None,task_ref=None,source_scopes=(),archive_snapshots=(),profile_binding=None,memory_bindings=()):
         self.endpoint,self.registry,self.groups=endpoint,registry,tuple(tuple(group) for group in groups)
         self.history=tuple(history);self.guard=guard
         self.usage_observer=usage_observer;self.task_ref=task_ref;self.attempt_ref=None;self._called=False;self.input_digest=None
         self.source_scopes=tuple(dict(s) for s in source_scopes)
         self.archive_snapshots=tuple(archive_snapshots);self.profile_binding=profile_binding
+        self.memory_bindings=tuple(dict(b) for b in memory_bindings)
 
     def stream_with_receipt(self,*,on_event,cancelled=None,**kwargs):
         return self._complete(stream=True,on_event=on_event,cancelled=cancelled,**kwargs)
@@ -119,11 +120,16 @@ class ScopedModelClient:
             def attempted():
                 nonlocal http_attempted
                 http_attempted=True
-            if self.source_scopes:
+            if self.source_scopes or self.memory_bindings:
                 from .source_access import source_current
                 # Prepared model scopes already own their final locks here.
                 # Selected read grants stay locked until this HTTP call returns.
                 with self.registry.store.transaction() as source_tx:
+                    if self.memory_bindings:
+                        from .deletion import lineage_lock
+                        from .source_access import memory_bindings_current
+                        lineage_lock(source_tx.conn,owner_ref)
+                        memory_bindings_current(source_tx,owner_ref,self.memory_bindings)
                     source_current(source_tx,self.registry,owner_ref,self.source_scopes,archive_snapshots=self.archive_snapshots,require_snapshot=True)
                     return adapter.send(body,before_request=attempted,on_event=on_event,cancelled=cancelled,guard=self.guard)
             return adapter.send(body,before_request=attempted,on_event=on_event,cancelled=cancelled,guard=self.guard)

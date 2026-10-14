@@ -47,10 +47,24 @@ class TelegramBindings:
         if binding.response_ref is not None: self._dependency(tx, binding.response_ref, ref, 'result')
         return item
 
+    def bind_presentation_in(self,tx,binding,*,expected_revision,prior_delivery_ref):
+        """An acknowledged edit may revise presentation of the same immutable result."""
+        self._lineage_lock(tx);ref=self._message_ref(binding.destination,binding.message_id)
+        tx._object_lock(self.owner,'conversation',ref);old=tx.get(self.owner,'conversation',ref)
+        if old is None:raise StateConflict('edited bot message binding unavailable')
+        before=dict(old.payload);before.pop('schema_version');after=asdict(binding)
+        if before['presentation_revision']!=expected_revision or before['delivery_ref']!=prior_delivery_ref or binding.presentation_revision!=expected_revision+1:raise StateConflict('presentation revision changed before edit')
+        if any(before[k]!=after[k] for k in before if k not in {'presentation_revision','delivery_ref'}):raise StateConflict('presentation edit cannot rebind facts or owner')
+        job=tx.conn.execute('SELECT payload,result_ref FROM pa_jobs.jobs WHERE owner=%s AND id=%s',(self.owner,binding.job_ref)).fetchone()
+        if job is None or job['result_ref']!=binding.response_ref:raise StateConflict('edited result unavailable')
+        self.queue._input(tx,self.owner,job['payload'])
+        return tx.put(self.owner,'conversation',ref,{'schema_version':'telegram.message_binding.v2',**after},expected_version=old.version)
+
     def source_ref(self, route, message_id):
         return self._message_ref(route, message_id).replace('telegram_message_', 'telegram_source_', 1)
 
     def source_in(self, tx, envelope):
+        if envelope.kind=='callback_query':return None,1
         if envelope.message_id is None: return None, 1
         ref = self.source_ref(envelope.destination, envelope.message_id)
         tx._object_lock(self.owner, 'conversation', ref)
@@ -247,6 +261,53 @@ class TelegramBindings:
             except StorageError: return None
             if value.get('response_ref') is not None and tx.get(self.owner, 'result', value['response_ref'], version=value['response_version']) is None: return None
             return value['command'], value['job_ref']
+
+    def issue_document_control(self,*,job_id,response_ref,response_version,brief_id,brief_version,content_digest,action,story_number=None,ttl_seconds=900):
+        if action not in {'full','explain','why','sources','apply','short','save','refresh','export'} or type(ttl_seconds)is not int or not 1<=ttl_seconds<=3600:raise StorageError('bounded document control required')
+        if story_number is not None and (type(story_number)is not int or not 1<=story_number<=20):raise StorageError('bounded document story required')
+        token=uuid.uuid4().hex;ref='telegram_control_'+token
+        with self.store.transaction() as tx:
+            self._lineage_lock(tx)
+            job=tx.conn.execute('SELECT payload,result_ref FROM pa_jobs.jobs WHERE owner=%s AND id=%s',(self.owner,job_id)).fetchone()
+            if job is None or job['result_ref']!=response_ref:raise StorageError('document control result differs')
+            self.queue._input(tx,self.owner,job['payload'])
+            result=tx.get(self.owner,'result',response_ref,version=response_version)
+            if result is None:raise StorageError('document control result version missing')
+            target=result.payload.get('payload',{}).get('document_binding') or result.payload.get('payload',{}).get('brief_document')
+            if not target or (target['brief_id'],target['version'])!=(brief_id,brief_version):raise StorageError('document control target differs')
+            from prm.storage.briefs import DurableBriefStore
+            store=DurableBriefStore(self.store.target,owner_ref=self.owner)
+            manifest=tx.get(self.owner,'result',store._document_ref(brief_id),version=brief_version)
+            if manifest is None or manifest.payload.get('content_digest')!=content_digest:raise StorageError('document control content differs')
+            now=tx.conn.execute('SELECT clock_timestamp() AS now').fetchone()['now']
+            tx.put(self.owner,'conversation',ref,{'schema_version':'telegram.document_control.v1','destination':asdict(self.destination),
+                'job_ref':job_id,'response_ref':response_ref,'response_version':response_version,'input_digest':job['payload']['input_digest'],
+                'brief_id':brief_id,'brief_version':brief_version,'content_digest':content_digest,'manifest_ref':manifest.object_id,
+                'manifest_digest':manifest.digest,'action':action,'story_number':story_number,'expires_at':(now+timedelta(seconds=ttl_seconds)).isoformat()},expected_version=0)
+            self._dependency(tx,response_ref,ref,'result');self._dependency(tx,manifest.object_id,ref,'result')
+        return 'paic:'+token
+
+    def document_control_in(self,tx,token,*,destination):
+        if destination!=self.destination or not isinstance(token,str) or not re.fullmatch(r'paic:[a-f0-9]{32}',token):return None
+        item=tx.get(self.owner,'conversation','telegram_control_'+token[5:])
+        if item is None:return None
+        value=item.payload
+        if value.get('schema_version')!='telegram.document_control.v1' or value.get('destination')!=asdict(destination):return None
+        now=tx.conn.execute('SELECT clock_timestamp() AS now').fetchone()['now']
+        if datetime.fromisoformat(value['expires_at'])<=now:return None
+        job=tx.conn.execute('SELECT payload,result_ref FROM pa_jobs.jobs WHERE owner=%s AND id=%s',(self.owner,value['job_ref'])).fetchone()
+        if not job or job['payload']['input_digest']!=value['input_digest'] or job['result_ref']!=value['response_ref']:return None
+        try:self.queue._input(tx,self.owner,job['payload'])
+        except StorageError:return None
+        result=tx.get(self.owner,'result',value['response_ref'],version=value['response_version'])
+        manifest=tx.get(self.owner,'result',value['manifest_ref'],version=value['brief_version'])
+        if result is None or manifest is None or manifest.digest!=value['manifest_digest'] or manifest.payload.get('content_digest')!=value['content_digest']:return None
+        return dict(value)
+
+    def resolve_document_control(self,token,*,destination):
+        with self.store.transaction() as tx:
+            self._lineage_lock(tx)
+            return self.document_control_in(tx,token,destination=destination)
 
 
 class TelegramInbox:

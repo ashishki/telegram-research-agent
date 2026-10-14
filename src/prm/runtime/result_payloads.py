@@ -14,6 +14,7 @@ PROJECTION_KEYS = frozenset({
     'model_call_attempted', 'model_reply_observed', 'provider_outcome',
     'accounting_status', 'write_performed', 'retrieval_performed',
     'telegram_parse_mode', 'telegram_navigation', 'delivery_completion',
+    'document_binding','brief_view','memory_bindings','archive_snapshots',
 })
 
 

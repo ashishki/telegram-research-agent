@@ -80,6 +80,11 @@ class KnownDeliveryNotStarted(KnownDeliveryRejection):
 
 def _multipart_payloads(payload):
     """Reconstruct the exact payloads used by both dispatch and reconciliation."""
+    if payload.get('telegram_method')=='sendRichMessage':
+        refs=payload.get('telegram_rich_parts',[])
+        if not isinstance(refs,list) or not 1<=len(refs)<=32:raise StorageError('sealed rich part plan required')
+        return [{**payload,'text':'Сохранённое rich-представление, часть '+str(index+1)+'/'+str(len(refs))+'.',
+            'telegram_rich_part_ref':part['ref'],'telegram_rich_part_digest':part['digest'],'part':index+1,'parts':len(refs)} for index,part in enumerate(refs)]
     text=payload['text']
     if len(text)>32000:raise StorageError('bounded answer exceeds delivery size')
     if payload.get('telegram_parse_mode')=='HTML':
@@ -104,6 +109,122 @@ class DeliveryExecutor:
         with self.store.transaction() as tx:
             _check(tx.conn)
             return tx.conn.execute('SELECT * FROM pa_delivery.attempts WHERE owner=%s AND id=%s', (owner, delivery_id)).fetchone()
+
+    def _rich_plan(self,owner,job_id,result,payload):
+        from prm.telegram_rich import render_rich_brief,render_rich_answer
+        from prm.storage.telegram import TelegramBindings
+        from prm.storage.jobs import JobQueue
+        from prm.storage.briefs import DurableBriefStore
+        options=result.payload.get('payload',{});pointer=options.get('document_binding') or options.get('brief_document')
+        bindings=TelegramBindings(JobQueue(self.store.target),owner=owner,destination=self.sender.destination)
+        controls=[];source_urls=[]
+        if pointer:
+            store=DurableBriefStore(self.store.target,owner_ref=owner,registry=self.registry)
+            item=store.store.get(owner,'result',store._document_ref(pointer['brief_id']),version=pointer['version'])
+            if item is None:raise StorageError('rich document version unavailable')
+            document=store._decode_document(item)
+            controls=[{'text':label,'callback_data':bindings.issue_document_control(job_id=job_id,response_ref=result.object_id,response_version=result.version,
+                brief_id=document.brief_id,brief_version=document.version,content_digest=document.content_digest,action=action,
+                story_number=pointer.get('story_number'))} for label,action in (('Источники','sources'),('Обсудить','full'),('Сохранить','save'))]
+            report=render_rich_brief(document,controls=controls,view=options.get('brief_view','full'),story_number=pointer.get('story_number'));messages=report.messages;source_urls=list(report.source_refs)
+            payload['telegram_document_binding']={'brief_id':document.brief_id,'version':document.version,'content_digest':document.content_digest}
+            payload['telegram_navigation']={'kind':'inline_keyboard','inline_keyboard':[[b] for b in controls]}
+        else:messages=render_rich_answer(result.payload['text'])
+        tokens=[b['callback_data'] for b in controls];parts=[]
+        for index,message in enumerate(messages):
+            urls=[];used_tokens=[]
+            def walk(node):
+                if isinstance(node,list):
+                    for value in node:walk(value)
+                elif isinstance(node,dict):
+                    if node.get('type')=='url':urls.append(node['url'])
+                    if 'callback_data' in node:used_tokens.append(node['callback_data'])
+                    for value in node.values():
+                        if isinstance(value,(list,dict)):walk(value)
+            walk(message)
+            if not set(urls)<=set(source_urls) or not set(used_tokens)<=set(tokens):raise StorageError('rich controls/source links differ')
+            value={'kind':'telegram_rich_part','parent_result_ref':result.object_id,'parent_result_digest':result.digest,'rich_message':message,
+                'source_urls':list(dict.fromkeys(urls)),'callback_tokens':list(dict.fromkeys(used_tokens)),
+                'data_classes':payload['data_classes'],'data_class':payload['data_class'],'source_scopes':payload.get('source_scopes',[]),
+                'archive_snapshots':payload.get('archive_snapshots',[])}
+            ref='richpart_'+hashlib.sha256((result.object_id+':'+str(index)+':'+_canonical(value)[1]).encode()).hexdigest()[:32]
+            with self.store.transaction() as tx:
+                from .deletion import lineage_lock
+                lineage_lock(tx.conn,owner);self._source_current(tx,owner,payload)
+                old=tx.get(owner,'result',ref)
+                stored=old or tx.put(owner,'result',ref,value,expected_version=0)
+                if stored.payload!=value:raise StateConflict('immutable rich part differs')
+                tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',(owner,'result',result.object_id,'result',ref))
+            parts.append({'ref':ref,'digest':stored.digest})
+        return {**payload,'schema_version':'telegram.delivery.v3','telegram_method':'sendRichMessage','telegram_rich_parts':parts,
+            'telegram_document_tokens':tokens,'compatible_delivery_id':'answer_'+job_id+'_compatible',
+            'text':'Сохранённое rich-представление результата.','text_is_receipt_summary':True}
+
+    def _compatible(self,owner,job_id,result,payload,destination_ref,upper_bound,effect_lease):
+        delivery_id=payload['compatible_delivery_id']
+        prior=self.attempt(owner=owner,delivery_id=delivery_id)
+        if prior:return prior
+        value={k:v for k,v in payload.items() if k not in {'telegram_rich_parts','telegram_rich_part_ref','telegram_rich_part_digest','compatible_delivery_id','text_is_receipt_summary','part','parts'}}
+        value.update(text=result.payload['text'],telegram_method='sendMessage',compatible_from='answer_'+job_id)
+        return self._send_payload(owner,job_id,delivery_id,destination_ref,value,upper_bound,effect_lease)
+
+    def _send_payload(self,owner,job_id,delivery_id,destination_ref,payload,upper_bound,effect_lease):
+        parts=_multipart_payloads(payload) if payload.get('telegram_method')=='sendRichMessage' or len(payload['text'])>3800 else [payload]
+        if len(parts)==1:
+            return self._deliver(owner=owner,delivery_id=delivery_id,kind='answer',source_ref=job_id,destination_ref=destination_ref,
+                payload=parts[0],upper_bound=upper_bound,effect_lease=effect_lease)
+        digest=_canonical(payload)[1]
+        with self.store.transaction() as tx:
+            existing=tx.conn.execute('SELECT * FROM pa_delivery.attempts WHERE owner=%s AND id=%s FOR UPDATE',(owner,delivery_id)).fetchone()
+            if existing:
+                if existing['digest']!=digest:raise StateConflict('aggregate rich/compatible identity differs')
+                return existing
+            tx.conn.execute("INSERT INTO pa_delivery.attempts(owner,id,attempt_ref,kind,source_ref,destination_ref,digest,payload,status) VALUES(%s,%s,%s,'answer',%s,%s,%s,%s,'unknown')",(owner,delivery_id,'attempt_'+uuid.uuid4().hex,job_id,destination_ref,digest,Jsonb(payload)))
+        receipts=[]
+        for index,part in enumerate(parts):
+            attempted=self._deliver(owner=owner,delivery_id=delivery_id+'_part_'+str(index+1),kind='answer',source_ref=job_id,destination_ref=destination_ref,payload=part,upper_bound=upper_bound,effect_lease=effect_lease)
+            if attempted['status']!='sent':
+                if index==0 and attempted['status']=='not_sent':
+                    with self.store.transaction() as tx:tx.conn.execute("UPDATE pa_delivery.attempts SET status='not_sent',reason=%s WHERE owner=%s AND id=%s AND status='unknown'",(attempted['reason'],owner,delivery_id))
+                return self.attempt(owner=owner,delivery_id=delivery_id)
+            receipts.append(attempted['provider_receipt'])
+        with self.store.transaction() as tx:tx.conn.execute("UPDATE pa_delivery.attempts SET status='sent',provider_receipt=%s,reason='all_parts_provider_accepted' WHERE owner=%s AND id=%s AND status='unknown'",('parts:'+hashlib.sha256('|'.join(receipts).encode()).hexdigest(),owner,delivery_id))
+        return self.attempt(owner=owner,delivery_id=delivery_id)
+
+    def edit_rich_result(self,*,owner,job_id,message_id,delivery_id,destination_ref,upper_bound):
+        """Explicit same-result restyle; no arbitrary message edit or fact refresh."""
+        from .transports import BoundedTelegramSender
+        from prm.storage.telegram import TelegramBindings
+        from prm.storage.jobs import JobQueue
+        from prm.telegram_rich import plain_text,validate_rich_message
+        if type(self.sender)is not BoundedTelegramSender or not self.sender.rich_messages or self.sender.destination_ref!=destination_ref:raise CapabilityDenied('selected rich destination required')
+        prior=self.attempt(owner=owner,delivery_id=delivery_id)
+        if prior:
+            if prior['source_ref']!=job_id or prior['payload'].get('edit_message_id')!=message_id:raise StateConflict('edit identity differs')
+            return prior
+        bindings=TelegramBindings(JobQueue(self.store.target),owner=owner,destination=self.sender.destination)
+        original=bindings.for_message(self.sender.destination,message_id)
+        if original is None or original.origin_kind!='bot' or original.job_ref!=job_id:raise CapabilityDenied('edit must address exact bot result')
+        with self.store.transaction() as tx:
+            from .deletion import lineage_lock
+            lineage_lock(tx.conn,owner)
+            if tx.conn.execute("SELECT 1 FROM pa_delivery.attempts WHERE owner=%s AND status='unknown' AND payload->>'edit_message_id'=%s LIMIT 1",(owner,str(message_id))).fetchone():raise StateConflict('unknown prior edit requires reconciliation')
+            old=self.attempt(owner=owner,delivery_id=original.delivery_ref)
+            if not old or old['status']!='sent' or old['payload'].get('telegram_method') not in {'sendRichMessage','editMessageText'}:raise CapabilityDenied('acknowledged rich message required')
+            value=dict(old['payload']);self._source_current(tx,owner,value)
+            part=tx.get(owner,'result',value['telegram_rich_part_ref'],version=1)
+            if part is None or part.digest!=value['telegram_rich_part_digest']:raise StorageError('original rich part unavailable')
+            content={'blocks':[{'type':'paragraph','text':plain_text(part.payload['rich_message'])}],'skip_entity_detection':True}
+            validate_rich_message(content)
+            packet={**part.payload,'rich_message':content,'source_urls':[],'callback_tokens':[]}
+            ref='richpart_'+hashlib.sha256((delivery_id+':'+_canonical(packet)[1]).encode()).hexdigest()[:32]
+            stored=tx.put(owner,'result',ref,packet,expected_version=0)
+            tx.conn.execute('INSERT INTO pa_memory.dependencies VALUES(%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING',(owner,'result',original.response_ref,'result',ref))
+        payload={k:v for k,v in value.items() if k not in {'part','parts','telegram_rich_parts','compatible_delivery_id'}}
+        payload.update(telegram_method='editMessageText',edit_message_id=message_id,telegram_rich_part_ref=ref,telegram_rich_part_digest=stored.digest,
+            telegram_document_tokens=[],presentation_revision=original.presentation_revision+1,prior_presentation_revision=original.presentation_revision,
+            prior_delivery_ref=original.delivery_ref)
+        return self._deliver(owner=owner,delivery_id=delivery_id,kind='answer',source_ref=job_id,destination_ref=destination_ref,payload=payload,upper_bound=upper_bound)
 
     def deliver_result(self, *, owner, job_id, destination_ref, upper_bound, effect_lease=None):
         prior = self.attempt(owner=owner, delivery_id='answer_' + job_id)
@@ -155,6 +276,8 @@ class DeliveryExecutor:
                 or prior['digest'] != _canonical(prior['payload'])[1]
                 or prior['payload'].get('result_ref') != result.object_id or prior['payload'].get('result_digest') != result.digest):
                 raise StateConflict('stored delivery identity differs')
+            if prior['status']=='not_sent' and prior['reason']=='provider_format_rejected' and prior['payload'].get('compatible_delivery_id'):
+                return self._compatible(owner,job_id,result,prior['payload'],destination_ref,upper_bound,effect_lease)
             return prior
         from .transports import BoundedTelegramSender
         if type(self.sender) is BoundedTelegramSender:
@@ -169,6 +292,11 @@ class DeliveryExecutor:
                 rows = [[{'text': label, 'callback_data': bindings.issue_control(command=command, job_id=job_id,
                     response_ref=result.object_id, response_version=result.version)}] for label, command in (('Статус', 'status'), ('Результат', 'result'))]
                 payload['telegram_navigation'] = {'kind': 'inline_keyboard', 'inline_keyboard': rows}
+            if self.sender.rich_messages and options.get('status')!='preview' and not options.get('proposal_ref') and result.payload.get('status')!='preview':
+                payload=self._rich_plan(owner,job_id,result,payload)
+                attempted=self._send_payload(owner,job_id,'answer_'+job_id,destination_ref,payload,upper_bound,effect_lease)
+                if attempted['status']=='not_sent' and attempted['reason']=='provider_format_rejected':return self._compatible(owner,job_id,result,payload,destination_ref,upper_bound,effect_lease)
+                return attempted
         if len(payload['text'])<=3800:
             return self._deliver(owner=owner, delivery_id='answer_' + job_id, kind='answer', source_ref=job_id,
                 destination_ref=destination_ref, payload=payload, upper_bound=upper_bound, effect_lease=effect_lease)
@@ -336,21 +464,36 @@ class DeliveryExecutor:
                 try:
                     from .transports import BoundedTelegramSender
                     if type(self.sender) is BoundedTelegramSender:
-                        if payload.get('schema_version') == 'telegram.delivery.v2' and (
-                            payload.get('telegram_method') != 'sendMessage' or payload.get('telegram_destination') != asdict(self.sender.destination)):
+                        if payload.get('schema_version') in {'telegram.delivery.v2','telegram.delivery.v3'} and (
+                            payload.get('telegram_method') not in {'sendMessage','sendRichMessage','editMessageText'} or payload.get('telegram_destination') != asdict(self.sender.destination)):
                             raise CapabilityDenied('sealed Telegram method/route differs')
-                        result=self.sender.send_with_options(destination_ref,payload['text'],row['attempt_ref'],
-                            navigation=payload.get('telegram_navigation'),parse_mode=payload.get('telegram_parse_mode'))
+                        if payload.get('telegram_method') in {'sendRichMessage','editMessageText'}:
+                            rich=tx.get(owner,'result',payload['telegram_rich_part_ref'],version=1)
+                            if (rich is None or rich.digest!=payload['telegram_rich_part_digest'] or rich.payload.get('kind')!='telegram_rich_part'
+                                or rich.payload.get('parent_result_ref')!=payload['result_ref'] or rich.payload.get('parent_result_digest')!=payload['result_digest']):raise CapabilityDenied('sealed rich part changed or deleted')
+                            from prm.storage.telegram import TelegramBindings
+                            from prm.storage.jobs import JobQueue
+                            bindings=TelegramBindings(JobQueue(self.store.target),owner=owner,destination=self.sender.destination)
+                            if payload.get('edit_message_id'):
+                                current_binding=tx.get(owner,'conversation',bindings._message_ref(self.sender.destination,payload['edit_message_id']))
+                                if (current_binding is None or current_binding.payload['presentation_revision']!=payload['prior_presentation_revision']
+                                    or current_binding.payload['delivery_ref']!=payload['prior_delivery_ref']):raise CapabilityDenied('edit presentation changed before HTTP')
+                            for token in payload.get('telegram_document_tokens',[]):
+                                if bindings.document_control_in(tx,token,destination=self.sender.destination) is None:raise CapabilityDenied('rich document control unavailable')
+                            result=self.sender.send_rich_with_options(destination_ref,rich.payload['rich_message'],row['attempt_ref'],source_urls=rich.payload['source_urls'],callback_tokens=rich.payload['callback_tokens'],message_id=payload.get('edit_message_id'))
+                        else:
+                            result=self.sender.send_with_options(destination_ref,payload['text'],row['attempt_ref'],
+                                navigation=payload.get('telegram_navigation'),parse_mode=payload.get('telegram_parse_mode'))
                     else:result = self.sender(destination_ref, payload['text'], row['attempt_ref'])
                 except KnownDeliveryNotStarted:
                     known_adapter_outcome = 'transport_not_started'
                     raise
-                except KnownDeliveryRejection:
-                    known_adapter_outcome = 'provider_rejected'
+                except KnownDeliveryRejection as error:
+                    known_adapter_outcome = 'provider_format_rejected' if payload.get('telegram_method')=='sendRichMessage' and getattr(error,'format_rejected',False) else 'provider_rejected'
                     raise
                 if tx.conn.closed:
                     raise StorageError('final scope connection lost; retain unknown attempt')
-                if payload.get('schema_version') == 'telegram.delivery.v2':
+                if payload.get('schema_version') in {'telegram.delivery.v2','telegram.delivery.v3'}:
                     if (type(result) is not TransportReceipt or result.method != payload['telegram_method']
                         or result.destination is None or asdict(result.destination) != payload['telegram_destination']
                         or type(result.message_id) is not int or result.message_id <= 0):
@@ -359,11 +502,13 @@ class DeliveryExecutor:
                     from prm.storage.telegram import TelegramBindings
                     from prm.telegram_contracts import TelegramMessageBinding
                     metadata = input_item.payload.get('telegram_envelope', {})
-                    TelegramBindings(queue, owner=owner, destination=result.destination).bind_message_in(tx,
-                        TelegramMessageBinding(owner, result.destination, result.message_id, source_ref,
+                    binding=TelegramMessageBinding(owner, result.destination, result.message_id, source_ref,
                             response_ref=payload['result_ref'], response_version=payload['result_version'],
                             delivery_ref=delivery_id, origin_kind='bot', source_revision_ref=metadata.get('source_revision_ref'),
-                            source_revision=metadata.get('source_revision', 1)))
+                            source_revision=metadata.get('source_revision', 1),presentation_revision=payload.get('presentation_revision',1))
+                    bindings=TelegramBindings(queue,owner=owner,destination=result.destination)
+                    if payload.get('edit_message_id'):bindings.bind_presentation_in(tx,binding,expected_revision=payload['prior_presentation_revision'],prior_delivery_ref=payload['prior_delivery_ref'])
+                    else:bindings.bind_message_in(tx,binding)
                 return result
         try:
             result = self.registry.execute_reserved_groups(tuple(tuple(decision.reservation for decision in group) for group in groups), transport)
@@ -373,7 +518,7 @@ class DeliveryExecutor:
         except KnownDeliveryNotStarted:
             status, reason = 'not_sent', 'transport_not_started'
         except KnownDeliveryRejection:
-            status, reason = 'not_sent', 'provider_rejected'
+            status, reason = 'not_sent', known_adapter_outcome or 'provider_rejected'
         except Exception:
             # Shared policy deliberately wraps transport errors as unknown.
             # Preserve only typed evidence captured from this exact adapter call;
@@ -396,7 +541,7 @@ class DeliveryExecutor:
         if pending['status'] != 'unknown' or adapter is None:
             return pending
         if pending['digest']!=_canonical(pending['payload'])[1]:raise StateConflict('reconciliation payload integrity differs')
-        if pending['kind']=='answer' and len(pending['payload'].get('text',''))>3800:
+        if pending['kind']=='answer' and not pending['payload'].get('part') and (pending['payload'].get('telegram_method')=='sendRichMessage' and len(pending['payload'].get('telegram_rich_parts',[]))>1 or pending['payload'].get('telegram_method','sendMessage')=='sendMessage' and len(pending['payload'].get('text',''))>3800):
             parts=_multipart_payloads(pending['payload']);receipts=[]
             for index,expected in enumerate(parts):
                 child_id=delivery_id+'_part_'+str(index+1)
@@ -496,6 +641,12 @@ class DeliveryExecutor:
         attempt = self.attempt(owner=owner, delivery_id=delivery_id)
         if attempt is None:
             return 'Попытка доставки не найдена.'
+        compatible = None
+        if attempt['status']=='not_sent' and attempt['reason']=='provider_format_rejected':
+            ref=attempt['payload'].get('compatible_delivery_id')
+            if ref:compatible=self.attempt(owner=owner,delivery_id=ref)
+        if compatible is not None:
+            return 'Rich-формат отклонён провайдером. Совместимый вариант: '+self.describe(owner=owner,delivery_id=compatible['id'])
         if attempt['status'] == 'not_sent' and attempt['reason'] == 'transport_not_started':
             return 'Отправка не началась. Автоматического повтора нет.'
         return {'unknown': 'Исход доставки неизвестен. Повтор заблокирован; нужна сверка с провайдером.',

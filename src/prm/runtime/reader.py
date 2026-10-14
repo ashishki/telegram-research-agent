@@ -102,6 +102,8 @@ class PrivateReportRuntime:
                 from .source_access import project_bindings_current
                 manifest=tx.get(self.root.owner_ref,'result',parent_ref,version=document.version)
                 project_bindings_current(tx,self.root.owner_ref,manifest.payload.get('project_bindings',[]))
+                from .source_access import memory_bindings_current
+                memory_bindings_current(tx,self.root.owner_ref,manifest.payload.get('memory_bindings',[]))
                 source_current(tx,self.root.registry,self.root.owner_ref,self.root.briefs.source_scopes(brief_id,version),
                     archive_snapshots=self.root.briefs.archive_snapshots(brief_id,version),require_snapshot=True)
             except (StorageError,CapabilityDenied):return None

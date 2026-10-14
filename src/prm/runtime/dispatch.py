@@ -40,6 +40,8 @@ SERVICE_COMMANDS = {
     'academic': ('/academic', '/academicdone', '/academicstage', '/academicwatch'),
     'memory': ('/memory', '/memoryedit', '/memorysearch', '/memoryexport', '/remember', '/memoryconfirm', '/forget'),
     'media': ('/transcriptedit',), 'brief': ('/weekly','/briefmaterials'),
+    'documents':('/document',),
+    'feedback':('/feedbackrule',),
 }
 SERVICE_PHRASES = {
     'mail': ('что в почте', 'что требует ответа в почте'),

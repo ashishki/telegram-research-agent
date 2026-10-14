@@ -47,29 +47,32 @@ def project_match(record, projects):
     return None
 
 
-def event_signals(event, *, projects=()):
+def event_signals(event, *, projects=(),rules=()):
     matches = [(r, project_match(r, projects)) for r in event.records]
     applicable = next(((r, m) for r, m in matches if m), None)
     representative = applicable[0] if applicable else min(event.records, key=lambda r: (
         {'critical': 0, 'high': 1, 'medium': 2, 'low': 3}.get(r.payload.get('importance'), 4), r.evidence_ref))
     p = representative.payload
     text = p.get('support_span') or p.get('summary') or ''
-    return representative, {'importance': p.get('importance', 'unknown'),
+    from prm.feedback import preference_signal
+    feedback=preference_signal(representative,rules)
+    return representative, {'importance': p.get('importance', 'unknown'),'feedback':feedback,
         'importance_basis': 'source_annotation_or_local_heuristic_not_verified_fact',
         'novelty': event.novelty, 'reliability': 'conflicting' if event.conflict else 'single_or_unverified_independence',
         'project_applicability': 'confirmed_relationship' if applicable else 'unknown',
         'project': applicable[1] if applicable else None,
-        'reading_cost_words': len(str(text).split()), 'mechanism': VERSION}
+        'reading_cost_words': len(str(text).split()),'selection_reading_cost_words':len(str(text).split())*(2 if 'reading_cost' in feedback['features'] else 1),
+        'verification_requested':'reliability' in feedback['features'],'mechanism': VERSION}
 
 
-def select_events(events, *, projects=(), maximum=20):
-    rows = [(e, *event_signals(e, projects=projects)) for e in events]
+def select_events(events, *, projects=(),rules=(), maximum=20):
+    rows = [(e, *event_signals(e, projects=projects,rules=rules)) for e in events]
     def rank(row):
         e, r, s = row
         return ({'critical': 0, 'high': 1}.get(s['importance'], 2),
                 0 if e.conflict else 1, 0 if s['project'] else 1,
-                {'changed': 0, 'new': 1, 'uncertain':2, 'repeated': 3}[e.novelty],
-                s['reading_cost_words'], r.evidence_ref)
+                s['feedback']['adjustment'],{'changed': 0, 'new': 1, 'uncertain':2, 'repeated': 3}[e.novelty],
+                s['selection_reading_cost_words'], r.evidence_ref)
     mandatory=sorted((r for r in rows if r[0].conflict or r[2]['importance']=='critical'),key=rank)
     selected=mandatory[:maximum]
     groups={}
@@ -123,6 +126,10 @@ def build_attention_editorial(document, decisions):
         elif continuations < 3:
             next_step = 'Изучить исходный материал, если тема сейчас полезна.'
             continuations += 1
+        if signal.get('feedback',{}).get('rule_bindings'):
+            why+=' Учтено подтверждённое правило для этой темы.'
+        if signal.get('verification_requested') and not project:
+            next_step='Проверить исходное утверждение перед применением.'
         if source.time_kind == 'discovered':
             caveat = 'Впервые обнаружено в этом периоде; время события не подтверждено. ' + caveat
         # Keep validator text limits/URL rules; source text with URLs remains in

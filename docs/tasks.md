@@ -12,6 +12,19 @@ Historical PRM-SN/RFX/UTD task records are preserved byte-for-byte at `docs/task
 
 ## Local daily implementation — 2026-10-13/14
 
+Package8 (2026-10-14): D19 + D20 + D21 + D58, base1db5034, assigned branch.
+Context/design: [registered boundary](verification/DAILY-package-08-design-20261014.md),
+four strategy BACKLOG cards, PRODUCT_ARCHITECTURE document/memory/feedback and
+TELEGRAM shared rich renderer/delivery sections. Outcome: exact document/story
+followups and fresh immutable versions, explicit feedback/scoped confirmed rules,
+relevant confirmed memory with separate source/model grants, opt-in rich delivery
+of the same document. Save+undo remains an inactive concrete policy proposal.
+Acceptance registered before source edits:
+`PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-pai/bin/python -m pytest -q tests/test_daily_document_dialogue.py tests/test_daily_feedback.py tests/test_daily_memory_context.py tests/test_daily_telegram_rich.py`.
+One accumulated independent local read-only Deep Review; critical fixes narrow
+rechecked before dependencies. No live/private/paid/external/production/DDL or
+full historical suite. Go/governed/human and formal statuses remain unchanged.
+
 Package7 (2026-10-14): D13 + D15 + D17 + D18, base05a1198, assigned branch.
 Context/design: [bounded slices and review boundary](verification/DAILY-package-07-design-20261014.md),
 strategy BACKLOG four cards and PRODUCT_ARCHITECTURE source/project/editorial

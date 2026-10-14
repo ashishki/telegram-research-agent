@@ -164,13 +164,30 @@ class FocusStore:
             for row in rows:self.root.queue._input(tx,self.owner,row['payload'])
             return item,classes,scopes
 
+    def resolve_document_metadata(self,ticket,*,guard):
+        """Refresh may use retained identity/period, never stale text or advice."""
+        if ticket.get('ambiguous') or not ticket.get('target'):raise StorageError('exact document target required')
+        with self.store.transaction() as tx:
+            lineage_lock(tx.conn,self.owner);guard();target=ticket['target']
+            item=tx.get(self.owner,'result',target['result_ref'],version=target['result_version'])
+            if item is None:raise StorageError('document result unavailable')
+            value=item.payload.get('payload',item.payload);pointer=value.get('document_binding') or value.get('brief_document')
+            if not pointer:raise StorageError('result is not a document')
+            rows=tx.conn.execute("SELECT payload FROM pa_jobs.jobs WHERE owner=%s AND result_ref=%s",(self.owner,item.object_id)).fetchall()
+            for row in rows:self.root.queue._input(tx,self.owner,row['payload'])
+            manifest=tx.get(self.owner,'result',self.root.briefs._document_ref(pointer['brief_id']),version=pointer['version'])
+            if manifest is None:raise StorageError('document metadata unavailable')
+            from .source_access import source_current
+            source_current(tx,self.root.registry,self.owner,manifest.payload.get('source_scopes',[]))
+            return {'brief_id':pointer['brief_id'],'version':pointer['version']}
+
 
 class FencedConversations:
     """Short mutations share the admission lock; model I/O never holds it."""
     def __init__(self,root,request_ref,lease):self.root,self.request_ref,self.lease=root,request_ref,lease;self.store=root._conversations
     def __getattr__(self,name):
         method=getattr(self.store,name)
-        if name not in {'load','start','active_or_start','begin_new_topic','record_response','offer_confirmation','resolve_plain_yes','start_request','finish_request','cancel','is_cancelled','history','history_for_model','user_prompts_for_model'}:return method
+        if name not in {'load','start','active_or_start','begin_new_topic','record_response','record_model_response','offer_confirmation','resolve_plain_yes','start_request','finish_request','cancel','is_cancelled','history','history_for_model','user_prompts_for_model'}:return method
         def scoped(chat_id,*args,**kwargs):
             with self.root.queue.store.transaction() as tx:
                 lineage_lock(tx.conn,self.root.owner_ref);self.root.focus._lock(tx)
@@ -178,5 +195,8 @@ class FencedConversations:
                 main=self.root.focus.current_in(tx,self.request_ref)
                 target=chat_id if main else self.request_ref
                 if name in {'history','history_for_model','user_prompts_for_model'}:return method(target,*args,**kwargs)
+                if name=='record_model_response':
+                    return self.store._record_model_response_in(tx,target,*args,_response_namespace=self.request_ref,**kwargs)
+                if name=='record_response':kwargs['_response_namespace']=self.request_ref
                 return self.store._run_in(tx,name,target,*args,**kwargs)
         return scoped

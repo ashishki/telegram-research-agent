@@ -727,12 +727,7 @@ def classify_brief_followup(text: str, *, active_item_number: int | None = None)
         "покажи полный бриф", "показать полный бриф", "полный бриф", "подробный бриф", "show full brief",
     }:
         return BriefFollowup("full")
-    if (
-        "менее техничес" in lowered
-        or "проще" in lowered
-        or "less technical" in lowered
-        or "less tech" in lowered
-    ):
+    if lowered.rstrip('?.!') in {'сделай менее техническим','менее технически','объясни проще','можно проще','а проще','простыми словами','less technical','make it less technical','less tech'}:
         return BriefFollowup("less_technical")
     if lowered in {
         "что из этого применить?", "что из этого применить", "что применить?", "что применить",
@@ -740,7 +735,7 @@ def classify_brief_followup(text: str, *, active_item_number: int | None = None)
         "а мне это зачем?", "а мне это зачем", "что попробовать?", "что попробовать",
     }:
         return BriefFollowup("apply")
-    if ("сравни" in lowered or "compare" in lowered) and ("прошл" in lowered or "week" in lowered or "недел" in lowered):
+    if lowered.rstrip('?.!') in {'сравни с прошлой неделей','сравни с предыдущей версией','сравни версии','compare with last week','compare weeks'}:
         return BriefFollowup("compare_weeks")
     topic = re.fullmatch(r"(?:только|покажи только|filter)\s+(.{1,120})", lowered)
     if topic is not None:

@@ -154,7 +154,7 @@ def validate_runtime_config(config: dict) -> None:
     sections = {
         'public_web': ({'token_env', 'bounds'}, {'token_env', 'bounds'}),
         'github': ({'repository_ref', 'ref', 'upper_bound', 'paths','issues','pulls','releases'}, {'repository_ref', 'ref', 'upper_bound'}),
-        'delivery': ({'token_env', 'upper_bound', 'destination_ref', 'origin', 'synthetic'}, {'token_env', 'upper_bound', 'destination_ref'}),
+        'delivery': ({'token_env', 'upper_bound', 'destination_ref', 'origin', 'synthetic','rich_messages'}, {'token_env', 'upper_bound', 'destination_ref'}),
         'media_download': ({'token_env', 'resource_ref', 'upper_bound', 'origin'}, {'token_env', 'resource_ref', 'upper_bound'}),
         'speech': ({'endpoint', 'upper_bound', 'resource_ref'}, {'endpoint', 'upper_bound'}),
         'vision': ({'endpoint', 'upper_bound', 'resource_ref'}, {'endpoint', 'upper_bound'}),
@@ -170,6 +170,7 @@ def validate_runtime_config(config: dict) -> None:
                 amount = config[key].get(field)
                 if amount is not None and (type(amount) not in {int, float} or not math.isfinite(amount) or amount < 0):
                     raise StorageError('invalid adapter budget bound')
+    if 'rich_messages' in config.get('delivery',{}) and type(config['delivery']['rich_messages'])is not bool:raise StorageError('invalid rich feature flag')
     for key in ('artifact_root', 'media_root'):
         if key in config and (not isinstance(config[key], str) or not Path(config[key]).is_absolute()):
             raise StorageError('explicit absolute private artifact path required')

@@ -52,12 +52,16 @@ class DurableBriefStore(BriefDocumentStore):
                 if old is not None:
                     from prm.runtime.source_access import project_bindings_current
                     project_bindings_current(tx,owner,old.payload.get('project_bindings',[]))
+                    from prm.runtime.source_access import memory_bindings_current
+                    memory_bindings_current(tx,owner,old.payload.get('memory_bindings',[]))
                     if old.payload.get('storage_digest')!=digest:raise StateConflict('immutable Brief version differs')
                     if self.registry is not None:
                         from prm.runtime.source_access import source_current
                         source_current(tx,self.registry,owner,old.payload.get('source_scopes',[]),archive_snapshots=old.payload.get('archive_snapshots',[]),require_snapshot=True)
                 else:
                     scopes=self.pending_scopes.get(item.content_digest,[]);snapshots=getattr(self,'pending_snapshots',{}).get(item.content_digest,[])
+                    from prm.runtime.source_access import memory_bindings_current
+                    memory_bindings_current(tx,owner,getattr(self,'pending_memory_bindings',{}).get(item.content_digest,[]))
                     classes=list(self.pending_classes.get(item.content_digest,('private_archive','private_connector_content')))
                     if self.registry is not None:
                         from prm.runtime.source_access import source_current
@@ -79,8 +83,10 @@ class DurableBriefStore(BriefDocumentStore):
                         'content_digest':item.content_digest,'storage_digest':digest,'source_data_classes':classes,'source_scopes':scopes,
                         'archive_snapshots':snapshots,'material_pages':pages,'source_coverage':self.pending_coverage.get(item.content_digest),
                         'topic':item.topic,'included_at':item.window.generated_at.isoformat(),
+                        'window':item.window.to_dict(),'period_basis':item.period_basis,
                         'event_selection':self.pending_events.get(item.content_digest),
-                        'project_bindings':self.pending_project_bindings.get(item.content_digest,[])},expected_version=item.version-1)
+                        'project_bindings':self.pending_project_bindings.get(item.content_digest,[]),
+                        'memory_bindings':getattr(self,'pending_memory_bindings',{}).get(item.content_digest,[])},expected_version=item.version-1)
                     tx.conn.execute('INSERT INTO pa_briefs.documents VALUES(%s,%s,%s,%s,%s)',(owner,item.brief_id,item.version,digest,Jsonb(encoded)))
                 if tx.conn.execute("SELECT to_regclass('pa_memory.dependencies') AS meta").fetchone()['meta'] is not None:
                     for dependency in self.pending_dependencies.get(item.content_digest,()):
@@ -167,6 +173,8 @@ class DurableBriefStore(BriefDocumentStore):
         with self.store.transaction() as tx:
             from prm.runtime.source_access import project_bindings_current
             project_bindings_current(tx,self.owner_ref,item.payload.get('project_bindings',[]))
+            from prm.runtime.source_access import memory_bindings_current
+            memory_bindings_current(tx,self.owner_ref,item.payload.get('memory_bindings',[]))
             row=tx.conn.execute('SELECT payload,digest FROM pa_briefs.documents WHERE owner=%s AND id=%s AND version=%s',
                 (self.owner_ref,item.payload['brief_id'],item.payload['version'])).fetchone()
         if row is None or row['digest']!=item.payload['storage_digest'] or hashlib.sha256(json.dumps(row['payload'],ensure_ascii=False,sort_keys=True).encode()).hexdigest()!=row['digest']:

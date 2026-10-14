@@ -103,10 +103,22 @@ def normalize_update(update, *, owner_chat_id, bot_ref='bot_default'):
     fields = [key for key in update if key != 'update_id']
     if len(fields) != 1: raise TelegramEnvelopeError('one Telegram update payload required')
     kind = fields[0]
-    if kind not in {'message', 'edited_message', 'callback_query'}:
+    if kind not in {'message', 'edited_message', 'callback_query','message_reaction'}:
         return TelegramUpdateEnvelope(update['update_id'], kind, digest, False)
     data = update[kind]
     if not isinstance(data, dict): raise TelegramEnvelopeError('typed Telegram update payload required')
+    if kind=='message_reaction':
+        user=data.get('user',{});chat=data.get('chat',{})
+        if (not isinstance(user,dict) or not isinstance(chat,dict) or str(user.get('id'))!=owner_chat_id
+            or str(chat.get('id'))!=owner_chat_id or chat.get('type')!='private' or data.get('actor_chat')is not None):return TelegramUpdateEnvelope(update['update_id'],kind,digest,False)
+        reactions=data.get('new_reaction')
+        if not isinstance(reactions,list) or len(reactions)>8:raise TelegramEnvelopeError('bounded personal reaction required')
+        for value in reactions:
+            if not isinstance(value,dict) or value.get('type') not in {'emoji','custom_emoji','paid'}:raise TelegramEnvelopeError('typed reaction required')
+            marker=value.get('emoji') if value['type']=='emoji' else value.get('custom_emoji_id') if value['type']=='custom_emoji' else 'paid'
+            if not isinstance(marker,str) or not 1<=len(marker)<=128:raise TelegramEnvelopeError('bounded reaction metadata required')
+        return TelegramUpdateEnvelope(update['update_id'],kind,digest,True,TelegramDestination(chat_id=owner_chat_id,bot_ref=bot_ref),owner_chat_id,
+            message_id=_message_id(data.get('message_id'),optional=False))
     callback = kind == 'callback_query'
     message = data.get('message', {}) if callback else data
     if not isinstance(message, dict): raise TelegramEnvelopeError('typed Telegram message required')
@@ -185,3 +197,4 @@ class TelegramOutcome:
     result: object = field(default=None, repr=False)
     error_code: int | None = None
     retry_after: int | None = None
+    format_rejected: bool = False

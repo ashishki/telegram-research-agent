@@ -14,8 +14,9 @@ from prm.telegram_contracts import TelegramDestination, TelegramOutcome
 class BotAPITransport:
     """A bounded, no-redirect request layer with explicit unknown outcomes."""
     METHODS = frozenset({'sendMessage', 'answerCallbackQuery', 'getUpdates'})
+    RICH_METHODS=frozenset({'sendRichMessage','editMessageText'})
 
-    def __init__(self, *, token, origin='https://api.telegram.org', synthetic=False):
+    def __init__(self, *, token, origin='https://api.telegram.org', synthetic=False,rich_messages=False):
         if not isinstance(token, str) or not token or len(token) > 512 or '\n' in token or '\r' in token:
             raise StorageError('explicit bounded bot credential required')
         parsed = urlsplit(origin)
@@ -26,13 +27,15 @@ class BotAPITransport:
                 raise StorageError('literal synthetic Telegram origin required')
         elif origin != 'https://api.telegram.org': raise StorageError('selected Telegram origin required')
         self._token, self.origin = token, origin.rstrip('/')
+        if type(rich_messages)is not bool:raise StorageError('explicit rich feature flag required')
+        self.rich_messages=rich_messages
 
     def request(self, method, values, *, timeout_seconds=8):
-        if method not in self.METHODS or not isinstance(values, dict) or type(timeout_seconds) is not int or not 1 <= timeout_seconds <= 35:
+        if method not in self.METHODS and not (self.rich_messages and method in self.RICH_METHODS) or not isinstance(values, dict) or type(timeout_seconds) is not int or not 1 <= timeout_seconds <= 35:
             raise StorageError('bounded supported Telegram request required')
         data = urlencode(values).encode()
-        if len(data) > 128000: raise StorageError('Telegram request exceeds bound')
-        maximum = 1048576 if method == 'getUpdates' else 64000
+        if len(data) > (1572864 if method in self.RICH_METHODS else 128000): raise StorageError('Telegram request exceeds bound')
+        maximum = 1048576 if method == 'getUpdates' else 512000 if method in self.RICH_METHODS else 64000
         status = 200
         try:
             request = Request(self.origin + '/bot' + self._token + '/' + method, data=data,
@@ -60,11 +63,15 @@ class BotAPITransport:
         parameters = value.get('parameters', {})
         retry = parameters.get('retry_after') if isinstance(parameters, dict) else None
         if type(retry) is not int or not 1 <= retry <= 86400: retry = None
-        return TelegramOutcome('known_rejected', error_code=code, retry_after=retry)
+        description=value.get('description','')
+        format_rejected=bool(method in self.RICH_METHODS and code==400 and isinstance(description,str) and description.casefold().startswith((
+            "bad request: can't parse rich message","bad request: invalid rich message","bad request: rich message format is not supported",
+            'bad request: method sendrichmessage is not supported')))
+        return TelegramOutcome('known_rejected', error_code=code, retry_after=retry,format_rejected=format_rejected)
 
 
 class BoundedTelegramSender:
-    def __init__(self,*,token,owner_chat_id,destination_ref,origin='https://api.telegram.org',synthetic=False,bot_ref='bot_default',message_thread_id=None):
+    def __init__(self,*,token,owner_chat_id,destination_ref,origin='https://api.telegram.org',synthetic=False,bot_ref='bot_default',message_thread_id=None,rich_messages=False):
         if not isinstance(token,str) or not token or '\n' in token or '\r' in token:raise StorageError('explicit bounded bot credential required')
         parsed=urlsplit(origin)
         if synthetic:
@@ -73,7 +80,8 @@ class BoundedTelegramSender:
         if not owner_chat_id.isdigit() or owner_chat_id.startswith('0'):raise StorageError('positive exact private chat required')
         self._token,self.owner_chat_id,self.destination_ref,self.origin=token,owner_chat_id,destination_ref,origin
         self.destination = TelegramDestination(chat_id=owner_chat_id, bot_ref=bot_ref, message_thread_id=message_thread_id)
-        self.api = BotAPITransport(token=token, origin=origin, synthetic=synthetic)
+        self.api = BotAPITransport(token=token, origin=origin, synthetic=synthetic,rich_messages=rich_messages)
+        self.rich_messages=rich_messages
     def __call__(self,destination,text,attempt_ref):
         return self.send_with_options(destination,text,attempt_ref)
 
@@ -104,6 +112,29 @@ class BoundedTelegramSender:
             raise StorageError('Telegram receipt recipient/identity unavailable')
         return TransportReceipt('telegram:'+self.owner_chat_id+':'+str(result['message_id']),
             destination=self.destination, message_id=result['message_id'], method='sendMessage')
+
+    def send_rich_with_options(self,destination,rich_message,attempt_ref,*,source_urls=(),callback_tokens=(),message_id=None):
+        if destination!=self.destination_ref:raise CapabilityDenied('Telegram destination substituted')
+        if not self.rich_messages:raise StorageError('rich presentation not selected')
+        from prm.telegram_rich import validate_rich_message
+        validate_rich_message(rich_message,source_urls=source_urls,callback_tokens=callback_tokens)
+        values={'chat_id':self.owner_chat_id,'rich_message':json.dumps(rich_message,ensure_ascii=False)}
+        method='sendRichMessage'
+        if message_id is not None:
+            if type(message_id)is not int or not 0<message_id<2**63:raise StorageError('exact rich edit message required')
+            values['message_id']=message_id;method='editMessageText'
+        elif self.destination.message_thread_id is not None:values['message_thread_id']=self.destination.message_thread_id
+        outcome=self.api.request(method,values)
+        if outcome.kind=='known_rejected':
+            error=KnownDeliveryRejection('provider rejected exact rich request')
+            error.format_rejected=outcome.format_rejected;error.error_code=outcome.error_code;error.retry_after=outcome.retry_after
+            raise error
+        if outcome.kind!='accepted':raise StorageError('Telegram rich outcome unknown')
+        result=outcome.result
+        if (not isinstance(result,dict) or not isinstance(result.get('chat'),dict) or str(result['chat'].get('id'))!=self.owner_chat_id
+            or result['chat'].get('type','private')!='private' or type(result.get('message_id'))is not int or not 0<result['message_id']<2**63
+            or message_id is not None and result['message_id']!=message_id or result.get('message_thread_id')!=self.destination.message_thread_id):raise StorageError('rich receipt identity unavailable')
+        return TransportReceipt('telegram:'+self.owner_chat_id+':'+str(result['message_id']),destination=self.destination,message_id=result['message_id'],method=method)
 
 
 def navigation_markup(value):

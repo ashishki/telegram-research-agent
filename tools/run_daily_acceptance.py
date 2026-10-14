@@ -13,7 +13,8 @@ TESTS = ('tests/test_daily_entrypoint.py', 'tests/test_daily_controls.py', 'test
          'tests/test_daily_profiles.py','tests/test_daily_projects.py','tests/test_daily_source_freshness.py',
          'tests/test_daily_retrieval.py','tests/test_daily_web_route.py','tests/test_daily_synthesis.py','tests/test_daily_brief_selection.py',
          'tests/test_daily_github_context.py','tests/test_daily_research.py','tests/test_daily_event_clusters.py','tests/test_daily_brief_editorial.py',
-         'tests/test_daily07_review_repairs.py')
+         'tests/test_daily07_review_repairs.py',
+         'tests/test_daily_document_dialogue.py','tests/test_daily_feedback.py','tests/test_daily_memory_context.py','tests/test_daily_telegram_rich.py')
 
 
 def main():
