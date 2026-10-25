@@ -19,6 +19,10 @@ through normal merge `3e5196b`; source stays `b00a5cb`, previous package handoff
 Remaining39 include conditional tasks, not a completion percentage. Current
 [documentation/publication receipt](verification/DAILY-docs-publication-20261025.md)
 records exact checks/Git boundaries. Next implementation remains D22/D23/D24/D57.
+The working branch was actually pushed25 October; first remote-verified
+publication is `cc6e15b5c25cc4b6ddcc6e37eea8e02995ce9c6d`. The subsequent
+documentation-only receipt/handoff commit records that result; current HEAD and
+upstream equality come from Git. Master was not changed by this publication.
 
 ## Current packages and next block
 

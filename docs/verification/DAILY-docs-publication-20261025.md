@@ -158,5 +158,33 @@ historical tier, provider/runtime/DB, or repeated package Deep Review was run.
 Destination: `origin`, branch `codex/pa-daily-implementation-20261013`; normal
 push with upstream tracking. No force, master update or production deployment.
 The repository's two push workflows do not select this codex branch; publication
-does not establish a new CI pass. Actual push/ref/clean-tree results follow
-after the command succeeds; no success is inferred from the presence of Git access.
+does not establish a new CI pass.
+
+**Observed publication:** documentation commit
+`cc6e15b5c25cc4b6ddcc6e37eea8e02995ce9c6d` (eight paths,350 insertions/
+45 deletions) was actually pushed. Exit0 created the new remote branch and set
+upstream `origin/codex/pa-daily-implementation-20261013`. A separate remote
+`ls-remote --heads` check returned that exact SHA, equal to local HEAD and the
+tracking ref; `git status --porcelain` was empty. This is Git publication
+evidence only, not model/provider/product acceptance.
+
+Local master remains `23312b8ae60f8c8ba885322583db379960af3afc`; fetched
+origin/master is `f878cc90baed6e770d0082f62990d04189b09c23`. Daily implementation
+was not merged or pushed into master. No PR or release was created.
+
+```bash
+git add -- README.md README_RU.md docs/CODEX_PROMPT.md docs/PA_DOCUMENT_INDEX.md docs/PRODUCT_STATUS.md docs/README.md docs/strategy/2026-10-11/README.md docs/verification/DAILY-docs-publication-20261025.md
+git commit -m 'docs: reconcile assistant functionality status and remaining plan'
+git -c core.sshCommand='ssh -o BatchMode=yes -o ConnectTimeout=15' push --set-upstream origin codex/pa-daily-implementation-20261013
+git -c core.sshCommand='ssh -o BatchMode=yes -o ConnectTimeout=15' ls-remote --heads origin refs/heads/codex/pa-daily-implementation-20261013
+git rev-parse HEAD
+git rev-parse origin/codex/pa-daily-implementation-20261013
+git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}'
+git status --porcelain
+```
+
+The following documentation-only receipt commit records this completed first
+publication and updates the handoff. Its own SHA is recorded by Git history;
+the final push/ref equality and clean-tree check are reported with the handoff.
+The latest reviewed implementation remains b00a5cb, and the next coding block
+remains D22/D23/D24/D57. No historical tests/reviews were repeated for publishing.
