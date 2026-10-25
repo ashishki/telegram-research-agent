@@ -1,12 +1,24 @@
 # Current assignment — local daily assistant implementation
 
-Updated: 2026-10-14. Active owner assignment lifts the research/documentation-only
+Updated: 2026-10-25 (documentation/Git reconciliation; implementation evidence
+remains dated 2026-10-14). Active owner assignment lifts the research/documentation-only
 stop and authorizes sequential local implementation of the agreed backlog.
 Branch: `codex/pa-daily-implementation-20261013`. Implementer uses the active
 session default model/reasoning, without override. Preserve others' changes;
 no source edits on master, reset, force push or completed historical task reruns.
 Research documents were preserved at `2a1236c` (original source `23312b8`).
 Previous research handoff remains in Git at `2a1236c:docs/CODEX_PROMPT.md`.
+
+Owner update25 October: reconcile README/documentation, commit and publish the
+assigned working branch without force, keep the tree clean, and explain current
+progress/full functionality/remaining plan. This pass has no new implementation.
+Fetched upstream master `f878cc9` (24 October EN/RU README refresh) is preserved
+through normal merge `3e5196b`; source stays `b00a5cb`, previous package handoff
+`865a7d8`. README/README_RU, indices and status now distinguish eight packages/
+23 local engineering cards from the62-card programme and69 requirement IDs.
+Remaining39 include conditional tasks, not a completion percentage. Current
+[documentation/publication receipt](verification/DAILY-docs-publication-20261025.md)
+records exact checks/Git boundaries. Next implementation remains D22/D23/D24/D57.
 
 ## Current packages and next block
 
@@ -200,7 +212,8 @@ packets. Do not read .env or personal DBs. Personal connections, production/
 migrations, services/timers, paid calls and external actions require separate
 explicit scope. Keys never imply source, model-egress, write or background
 consent. Preserve unknown effects and owner/version/expiry/one-use confirmations.
-No publication/master integration requested by this daily assignment.
+The25 October owner update authorizes a normal push of the assigned branch.
+This publication pass does not integrate the daily implementation into master.
 
 After every package update backlog/handoff: changed files, exact argv/results,
 reviewed SHA/diff/provenance, remaining findings/gates and next command. Separate

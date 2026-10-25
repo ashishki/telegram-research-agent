@@ -1,5 +1,15 @@
 # План развития ежедневного личного ассистента
 
+Сверка навигации, **25 октября**: восемь пакетов D01–D21/D56/D58 имеют local
+engineering evidence,23 из62 карточек; оставшиеся39 включают условные ветви.
+Source/rechecked `b00a5cb`, package handoff `865a7d8`, следующий пакет
+**D22+D23+D24+D57**. [English README](../../../README.md) и
+[русский обзор](../../../README_RU.md) синхронизируют заявленный функционал,
+фактическую механику и оставшийся план. Чужое обновление README от24 октября
+сохранено normal merge. [Doc/Git receipt](../../verification/DAILY-docs-publication-20261025.md)
+не заменяет runtime/provider/CI/visual/operator/formal acceptance. Исследование
+ниже и все датированные review/failed receipts сохранены.
+
 Обновление исполнения, 13 октября: владелец снял documentation-only stop и
 назначил локальную реализацию. D01–D03: reviewed `08fb32e`, local P1 recheck
 `988da0e`. D56: reviewed `8b56d8e`, final fix/local P1 recheck `d231d9a`.

@@ -1,5 +1,25 @@
 # Подробный статус Personal AI Assistant
 
+**Сверка документации, 25 октября:** текущий source/rechecked **`b00a5cb` от
+14 октября**, предыдущий package handoff `865a7d8`, ветка
+`codex/pa-daily-implementation-20261013`. Восемь daily-пакетов покрывают
+**D01–D21, D56 и D58: local engineering evidence для23 из62 карточек**.
+Оставшиеся39 включают обязательные/условные работы; это не процент готовности
+и не формальная приёмка. Machine backlog/69 requirement mappings сохранены.
+Чужой English/Russian README refresh от24 октября `f878cc9` подтянут обычным
+merge; ежедневный код пока в рабочей ветке, без интеграции в master.
+
+Ближайший пакет **D22+D23+D24+D57**: сначала ограниченные storage/recovery
+и status/cancel→draft/stream slices, затем synthetic storage/retention/restore/
+runtime-profile/progress. Дальше D25/D26, separately authorized D27/D40 и
+пилоты D38/D39, независимая оценка D35–D37, затем полный mail/calendar/Watch/
+media/Nebula/Act programme по зависимостям. Подробный заявленный функционал и
+порядок — в [русском README](../README_RU.md) и [backlog](strategy/2026-10-11/BACKLOG.md).
+Mini App исключён. Эта сверка/публикация документов не запускает runtime/tests/
+провайдеры и не обновляет исторические acceptance/quality/CI/visual результаты.
+[Git/doc receipt](verification/DAILY-docs-publication-20261025.md) отделяет
+публикацию ветки от production, реальных подключений и human acceptance.
+
 **Локальная реализация, 13 октября:** в ветке `codex/pa-daily-implementation-20261013`
 выполнены D01–D03 и следующий пакет **D56**: durable Telegram routing/reply/callback,
 acknowledgement, cursor/quarantine, bounded transport и source-edit fences.

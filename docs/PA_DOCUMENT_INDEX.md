@@ -1,17 +1,20 @@
 # PA — индекс актуальных документов
 
-Обновлён10 октября2026. Начать с [README](../README.md) и [подробного статуса](PRODUCT_STATUS.md). Датированные результаты не превращаются в подтверждение live/production при обновлении индекса.
+Обновлён **25 октября 2026**. Начать с [English README](../README.md), [русского обзора и плана](../README_RU.md) и [подробного статуса](PRODUCT_STATUS.md). Текущий source/rechecked `b00a5cb`, восемь daily-пакетов; следующий D22+D23+D24+D57. Датированные результаты не превращаются в подтверждение live/production при обновлении индекса.
 
 | Потребность | Канонический документ |
 | --- | --- |
 | Что готово /что нет /почему | [PRODUCT_STATUS](PRODUCT_STATUS.md) |
+| Daily62: engineering23, оставшиеся39, зависимости и пакеты | [Strategy](strategy/2026-10-11/README.md), [backlog](strategy/2026-10-11/BACKLOG.md), [JSON](strategy/2026-10-11/backlog.json) |
+| Последний код /review /ограничения | [Package08 ledger](verification/DAILY-package-08-D19-D20-D21-D58-20261014.md), [review/rechecks](verification/DAILY-package-08-local-review-20261014.md) |
 | Пять режимов и полный конечный продукт | [PERSONAL_ASSISTANT_SPEC](PERSONAL_ASSISTANT_SPEC.md) |
 | Реализованный runtime /data/effects | [ARCHITECTURE](ARCHITECTURE.md) |
 | Продолжение /current scope | [CODEX_PROMPT](CODEX_PROMPT.md) |
-| Каждое69 требование /10 сценариев | [Evidence projection](verification/PAI-requirement-evidence-20261010.md), [JSON](verification/PAI-requirement-evidence-20261010.json) |
-| Реальные model calls /P1 closure /quality | [Go/pilot report](verification/PAI-go-pilot-20261010.md), [receipts](verification/PAI-go-pilot-20261010.json) |
+| Датированный foundation baseline:69 требований /10 сценариев | [Evidence projection](verification/PAI-requirement-evidence-20261010.md), [JSON](verification/PAI-requirement-evidence-20261010.json) |
+| Реальные model calls /P1 closure /quality на 10 октября | [Go/pilot report](verification/PAI-go-pilot-20261010.md), [receipts](verification/PAI-go-pilot-20261010.json) |
 | Просмотреть HTML/PDF/mobile и inputs | [Portable synthetic artifacts](artifacts/pa-20261010/README.md) |
-| Master refs /current CI checks | [Integration packet](verification/PAI-master-integration-20261010.md) |
+| Foundation master refs /CI на 10 октября | [Integration packet](verification/PAI-master-integration-20261010.md) |
+| Сверка README и Git-публикация 25 октября | [Publication receipt](verification/DAILY-docs-publication-20261025.md) |
 | Live test account/destination/20 tasks | [Pilot access](verification/PAI-pilot-access-20261010.md), [owner setup](security/OWNER-ACCESS-REQUEST.md) |
 | Private target /cutover | [Prepared PAI-28 packet](verification/PAI-28-cutover-packet.md) |
 | Полный dependency/scope/test graph | [Tasks](tasks.md), [PAI execution cards](PA_IMPLEMENTATION_TASKS.md), [PAI design](design/PAI.md), [registry](design/PAI.design.json) |
@@ -20,7 +23,7 @@
 | Проверки /commands /expected gates | [TEST_STRATEGY](TEST_STRATEGY.md), [review policy](REVIEW_POLICY.md), [Playbook adoption](PLAYBOOK_ADOPTION.md) |
 | Operator/runtime next step | [Operating model](PRODUCT_OPERATING_MODEL.md), [runtime runbook](runbooks/assistant_runtime.md) |
 | История решений/ошибок | [Evidence index](EVIDENCE_INDEX.md), [implementation journal](IMPLEMENTATION_JOURNAL.md), [PAI chronological progress](verification/PAI-progress.md) |
-| Последняя Git authority | [ADR-019](adr/ADR-019-pa-documentation-and-master-merge.md) |
+| Историческая master-integration authority | [ADR-019](adr/ADR-019-pa-documentation-and-master-merge.md); актуальное назначение — в handoff/publication receipt |
 
 ## Что не переписано как новое доказательство
 
